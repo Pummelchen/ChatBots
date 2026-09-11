@@ -70,7 +70,8 @@ Full guides are in the **[wiki](https://github.com/Pummelchen/ChatBots/wiki)**:
 ## Requirements
 
 Apple silicon (M1 or later) — the models run on the GPU, and Intel Macs are not supported.
-macOS 14 or newer. Around 8 GB of free disk space; 16 GB of memory is comfortable.
+**macOS 26 or newer** — the desktop app reaches the engine over WebTransport, which requires it.
+Around 8 GB of free disk space; 16 GB of memory is comfortable.
 
 ## Licence
 
