@@ -112,14 +112,24 @@ struct UnifiedConversation: View {
     // MARK: Conversation
 
     private var conversation: some View {
+        // The placeholder is drawn *over* the scroll view rather than inside it. Inside a
+        // `LazyVStack` — whose width the scroll view decides from its content — `maxWidth:
+        // .infinity` resolves to the stack's own idea of its width rather than the viewport's,
+        // so "centred" landed well right of centre with nothing in the thread to size against.
+        ZStack {
+            transcript
+            if rows.isEmpty {
+                emptyState
+            }
+        }
+    }
+
+    private var transcript: some View {
         AppKitScrollView(scrollToBottomSignal: controller.threadScrollSignal) {
             // No stack spacing: each row brings its own. A group chat's rhythm is the point —
             // messages from one person sit tight together and a change of speaker gets air —
             // and a uniform gap throws exactly that information away.
             LazyVStack(alignment: .leading, spacing: 0) {
-                if rows.isEmpty {
-                    emptyState
-                }
                 ForEach(rows) { row in
                     if let turn = row.turn {
                         ThreadMessage(
@@ -154,6 +164,11 @@ struct UnifiedConversation: View {
         }
     }
 
+    /// What the thread says before anything has been said.
+    ///
+    /// Centred in the space it is actually given, which is why it is a sibling of the scroll
+    /// view: see the note in `conversation`. Nudged up a little, because dead centre of a tall
+    /// window reads as bottom-heavy once the eye includes the bars above and below.
     private var emptyState: some View {
         VStack(spacing: 8) {
             Image(systemName: "bubble.left.and.bubble.right")
@@ -167,8 +182,9 @@ struct UnifiedConversation: View {
                 .foregroundStyle(palette.textTertiary)
                 .multilineTextAlignment(.center)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 60)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .padding(.bottom, 40)
+        .allowsHitTesting(false)
     }
 
     // MARK: Footer
