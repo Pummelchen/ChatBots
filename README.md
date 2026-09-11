@@ -573,6 +573,27 @@ already carries the previous name, and a rename mid-thread would leave the share
 attributing turns to two different names for the same participant. Earlier turns keep the
 name they were spoken under rather than being retroactively re-attributed.
 
+### Picking who is in the room
+
+Each pane header carries a **persona picker**. It opens a sheet rather than a native menu,
+because the entertainment cast is 36 characters and the research library 19 — a menu of that
+length is unusable on a phone, and the sheet lets each character carry the one-line
+description a moderator actually chooses on.
+
+The library offered depends on the room's **mode**, which the header switches between
+**Show** and **Research**. Switching reseats every persona rather than quietly reinterpreting
+the identifier: a seat holding "The Villain" has no meaning in an investigation, and resolving
+it to a default in silence would leave the picker showing something the seat is not using.
+Personas that suit either mode — the shared communication styles, including `neutral` — are
+kept.
+
+Both the mode and the personas are fixed once a conversation has started, because the log was
+written against the personas it began with; the panel and the pickers disable rather than
+accepting a change that would make the transcript incoherent.
+
+`GET /api/personas` returns **both** libraries, each with its characters, categories, emoji
+and descriptions, so a picker can switch modes without a second request.
+
 ### 2–4 seats
 
 The engine has always rotated through however many seats it was given; what was missing was

@@ -672,3 +672,104 @@ body[data-device="tablet"] .toggle-text { display: inline; }
   body[data-device="tablet"] #stage,
   body[data-device="desktop"] #stage { grid-template-columns: 1fr; }
 }
+
+
+/* ── The persona picker ───────────────────────────────────────────────────────────── */
+
+.persona-row {
+  flex: 0 0 auto;
+  padding: calc(4px * var(--scale)) var(--pad);
+  border-bottom: 1px solid var(--line);
+}
+
+.persona-picker {
+  font: inherit;
+  font-size: var(--font-small);
+  color: var(--text);
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: calc(4px * var(--scale)) calc(9px * var(--scale));
+  width: 100%;
+  text-align: left;
+  min-height: calc(var(--tap) * 0.72);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.persona-picker:disabled { opacity: 0.6; }
+
+/* The list itself. A native-feeling panel rather than a floating dropdown, because it can
+   hold the whole cast and works the same with a finger and a mouse. */
+.persona-sheet {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+  padding: 12px;
+}
+
+.persona-sheet-inner {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  width: min(720px, 100%);
+  max-height: min(80vh, 640px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
+}
+
+.persona-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: var(--pad);
+  border-bottom: 1px solid var(--line);
+}
+
+.persona-sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: calc(8px * var(--scale));
+}
+
+.persona-group {
+  font-size: var(--font-tiny);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  margin: calc(10px * var(--scale)) 0 calc(4px * var(--scale));
+}
+
+.persona-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: calc(7px * var(--scale)) calc(9px * var(--scale));
+  min-height: var(--tap);
+}
+
+.persona-item:hover { background: var(--bg-sunken); }
+.persona-item.on { border-color: var(--seat-a); background: var(--bg-sunken); }
+.persona-item b { font-weight: 600; white-space: nowrap; }
+.persona-item span { color: var(--text-dim); font-size: var(--font-tiny); }
+
+/* On a phone the sheet takes the screen, because a half-height list of 36 characters in a
+   centred box is worse than a full-screen one. */
+@media (max-width: 600px) {
+  .persona-sheet { padding: 0; align-items: flex-end; }
+  .persona-sheet-inner { width: 100%; max-height: 88vh; border-radius: 12px 12px 0 0; }
+}

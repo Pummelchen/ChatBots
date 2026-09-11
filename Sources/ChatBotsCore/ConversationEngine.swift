@@ -839,6 +839,39 @@ public final class ConversationEngine {
             stopReason: reason == .running ? nil : reason.explanation)
     }
 
+    /// Switch the whole room between entertainment and research.
+    ///
+    /// Reseats every persona, because the two libraries are not interchangeable: a seat
+    /// holding "The Villain" has no meaning in a research session, and resolving it to a
+    /// default silently would leave the picker showing something the seat is not using.
+    /// Refused once the conversation has started, since the log was written against the
+    /// personas it began with.
+    @discardableResult
+    public func setMode(_ mode: DiscussionMode) -> Bool {
+        guard startedTurns == 0, generationTask == nil else { return false }
+        for index in seats.indices {
+            seats[index].spec.mode = mode
+            if !mode.owns(personaID: seats[index].spec.personaID) {
+                seats[index].spec.personaID = mode.defaultPersonaID(forSeat: index)
+            }
+            let spec = seats[index].spec
+            if let engine = seatEngine(for: spec.id) {
+                Task { await engine.setPersona(spec.personaID) }
+            }
+        }
+        // A research run needs a session; an entertainment one must not have a budget
+        // counting against it.
+        if mode == .research {
+            conversation.research = ResearchSession(
+                budget: configuration.researchBudget ?? .preset(.standard))
+        } else {
+            conversation.research = nil
+        }
+        note("Mode set to \(mode.label) — \(mode.summary)")
+        publishTranscript()
+        return true
+    }
+
     /// Set the research budget before the investigation starts.
     ///
     /// Refused once it is running: the budget is what the session is being measured against,

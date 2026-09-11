@@ -462,6 +462,7 @@
     drawLive();
     drawControls();
     drawSeats();
+    drawMode();
     drawAttachments();
     drawContext();
     drawResearch();
@@ -493,6 +494,90 @@
     if (s.error) toast(s.error);
   }
 
+  /**
+   * Show the persona library for the current mode and let one be chosen.
+   *
+   * A sheet rather than a dropdown: the entertainment cast is 36 characters and the research
+   * library 19, and a native menu of that length is unusable on a phone. The sheet also lets
+   * each persona carry its one-line description, which is what a moderator picks on.
+   */
+  async function openPersonaPicker(seatIndex) {
+    const seat = state.snapshot && state.snapshot.seats[seatIndex];
+    if (!seat) return;
+    if (!state.snapshot.canAttach) {
+      toast("Who is speaking is fixed once the conversation has started.");
+      return;
+    }
+
+    let groups;
+    try {
+      groups = await api.get("/api/personas");
+    } catch (error) {
+      toast(error.message);
+      return;
+    }
+
+    const sheet = document.createElement("div");
+    sheet.className = "persona-sheet";
+    sheet.innerHTML = `
+      <div class="persona-sheet-inner">
+        <div class="persona-sheet-head">
+          <b>Who is ${escapeHTML(seat.name)}?</b>
+          <div class="spacer"></div>
+          <button class="small" data-close>Close</button>
+        </div>
+        <div class="persona-sheet-body"></div>
+      </div>`;
+
+    const body = sheet.querySelector(".persona-sheet-body");
+    for (const group of groups) {
+      // Only the active mode's library, plus the shared styles it also offers.
+      if (group.mode !== state.snapshot.mode) continue;
+      let lastCategory = null;
+      for (const persona of group.personas) {
+        if (persona.category !== lastCategory) {
+          lastCategory = persona.category;
+          const heading = document.createElement("div");
+          heading.className = "persona-group";
+          heading.textContent = persona.category || "Other";
+          body.append(heading);
+        }
+        const item = document.createElement("button");
+        item.className = "persona-item" + (persona.id === seat.personaID ? " on" : "");
+        item.innerHTML =
+          `<b>${escapeHTML(persona.emoji ? persona.emoji + " " : "")}${escapeHTML(persona.name)}</b>` +
+          `<span>${escapeHTML(persona.summary)}</span>`;
+        item.onclick = async () => {
+          sheet.remove();
+          await run(() => api.post("/api/seat", { seat: seat.id, personaID: persona.id }));
+        };
+        body.append(item);
+      }
+    }
+
+    sheet.querySelector("[data-close]").onclick = () => sheet.remove();
+    sheet.onclick = (event) => { if (event.target === sheet) sheet.remove(); };
+    document.body.append(sheet);
+  }
+
+  function escapeHTML(text) {
+    return String(text ?? "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  /** Reflect the room's mode in the switch. */
+  function drawMode() {
+    const mode = state.snapshot.mode;
+    $("mode-entertainment").classList.toggle("on", mode === "entertainment");
+    $("mode-research").classList.toggle("on", mode === "research");
+    // The mode is fixed once the conversation starts, since the log was written against the
+    // personas it began with.
+    const locked = !state.snapshot.canAttach;
+    $("mode-entertainment").disabled = locked;
+    $("mode-research").disabled = locked;
+  }
+
   function drawSeats() {
     const s = state.snapshot;
     for (const [index, pane] of panes().entries()) {
@@ -502,6 +587,19 @@
       if (nameEl.contentEditable !== "true") nameEl.textContent = seat.name;
       pane.root.querySelector(".meta").textContent =
         `${seat.modelShortName} · ${seat.backend === "mlx" ? "MLX" : "API"} · ${seat.personaName}`;
+      const picker = pane.root.querySelector(".persona-picker");
+      if (picker) {
+        picker.textContent = `${seat.personaEmoji ? seat.personaEmoji + " " : ""}${seat.personaName}`;
+        picker.title = `${seat.personaName} — ${seat.personaSummary}`;
+        picker.disabled = !s.canAttach;
+        picker.dataset.personaSeat = String(index);
+        picker.dataset.wiredPersona = picker.dataset.wiredPersona || "0";
+        if (picker.dataset.wiredPersona !== "1") {
+          picker.dataset.wiredPersona = "1";
+          picker.addEventListener("click", () => openPersonaPicker(Number(picker.dataset.personaSeat)));
+        }
+      }
+
       const live = s.live.find((l) => l.seatID === seat.id);
       const busy = live && live.isGenerating;
       const stateEl = pane.root.querySelector(".state");
@@ -686,6 +784,8 @@
     $("attach").onclick = () => $("files").click();
     $("files").onchange = (event) => addFiles([...event.target.files]);
 
+    $("mode-entertainment").onclick = () => setMode("entertainment");
+    $("mode-research").onclick = () => setMode("research");
     $("depth-quick").onclick = () => setDepth("quick");
     $("depth-standard").onclick = () => setDepth("standard");
     $("depth-deep").onclick = () => setDepth("deep");
@@ -746,6 +846,10 @@
       clearTimeout(timer);
       timer = setTimeout(() => fn(...args), ms);
     };
+  }
+
+  async function setMode(mode) {
+    await run(() => api.post("/api/mode", { value: mode }));
   }
 
   async function setDepth(depth) {

@@ -48,6 +48,12 @@
     <label class="toggle" title="Stream the models' thinking into the panes">
       <input id="thinking" type="checkbox" checked> <span class="toggle-text">Show thinking</span>
     </label>
+    <!-- The mode decides which persona library the pickers offer, so it belongs next to
+         them rather than buried in a sheet. -->
+    <div class="seg" role="group" aria-label="Mode">
+      <button id="mode-entertainment" class="on" title="Give personalities a topic and watch them argue">Show</button>
+      <button id="mode-research" title="Specialists investigate a question">Research</button>
+    </div>
     <!-- Auto follows the detected device; the other two override it and are remembered. -->
     <div class="seg" role="group" aria-label="View mode">
       <button id="view-auto" class="on" title="Follow this device automatically">Auto</button>
@@ -70,6 +76,11 @@
         </div>
         <div class="spacer"></div>
         <span class="state"></span>
+      </div>
+      <!-- The persona picker. In the pane header rather than in a settings sheet, because
+           who is speaking is the thing a viewer most wants to change. -->
+      <div class="persona-row">
+        <button class="persona-picker" title="Change who this participant is"></button>
       </div>
       <div class="params"></div>
       <div class="transcript"></div>

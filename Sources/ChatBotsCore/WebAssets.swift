@@ -84,6 +84,12 @@ public enum WebAssets {
     <label class="toggle" title="Stream the models' thinking into the panes">
       <input id="thinking" type="checkbox" checked> <span class="toggle-text">Show thinking</span>
     </label>
+    <!-- The mode decides which persona library the pickers offer, so it belongs next to
+         them rather than buried in a sheet. -->
+    <div class="seg" role="group" aria-label="Mode">
+      <button id="mode-entertainment" class="on" title="Give personalities a topic and watch them argue">Show</button>
+      <button id="mode-research" title="Specialists investigate a question">Research</button>
+    </div>
     <!-- Auto follows the detected device; the other two override it and are remembered. -->
     <div class="seg" role="group" aria-label="View mode">
       <button id="view-auto" class="on" title="Follow this device automatically">Auto</button>
@@ -106,6 +112,11 @@ public enum WebAssets {
         </div>
         <div class="spacer"></div>
         <span class="state"></span>
+      </div>
+      <!-- The persona picker. In the pane header rather than in a settings sheet, because
+           who is speaking is the thing a viewer most wants to change. -->
+      <div class="persona-row">
+        <button class="persona-picker" title="Change who this participant is"></button>
       </div>
       <div class="params"></div>
       <div class="transcript"></div>
@@ -832,6 +843,107 @@ body[data-device="tablet"] .toggle-text { display: inline; }
   body[data-device="desktop"] #stage { grid-template-columns: 1fr; }
 }
 
+
+/* ── The persona picker ───────────────────────────────────────────────────────────── */
+
+.persona-row {
+  flex: 0 0 auto;
+  padding: calc(4px * var(--scale)) var(--pad);
+  border-bottom: 1px solid var(--line);
+}
+
+.persona-picker {
+  font: inherit;
+  font-size: var(--font-small);
+  color: var(--text);
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: calc(4px * var(--scale)) calc(9px * var(--scale));
+  width: 100%;
+  text-align: left;
+  min-height: calc(var(--tap) * 0.72);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.persona-picker:disabled { opacity: 0.6; }
+
+/* The list itself. A native-feeling panel rather than a floating dropdown, because it can
+   hold the whole cast and works the same with a finger and a mouse. */
+.persona-sheet {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+  padding: 12px;
+}
+
+.persona-sheet-inner {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  width: min(720px, 100%);
+  max-height: min(80vh, 640px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
+}
+
+.persona-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: var(--pad);
+  border-bottom: 1px solid var(--line);
+}
+
+.persona-sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: calc(8px * var(--scale));
+}
+
+.persona-group {
+  font-size: var(--font-tiny);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  margin: calc(10px * var(--scale)) 0 calc(4px * var(--scale));
+}
+
+.persona-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: calc(7px * var(--scale)) calc(9px * var(--scale));
+  min-height: var(--tap);
+}
+
+.persona-item:hover { background: var(--bg-sunken); }
+.persona-item.on { border-color: var(--seat-a); background: var(--bg-sunken); }
+.persona-item b { font-weight: 600; white-space: nowrap; }
+.persona-item span { color: var(--text-dim); font-size: var(--font-tiny); }
+
+/* On a phone the sheet takes the screen, because a half-height list of 36 characters in a
+   centred box is worse than a full-screen one. */
+@media (max-width: 600px) {
+  .persona-sheet { padding: 0; align-items: flex-end; }
+  .persona-sheet-inner { width: 100%; max-height: 88vh; border-radius: 12px 12px 0 0; }
+}
+
 """
 
     static let appJS = """
@@ -1299,6 +1411,7 @@ body[data-device="tablet"] .toggle-text { display: inline; }
     drawLive();
     drawControls();
     drawSeats();
+    drawMode();
     drawAttachments();
     drawContext();
     drawResearch();
@@ -1330,6 +1443,90 @@ body[data-device="tablet"] .toggle-text { display: inline; }
     if (s.error) toast(s.error);
   }
 
+  /**
+   * Show the persona library for the current mode and let one be chosen.
+   *
+   * A sheet rather than a dropdown: the entertainment cast is 36 characters and the research
+   * library 19, and a native menu of that length is unusable on a phone. The sheet also lets
+   * each persona carry its one-line description, which is what a moderator picks on.
+   */
+  async function openPersonaPicker(seatIndex) {
+    const seat = state.snapshot && state.snapshot.seats[seatIndex];
+    if (!seat) return;
+    if (!state.snapshot.canAttach) {
+      toast("Who is speaking is fixed once the conversation has started.");
+      return;
+    }
+
+    let groups;
+    try {
+      groups = await api.get("/api/personas");
+    } catch (error) {
+      toast(error.message);
+      return;
+    }
+
+    const sheet = document.createElement("div");
+    sheet.className = "persona-sheet";
+    sheet.innerHTML = `
+      <div class="persona-sheet-inner">
+        <div class="persona-sheet-head">
+          <b>Who is ${escapeHTML(seat.name)}?</b>
+          <div class="spacer"></div>
+          <button class="small" data-close>Close</button>
+        </div>
+        <div class="persona-sheet-body"></div>
+      </div>`;
+
+    const body = sheet.querySelector(".persona-sheet-body");
+    for (const group of groups) {
+      // Only the active mode's library, plus the shared styles it also offers.
+      if (group.mode !== state.snapshot.mode) continue;
+      let lastCategory = null;
+      for (const persona of group.personas) {
+        if (persona.category !== lastCategory) {
+          lastCategory = persona.category;
+          const heading = document.createElement("div");
+          heading.className = "persona-group";
+          heading.textContent = persona.category || "Other";
+          body.append(heading);
+        }
+        const item = document.createElement("button");
+        item.className = "persona-item" + (persona.id === seat.personaID ? " on" : "");
+        item.innerHTML =
+          `<b>${escapeHTML(persona.emoji ? persona.emoji + " " : "")}${escapeHTML(persona.name)}</b>` +
+          `<span>${escapeHTML(persona.summary)}</span>`;
+        item.onclick = async () => {
+          sheet.remove();
+          await run(() => api.post("/api/seat", { seat: seat.id, personaID: persona.id }));
+        };
+        body.append(item);
+      }
+    }
+
+    sheet.querySelector("[data-close]").onclick = () => sheet.remove();
+    sheet.onclick = (event) => { if (event.target === sheet) sheet.remove(); };
+    document.body.append(sheet);
+  }
+
+  function escapeHTML(text) {
+    return String(text ?? "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  /** Reflect the room's mode in the switch. */
+  function drawMode() {
+    const mode = state.snapshot.mode;
+    $("mode-entertainment").classList.toggle("on", mode === "entertainment");
+    $("mode-research").classList.toggle("on", mode === "research");
+    // The mode is fixed once the conversation starts, since the log was written against the
+    // personas it began with.
+    const locked = !state.snapshot.canAttach;
+    $("mode-entertainment").disabled = locked;
+    $("mode-research").disabled = locked;
+  }
+
   function drawSeats() {
     const s = state.snapshot;
     for (const [index, pane] of panes().entries()) {
@@ -1339,6 +1536,19 @@ body[data-device="tablet"] .toggle-text { display: inline; }
       if (nameEl.contentEditable !== "true") nameEl.textContent = seat.name;
       pane.root.querySelector(".meta").textContent =
         `${seat.modelShortName} · ${seat.backend === "mlx" ? "MLX" : "API"} · ${seat.personaName}`;
+      const picker = pane.root.querySelector(".persona-picker");
+      if (picker) {
+        picker.textContent = `${seat.personaEmoji ? seat.personaEmoji + " " : ""}${seat.personaName}`;
+        picker.title = `${seat.personaName} — ${seat.personaSummary}`;
+        picker.disabled = !s.canAttach;
+        picker.dataset.personaSeat = String(index);
+        picker.dataset.wiredPersona = picker.dataset.wiredPersona || "0";
+        if (picker.dataset.wiredPersona !== "1") {
+          picker.dataset.wiredPersona = "1";
+          picker.addEventListener("click", () => openPersonaPicker(Number(picker.dataset.personaSeat)));
+        }
+      }
+
       const live = s.live.find((l) => l.seatID === seat.id);
       const busy = live && live.isGenerating;
       const stateEl = pane.root.querySelector(".state");
@@ -1523,6 +1733,8 @@ body[data-device="tablet"] .toggle-text { display: inline; }
     $("attach").onclick = () => $("files").click();
     $("files").onchange = (event) => addFiles([...event.target.files]);
 
+    $("mode-entertainment").onclick = () => setMode("entertainment");
+    $("mode-research").onclick = () => setMode("research");
     $("depth-quick").onclick = () => setDepth("quick");
     $("depth-standard").onclick = () => setDepth("standard");
     $("depth-deep").onclick = () => setDepth("deep");
@@ -1583,6 +1795,10 @@ body[data-device="tablet"] .toggle-text { display: inline; }
       clearTimeout(timer);
       timer = setTimeout(() => fn(...args), ms);
     };
+  }
+
+  async function setMode(mode) {
+    await run(() => api.post("/api/mode", { value: mode }));
   }
 
   async function setDepth(depth) {

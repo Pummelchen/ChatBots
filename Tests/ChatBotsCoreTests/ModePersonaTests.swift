@@ -303,3 +303,92 @@ struct ModePromptTests {
         #expect(!prompt(mode: .entertainment).contains("prefer primary sources"))
     }
 }
+
+@Suite("Switching the room's mode")
+struct ModeSwitchTests {
+
+    @MainActor
+    private func engine(mode: DiscussionMode = .entertainment) -> ConversationEngine {
+        let specs = AgentSpec.makeSeats(count: 3).map { seat -> AgentSpec in
+            var copy = seat
+            copy.mode = mode
+            copy.personaID = mode.defaultPersonaID(forSeat: 0)
+            return copy
+        }
+        var configuration = ConversationEngine.Configuration()
+        configuration.pace = .zero
+        return ConversationEngine(
+            seats: specs.map { .init(spec: $0, engine: StubSeat(spec: $0)) },
+            configuration: configuration)
+    }
+
+    @Test("Switching to research reseats every persona, because the libraries differ")
+    @MainActor
+    func switchReseats() {
+        let engine = engine()
+        // All three seats start on the same entertainment character, which is invalid in
+        // research: a seat holding "The Villain" has no meaning there.
+        #expect(engine.specs.allSatisfy { PersonaCatalog.style(id: $0.personaID, mode: .entertainment, seatIndex: 0).isAnalyst == false })
+
+        #expect(engine.setMode(.research))
+        #expect(engine.specs.allSatisfy { $0.mode == .research })
+        for (index, spec) in engine.specs.enumerated() {
+            let style = PersonaCatalog.style(id: spec.personaID, mode: .research, seatIndex: index)
+            #expect(style.isAnalyst, "seat \(index) kept a character from the other library")
+        }
+    }
+
+    @Test("A research mode brings a session, and leaving it drops the budget")
+    @MainActor
+    func modeManagesTheSession() {
+        let engine = engine()
+        #expect(engine.researchSession == nil, "entertainment has no end condition on purpose")
+
+        #expect(engine.setMode(.research))
+        #expect(engine.researchSession != nil, "an investigation needs a budget")
+
+        #expect(engine.setMode(.entertainment))
+        #expect(engine.researchSession == nil, "no budget should count against a show")
+    }
+
+    @Test("The mode is fixed once the conversation has started")
+    @MainActor
+    func modeIsLockedWhileRunning() async {
+        let engine = engine()
+        engine.start(topic: "Why are eggs not round?")
+        // The log was written against the personas the conversation began with.
+        #expect(!engine.setMode(.research))
+        await engine.waitUntilFinished()
+    }
+
+    @Test("Personas that suit either mode are kept when the mode changes")
+    @MainActor
+    func sharedPersonasSurvive() {
+        let engine = engine()
+        // `neutral` means "no style", which every mode needs, so a seat using it should not be
+        // reseated just because the room changed.
+        engine.updateSeat({
+            var spec = engine.specs[0]
+            spec.personaID = PersonaLibrary.neutral.id
+            return spec
+        }())
+        #expect(engine.setMode(.research))
+        #expect(engine.specs[0].personaID == PersonaLibrary.neutral.id)
+    }
+}
+
+/// A seat that never produces anything; these tests are about configuration, not turns.
+private actor StubSeat: LLMEngine {
+    nonisolated let spec: AgentSpec
+    init(spec: AgentSpec) { self.spec = spec }
+    var isLoaded: Bool { true }
+    var contextWindow: Int { spec.contextWindow }
+    var currentSpec: AgentSpec { spec }
+    func load() async throws {}
+    func unload() async {}
+    func generate(
+        messages: [PromptMessage], tools: [any ToolProvider],
+        onToolCall: @escaping @Sendable (String, String) async -> Void,
+        onEvent: @escaping @Sendable (TurnEvent) async -> Void
+    ) async throws -> String { "" }
+}

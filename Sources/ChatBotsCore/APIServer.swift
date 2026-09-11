@@ -20,6 +20,9 @@ public struct APISnapshot: Codable, Sendable {
     public struct Seat: Codable, Sendable {
         public var id: String
         public var name: String
+        /// The persona's symbol, so a picker and the header can show the cast rather than
+        /// only naming it.
+        public var personaEmoji: String
         public var model: String
         public var modelShortName: String
         public var backend: String
@@ -64,6 +67,9 @@ public struct APISnapshot: Codable, Sendable {
     }
 
     public var topic: String
+    /// The mode this room is in, so a front end knows which library to offer.
+    public var mode: String
+    public var modeLabel: String
     public var status: String
     public var isRunning: Bool
     public var isPaused: Bool
@@ -132,6 +138,17 @@ public struct APIPersona: Codable, Sendable {
     public var name: String
     public var category: String
     public var summary: String
+    public var emoji: String
+    /// True for the analytical roles, so a picker can mark which library it is showing.
+    public var isAnalyst: Bool
+}
+
+/// One mode's worth of personas, for the picker.
+public struct PersonaOption: Codable, Sendable {
+    public var mode: String
+    public var label: String
+    public var summary: String
+    public var personas: [APIPersona]
 }
 
 /// What the client measured about its own layout.
@@ -339,9 +356,33 @@ public final class APIServer {
             return .json(DeviceMatch(matched: false, profile: nil, width: width, height: height))
 
         case ("GET", "/api/personas"):
-            return .json(PersonaLibrary.all.map {
-                APIPersona(id: $0.id, name: $0.name, category: $0.category.rawValue, summary: $0.summary)
+            // Per mode, because the libraries are different: offering a research seat "The
+            // Villain" would be the modes sharing a philosophy through the back door.
+            let requested = request.string("mode").flatMap(DiscussionMode.init(rawValue:))
+                ?? engine.specs.first?.mode
+                ?? .entertainment
+            return .json(DiscussionMode.allCases.map { mode in
+                PersonaOption(
+                    mode: mode.rawValue,
+                    label: mode.label,
+                    summary: mode.summary,
+                    personas: PersonaCatalog.styles(for: mode).map {
+                        APIPersona(
+                            id: $0.id, name: $0.name, category: $0.group,
+                            summary: $0.summary, emoji: $0.emoji, isAnalyst: $0.isAnalyst)
+                    })
             })
+
+        case ("POST", "/api/mode"):
+            guard let command = request.json(APICommand.self), let raw = command.value,
+                let mode = DiscussionMode(rawValue: raw)
+            else {
+                return .error("a mode of entertainment or research is required", status: 400)
+            }
+            guard engine.setMode(mode) else {
+                return .error("the mode cannot be changed once the conversation has started", status: 409)
+            }
+            return .json(snapshot())
 
         case ("POST", "/api/topic"):
             guard let command = request.json(APICommand.self), let topic = command.topic else {
@@ -534,8 +575,11 @@ public final class APIServer {
 
     public func snapshot() -> APISnapshot {
         let usage = engine.contextUsage
+        let roomMode = engine.specs.first?.mode ?? .entertainment
         return APISnapshot(
             topic: engine.topic,
+            mode: roomMode.rawValue,
+            modeLabel: roomMode.label,
             status: engine.status.label,
             isRunning: engine.isRunning,
             isPaused: engine.isPaused,
@@ -584,8 +628,10 @@ public final class APIServer {
             },
             canAttach: engine.canAttachFiles,
             imagesAllowed: engine.allSeatsSupportVision,
-            availablePersonas: PersonaLibrary.all.map {
-                APIPersona(id: $0.id, name: $0.name, category: $0.category.rawValue, summary: $0.summary)
+            availablePersonas: PersonaCatalog.styles(for: roomMode).map {
+                APIPersona(
+                    id: $0.id, name: $0.name, category: $0.group, summary: $0.summary,
+                    emoji: $0.emoji, isAnalyst: $0.isAnalyst)
             },
             serverTime: Date(),
             research: engine.researchStatus(),
@@ -603,10 +649,11 @@ public final class APIServer {
     }
 
     private func seat(_ spec: AgentSpec) -> APISnapshot.Seat {
-        let persona = PersonaLibrary.persona(id: spec.personaID)
+        let persona = spec.personaStyle
         return APISnapshot.Seat(
             id: spec.id,
             name: spec.displayName,
+            personaEmoji: spec.personaStyle.emoji,
             model: spec.modelID,
             modelShortName: spec.modelLabel,
             backend: spec.backend.rawValue,
