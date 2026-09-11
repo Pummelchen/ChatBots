@@ -510,6 +510,22 @@ public final class ConversationEngine {
 
     // MARK: - Transcript plumbing
 
+    /// Set the source material seats should read. Rejected once a conversation is running,
+    /// since the material is context for the discussion rather than a message in it.
+    @discardableResult
+    public func setAttachments(_ documents: [AttachedDocument]) -> Bool {
+        // Allowed *before* a conversation starts, and refused once one has. The task is
+        // non-nil only while a turn is running, so requiring it to be nil would have made
+        // this succeed precisely in the case it is meant to refuse and fail otherwise.
+        guard turnsCompleted == 0, generationTask == nil else { return false }
+        conversation.attachments = documents
+        publishTranscript()
+        return true
+    }
+
+    /// The source material currently attached.
+    public var attachments: [AttachedDocument] { conversation.attachments }
+
     /// Rough prompt size and how full the tightest seat's window is.
     ///
     /// Measured from the last prompt a seat actually received, not from the transcript's
@@ -520,6 +536,7 @@ public final class ConversationEngine {
     /// first turn has run.
     public var contextUsage: (tokens: Int, window: Int, fraction: Double) {
         let dialogue = conversation.dialogueTurns.reduce(0) { $0 + max(1, $1.content.count / 4) }
+            + PromptBuilder.attachmentCharacters(conversation.attachments) / 4
         // A completed turn's prompt is the closest thing to ground truth available, plus
         // the prompt for the turn being composed now.
         let measured = measuredPromptTokens.map { $0 + dialogue - lastMeasuredDialogueTokens } ?? dialogue

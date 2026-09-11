@@ -71,10 +71,15 @@ public struct Turn: Identifiable, Sendable, Hashable {
 public struct Conversation: Sendable {
     public var topic: String
     public var turns: [Turn]
+    /// Source material the moderator added before the conversation started, already
+    /// converted to text. Read by every seat on every turn, because it is context for the
+    /// discussion rather than a message in it.
+    public var attachments: [AttachedDocument]
 
-    public init(topic: String, turns: [Turn] = []) {
+    public init(topic: String, turns: [Turn] = [], attachments: [AttachedDocument] = []) {
         self.topic = topic
         self.turns = turns
+        self.attachments = attachments
     }
 
     /// Turns that an LLM should actually read: history and opening brief, but not
@@ -165,6 +170,9 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
     public var webSearchEnabled: Bool
     /// How much this seat may think before answering. Changeable at runtime from the pane;
     /// `LLMEngine.currentSpec` carries the live value, `spec` the value at construction.
+    /// Overrides what this seat's model is assumed to accept, for an API model whose family
+    /// cannot be recognised from its id. Nil means "work it out".
+    public var visionOverride: VisionSupport?
     public var thinking: ThinkingMode
     /// Which style this seat argues in. Stored as an id so the library can be extended
     /// or reworded without invalidating saved configuration; an unknown id resolves to
@@ -189,6 +197,7 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
         repetitionPenalty: Double? = nil,
         maxTokens: Int = 1024,
         contextWindow: Int = AgentSpec.defaultContextWindow,
+        visionOverride: VisionSupport? = nil,
         webSearchEnabled: Bool = true,
         thinking: ThinkingMode = .medium,
         personaID: String = PersonaLibrary.neutral.id
@@ -207,6 +216,7 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
         self.repetitionPenalty = repetitionPenalty
         self.maxTokens = maxTokens
         self.contextWindow = contextWindow
+        self.visionOverride = visionOverride
         self.webSearchEnabled = webSearchEnabled
         self.thinking = thinking
         self.personaID = personaID

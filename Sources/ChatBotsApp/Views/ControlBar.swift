@@ -30,6 +30,8 @@ struct ControlBar: View {
                 transport
             }
 
+            AttachmentBar(controller: controller)
+
             HStack(spacing: 10) {
                 statusPill
 

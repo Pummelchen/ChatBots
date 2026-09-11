@@ -63,6 +63,11 @@ let package = Package(
         // MARK: - Tests
 
         .testTarget(
+            name: "ChatBotsAppTests",
+            dependencies: ["ChatBots"],
+            path: "Tests/ChatBotsAppTests"
+        ),
+        .testTarget(
             name: "ChatBotsCoreTests",
             dependencies: ["ChatBotsCore"],
             path: "Tests/ChatBotsCoreTests"

@@ -1,0 +1,337 @@
+// ChatBotsCore — documents and images the moderator adds before a conversation starts
+//
+// Two quite different things arrive through the same door:
+//
+//   * **Documents** (PDF, txt, md, docx, rtf, html…) are converted to plain text. This is
+//     not merely convenient, it is the cheaper path by a wide margin: a page of text costs
+//     a few hundred tokens, while the same page as an image costs thousands and needs a
+//     vision model to read it. Extracting first means any seat can use it, including seats
+//     that cannot see.
+//   * **Images** can only be used by seats that support vision, so they are offered only
+//     when *every* participating seat does. A conversation where one participant cannot see
+//     the picture is worse than being told upfront that images are unavailable.
+//
+// The extractors themselves live in the app target, which can use PDFKit and `textutil`;
+// this file holds the shapes and the rules, so they can be tested.
+
+import Foundation
+
+/// A file format the moderator can add.
+public enum DocumentKind: String, CaseIterable, Sendable, Codable {
+    case plainText
+    case markdown
+    case pdf
+    case word
+    case richText
+    case html
+    case image
+
+    /// Extensions offered in the open panel, per kind.
+    public var extensions: [String] {
+        switch self {
+        case .plainText: ["txt", "text", "log", "csv", "tsv", "json", "xml", "yaml", "yml"]
+        case .markdown: ["md", "markdown", "mdown"]
+        case .pdf: ["pdf"]
+        case .word: ["docx", "doc", "odt", "rtf", "rtfd", "wordml"]
+        case .richText: ["rtf", "rtfd"]
+        case .html: ["html", "htm", "webarchive"]
+        case .image: ["png", "jpg", "jpeg", "bmp", "gif", "tiff", "tif", "heic", "webp"]
+        }
+    }
+
+    public var isImage: Bool { self == .image }
+
+    /// What to call it in the interface.
+    public var label: String {
+        switch self {
+        case .plainText: "Text"
+        case .markdown: "Markdown"
+        case .pdf: "PDF"
+        case .word: "Word"
+        case .richText: "Rich text"
+        case .html: "HTML"
+        case .image: "Image"
+        }
+    }
+
+    /// The symbol shown on the attachment chip.
+    public var symbol: String {
+        switch self {
+        case .plainText: "doc.text"
+        case .markdown: "text.document"
+        case .pdf: "doc.richtext"
+        case .word: "doc.text.fill"
+        case .richText: "doc.rtf"
+        case .html: "chevron.left.forwardslash.chevron.right"
+        case .image: "photo"
+        }
+    }
+
+    public static func forExtension(_ ext: String) -> DocumentKind? {
+        let lowered = ext.lowercased()
+        return allCases.first { $0.extensions.contains(lowered) }
+    }
+
+    /// Infer from a filename, for files arriving from the open panel or a drop.
+    public static func forFilename(_ name: String) -> DocumentKind? {
+        forExtension((name as NSString).pathExtension)
+    }
+
+    /// Every plain-text extension, for the open panel's allowed types.
+    public static var documentExtensions: [String] {
+        allCases.filter { !$0.isImage }.flatMap(\.extensions)
+    }
+
+    public static var imageExtensions: [String] {
+        DocumentKind.image.extensions
+    }
+}
+
+/// A document the moderator added, with its text extracted once.
+///
+/// The text is kept rather than the path: extraction is the expensive step, the file may be
+/// edited or deleted afterwards, and the extract is what actually goes into the prompt.
+public struct AttachedDocument: Identifiable, Sendable, Equatable, Codable {
+    public let id: UUID
+    public var name: String
+    public var kind: DocumentKind
+    /// The extracted plain text. Empty for an image, which is sent as an image.
+    public var text: String
+    /// Bytes of the original file, for display.
+    public var byteCount: Int
+    /// Pages or sheets, when the format has them.
+    public var pageCount: Int?
+    /// True when the text was shortened to fit the context budget.
+    public var wasTruncated: Bool
+    /// For an image: the encoded bytes, ready to send.
+    public var imageData: Data?
+    public var addedAt: Date
+
+    public init(
+        id: UUID = UUID(),
+        name: String,
+        kind: DocumentKind,
+        text: String = "",
+        byteCount: Int = 0,
+        pageCount: Int? = nil,
+        wasTruncated: Bool = false,
+        imageData: Data? = nil,
+        addedAt: Date = Date()
+    ) {
+        self.id = id
+        self.name = name
+        self.kind = kind
+        self.text = text
+        self.byteCount = byteCount
+        self.pageCount = pageCount
+        self.wasTruncated = wasTruncated
+        self.imageData = imageData
+        self.addedAt = addedAt
+    }
+
+    /// Approximate tokens, at the four-characters-per-token rule used elsewhere.
+    public var estimatedTokens: Int { max(0, text.count / 4) }
+
+    /// A short description for the chip: "12 pages · 4.2k words".
+    public var summary: String {
+        var parts: [String] = []
+        if let pageCount, pageCount > 1 { parts.append("\(pageCount) pages") }
+        if kind.isImage {
+            parts.append(ByteCountFormatter.string(fromByteCount: Int64(byteCount), countStyle: .file))
+        } else {
+            let words = text.split { $0.isWhitespace || $0.isNewline }.count
+            parts.append("\(words) words")
+            if wasTruncated { parts.append("shortened") }
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// Text that cannot be understood by a model is not worth sending.
+    public var isUsable: Bool {
+        kind.isImage ? (imageData?.isEmpty == false) : !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+/// Why a file could not be added.
+public enum DocumentError: LocalizedError, Equatable {
+    case unsupportedType(String)
+    case unreadable(String)
+    case emptyText(String)
+    case needsOCR(String)
+    case tooLarge(String, limit: Int)
+    case imageNotAllowed
+
+    public var errorDescription: String? {
+        switch self {
+        case .unsupportedType(let name):
+            "\(name) is not a format this app can read."
+        case .unreadable(let reason):
+            "Could not read the file: \(reason)"
+        case .emptyText(let name):
+            "\(name) contains no readable text."
+        case .needsOCR(let name):
+            "\(name) has no text layer — it looks like a scan, so its text cannot be extracted."
+        case .tooLarge(let name, let limit):
+            "\(name) is larger than \(limit / 1_000_000) MB."
+        case .imageNotAllowed:
+            "Images need every participating seat to support vision."
+        }
+    }
+}
+
+/// How much of a document is kept.
+public struct AttachmentLimits: Sendable {
+    /// Per-file ceiling on the extracted text, in characters.
+    ///
+    /// A guard against one enormous file consuming the whole context window before a
+    /// conversation starts. At roughly four characters per token this is about 30k tokens
+    /// — sizeable but well inside the window, leaving room for the discussion itself.
+    public var maximumTextCharacters: Int = 120_000
+    /// Refuse files larger than this outright, since reading them is the slow part.
+    public var maximumFileBytes: Int = 64 * 1024 * 1024
+
+    public init(maximumTextCharacters: Int = 120_000, maximumFileBytes: Int = 64 * 1024 * 1024) {
+        self.maximumTextCharacters = maximumTextCharacters
+        self.maximumFileBytes = maximumFileBytes
+    }
+
+    public static let standard = AttachmentLimits()
+}
+
+/// Reads a file and returns its text.
+///
+/// A protocol so the app can supply the real extractors while tests supply fakes, and so a
+/// future format is one more implementation rather than a change here.
+public protocol DocumentExtracting: Sendable {
+    func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument
+}
+
+/// Chooses an extractor per kind, and holds the shared rules — size limits and the
+/// blank-result check — so no individual extractor has to remember them.
+/// `@unchecked Sendable` because its stored values are immutable — a dictionary of sendable
+/// extractors and `FileManager`, which is documented as safe to share.
+public final class DocumentIngestor: @unchecked Sendable {
+    private let extractors: [DocumentKind: any DocumentExtracting]
+    private let fileManager: FileManager
+
+    public init(
+        extractors: [DocumentKind: any DocumentExtracting],
+        fileManager: FileManager = .default
+    ) {
+        self.extractors = extractors
+        self.fileManager = fileManager
+    }
+
+    /// Add a file. Throws `DocumentError` with something the moderator can act on.
+    public func add(url: URL, limits: AttachmentLimits = .standard) throws -> AttachedDocument {
+        let name = url.lastPathComponent
+        guard let kind = DocumentKind.forFilename(name) else {
+            throw DocumentError.unsupportedType(name)
+        }
+        guard let extractor = extractors[kind] ?? extractors.first(where: { $0.key.extensions.contains(kind.extensions.first ?? "") })?.value
+        else {
+            throw DocumentError.unsupportedType(name)
+        }
+
+        let attributes = try? fileManager.attributesOfItem(atPath: url.path)
+        let size = (attributes?[.size] as? NSNumber)?.intValue ?? 0
+        if size > limits.maximumFileBytes {
+            throw DocumentError.tooLarge(name, limit: limits.maximumFileBytes)
+        }
+
+        var document = try extractor.extract(url: url, kind: kind, limits: limits)
+        document.name = name
+        document.byteCount = size
+
+        guard document.isUsable else {
+            // An image with no bytes is a read failure; a document with no text is either
+            // empty or a scan, and saying which is the difference between "pick another
+            // file" and "this needs OCR".
+            if kind == .pdf {
+                throw DocumentError.needsOCR(name)
+            }
+            throw DocumentError.emptyText(name)
+        }
+        return document
+    }
+}
+
+// MARK: - Whether a seat can see
+
+/// Whether a seat's model can accept images.
+///
+/// This gates the image part of the interface: images are offered only when *every*
+/// participating seat supports vision, because a discussion where one participant cannot
+/// see the picture is worse than being told upfront that images are unavailable. Text
+/// documents have no such restriction — extraction is exactly what makes them universally
+/// usable.
+public enum VisionSupport: String, Sendable, Codable {
+    /// The model is known to accept images.
+    case supported
+    /// The model is known not to, or is a local checkpoint with no vision tower.
+    case unsupported
+    /// Nothing is known and nothing could be found out, so the interface does not offer it.
+    case unknown
+
+    public var allowsImages: Bool { self == .supported }
+}
+
+extension AgentSpec {
+    /// Model families known to accept images, matched case-insensitively against the model
+    /// id. A server does not advertise this through `/v1/models`, so it has to be known — and
+    /// when it is not, the answer is `unknown` rather than a hopeful `supported`.
+    private static let visionModelMarkers = [
+        "gpt-4o", "gpt-4.1", "gpt-4-turbo", "gpt-5", "o3", "o4",
+        "claude-3", "claude-4", "claude-opus", "claude-sonnet", "claude-haiku",
+        "gemini", "llava", "qwen-vl", "qwen2-vl", "qwen2.5-vl", "qwen3-vl", "qwen3.5-vl",
+        "pixtral", "internvl", "minicpm-v", "moondream", "paligemma", "idefics",
+        "smolvlm", "gemma-3", "gemma3", "mistral-small-3", "glm-4v", "glm-4.5v",
+    ]
+
+    /// What this seat's model can accept.
+    ///
+    /// For a local checkpoint the answer comes from the checkpoint itself, which is
+    /// authoritative. For an API seat it comes from a configured override first — since a
+    /// server that is *not* serving the model on this disk is the only case where nothing
+    /// authoritative exists — then from the checkpoint if it happens to be here, then from
+    /// the model id's family.
+    public var visionSupport: VisionSupport {
+        if backend == .mlx {
+            // The local loader only knows text models, so a checkpoint with no vision tower
+            // cannot be given an image however it is asked.
+            guard ModelStore.declaresVision(for: modelID) == true else { return .unsupported }
+            return .supported
+        }
+        if let override = visionOverride { return override }
+        if let declared = ModelStore.declaresVision(for: modelID) {
+            return declared ? .supported : .unsupported
+        }
+        let id = modelID.lowercased()
+        return Self.visionModelMarkers.contains { id.contains($0) } ? .supported : .unknown
+    }
+}
+
+extension ModelStore {
+    /// Whether a checkpoint on disk declares a vision tower.
+    ///
+    /// Returns nil when the checkpoint is not here, which is different from "no": for an API
+    /// seat pointing at a model this app has never seen, the honest answer is that nothing is
+    /// known, and the interface should not offer images on a guess.
+    public static func declaresVision(for modelID: String, in root: URL? = nil) -> Bool? {
+        guard let directory = localCheckpoint(for: modelID, in: root) else { return nil }
+        let config = directory.appending(path: "config.json")
+        guard let data = try? Data(contentsOf: config),
+            let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+
+        // The multimodal wrapper puts the vision tower beside the text config; a
+        // text-only checkpoint has neither, so its absence is a definite "no".
+        if let vision = parsed["vision_config"] as? [String: Any], !vision.isEmpty { return true }
+        if parsed["image_token_id"] != nil || parsed["vision_start_token_id"] != nil { return true }
+        if let text = parsed["text_config"] as? [String: Any] {
+            if let vision = text["vision_config"] as? [String: Any], !vision.isEmpty { return true }
+            if text["image_token_id"] != nil { return true }
+        }
+        return false
+    }
+}

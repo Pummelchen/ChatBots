@@ -8,6 +8,7 @@
 import AppKit
 import ChatBotsCore
 import Combine
+import UniformTypeIdentifiers
 import Foundation
 import SwiftUI
 
@@ -673,6 +674,119 @@ public final class ChatController: ObservableObject {
     /// bar can show where the log will be condensed rather than the reader having to guess.
     public var contextUsage: (tokens: Int, window: Int, fraction: Double) {
         engine.contextUsage
+    }
+
+    // MARK: - Source material
+
+    /// Documents and images the moderator has added.
+    public var attachments: [AttachedDocument] { engine.attachments }
+
+    /// True when every seat's model can accept images, which is what decides whether the
+    /// image part of the interface is offered at all. A conversation where one participant
+    /// cannot see the picture is worse than being told upfront that images are unavailable.
+    public var allSeatsSupportVision: Bool {
+        panes.allSatisfy { $0.spec.visionSupport.allowsImages }
+    }
+
+    /// Which seats cannot see, for the explanation shown when images are unavailable.
+    public var seatsWithoutVision: [String] {
+        panes.filter { !$0.spec.visionSupport.allowsImages }.map { $0.spec.displayName }
+    }
+
+    /// Files may only be added before the conversation starts: the material is context for
+    /// the discussion, and adding it midway would leave earlier turns ignorant of it.
+    public var canAttachFiles: Bool { turns.isEmpty && !isRunning }
+
+    /// Add files through the standard open panel.
+    @discardableResult
+    public func attachFiles(allowImages: Bool? = nil) -> Int {
+        guard canAttachFiles else {
+            errorBanner = "Source material must be added before the conversation starts."
+            return 0
+        }
+        let imagesAllowed = allowImages ?? allSeatsSupportVision
+
+        let panel = NSOpenPanel()
+        panel.title = "Add Source Material"
+        panel.message = imagesAllowed
+            ? "Choose documents or images. Text is extracted so the models can read it."
+            : "Choose documents. Images need every seat to support vision."
+        panel.prompt = "Add"
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        var types: [UTType] = [.plainText, .pdf, .rtf, .html]
+        if let markdown = UTType(filenameExtension: "md") { types.append(markdown) }
+        if let word = UTType(filenameExtension: "docx") { types.append(word) }
+        if let legacyWord = UTType(filenameExtension: "doc") { types.append(legacyWord) }
+        if imagesAllowed { types.append(contentsOf: [.png, .jpeg, .bmp, .gif, .tiff, .heic]) }
+        panel.allowedContentTypes = types
+
+        guard panel.runModal() == .OK else { return 0 }
+        return addFiles(panel.urls, allowImages: imagesAllowed)
+    }
+
+    /// Add already-chosen files. Returns how many were accepted.
+    @discardableResult
+    public func addFiles(_ urls: [URL], allowImages: Bool = true) -> Int {
+        let (documents, reportedFailures) = SystemDocumentExtractor.add(urls: urls)
+        var failures = reportedFailures
+        var accepted = documents.filter { document in
+            guard document.kind.isImage else { return true }
+            guard allowImages, allSeatsSupportVision else { return false }
+            return true
+        }
+        let rejectedImages = documents.count - accepted.count
+        if rejectedImages > 0 {
+            failures.append(
+                DocumentError.imageNotAllowed.errorDescription ?? "Images are unavailable.")
+        }
+        guard !accepted.isEmpty else {
+            errorBanner = failures.first
+            return 0
+        }
+
+        // Replace an attachment with the same name and size rather than stacking copies.
+        var current = attachments
+        for document in accepted {
+            if let existing = current.firstIndex(where: {
+                $0.name == document.name && $0.byteCount == document.byteCount
+            }) {
+                current[existing] = document
+            } else {
+                current.append(document)
+            }
+        }
+        accepted = documents
+        engine.setAttachments(current)
+        // A failure alongside successes is reported without hiding the successes.
+        errorBanner = failures.isEmpty ? nil : failures.joined(separator: "\n")
+        saveSettings()
+        return accepted.count
+    }
+
+    /// Seed the attached material at launch, before any turn can run.
+    @discardableResult
+    public func setAttachments(_ documents: [AttachedDocument]) -> Bool {
+        engine.setAttachments(documents)
+    }
+
+    public func removeAttachment(_ id: UUID) {
+        engine.setAttachments(attachments.filter { $0.id != id })
+        saveSettings()
+    }
+
+    public func removeAllAttachments() {
+        engine.setAttachments([])
+        saveSettings()
+    }
+
+    /// Ask for a vision override on a seat, for an API model whose family cannot be
+    /// recognised from its id.
+    public func setVisionOverride(_ agentID: String, _ support: VisionSupport?) {
+        guard var spec = panes.first(where: { $0.id == agentID })?.spec else { return }
+        spec.visionOverride = support
+        pane(agentID)?.spec = spec
+        saveSettings()
     }
 
     /// Where the log gets condensed, for display.

@@ -29,6 +29,8 @@ struct ChatBotsApp: App {
             initialModeratorDraft: store.settings.moderatorDraft,
             initialShowReasoning: store.settings.showReasoning
         )
+        // Source material is restored before any turn can run.
+        _ = restored.setAttachments(store.settings.attachments)
         // Every change writes: the topic as it is typed, and each seat's persona, thinking
         // level and backend as they are picked.
         let snapshot: @MainActor () -> UserSettings = { [weak restored] in
@@ -36,7 +38,8 @@ struct ChatBotsApp: App {
                 topic: restored?.topic ?? "",
                 moderatorDraft: restored?.moderatorDraft ?? "",
                 showReasoning: restored?.showReasoning ?? true,
-                seats: restored?.currentSeats ?? AgentSpec.SeatRoster.specs()
+                seats: restored?.currentSeats ?? AgentSpec.SeatRoster.specs(),
+                attachments: restored?.attachments ?? []
             )
         }
         restored.onSettingsChanged = { [weak store] in

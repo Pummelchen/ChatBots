@@ -21,19 +21,25 @@ public struct UserSettings: Codable, Sendable, Equatable {
     public var showReasoning: Bool
     /// Per-seat configuration: model, backend, endpoint, persona, thinking, sampler.
     public var seats: [AgentSpec]
+    /// Source material the moderator added, with its text already extracted. Stored rather
+    /// than re-read from disk because extraction is the slow part and the original file may
+    /// have moved or changed since.
+    public var attachments: [AttachedDocument]
 
     public init(
         version: Int = UserSettings.currentVersion,
         topic: String,
         moderatorDraft: String = "",
         showReasoning: Bool = true,
-        seats: [AgentSpec]
+        seats: [AgentSpec],
+        attachments: [AttachedDocument] = []
     ) {
         self.version = version
         self.topic = topic
         self.moderatorDraft = moderatorDraft
         self.showReasoning = showReasoning
         self.seats = seats
+        self.attachments = attachments
     }
 
     /// Decode field by field, defaulting anything absent.
@@ -50,6 +56,7 @@ public struct UserSettings: Codable, Sendable, Equatable {
         self.moderatorDraft = try container.decodeIfPresent(String.self, forKey: .moderatorDraft) ?? ""
         self.showReasoning = try container.decodeIfPresent(Bool.self, forKey: .showReasoning) ?? true
         self.seats = try container.decodeIfPresent([AgentSpec].self, forKey: .seats) ?? []
+        self.attachments = try container.decodeIfPresent([AttachedDocument].self, forKey: .attachments) ?? []
     }
 
     /// Defaults for a first run, or after a stored payload could not be used.

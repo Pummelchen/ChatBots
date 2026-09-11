@@ -179,6 +179,48 @@ audited:
 [ChatBots] Agent A sampler: temp=1.00 topP=0.95 topK=20 minP=0.00 presence=-1.50 repetition=1.00 maxOut=32768
 ```
 
+### Source material: documents and images
+
+**Add files** before a conversation starts. Documents are converted to plain text, and the
+text is what the models are given — on every turn, as its own system message.
+
+Converting rather than sending pages as pictures is the whole point, and it is cheaper by a
+wide margin: a page of text costs a few hundred tokens, while the same page as an image
+costs thousands and needs a vision model to read it. Extraction also means *any* seat can
+use the material, including seats that cannot see.
+
+| Format | Read by |
+| --- | --- |
+| txt, md, csv, json, log, yaml | read directly (Markdown is passed through as written — its structure helps a model) |
+| pdf | PDFKit, page by page, stopping once the budget is spent |
+| docx, doc, rtf, rtfd, odt, html, webarchive | the system's `textutil` converter |
+
+Each chip shows what was actually extracted — words, pages, bytes — and a magnifying-glass
+button opens the text itself. That matters because extraction is where a PDF's columns can
+interleave or a table can lose its shape, and looking is the only way to know; it is also
+the quickest way to confirm a file was read at all. A long document is shortened to fit the
+context budget and the chip says so rather than silently truncating.
+
+**Images** are offered only when *every* participating seat can see. A discussion where one
+participant cannot see the picture is worse than being told upfront that images are
+unavailable, so the option is hidden — with a note explaining which seat is the reason. A
+seat counts as able to see when:
+
+* it runs a **local checkpoint that declares a vision tower** in its `config.json` (the
+  shipped Qwen 3.5 checkpoint does — it carries 297 vision tensors), or
+* its **API model id matches a known vision family** (GPT-4o/4.1/5, Claude 3/4, Gemini,
+  LLaVA, Qwen-VL, Pixtral, and similar), or
+* you set a **per-seat override**, for a model whose family cannot be recognised from its id.
+
+An unrecognised API model counts as *unknown*, not as supported: the interface does not
+offer images on a guess. Images are read as bytes and sent as-is — no conversion is
+attempted, since there is nothing to convert them to that would cost less.
+
+Material is kept with the preferences, so it survives a relaunch without being re-read —
+and the extraction is the slow part. **Clear** keeps the source material, so starting the
+conversation again does not mean uploading the same PDF twice; remove a file with the × on
+its chip.
+
 ### Saving the conversation
 
 **Save** in the toolbar (or File ▸ Save Conversation, ⌘S) opens the standard macOS save

@@ -122,6 +122,38 @@ public enum PromptBuilder {
         "\(tag(for: turn))\n\(turn.content)"
     }
 
+    /// The moderator's source material, as its own system message.
+    ///
+    /// Its own message rather than folded into the system prompt so it is obvious in the
+    /// log what the models were given, and so a seat's persona instructions are not buried
+    /// under several pages of document. Only text documents appear here: an image cannot be
+    /// put in a prompt as text, which is exactly why the app converts documents instead of
+    /// sending their pages as pictures.
+    public static func attachmentContext(_ documents: [AttachedDocument]) -> String? {
+        // Trimmed, not merely non-empty: a document of spaces would otherwise produce a
+        // section announcing material that is not there.
+        let usable = documents.filter {
+            !$0.kind.isImage
+                && !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        guard !usable.isEmpty else { return nil }
+
+        let names = usable.map(\.name).joined(separator: ", ")
+        var out = """
+            The moderator has supplied the following source material for this discussion: \
+            \(names). Treat it as the shared reference for the topic, and prefer it over \
+            assumption where it speaks to a question. It is reference material, not a \
+            participant: nobody said it, and it does not address you.
+
+            """
+        for document in usable {
+            out += "--- BEGIN \(document.name) ---\n"
+            out += document.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            out += "\n--- END \(document.name) ---\n\n"
+        }
+        return out.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     /// The instruction used to condense a transcript.
     ///
     /// Deliberately specific about what to keep: a summary that loses the open questions
@@ -192,6 +224,12 @@ public enum PromptBuilder {
             )
         ]
 
+        // The moderator's source material, as its own message: obvious in the log, and it
+        // keeps a seat's own instructions from being buried under pages of document.
+        if let material = attachmentContext(conversation.attachments) {
+            messages.append(.init(role: .system, content: material))
+        }
+
         // One user message carrying the entire shared log. Folding history into a single
         // user turn keeps the role sequence valid for strict chat templates (user /
         // assistant alternation) while still showing every speaker tag.
@@ -224,5 +262,11 @@ public enum PromptBuilder {
     /// Rough token estimate (≈4 chars/token) used to warn before the context fills up.
     public static func estimatedTokens(of messages: [PromptMessage]) -> Int {
         messages.reduce(0) { $0 + max(1, $1.content.count / 4) }
+    }
+
+    /// Prompt characters contributed by the attachments, which are re-sent every turn and
+    /// so belong in the context estimate.
+    public static func attachmentCharacters(_ documents: [AttachedDocument]) -> Int {
+        documents.reduce(0) { $0 + ($1.kind.isImage ? 0 : $1.text.count) }
     }
 }
