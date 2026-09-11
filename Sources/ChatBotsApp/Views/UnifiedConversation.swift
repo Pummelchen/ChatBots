@@ -1,8 +1,13 @@
 // ChatBotsApp — the single-thread window mode
 //
-// One conversation, newest at the bottom: each seat's messages are attributed and
-// tinted by who said them, the way a messaging app renders a group chat. This is the
-// alternative to the split view, where each seat gets its own pane.
+// One conversation, newest at the bottom, drawn the way a group chat draws one: your own
+// messages on the right in blue, everybody else's on the left in grey, a name above the first
+// message of a run, an avatar beside the last, and the app's own notes as centred grey lines.
+//
+// The identity is carried by the name and the avatar rather than by which side a bubble is on,
+// which is the whole reason a group chat looks like this: with four people in the room, two
+// sides cannot tell you who is speaking. This is the alternative to the split view, where each
+// seat gets its own pane.
 //
 // Everything in here obeys the two SwiftUI rules this app learned the hard way, both of
 // which otherwise pin the main thread in `GraphHost.flushTransactions` and stop the
@@ -22,10 +27,12 @@ struct UnifiedConversation: View {
     @Environment(\.themePalette) private var palette
     @ObservedObject var controller: ChatController
 
-    /// Turns with the setup brief and tool traffic removed, plus the two seats' live text
-    /// spliced in at the end, so the thread reads like a chat rather than a debug log.
+    /// Turns with the setup brief and tool traffic removed, plus the seats' live text spliced
+    /// in at the end, so the thread reads like a chat rather than as a debug log.
+    ///
+    /// The setup brief is not a message and belongs in `SetupBlock`, which is where it is.
     private var rows: [ThreadRow] {
-        var rows: [ThreadRow] = controller.turns.compactMap { turn in
+        var built: [ThreadRow] = controller.turns.compactMap { turn in
             switch turn.kind {
             case .introduction, .tool: nil
             case .topic, .steering, .direction, .chat, .summary, .report:
@@ -34,9 +41,9 @@ struct UnifiedConversation: View {
         }
         // An actively generating seat gets a row, with whatever it has produced so far.
         for pane in controller.panes where pane.isGenerating {
-            rows.append(ThreadRow(live: pane))
+            built.append(ThreadRow(live: pane))
         }
-        return rows
+        return ThreadRow.grouped(built)
     }
 
     var body: some View {
@@ -106,40 +113,44 @@ struct UnifiedConversation: View {
 
     private var conversation: some View {
         AppKitScrollView(scrollToBottomSignal: controller.threadScrollSignal) {
-            LazyVStack(alignment: .leading, spacing: 10) {
+            // No stack spacing: each row brings its own. A group chat's rhythm is the point —
+            // messages from one person sit tight together and a change of speaker gets air —
+            // and a uniform gap throws exactly that information away.
+            LazyVStack(alignment: .leading, spacing: 0) {
                 if rows.isEmpty {
                     emptyState
                 }
                 ForEach(rows) { row in
                     if let turn = row.turn {
                         ThreadMessage(
-                                controller: controller,
-                                turn: turn,
-                                isPending: controller.pendingSteeringIDs.contains(turn.id),
-                                isOwn: false,
-                                liveText: "",
-                                liveReasoning: "",
-                                liveBlocks: [],
+                            controller: controller,
+                            turn: turn,
+                            isPending: controller.pendingSteeringIDs.contains(turn.id),
+                            liveText: "",
+                            liveReasoning: "",
+                            liveBlocks: [],
                             activity: "",
-                            showReasoning: controller.showReasoning
+                            showReasoning: controller.showReasoning,
+                            row: row
                         )
                     } else if let pane = row.live {
                         ThreadMessage(
                             controller: controller,
                             turn: nil,
                             isPending: false,
-                            isOwn: false,
                             liveText: pane.liveText,
                             liveReasoning: pane.liveReasoning,
                             liveBlocks: pane.liveBlocks,
                             activity: pane.activity,
                             showReasoning: controller.showReasoning,
-                            liveSpec: pane.spec
+                            liveSpec: pane.spec,
+                            row: row
                         )
                     }
                 }
             }
-            .padding(12)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
         }
     }
 
@@ -196,38 +207,91 @@ struct UnifiedConversation: View {
 }
 
 /// One row of the thread: either a logged turn or a seat that is mid-generation.
+///
+/// The grouping — who is named, whose picture is drawn, where the gaps and the date lines go —
+/// is `ThreadGrouping` in the core, which is where it can be tested. This type only carries the
+/// answer to the view.
 struct ThreadRow: Identifiable {
     var turn: Turn?
     var live: AgentPaneState?
-    /// Stable across rebuilds so SwiftUI does not re-create the row every update.
+    var flags = ThreadGrouping.Flags(
+        opensRun: true, closesRun: true, startsGroup: true, divider: nil)
+
     var id: String {
         if let turn { return "turn-\(turn.id)" }
         if let live { return "live-\(live.id)" }
         return "empty"
     }
 
-    init(turn: Turn) { self.turn = turn }
-    init(live: AgentPaneState) { self.live = live }
+    var shape: ThreadGrouping.Shape {
+        guard let turn else { return .theirs }   // a seat mid-generation
+        return ThreadGrouping.shape(of: turn.kind)
+    }
+
+    var speaker: String? {
+        if let turn { return turn.speakerID ?? turn.speakerName }
+        if let live { return live.id }
+        return nil
+    }
+
+    /// Group a whole thread, in one pass, over the rows in the order they are drawn.
+    static func grouped(_ rows: [ThreadRow]) -> [ThreadRow] {
+        let described = rows.map {
+            ThreadGrouping.Row(shape: $0.shape, speaker: $0.speaker, at: $0.turn?.timestamp)
+        }
+        let flags = ThreadGrouping.flags(for: described)
+        return zip(rows, flags).map { row, flag in
+            var copy = row
+            copy.flags = flag
+            return copy
+        }
+    }
+}
+
+/// A participant's picture, in the only form this app has: their symbol in their colour.
+///
+/// A group chat identifies people by their picture. There are no photographs here, so the seat's
+/// own symbol stands in — and it does the same job, which is letting the eye follow one person
+/// down a long thread without reading a name each time.
+struct SeatAvatar: View {
+    let seatID: String
+    let palette: AppPalette
+    var isStreaming = false
+
+    var body: some View {
+        let tint = AgentTheme.tint(for: seatID, palette: palette)
+        ZStack {
+            Circle().fill(tint.opacity(isStreaming ? 0.16 : 0.26))
+            Image(systemName: AgentTheme.symbol(for: seatID))
+                .scaledFont(size: 11, weight: .semibold)
+                .foregroundStyle(tint)
+        }
+        .frame(width: 26, height: 26)
+        .overlay(
+            Circle().strokeBorder(tint.opacity(isStreaming ? 0.5 : 0.0), lineWidth: 1.5)
+        )
+    }
 }
 
 /// One message in the thread.
 ///
-/// Alignment and tint carry the attribution: a seat's messages hug its own side, the
-/// moderator's stay centred and neutral. Reasoning and tool traffic hang off whichever
-/// message produced them, so the thread stays readable while remaining honest about what
-/// the model did.
+/// Three shapes, and nothing else: yours (blue, right), theirs (grey, left, with a name above
+/// the first of a run and an avatar beside the last), and the app's own notes (a centred grey
+/// line, no bubble). Reasoning and tool activity hang off the message that produced them, so the
+/// thread stays readable while remaining honest about what the model actually did.
 struct ThreadMessage: View {
     @Environment(\.themePalette) private var palette
     @ObservedObject var controller: ChatController
     let turn: Turn?
     let isPending: Bool
-    let isOwn: Bool
     let liveText: String
     let liveReasoning: String
     let liveBlocks: [String]
     let activity: String
     let showReasoning: Bool
     var liveSpec: AgentSpec?
+    /// Where this row sits in the thread, so the gaps and the name and the avatar are right.
+    let row: ThreadRow
 
     private var speakerID: String? { turn?.speakerID ?? liveSpec?.id }
 
@@ -235,102 +299,203 @@ struct ThreadMessage: View {
         turn?.speakerName ?? liveSpec?.displayName ?? "Model"
     }
 
-    private var isModerator: Bool {
-        turn?.kind == .topic || turn?.kind == .steering || turn?.kind == .direction
-    }
-
-    /// Seats alternate sides so the eye can follow who is speaking without reading names.
-    private var alignment: HorizontalAlignment { isModerator ? .center : .leading }
-
-    private var frameAlignment: Alignment {
-        if isModerator { return .center }
-        return isSecondSeat ? .trailing : .leading
-    }
-
-    private var isSecondSeat: Bool {
-        guard let speakerID else { return false }
-        return speakerID.hasSuffix("B")
-    }
+    private var isMine: Bool { row.shape == .mine }
+    private var isSystem: Bool { row.shape == .system }
 
     private var tint: Color {
-        guard let speakerID, !isModerator else {
-            return AgentTheme.moderatorTint(palette)
-        }
+        guard let speakerID, !isSystem else { return AgentTheme.moderatorTint(palette) }
         return AgentTheme.tint(for: speakerID, palette: palette)
     }
 
     private var text: String { turn?.content ?? liveText }
 
     var body: some View {
-        VStack(alignment: alignment, spacing: 4) {
-            header
-            if !liveReasoning.isEmpty, showReasoning {
-                ReasoningBlock(text: liveReasoning, tint: tint)
-                    .frame(maxWidth: 620, alignment: .leading)
+        VStack(alignment: .leading, spacing: 0) {
+            if let divider = row.flags.divider {
+                Text(divider)
+                    .scaledFont(size: 10.5, weight: .medium)
+                    .foregroundStyle(palette.textTertiary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 6)
+                    .padding(.bottom, 10)
             }
-            bubble
-            if let turn { VoteButtons(controller: controller, turn: turn) }
+
+            if isSystem {
+                systemLine
+            } else if isMine {
+                mine
+            } else {
+                theirs
+            }
         }
-        .frame(maxWidth: .infinity, alignment: frameAlignment)
+        .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
+        .padding(.top, row.flags.startsGroup && row.flags.divider == nil ? 9 : 0)
     }
 
-    private var header: some View {
-        HStack(spacing: 5) {
-            if isModerator {
-                Image(systemName: turn?.symbol ?? "person.wave.2.fill")
+    // MARK: Your own messages
+
+    private var mine: some View {
+        HStack(alignment: .bottom, spacing: 6) {
+            Spacer(minLength: 40)
+            VStack(alignment: .trailing, spacing: 3) {
+                bubble(
+                    text: text,
+                    blocks: [],
+                    fill: palette.bubbleMine,
+                    foreground: palette.onBubbleMine,
+                    maxWidth: 520
+                )
+                // A queued message is the one status this app can honestly report. There is no
+                // "Delivered" or "Read" to claim: nothing acknowledges a model having read it.
+                if isPending {
+                    Text("Queued")
+                        .scaledFont(size: 9.5)
+                        .foregroundStyle(palette.textTertiary)
+                        .padding(.trailing, 4)
+                }
+                if let turn { VoteButtons(controller: controller, turn: turn) }
+            }
+        }
+    }
+
+    // MARK: Everybody else
+
+    private var theirs: some View {
+        HStack(alignment: .bottom, spacing: 6) {
+            // The avatar holds the place even when it is not drawn, so every bubble in a run
+            // starts at the same edge and the column does not wobble.
+            Group {
+                if row.flags.closesRun {
+                    SeatAvatar(
+                        seatID: speakerID ?? "unknown",
+                        palette: palette,
+                        isStreaming: turn == nil
+                    )
+                } else {
+                    Color.clear.frame(width: 26, height: 26)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                if row.flags.opensRun {
+                    Text(name)
+                        .scaledFont(size: 10.5, weight: .semibold)
+                        .foregroundStyle(palette.textSecondary)
+                        .padding(.leading, 3)
+                }
+                if !liveReasoning.isEmpty, showReasoning {
+                    ReasoningBlock(text: liveReasoning, tint: tint)
+                        .frame(maxWidth: 560, alignment: .leading)
+                }
+                bubble(
+                    text: text,
+                    blocks: liveBlocks,
+                    fill: palette.bubbleTheirs,
+                    foreground: Color.primary,
+                    maxWidth: 520,
+                    isStreaming: turn == nil
+                )
+                if turn == nil { ActivityLine(activity: activity) }
+                if let turn { VoteButtons(controller: controller, turn: turn) }
+            }
+            Spacer(minLength: 40)
+        }
+    }
+
+    // MARK: The app's own notes
+
+    /// A centred grey line, the way a messaging app reports that somebody was added to a group.
+    ///
+    /// The research moderator's assignments go here rather than into a bubble, and that is a
+    /// decision rather than a shortcut: the director is the app speaking, not one of the
+    /// participants, and a bubble would put it in the argument the analysts are having.
+    private var systemLine: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 5) {
+                Image(systemName: turn?.symbol ?? "info.circle")
                     .scaledFont(size: 9)
+                Text(systemLabel)
+                    .scaledFont(size: 10.5, weight: .semibold)
             }
-            Text(isModerator ? name.uppercased() : name)
-                .scaledFont(size: 10, weight: .heavy, design: .rounded)
-            if turn == nil {
-                Text("streaming")
-                    .scaledFont(size: 9, weight: .semibold, design: .rounded)
+            .foregroundStyle(palette.textSecondary)
+
+            if !text.isEmpty {
+                Text(text)
+                    .scaledFont(size: 11)
                     .foregroundStyle(palette.textSecondary)
-            }
-            if isPending {
-                HStack(spacing: 3) {
-                    Image(systemName: "clock")
-                    Text("queued")
-                }
-                .scaledFont(size: 9, weight: .semibold, design: .rounded)
-                .foregroundStyle(AgentTheme.warning)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 520)
             }
         }
-        .foregroundStyle(tint)
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.vertical, 2)
+        .opacity(isPending ? 0.6 : 1)
     }
 
-    private var bubble: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if !liveBlocks.isEmpty || !text.isEmpty {
-                // Frozen paragraphs first, then the growing tail. Selection is off for the
-                // reason given at the top of this file.
-                ForEach(Array(liveBlocks.enumerated()), id: \.offset) { _, block in
-                    Text(block)
-                        .scaledFont(size: 12.5)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                if text.isEmpty, turn == nil {
-                    WaitingLine(name: name, tint: tint, activity: activity)
-                } else if !text.isEmpty {
-                    Text(text)
-                        .scaledFont(size: 12.5)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            } else if turn == nil {
-                WaitingLine(name: name, tint: tint, activity: activity)
+    private var systemLabel: String {
+        switch turn?.kind {
+        case .direction: "Research Moderator assigned work"
+        case .summary: "Earlier discussion condensed"
+        case .report: "Research report"
+        default: name
+        }
+    }
+
+    // MARK: The bubble
+
+    @ViewBuilder
+    private func bubble(
+        text: String,
+        blocks: [String],
+        fill: Color,
+        foreground: Color,
+        maxWidth: CGFloat,
+        isStreaming: Bool = false
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // Frozen paragraphs first, then the growing tail. Selection is off for the reason
+            // given at the top of this file.
+            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+                Text(block)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if text.isEmpty, isStreaming {
+                TypingDots()
+            } else if !text.isEmpty {
+                Text(text)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .frame(maxWidth: 620, alignment: .leading)
-        .background(tint.opacity(isModerator ? 0.18 : 0.12), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(tint.opacity(isModerator ? 0.35 : 0.28), lineWidth: 0.8)
-        )
-        .opacity(isPending ? 0.65 : 1)
+        .scaledFont(size: 12.5)
+        .foregroundStyle(foreground)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 7)
+        .frame(maxWidth: maxWidth, alignment: .leading)
+        // Continuous corners, because a group chat's bubbles are squircles rather than
+        // rounded rectangles — at 17 points the difference is most of what makes it look right.
+        .background(fill, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+    }
+}
+
+/// A seat that has started producing tokens but has nothing readable yet.
+///
+/// Three dots rather than a spinner, because this is the one place the app is imitating a chat
+/// window and a spinner is the one thing a chat window never shows. Deliberately *not* animated:
+/// this thread is rebuilt on every streamed token, and a repeating animation inside it is how
+/// this file's SwiftUI main-thread stalls start.
+private struct TypingDots: View {
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<3, id: \.self) { index in
+                Circle()
+                    .frame(width: 6, height: 6)
+                    .opacity(0.35 + Double(index) * 0.25)
+            }
+        }
+        .padding(.vertical, 3)
     }
 }
 
@@ -373,19 +538,21 @@ struct SetupBlock: View {
     }
 }
 
-/// A seat that is generating but has not produced text yet.
-private struct WaitingLine: View {
-    let name: String
-    let tint: Color
+/// What a seat is doing while it has produced no readable text.
+///
+/// The typing bubble says "something is coming"; this says *what* — "searching the web" is worth
+/// knowing and a row of dots cannot say it. Small and grey, under the bubble, where a chat app
+/// puts a receipt.
+private struct ActivityLine: View {
+    @Environment(\.themePalette) private var palette
     let activity: String
 
     var body: some View {
-        HStack(spacing: 8) {
-            ProgressView().controlSize(.small)
-            Text("\(name) \(activity.isEmpty ? "is thinking" : activity)")
-                .scaledFont(size: 11.5, design: .rounded)
-                .foregroundStyle(tint)
-            Spacer(minLength: 0)
+        if !activity.isEmpty {
+            Text(activity)
+                .scaledFont(size: 10)
+                .foregroundStyle(palette.textTertiary)
+                .padding(.leading, 3)
         }
     }
 }

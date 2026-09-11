@@ -82,6 +82,18 @@ struct AppPalette: Sendable {
     let textSecondary: AnyShapeStyle
     let textTertiary: AnyShapeStyle
 
+    /// The thread's message bubbles, in the group-chat sense: the human's own on the right in
+    /// blue, everybody else's on the left in grey.
+    ///
+    /// The incoming grey is translucent rather than a fixed value, so one constant reads
+    /// correctly over both the light pane and the black one — which is how the real thing
+    /// behaves, and is cheaper than a second set of colours to keep in step.
+    let bubbleMine: Color
+    let bubbleTheirs: Color
+    /// Text on the human's own bubble. White in both themes because the blue does not change
+    /// with the appearance, and dark ink on it would be unreadable.
+    let onBubbleMine: Color
+
     /// Whether the window chrome should be forced dark.
     let forcesDarkChrome: Bool
     /// Whether the original materials (`.bar`) can be used for panels.
@@ -96,6 +108,9 @@ struct AppPalette: Sendable {
         text: AnyShapeStyle(.primary),
         textSecondary: AnyShapeStyle(.secondary),
         textTertiary: AnyShapeStyle(.tertiary),
+        bubbleMine: Color(red: 0.039, green: 0.518, blue: 1.0),
+        bubbleTheirs: Color(white: 0.45, opacity: 0.20),
+        onBubbleMine: .white,
         forcesDarkChrome: false,
         usesMaterials: true,
         isBlack: false
@@ -110,6 +125,9 @@ struct AppPalette: Sendable {
         text: AnyShapeStyle(Color(white: 0.95)),
         textSecondary: AnyShapeStyle(Color(white: 0.62)),
         textTertiary: AnyShapeStyle(Color(white: 0.40)),
+        bubbleMine: Color(red: 0.039, green: 0.518, blue: 1.0),
+        bubbleTheirs: Color(white: 0.55, opacity: 0.26),
+        onBubbleMine: .white,
         forcesDarkChrome: true,
         usesMaterials: false,
         isBlack: true

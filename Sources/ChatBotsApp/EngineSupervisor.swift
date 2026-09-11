@@ -91,6 +91,20 @@ public final class EngineSupervisor: ObservableObject {
             return
         }
 
+        // Answering on the HTTP port but not on the transport: an engine is running that this
+        // app cannot talk to. Starting a second one used to "work" — SO_REUSEADDR let both
+        // bind the same ports — and the two then split incoming connections, so the browser and
+        // the app showed different conversations. Saying so is the honest answer.
+        if HTTPServer.isSomethingListening(on: configuration.httpPort) {
+            state = .failed(
+                """
+                An engine is already running on port \(configuration.httpPort), but it is not \
+                answering over WebTransport, which is how this app talks to it. Stop the other \
+                engine and start again, or point the app at a free port.
+                """)
+            return
+        }
+
         guard let executable = locateEngineExecutable() else {
             state = .failed(
                 """
@@ -250,10 +264,23 @@ public final class EngineSupervisor: ObservableObject {
     /// Asked over WebTransport rather than HTTP, because that is the channel the app will use:
     /// an engine whose HTTP side is up but whose transport is not would otherwise be adopted
     /// and then fail to connect.
-    private func isEngineAnswering() async -> Bool {
+    /// Retried, because the first attempt after a launch pays for the QUIC handshake, the
+    /// certificate check and a cold TLS stack, and a single two-second attempt occasionally lost
+    /// that race. The consequence was not a retry: it was this app starting a *second* engine on
+    /// the same ports, which SO_REUSEADDR allowed, leaving the browser and the app talking to
+    /// different processes. Three seconds of patience is cheaper than that.
+    private func isEngineAnswering(attempts: Int = 3) async -> Bool {
+        for attempt in 0..<attempts {
+            if await probeEngine() { return true }
+            if attempt < attempts - 1 { try? await Task.sleep(for: .milliseconds(500)) }
+        }
+        return false
+    }
+
+    private func probeEngine() async -> Bool {
         var configuration = WebTransportEngineClient.Configuration()
         configuration.port = self.configuration.port
-        configuration.timeoutMilliseconds = 2_000
+        configuration.timeoutMilliseconds = 4_000
         let client = WebTransportEngineClient(configuration: configuration)
         do {
             try await client.connect()

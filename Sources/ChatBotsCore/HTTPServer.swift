@@ -330,6 +330,16 @@ public final class HTTPServer: @unchecked Sendable {
     /// Start listening. Throws if the port cannot be taken, which the caller must report
     /// rather than silently serving nothing.
     public func start() throws {
+        // Asked before binding, because a second process *can* take the same port:
+        // `allowLocalEndpointReuse` below is set so a restart is not blocked by a socket in
+        // TIME_WAIT, and BSD's SO_REUSEADDR also permits two live listeners on one address. The
+        // second engine then binds happily and the two split incoming connections between them,
+        // so the browser and the app quietly talk to different conversations. Checking first
+        // turns that back into a failure the caller can report.
+        if HTTPServer.isSomethingListening(on: port) {
+            throw HTTPError.portInUse(port)
+        }
+
         let parameters = NWParameters.tcp
         // Loopback only: this server drives a local chat app and has no business being
         // reachable from the network. The Caddy front end is the one that faces outwards.
@@ -372,6 +382,39 @@ public final class HTTPServer: @unchecked Sendable {
             try? await Task.sleep(for: .milliseconds(20))
         }
         return isRunning
+    }
+
+    /// Whether anything already accepts a connection on this port.
+    ///
+    /// A blocking connect to loopback with a short timeout. A listener accepts immediately, and
+    /// this needs nothing else to be true for the answer to be useful.
+    /// Public because the app has to ask the same question before it decides whether to start
+    /// an engine of its own: a port that answers but does not speak the app's transport is a
+    /// situation to report, not one to bulldoze with a second engine.
+    public static func isSomethingListening(on port: UInt16) -> Bool {
+        let handle = socket(AF_INET, SOCK_STREAM, 0)
+        guard handle >= 0 else { return false }
+        defer { close(handle) }
+
+        var timeout = timeval(tv_sec: 0, tv_usec: 250_000)
+        _ = setsockopt(
+            handle, SOL_SOCKET, SO_SNDTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+
+        var address = sockaddr_in()
+        // Darwin's sockaddr_in carries its own length and `connect` rejects the address without
+        // it — silently, with EINVAL, which reads here as "nothing is listening" and is exactly
+        // the wrong answer. This was the bug in the first version of this check.
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_port = port.bigEndian
+        address.sin_addr.s_addr = inet_addr("127.0.0.1")
+
+        let connected = withUnsafePointer(to: &address) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { socketAddress in
+                connect(handle, socketAddress, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        return connected == 0
     }
 
     public func stop() {
