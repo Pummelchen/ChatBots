@@ -17,7 +17,9 @@ key, nothing leaves your Mac.
   Peacemaker, the Grudge Holder…
 * **Research Team** — specialists investigate a question from different methods and produce a
   report you can act on, with every claim labelled as fact, sourced, inference, assumption,
-  opinion or scenario, and the disagreements and gaps named rather than hidden.
+  opinion or scenario, and the disagreements and gaps named rather than hidden. The Moderator
+  runs the investigation rather than only writing it up: it decides what the question still owes
+  and hands the next piece of work to whichever analyst's method fits it.
 
 **The participants have names.** Agent 1 is given a female name and Agent 2 a male one, drawn
 at random from English, French, German, Spanish (Latino), Brazilian Portuguese and Italian
@@ -27,6 +29,11 @@ choice is saved with your settings and stays for that conversation.
 **Two front ends, one engine.** A macOS app with the models side by side, and a web interface
 at `http://localhost:7788` for any browser, including your phone. They are clients of the same
 conversation engine, so anything you can do in one you can do in the other.
+
+**Nothing is lost.** Every conversation is written to disk as it runs, so closing the window —
+or quitting — does not lose it. **Kept** in either front end reopens one, or deletes the ones
+you are done with. **Save** exports any conversation, or a finished report, as a text or
+Markdown file you can send to someone.
 
 ## Quick start
 
@@ -61,7 +68,8 @@ Full guides are in the **[wiki](https://github.com/Pummelchen/ChatBots/wiki)**:
 | [Using the desktop app](https://github.com/Pummelchen/ChatBots/wiki/Using-the-desktop-app) | every control, and what it is for |
 | [Using the website](https://github.com/Pummelchen/ChatBots/wiki/Using-the-website) | the browser and phone interface, and the three start scripts |
 | [Personas](https://github.com/Pummelchen/ChatBots/wiki/Personas) | who can take part, and how to choose |
-| [Running a research session](https://github.com/Pummelchen/ChatBots/wiki/Running-a-research-session) | budgets, and reading the report |
+| [Running a research session](https://github.com/Pummelchen/ChatBots/wiki/Running-a-research-session) | budgets, the moderator assigning the work, and reading the report |
+| [Keeping and sharing](https://github.com/Pummelchen/ChatBots/wiki/Keeping-and-sharing) | reopening a past conversation, where the files are, exporting one |
 | [Using cloud models](https://github.com/Pummelchen/ChatBots/wiki/Using-cloud-models) | DeepSeek, LM Studio, or any OpenAI-compatible server |
 | [Documents and images](https://github.com/Pummelchen/ChatBots/wiki/Documents-and-images) | giving the models something to read or look at |
 | [Troubleshooting](https://github.com/Pummelchen/ChatBots/wiki/Troubleshooting) | when it will not start, crashes, or is slow |
