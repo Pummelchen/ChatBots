@@ -213,8 +213,17 @@ seat counts as able to see when:
 * you set a **per-seat override**, for a model whose family cannot be recognised from its id.
 
 An unrecognised API model counts as *unknown*, not as supported: the interface does not
-offer images on a guess. Images are read as bytes and sent as-is — no conversion is
+offer images on a guess. Images are read as bytes and kept as-is — no conversion is
 attempted, since there is nothing to convert them to that would cost less.
+
+**Status: image *detection* is complete, image *transmission* is not.** The capability
+answer above is real and decides whether the image formats appear in the open panel, and an
+image that is added is extracted, stored, persisted and shown on its chip. What is not yet
+wired up is sending the bytes: the API path needs an `input_image` content block in the
+request, and the local path needs its engine to load through `VLMModelFactory` and pass a
+`UserInput` carrying the image rather than a plain text prompt. Until then an image sits in
+the source list without reaching the models, so **prefer documents** — they are the cheaper
+path anyway, and they already work.
 
 Material is kept with the preferences, so it survives a relaunch without being re-read —
 and the extraction is the slow part. **Clear** keeps the source material, so starting the
