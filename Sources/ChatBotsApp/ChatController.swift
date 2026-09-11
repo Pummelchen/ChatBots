@@ -1115,6 +1115,9 @@ public final class ChatController: ObservableObject {
         }
     }
 
+    /// Dismiss the connection notice once it has been read.
+    public func clearConnectionMessage() { engineConnection = nil }
+
     /// Where this engine's HTTP server is, so a share link can be built without being told a
     /// port. Nil when the engine is WebTransport-only, and then there is nothing to share to.
     public var shareBase: String? {

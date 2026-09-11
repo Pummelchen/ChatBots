@@ -472,17 +472,19 @@ struct ThreadMessage: View {
         VStack(alignment: .leading, spacing: 6) {
             // Frozen paragraphs first, then the growing tail. Selection is off for the reason
             // given at the top of this file.
+            // No `maxWidth: .infinity` inside the bubble. A frame that fills the available
+            // width makes *every* bubble the maximum width regardless of what it says, so
+            // "Why are eggs not round?" drew as a 520-point slab and a one-word reply would
+            // have too. The bubble hugs its text and stops at the cap instead.
             ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                 Text(block)
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             if text.isEmpty, isStreaming {
                 TypingDots()
             } else if !text.isEmpty {
                 Text(text)
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .scaledFont(size: 12.5)

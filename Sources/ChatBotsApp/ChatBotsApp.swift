@@ -94,15 +94,23 @@ struct ChatBotsApp: App {
                 .environmentObject(endpoints)
                 .environmentObject(settings)
                 .environmentObject(zoom)
-                // Restore each seat's saved endpoint before any turn can run.
-                .task { controller.applyAPIEndpoints(endpoints) }
-                // Start the engine, then attach to it. The window draws the saved seats
-                // immediately and the engine's own state replaces them as soon as the first
-                // snapshot arrives, so a slow start shows the interface rather than a blank
-                // window.
+                // Start the engine, attach to it, and only then restore the seats' saved
+                // endpoints.
+                //
+                // These were two independent `.task`s, so the endpoint restore raced the
+                // connection: it would find no client, report "Not connected to the engine.",
+                // and — because that notice is only cleared by hand — leave that on screen
+                // covering whatever the connection had actually said. The endpoints themselves
+                // were quietly never applied either, since the command was dropped rather than
+                // retried.
+                //
+                // The window draws the saved seats immediately and the engine's own state
+                // replaces them as soon as the first snapshot arrives, so a slow start shows
+                // the interface rather than a blank window.
                 .task {
                     await supervisor.start()
                     await controller.connect(port: supervisor.configuration.port)
+                    controller.applyAPIEndpoints(endpoints)
                     if case .failed(let reason) = supervisor.state {
                         controller.errorBanner = reason
                     }

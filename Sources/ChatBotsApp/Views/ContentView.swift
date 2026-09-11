@@ -27,8 +27,14 @@ struct ContentView: View {
             minWidth: 700 * zoom.scale, idealWidth: 1280, minHeight: 460, idealHeight: 780
         )
         .safeAreaInset(edge: .top, spacing: 0) {
+            // The connection state is shown here too. It was set on every failure and never
+            // displayed anywhere, so an engine that could not be reached, or one whose live
+            // updates had stopped, looked exactly like a conversation nobody had started: the
+            // window simply sat there saying "Nothing yet" and offered no reason.
             if let message = controller.errorBanner {
                 ErrorBanner(message: message) { controller.errorBanner = nil }
+            } else if let connection = controller.engineConnection {
+                ErrorBanner(message: connection) { controller.clearConnectionMessage() }
             }
         }
         .overlay(alignment: .top) {
