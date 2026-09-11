@@ -191,6 +191,23 @@ struct Options {
         return spec
     }
 
+    /// Apply this run's settings to every seat, including the third and fourth.
+    ///
+    /// Found by running a four-seat conversation: `--max-tokens 30` reached seats 1 and 2,
+    /// because they are built through `configured` above, while seats 3 and 4 came from
+    /// `makeSeats` and kept their defaults. The log showed `maxOut=30` for two seats and a
+    /// 636-token turn from a fourth. Any per-run setting has to reach all of them or a
+    /// four-seat run is not testing what the flags say it is.
+    func applyToAllSeats(_ seats: [AgentSpec]) -> [AgentSpec] {
+        seats.map { spec in
+            configured(
+                spec,
+                persona: nil,
+                // Only the first two have a per-seat backend choice on the command line.
+                backend: spec.backend)
+        }
+    }
+
     var specA: AgentSpec {
         configured(AgentSpec.seatA(modelID: modelA), persona: personaA, backend: backendA)
     }
@@ -372,6 +389,8 @@ var specs: [AgentSpec] = {
         built.append(contentsOf: AgentSpec.makeSeats(count: count).dropFirst(2))
     }
     built = Array(built.prefix(count))
+    // Every seat gets this run's settings, not just the two the command line names directly.
+    built = options.applyToAllSeats(built)
     // Named like the app: one female and one male, at random. The CLI built its own first two
     // seats, so it has to ask for this rather than inheriting it.
     var generator = SystemRandomNumberGenerator()
