@@ -75,11 +75,22 @@ public struct Conversation: Sendable {
     /// converted to text. Read by every seat on every turn, because it is context for the
     /// discussion rather than a message in it.
     public var attachments: [AttachedDocument]
+    /// The social state an entertainment conversation has built up: who respects whom, who is
+    /// annoyed with whom, what grudges and alliances are live. Persists across turns and is
+    /// fed back into each seat's prompt, which is what makes a conversation develop rather
+    /// than restart every message.
+    public var conflict = ConflictState()
 
-    public init(topic: String, turns: [Turn] = [], attachments: [AttachedDocument] = []) {
+    public init(
+        topic: String,
+        turns: [Turn] = [],
+        attachments: [AttachedDocument] = [],
+        conflict: ConflictState = ConflictState()
+    ) {
         self.topic = topic
         self.turns = turns
         self.attachments = attachments
+        self.conflict = conflict
     }
 
     /// Turns that an LLM should actually read: history and opening brief, but not

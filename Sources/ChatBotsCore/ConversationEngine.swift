@@ -606,15 +606,39 @@ public final class ConversationEngine {
             if clean.isEmpty {
                 note("\(id) produced no text (stop: \(stats.stopReason)).")
             } else {
+                let sequence = nextSequence()
                 conversation.turns.append(
                     Turn(
-                        sequence: nextSequence(),
+                        sequence: sequence,
                         speakerID: id,
                         speakerName: currentSpeakerName ?? id,
                         kind: .chat,
                         content: clean
                     )
                 )
+                // Read the turn for social signals, so the next speaker reacts to what was
+                // actually said rather than to a transcript it has to re-derive. Only in
+                // entertainment: a research seat is judged on method and evidence, and
+                // importing grudges into it would be the modes sharing a philosophy.
+                // The handler is given an id, not the seat, so the mode is looked up here.
+                let speakerMode = seats.first { $0.spec.id == id }?.spec.mode ?? .entertainment
+                if speakerMode == .entertainment {
+                    let everyone = seats.map(\.spec.id)
+                    let signals = ConflictReader.signals(
+                        in: clean,
+                        from: id,
+                        others: everyone,
+                        // Aimed at whoever spoke last, which is who the message is answering.
+                        addressing: conversation.turns.dropLast().last { $0.kind == .chat }?.speakerID
+                    )
+                    conversation.conflict.apply(
+                        signals: signals,
+                        from: id,
+                        others: everyone,
+                        sequence: sequence,
+                        summary: ConflictReader.summary(of: clean)
+                    )
+                }
                 publishTranscript()
             }
             publishEvent(event)

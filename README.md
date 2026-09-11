@@ -573,6 +573,45 @@ already carries the previous name, and a rename mid-thread would leave the share
 attributing turns to two different names for the same participant. Earlier turns keep the
 name they were spoken under rather than being retroactively re-attributed.
 
+### The conflict engine (Reality Show)
+
+A reality-show conversation is not a sequence of independent replies. The brief asks that a
+character react to what happened earlier — hold a grudge, form an alliance, take a side,
+enjoy a win — and that needs state which survives between turns and is fed back into the
+prompt. `ConflictState` is that state.
+
+It is **per pair**, not per seat. Almost everything worth modelling is relational: respect for
+one character says nothing about respect for another, and an alliance is between two seats. A
+single score per seat could not express "sides with B against C", and with 3–4 seats that
+distinction is the interesting part.
+
+| Axis | Raised by | Meaning in the prompt |
+| --- | --- | --- |
+| respect | a good argument, new evidence | engages seriously, or holds them in contempt |
+| annoyance | a jab, a contradiction caught | hostile, irritated, retaliating |
+| trust | agreement, being defended | trusting — or actively distrustful, since it is bipolar |
+| competition | being attacked, going after someone | keeps score |
+| grudge | a jab serious enough to remember | *names the remark and the turn it happened* |
+| alliance | mutual agreement | allied, and says so |
+
+**What the reader infers, and what it refuses to.** Detecting that an argument was *good* is
+not something a phrase list can do, and a conflict engine fed wrong signals is worse than one
+fed none — it produces hostility nobody earned. So `ConflictReader` commits only to what the
+text shows plainly: an explicit concession, an apology, a returned agreement, a personal
+attack as distinct from an attack on a claim, a contradiction held up. It deliberately does
+not judge persuasiveness; that is left to trajectory, which a phrase list *can* see — a seat
+that keeps being challenged without conceding loses respect over several turns.
+
+**Nothing is random.** The same conversation read twice produces the same state, which is what
+makes it testable and what stops a conversation behaving differently on each run.
+
+The state reaches a seat as its own system message, so a model mid-conversation meets it as
+*news* rather than as part of the character sheet — and it contains **no numbers**, because
+"annoyance: 0.62" means nothing to a model. It says "still holding the earlier slight, since
+turn 3: that is a ridiculous claim". Research seats get none of this: importing grudges into
+an investigation is exactly the shared philosophy the brief rules out, and there is a test for
+it.
+
 ### Two modes, two persona philosophies
 
 The brief is explicit that the modes must not share a persona philosophy, and the code takes

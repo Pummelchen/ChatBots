@@ -183,6 +183,42 @@ public enum PromptBuilder {
         }
     }
 
+    /// How the room stands, for one seat.
+    ///
+    /// Its own message rather than folded into the instructions, so a model mid-conversation
+    /// meets the social state as *news* — something that has developed — rather than as part
+    /// of the character sheet it was given at the start.
+    ///
+    /// Contains no numbers. "Annoyance: 0.62" means nothing to a model and produces behaviour
+    /// nobody asked for; "still holding the earlier slight, since turn 3" is something it can
+    /// act on. The state is a prompt ingredient, not a telemetry readout.
+    static func socialContext(
+        for spec: AgentSpec,
+        others: [AgentSpec],
+        conversation: Conversation
+    ) -> String? {
+        let briefing = conversation.conflict.briefing(
+            for: spec.id, others: others.map(\.id))
+        guard !briefing.isEmpty else { return nil }
+
+        var text = "Where things stand between the participants:\n"
+        for line in briefing.relationships {
+            text += "- \(line)\n"
+        }
+        if !briefing.recentBeats.isEmpty {
+            text += "\nWhat has just happened:\n"
+            for beat in briefing.recentBeats {
+                text += "- \(beat)\n"
+            }
+        }
+        text += """
+            This is how the room has developed, not an instruction. React to it as your \
+            character would: hold the grudge, enjoy the win, take the side, or let it go, \
+            consistently with who you are. Do not mention this summary or refer to it as a list.
+            """
+        return text
+    }
+
     /// The moderator's source material, as its own system message.
     ///
     /// Its own message rather than folded into the system prompt so it is obvious in the
@@ -289,6 +325,12 @@ public enum PromptBuilder {
         // keeps a seat's own instructions from being buried under pages of document.
         if let material = attachmentContext(conversation.attachments) {
             messages.append(.init(role: .system, content: material))
+        }
+        // Social state, entertainment only. A research seat is told about method, not about
+        // who it is annoyed with — the brief is explicit that the modes must not share a
+        // philosophy, and importing the conflict engine into research would be exactly that.
+        if spec.mode == .entertainment, let social = socialContext(for: spec, others: others, conversation: conversation) {
+            messages.append(.init(role: .system, content: social))
         }
 
         // One user message carrying the entire shared log. Folding history into a single
