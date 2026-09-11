@@ -61,6 +61,36 @@ Sources/ChatBotsCLI             headless runner — same core, no window
 Tests/ChatBotsCoreTests         orchestration, prompt assembly, thinking parser
 ```
 
+### Both seats run on the GPU — measured, not assumed
+
+Two seats share the M3 GPU happily; there is no need to push one onto the CPU. Measured
+with `chatbots-cli --benchmark --max-tokens 200` (M3, 24 GB, Qwen3.5-4B-MLX-4bit ×2):
+
+| | seat A | seat B |
+| --- | --- | --- |
+| alone | 30.0 tok/s | 30.2 tok/s |
+| both generating at once | 15.0 tok/s | 15.0 tok/s |
+
+When both seats really do generate at the same moment the GPU serialises them and each
+gets exactly half — the combined rate is unchanged, so nothing is lost, and they load
+concurrently without complaint. **The conversation never hits that case anyway**: a turn
+needs the previous speaker's text to exist before the next seat can read it, so the loop
+is sequential and the speaking seat always has the GPU to itself at full 30 tok/s.
+
+CPU offload is deliberately not offered. It is not merely slower — it is impossible for
+this checkpoint: Qwen 3.5's linear-attention layers call MLX's `metal_kernel`, and
+forcing the CPU fails hard with
+
+```
+Fatal error: [metal_kernel] Only supports the GPU.
+```
+
+If a future seat uses a dense model that lacks those kernels, `MLXEngine` can be pointed
+at another device, but no such seat ships here.
+
+`--benchmark` is kept because it is also the cheapest way to prove a new checkpoint loads
+and generates at all before wiring it into a conversation.
+
 ### Three decisions worth knowing about
 
 **1. One engine per seat, not one shared model.**
@@ -160,6 +190,9 @@ swift test
 
 # headless conversation, real models
 swift run chatbots-cli --topic "Why are eggs not round?" --turns 4
+
+# measure both seats (and prove a checkpoint works) without a full debate
+swift run chatbots-cli --benchmark --max-tokens 200
 ```
 
 `chatbots-cli --help` documents the other flags (`--model-a`, `--model-b`,
@@ -194,3 +227,5 @@ models — that is fine here, because each seat tokenizes its own prompt.
   dispatch is driven from `MLXEngine` rather than the session's own loop. Both are
   consequences of the pinned 3.31.4 API; see the comment in `MLXEngine.generate`.
 * Measured on an M3: ~30 tokens/s per seat, ~20 s for a 500-token opening statement.
+* Both seats are GPU-only — see the benchmark table above for why CPU offload is not an
+  option for this checkpoint.

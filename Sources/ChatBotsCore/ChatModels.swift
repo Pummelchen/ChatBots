@@ -135,6 +135,7 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
 
     public static let defaultModelID = "mlx-community/Qwen3.5-4B-MLX-4bit"
 
+
     /// Seat A — the default opening speaker.
     public static func seatA(modelID: String = AgentSpec.defaultModelID) -> AgentSpec {
         AgentSpec(

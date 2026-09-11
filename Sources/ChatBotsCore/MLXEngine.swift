@@ -40,6 +40,9 @@ public actor MLXEngine: LLMEngine {
     private var loadedContextWindow = 32_768
     private var didLogConfiguration = false
 
+    /// Throughput of this seat's most recent turn, for diagnostics and benchmarks.
+    public private(set) var lastStats: TurnStats?
+
     public init(
         spec: AgentSpec,
         toolRegistry: ToolRegistry = .shared,
@@ -72,7 +75,7 @@ public actor MLXEngine: LLMEngine {
             onStateChange(.loading(progress: 0))
             let progressBox = ProgressBox()
 
-            let container = try await #huggingFaceLoadModelContainer(
+            return try await #huggingFaceLoadModelContainer(
                 configuration: ModelConfiguration(id: spec.modelID)
             ) { progress in
                 let fraction =
@@ -81,7 +84,6 @@ public actor MLXEngine: LLMEngine {
                     : 0
                 progressBox.report(fraction, to: onStateChange)
             }
-            return container
         }
         loadingTask = task
 
@@ -209,6 +211,13 @@ public actor MLXEngine: LLMEngine {
             return segment.answer
         }
 
+        // Both seats compute on the GPU. This is not a preference: Qwen 3.5's
+        // linear-attention layers call `metal_kernel`, and MLX reports
+        // "[metal_kernel] Only supports the GPU" if it is forced onto the CPU, so a
+        // CPU seat is not possible for this checkpoint (and is slower for dense models
+        // anyway). Apple GPUs are shared, so two seats coexist; when they generate at
+        // the same time they time-share rather than overlap. The orchestrator's turn
+        // loop is sequential, so in practice one seat is always idle.
         rounds: while true {
             let entriesForRound = promptEntries
             let stream = await container.perform {
@@ -308,6 +317,7 @@ public actor MLXEngine: LLMEngine {
             )
         }
 
+        lastStats = stats
         await onEvent(.turnFinished(agentID: agentID, text: final, stats: stats))
         logConfigurationOnce(container: container, spec: spec)
         return final
