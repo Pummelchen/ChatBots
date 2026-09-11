@@ -30,6 +30,10 @@
   --text-faint: #6b6b7a;
   --seat-a: #4aa3ff;
   --seat-b: #b07cff;
+  /* A third and fourth seat need their own hues: telling two blues apart under pressure is
+     harder than telling blue from amber. */
+  --seat-c: #f2a03d;
+  --seat-d: #3ecf8e;
   --mod: #ffc44d;
   --danger: #ff6b6b;
   --radius: 10px;
@@ -70,6 +74,12 @@
 @media (max-width: 340px)  { :root { --scale: 0.9; } }
 
 * { box-sizing: border-box; }
+
+/* Several panels below set `display`, which overrides the browser's default styling for the
+   `hidden` attribute — an element with `display: flex` from a class stays visible even when
+   hidden. Found by looking at a capture: the research report panel was showing over an
+   entertainment conversation, with nothing in it. */
+[hidden] { display: none !important; }
 
 html, body {
   height: 100%;
@@ -274,9 +284,22 @@ body[data-device="phone"] button { min-height: var(--tap); padding-inline: calc(
   background: var(--line);
 }
 
-/* Two columns only when the device is a tablet or a desktop. */
-body[data-device="tablet"] #stage { grid-template-columns: 1fr 1fr; }
-body[data-device="desktop"] #stage { grid-template-columns: 1fr 1fr; }
+/* Two columns is the comfortable case; three and four are allowed on a wide screen but each
+   pane stays wide enough to read, which is why the columns are capped rather than made
+   equal. Below the tablet breakpoint everything is one column, whatever the seat count: a
+   180-point pane is not a conversation. */
+body[data-device="tablet"] #stage { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+body[data-device="desktop"] #stage {
+  grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
+}
+/* With four seats on a modest desktop, two rows of two reads better than four narrow
+   columns. */
+body[data-device="desktop"][data-seats="4"] #stage {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+body[data-device="desktop"][data-seats="3"] #stage {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 
 /* The single-column shape: one conversation, both participants in it. */
 body[data-layout="thread"] #stage { grid-template-columns: 1fr; }
@@ -630,4 +653,22 @@ body[data-device="tablet"] .toggle-text { display: inline; }
 @media (max-width: 780px) {
   .report-panel { width: calc(var(--vw) - 12px); }
   .report-head .spacer { display: none; }
+}
+
+
+/* ── More than two seats ──────────────────────────────────────────────────────────── */
+
+/* Each seat gets its own tint, so a four-way conversation is still readable at a glance.
+   Distinct hues rather than shades: telling two blues apart under pressure is harder than
+   telling blue from amber. */
+.pane[data-seat="2"] .dot { background: var(--seat-c); }
+.pane[data-seat="3"] .dot { background: var(--seat-d); }
+.msg[data-seat="2"] { border-left-color: var(--seat-c); }
+.msg[data-seat="3"] { border-left-color: var(--seat-d); }
+.msg[data-seat="2"] .msg-who { color: var(--seat-c); }
+.msg[data-seat="3"] .msg-who { color: var(--seat-d); }
+
+@media (max-width: 780px) {
+  body[data-device="tablet"] #stage,
+  body[data-device="desktop"] #stage { grid-template-columns: 1fr; }
 }

@@ -573,6 +573,30 @@ already carries the previous name, and a rename mid-thread would leave the share
 attributing turns to two different names for the same participant. Earlier turns keep the
 name they were spoken under rather than being retroactively re-attributed.
 
+### 2–4 seats
+
+The engine has always rotated through however many seats it was given; what was missing was
+the interfaces assuming two.
+
+```
+CHATBOTS_SEATS=4 bash tools/start.sh
+```
+
+The count is stored with the preferences, so a 4-seat room reopens as one rather than
+silently dropping back to two. Each seat gets its own tint — a distinct hue rather than a
+shade, because telling two blues apart under pressure is harder than telling blue from amber.
+
+The web interface **builds a pane per seat** instead of having two in the markup. That was the
+actual blocker: the engine supported four, the API reported four, and the page drew two.
+
+Layout by screen: two columns on a tablet, and on a desktop `auto-fit` with a 380-point floor
+so four panes stay readable — falling back to 2×2 for four seats and three columns for three,
+which reads better than four narrow strips. Below the tablet breakpoint everything collapses
+to the single column whatever the seat count, because a 180-point pane is not a conversation.
+
+Verified at 1440×900 (four panes, 2×2), 810×1080 (four panes, two columns) and 390×844 (four
+panes, single column), with no horizontal overflow at any of them.
+
 ### Research sessions end, and produce a report
 
 The modes differ in more than tone: an entertainment conversation is endless by design, while

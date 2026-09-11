@@ -248,6 +248,52 @@
     return el;
   }
 
+  /**
+   * Build one pane per seat.
+   *
+   * The seat count is 2, 3 or 4, so the panes cannot be in the markup — the original version
+   * hard-coded two, which is what made a four-seat room impossible in the web interface even
+   * though the engine supported it.
+   *
+   * Rebuilding clears the rendered messages, because every pane's transcript is replaced; the
+   * caller redraws afterwards.
+   */
+  function buildPanes(seatCount) {
+    const stage = $("stage");
+    const build = document.body.dataset.seats;
+    if (build === String(seatCount)) return false;
+    document.body.dataset.seats = String(seatCount);
+
+    // Remove existing panes but leave the thread container.
+    for (const pane of stage.querySelectorAll(".pane")) pane.remove();
+
+    const template = $("pane-template");
+    const thread = $("thread");
+    for (let index = 0; index < seatCount; index += 1) {
+      const pane = template.content.firstElementChild.cloneNode(true);
+      pane.dataset.seat = String(index);
+      pane.querySelector(".name").dataset.rename = String(index);
+      pane.querySelector(".dot").textContent = String.fromCharCode(65 + index);
+      stage.insertBefore(pane, thread);
+    }
+    wirePaneControls();
+    rebuildTranscripts();
+    return true;
+  }
+
+  /** Renaming is per pane, so it has to be attached whenever the panes are rebuilt. */
+  function wirePaneControls() {
+    for (const button of document.querySelectorAll(".name")) {
+      // Guard against attaching twice to a pane that survived.
+      if (button.dataset.wired === "1") continue;
+      button.dataset.wired = "1";
+      button.addEventListener("dblclick", () => startRename(button));
+      button.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") { event.preventDefault(); startRename(button); }
+      });
+    }
+  }
+
   function containers() {
     return [
       ...document.querySelectorAll(".transcript"),
@@ -407,6 +453,10 @@
   function apply(next) {
     const first = state.snapshot === null;
     state.snapshot = next;
+    // A seat count change replaces the panes, so it is handled before anything draws.
+    if (buildPanes(next.seats.length)) {
+      $("thread").textContent = "";
+    }
     if (first) $("topic").value = next.topic || "";
     drawMessages();
     drawLive();
@@ -657,12 +707,7 @@
     $("view-phone").onclick = () => setViewMode("phone");
     $("view-desktop").onclick = () => setViewMode("desktop");
 
-    for (const button of document.querySelectorAll(".name")) {
-      button.addEventListener("dblclick", () => startRename(button));
-      button.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") { event.preventDefault(); startRename(button); }
-      });
-    }
+    wirePaneControls();
 
     for (const container of containers()) {
       container.addEventListener("scroll", () => {

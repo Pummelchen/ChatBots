@@ -94,33 +94,23 @@ public enum WebAssets {
 </header>
 
 <main id="stage">
-  <section class="pane" data-pane="0">
-    <div class="pane-head">
-      <span class="dot" data-seat="0">A</span>
-      <div class="who">
-        <button class="name" data-rename="0" title="Press to rename">Agent 1</button>
-        <span class="meta" data-meta="0"></span>
+  <!-- One pane per seat, built by the client: the seat count is 2, 3 or 4, and hard-coding
+       two of them was what made a 4-seat room impossible. The template is cloned. -->
+  <template id="pane-template">
+    <section class="pane">
+      <div class="pane-head">
+        <span class="dot"></span>
+        <div class="who">
+          <button class="name" title="Press to rename"></button>
+          <span class="meta"></span>
+        </div>
+        <div class="spacer"></div>
+        <span class="state"></span>
       </div>
-      <div class="spacer"></div>
-      <span class="state" data-state="0">idle</span>
-    </div>
-    <div class="params" data-params="0"></div>
-    <div class="transcript" data-transcript="0"></div>
-  </section>
-
-  <section class="pane" data-pane="1">
-    <div class="pane-head">
-      <span class="dot" data-seat="1">B</span>
-      <div class="who">
-        <button class="name" data-rename="1" title="Press to rename">Agent 2</button>
-        <span class="meta" data-meta="1"></span>
-      </div>
-      <div class="spacer"></div>
-      <span class="state" data-state="1">idle</span>
-    </div>
-    <div class="params" data-params="1"></div>
-    <div class="transcript" data-transcript="1"></div>
-  </section>
+      <div class="params"></div>
+      <div class="transcript"></div>
+    </section>
+  </template>
 
   <div id="thread" class="thread" hidden></div>
 </main>
@@ -199,6 +189,10 @@ public enum WebAssets {
   --text-faint: #6b6b7a;
   --seat-a: #4aa3ff;
   --seat-b: #b07cff;
+  /* A third and fourth seat need their own hues: telling two blues apart under pressure is
+     harder than telling blue from amber. */
+  --seat-c: #f2a03d;
+  --seat-d: #3ecf8e;
   --mod: #ffc44d;
   --danger: #ff6b6b;
   --radius: 10px;
@@ -239,6 +233,12 @@ public enum WebAssets {
 @media (max-width: 340px)  { :root { --scale: 0.9; } }
 
 * { box-sizing: border-box; }
+
+/* Several panels below set `display`, which overrides the browser's default styling for the
+   `hidden` attribute — an element with `display: flex` from a class stays visible even when
+   hidden. Found by looking at a capture: the research report panel was showing over an
+   entertainment conversation, with nothing in it. */
+[hidden] { display: none !important; }
 
 html, body {
   height: 100%;
@@ -443,9 +443,22 @@ body[data-device="phone"] button { min-height: var(--tap); padding-inline: calc(
   background: var(--line);
 }
 
-/* Two columns only when the device is a tablet or a desktop. */
-body[data-device="tablet"] #stage { grid-template-columns: 1fr 1fr; }
-body[data-device="desktop"] #stage { grid-template-columns: 1fr 1fr; }
+/* Two columns is the comfortable case; three and four are allowed on a wide screen but each
+   pane stays wide enough to read, which is why the columns are capped rather than made
+   equal. Below the tablet breakpoint everything is one column, whatever the seat count: a
+   180-point pane is not a conversation. */
+body[data-device="tablet"] #stage { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+body[data-device="desktop"] #stage {
+  grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
+}
+/* With four seats on a modest desktop, two rows of two reads better than four narrow
+   columns. */
+body[data-device="desktop"][data-seats="4"] #stage {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+body[data-device="desktop"][data-seats="3"] #stage {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 
 /* The single-column shape: one conversation, both participants in it. */
 body[data-layout="thread"] #stage { grid-template-columns: 1fr; }
@@ -801,6 +814,24 @@ body[data-device="tablet"] .toggle-text { display: inline; }
   .report-head .spacer { display: none; }
 }
 
+
+/* ── More than two seats ──────────────────────────────────────────────────────────── */
+
+/* Each seat gets its own tint, so a four-way conversation is still readable at a glance.
+   Distinct hues rather than shades: telling two blues apart under pressure is harder than
+   telling blue from amber. */
+.pane[data-seat="2"] .dot { background: var(--seat-c); }
+.pane[data-seat="3"] .dot { background: var(--seat-d); }
+.msg[data-seat="2"] { border-left-color: var(--seat-c); }
+.msg[data-seat="3"] { border-left-color: var(--seat-d); }
+.msg[data-seat="2"] .msg-who { color: var(--seat-c); }
+.msg[data-seat="3"] .msg-who { color: var(--seat-d); }
+
+@media (max-width: 780px) {
+  body[data-device="tablet"] #stage,
+  body[data-device="desktop"] #stage { grid-template-columns: 1fr; }
+}
+
 """
 
     static let appJS = """
@@ -1054,6 +1085,52 @@ body[data-device="tablet"] .toggle-text { display: inline; }
     return el;
   }
 
+  /**
+   * Build one pane per seat.
+   *
+   * The seat count is 2, 3 or 4, so the panes cannot be in the markup — the original version
+   * hard-coded two, which is what made a four-seat room impossible in the web interface even
+   * though the engine supported it.
+   *
+   * Rebuilding clears the rendered messages, because every pane's transcript is replaced; the
+   * caller redraws afterwards.
+   */
+  function buildPanes(seatCount) {
+    const stage = $("stage");
+    const build = document.body.dataset.seats;
+    if (build === String(seatCount)) return false;
+    document.body.dataset.seats = String(seatCount);
+
+    // Remove existing panes but leave the thread container.
+    for (const pane of stage.querySelectorAll(".pane")) pane.remove();
+
+    const template = $("pane-template");
+    const thread = $("thread");
+    for (let index = 0; index < seatCount; index += 1) {
+      const pane = template.content.firstElementChild.cloneNode(true);
+      pane.dataset.seat = String(index);
+      pane.querySelector(".name").dataset.rename = String(index);
+      pane.querySelector(".dot").textContent = String.fromCharCode(65 + index);
+      stage.insertBefore(pane, thread);
+    }
+    wirePaneControls();
+    rebuildTranscripts();
+    return true;
+  }
+
+  /** Renaming is per pane, so it has to be attached whenever the panes are rebuilt. */
+  function wirePaneControls() {
+    for (const button of document.querySelectorAll(".name")) {
+      // Guard against attaching twice to a pane that survived.
+      if (button.dataset.wired === "1") continue;
+      button.dataset.wired = "1";
+      button.addEventListener("dblclick", () => startRename(button));
+      button.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") { event.preventDefault(); startRename(button); }
+      });
+    }
+  }
+
   function containers() {
     return [
       ...document.querySelectorAll(".transcript"),
@@ -1213,6 +1290,10 @@ body[data-device="tablet"] .toggle-text { display: inline; }
   function apply(next) {
     const first = state.snapshot === null;
     state.snapshot = next;
+    // A seat count change replaces the panes, so it is handled before anything draws.
+    if (buildPanes(next.seats.length)) {
+      $("thread").textContent = "";
+    }
     if (first) $("topic").value = next.topic || "";
     drawMessages();
     drawLive();
@@ -1463,12 +1544,7 @@ body[data-device="tablet"] .toggle-text { display: inline; }
     $("view-phone").onclick = () => setViewMode("phone");
     $("view-desktop").onclick = () => setViewMode("desktop");
 
-    for (const button of document.querySelectorAll(".name")) {
-      button.addEventListener("dblclick", () => startRename(button));
-      button.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") { event.preventDefault(); startRename(button); }
-      });
-    }
+    wirePaneControls();
 
     for (const container of containers()) {
       container.addEventListener("scroll", () => {

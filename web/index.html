@@ -58,33 +58,23 @@
 </header>
 
 <main id="stage">
-  <section class="pane" data-pane="0">
-    <div class="pane-head">
-      <span class="dot" data-seat="0">A</span>
-      <div class="who">
-        <button class="name" data-rename="0" title="Press to rename">Agent 1</button>
-        <span class="meta" data-meta="0"></span>
+  <!-- One pane per seat, built by the client: the seat count is 2, 3 or 4, and hard-coding
+       two of them was what made a 4-seat room impossible. The template is cloned. -->
+  <template id="pane-template">
+    <section class="pane">
+      <div class="pane-head">
+        <span class="dot"></span>
+        <div class="who">
+          <button class="name" title="Press to rename"></button>
+          <span class="meta"></span>
+        </div>
+        <div class="spacer"></div>
+        <span class="state"></span>
       </div>
-      <div class="spacer"></div>
-      <span class="state" data-state="0">idle</span>
-    </div>
-    <div class="params" data-params="0"></div>
-    <div class="transcript" data-transcript="0"></div>
-  </section>
-
-  <section class="pane" data-pane="1">
-    <div class="pane-head">
-      <span class="dot" data-seat="1">B</span>
-      <div class="who">
-        <button class="name" data-rename="1" title="Press to rename">Agent 2</button>
-        <span class="meta" data-meta="1"></span>
-      </div>
-      <div class="spacer"></div>
-      <span class="state" data-state="1">idle</span>
-    </div>
-    <div class="params" data-params="1"></div>
-    <div class="transcript" data-transcript="1"></div>
-  </section>
+      <div class="params"></div>
+      <div class="transcript"></div>
+    </section>
+  </template>
 
   <div id="thread" class="thread" hidden></div>
 </main>

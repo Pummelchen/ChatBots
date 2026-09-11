@@ -276,7 +276,17 @@ if let key = options.tavilyKey {
     setenv("TAVILY_API_KEY", key, 1)
 }
 
-var specs = [options.specA, options.specB]
+// The roster decides how many seats, so `CHATBOTS_SEATS=4` gives four — the same rule the
+// app uses. The first two keep the CLI's own flags; any beyond that take their defaults, so
+// the flags did not have to grow a third and fourth variant to make a four-seat run possible.
+var specs: [AgentSpec] = {
+    let count = AgentSpec.SeatRoster.count()
+    var built = [options.specA, options.specB]
+    if count > 2 {
+        built.append(contentsOf: AgentSpec.makeSeats(count: count).dropFirst(2))
+    }
+    return Array(built.prefix(count))
+}()
 // The mode decides which library a persona comes from, so it is applied to every seat
 // before anything reads one. A seat holding an identifier from the other library resolves
 // to that mode's default rather than to nothing.

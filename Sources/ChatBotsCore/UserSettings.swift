@@ -19,6 +19,12 @@ public struct UserSettings: Codable, Sendable, Equatable {
     public var moderatorDraft: String
     /// Whether the models' thinking blocks are streamed into the panes.
     public var showReasoning: Bool
+    /// How many seats this configuration is for, so a 3- or 4-seat room reopens as one.
+    ///
+    /// Stored separately from the `seats` array because reconciling a stored roster against
+    /// what the build supports depends on knowing what was intended: an array of two with a
+    /// count of four means "two configured, two to add".
+    public var seatCount: Int
     /// Per-seat configuration: model, backend, endpoint, persona, thinking, sampler.
     public var seats: [AgentSpec]
     /// Source material the moderator added, with its text already extracted. Stored rather
@@ -32,6 +38,7 @@ public struct UserSettings: Codable, Sendable, Equatable {
         moderatorDraft: String = "",
         showReasoning: Bool = true,
         seats: [AgentSpec],
+        seatCount: Int? = nil,
         attachments: [AttachedDocument] = []
     ) {
         self.version = version
@@ -39,6 +46,7 @@ public struct UserSettings: Codable, Sendable, Equatable {
         self.moderatorDraft = moderatorDraft
         self.showReasoning = showReasoning
         self.seats = seats
+        self.seatCount = seatCount ?? seats.count
         self.attachments = attachments
     }
 
@@ -56,6 +64,9 @@ public struct UserSettings: Codable, Sendable, Equatable {
         self.moderatorDraft = try container.decodeIfPresent(String.self, forKey: .moderatorDraft) ?? ""
         self.showReasoning = try container.decodeIfPresent(Bool.self, forKey: .showReasoning) ?? true
         self.seats = try container.decodeIfPresent([AgentSpec].self, forKey: .seats) ?? []
+        // A payload from before the field existed describes as many seats as it holds.
+        self.seatCount = try container.decodeIfPresent(Int.self, forKey: .seatCount)
+            ?? self.seats.count
         self.attachments = try container.decodeIfPresent([AttachedDocument].self, forKey: .attachments) ?? []
     }
 
