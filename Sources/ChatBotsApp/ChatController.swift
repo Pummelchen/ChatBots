@@ -137,6 +137,11 @@ public final class ChatController: ObservableObject {
     @Published public private(set) var status: RunStatus = .idle
     @Published public private(set) var notices: [String] = []
     @Published public var errorBanner: String?
+    /// What the engine has kept, drawn as a list the moderator can reopen.
+    ///
+    /// Held here rather than fetched by the view so the list survives the sheet being closed and
+    /// reopened, and so there is one place that knows when it is out of date.
+    @Published public private(set) var savedConversations: [SavedConversationSummary] = []
 
     public let panes: [AgentPaneState]
 
@@ -1018,4 +1023,63 @@ public final class ChatController: ObservableObject {
         errorBanner = nil
         run { client in _ = try await client.send(.compact) }
     }
+
+    // MARK: - Kept conversations
+
+    /// What the engine has kept, newest first.
+    public func refreshSavedConversations() {
+        run { [weak self] client in
+            let reply = try await client.send(.listSavedConversations)
+            let list = reply.saved ?? []
+            await MainActor.run { self?.savedConversations = list }
+        }
+    }
+
+    /// Replace what is on screen with a conversation the engine kept.
+    ///
+    /// The engine answers with the whole state, so the transcript, the topic and the seats all
+    /// come from one reply and cannot disagree with each other. A conversation can only be
+    /// swapped while nothing is running: loading mid-run would leave the turn in flight writing
+    /// into a transcript that is no longer on screen.
+    public func loadSavedConversation(id: String) {
+        errorBanner = nil
+        run { [weak self] client in
+            let reply = try await client.send(.loadSavedConversation(id: id))
+            if let reason = reply.refusal {
+                await MainActor.run { self?.errorBanner = reason }
+                return
+            }
+            guard let snapshot = reply.snapshot else { return }
+            await MainActor.run { self?.apply(snapshot) }
+        }
+    }
+
+    /// Forget one kept conversation. The file on disk is removed, not just hidden.
+    public func deleteSavedConversation(id: String) {
+        errorBanner = nil
+        run { [weak self] client in
+            let reply = try await client.send(.deleteSavedConversation(id: id))
+            if let reason = reply.refusal {
+                await MainActor.run { self?.errorBanner = reason }
+                return
+            }
+            self?.refreshSavedConversations()
+        }
+    }
+
+    /// Start a fresh conversation without restarting the app or the engine.
+    public func beginNewConversation() {
+        errorBanner = nil
+        run { [weak self] client in
+            let reply = try await client.send(.newConversation)
+            if let snapshot = reply.snapshot {
+                await MainActor.run { self?.apply(snapshot) }
+            }
+            self?.refreshSavedConversations()
+        }
+    }
+
+    /// Whether a kept conversation can be opened right now. Loading replaces the transcript, so
+    /// it is refused while a turn is generating rather than silently discarding that turn.
+    public var canLoadSavedConversation: Bool { !isRunning }
 }

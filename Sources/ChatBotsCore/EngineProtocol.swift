@@ -114,6 +114,19 @@ public enum EngineReply: Sendable, Codable {
         if case .state(let snapshot) = self { return snapshot }
         return nil
     }
+
+    /// The kept conversations, when that is what was asked for.
+    public var saved: [SavedConversationSummary]? {
+        if case .savedConversations(let list) = self { return list }
+        return nil
+    }
+
+    /// Why a command was refused, when it was. A refusal is an answer rather than a failure,
+    /// so a front end shows it and carries on.
+    public var refusal: String? {
+        if case .refused(let reason) = self { return reason }
+        return nil
+    }
 }
 
 /// One kept conversation, as much as a list needs.

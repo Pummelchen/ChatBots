@@ -11,6 +11,7 @@ struct ControlBar: View {
     @ObservedObject var controller: ChatController
     @State private var showNotes = false
     @State private var showEndpoints = false
+    @State private var showSaved = false
 
     private var status: RunStatus { controller.status }
 
@@ -157,6 +158,20 @@ struct ControlBar: View {
             .buttonStyle(.bordered)
             .disabled(controller.turns.isEmpty)
             .help("Save the full conversation log to a text file")
+
+            Button {
+                showSaved = true
+            } label: {
+                Label("Kept", systemImage: "clock.arrow.circlepath")
+            }
+            .buttonStyle(.bordered)
+            .help("Reopen a conversation the engine kept, or start a new one")
+            .sheet(isPresented: $showSaved) {
+                SavedConversationsSheet(controller: controller) { showSaved = false }
+                    // A sheet is a separate presentation context, so it does not inherit the
+                    // window's environment objects.
+                    .environmentObject(zoom)
+            }
 
             Button {
                 controller.reset()

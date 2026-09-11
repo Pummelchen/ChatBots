@@ -126,7 +126,7 @@ public final class WebTransportEngineServer {
         for continuation in subscribers.values { continuation.finish() }
         subscribers.removeAll()
         if let listener {
-            await listener.shutdown()
+            listener.shutdown()
         }
         listener = nil
     }

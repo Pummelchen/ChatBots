@@ -65,6 +65,7 @@ public enum WebAssets {
       <button id="pause" disabled>Pause</button>
       <button id="stop" disabled>Stop</button>
       <button id="save" disabled title="Download the conversation log">Save</button>
+      <button id="kept" title="Reopen a conversation the engine kept">Kept</button>
       <button id="clear" disabled>Clear</button>
     </div>
   </div>
@@ -156,6 +157,19 @@ public enum WebAssets {
     <button id="report-close" class="small">Close</button>
   </div>
   <div id="report-body" class="report-body"></div>
+</div>
+
+<!-- Every conversation is kept on disk as it runs, so this is how one comes back. -->
+<div id="kept-panel" class="report-panel" hidden>
+  <div class="report-head">
+    <b>Kept conversations</b>
+    <span id="kept-meta" class="note"></span>
+    <div class="spacer"></div>
+    <button id="kept-refresh" class="small">Refresh</button>
+    <button id="kept-new" class="small">New</button>
+    <button id="kept-close" class="small">Close</button>
+  </div>
+  <div id="kept-body" class="report-body"></div>
 </div>
 
 <div id="toast" class="toast" hidden></div>
@@ -827,6 +841,36 @@ body[data-device="tablet"] .toggle-text { display: inline; }
   .report-panel { width: calc(var(--vw) - 12px); }
   .report-head .spacer { display: none; }
 }
+
+/* The kept list borrows the report panel's shape: same furniture, different contents. */
+.kept-row {
+  display: flex;
+  align-items: flex-start;
+  gap: calc(10px * var(--scale));
+  padding: calc(8px * var(--scale)) 0;
+  border-bottom: 1px solid var(--line);
+}
+.kept-row:last-child { border-bottom: 0; }
+.kept-text { flex: 1 1 auto; min-width: 0; }
+.kept-topic {
+  font-weight: 600;
+  font-size: var(--font-body);
+  overflow-wrap: anywhere;
+}
+.kept-sub {
+  color: var(--text-secondary);
+  font-size: var(--font-small);
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+.kept-meta {
+  color: var(--text-faint);
+  font-size: var(--font-tiny);
+  font-family: ui-monospace, Menlo, monospace;
+  margin-top: 3px;
+}
+.kept-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+.kept-empty { color: var(--text-secondary); text-align: center; padding: calc(28px * var(--scale)) 0; }
 
 
 /* ── More than two seats ──────────────────────────────────────────────────────────── */
@@ -1749,6 +1793,92 @@ body[data-view="phone"] {
     }
   }
 
+  // ── Kept conversations ───────────────────────────────────────────────────────────
+
+  function stamp(iso) {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return "";
+    const today = new Date();
+    const sameDay = date.toDateString() === today.toDateString();
+    return sameDay
+      ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      : date.toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" });
+  }
+
+  async function refreshKept() {
+    const body = $("kept-body");
+    body.textContent = "";
+    let list;
+    try {
+      list = await api.get("/api/conversations");
+    } catch (error) {
+      toast(error.message);
+      return;
+    }
+    $("kept-meta").textContent = list.length
+      ? `${list.length} kept`
+      : "";
+
+    if (!list.length) {
+      const empty = document.createElement("div");
+      empty.className = "kept-empty";
+      empty.textContent =
+        "Nothing kept yet. A conversation is kept as soon as it starts and stays after this window closes.";
+      body.append(empty);
+      return;
+    }
+
+    for (const item of list) {
+      const row = document.createElement("div");
+      row.className = "kept-row";
+
+      const text = document.createElement("div");
+      text.className = "kept-text";
+      const topic = document.createElement("div");
+      topic.className = "kept-topic";
+      topic.textContent = item.topic || "Untitled";
+      const sub = document.createElement("div");
+      sub.className = "kept-sub";
+      sub.textContent = item.summary || "";
+      const meta = document.createElement("div");
+      meta.className = "kept-meta";
+      meta.textContent = `${item.replies} messages · ${stamp(item.updatedAt)}`;
+      text.append(topic, sub, meta);
+
+      const actions = document.createElement("div");
+      actions.className = "kept-actions";
+
+      const open = document.createElement("button");
+      open.className = "small";
+      open.textContent = "Open";
+      open.disabled = Boolean(state.snapshot && state.snapshot.isRunning);
+      if (open.disabled) open.title = "Stop the conversation before opening another one";
+      open.onclick = async () => {
+        await run(() => api.post("/api/conversations/load", { value: item.id }));
+        $("kept-panel").hidden = true;
+      };
+
+      const remove = document.createElement("button");
+      remove.className = "small";
+      remove.textContent = "Delete";
+      // A kept conversation is a file on disk, so this asks first: a mis-tap here destroys
+      // work rather than hiding it.
+      remove.onclick = async () => {
+        if (!window.confirm(`Delete "${item.topic || "Untitled"}" from disk?`)) return;
+        try {
+          await api.post("/api/conversations/delete", { value: item.id });
+        } catch (error) {
+          toast(error.message);
+        }
+        await refreshKept();
+      };
+
+      actions.append(open, remove);
+      row.append(text, actions);
+      body.append(row);
+    }
+  }
+
   function wire() {
     $("start").onclick = () => run(() => api.post("/api/start"));
     $("pause").onclick = () => run(() =>
@@ -1786,6 +1916,19 @@ body[data-view="phone"] {
     $("depth-standard").onclick = () => setDepth("standard");
     $("depth-deep").onclick = () => setDepth("deep");
     $("report-close").onclick = () => { $("report-panel").hidden = true; };
+    $("kept").onclick = () => {
+      $("kept-panel").hidden = false;
+      refreshKept();
+    };
+    $("kept-close").onclick = () => { $("kept-panel").hidden = true; };
+    $("kept-refresh").onclick = refreshKept;
+    $("kept-new").onclick = async () => {
+      // The engine has already kept what is on screen, so this clears the view rather than
+      // destroying anything — which is why it does not ask first.
+      await run(() => api.post("/api/conversations/new"));
+      await refreshKept();
+      $("kept-panel").hidden = true;
+    };
     $("report-download").onclick = () => {
       const report = state.snapshot && state.snapshot.report;
       if (!report) return;
