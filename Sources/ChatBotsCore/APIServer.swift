@@ -498,112 +498,6 @@ public final class APIServer {
     }
 
 
-    // MARK: - State
-
-    public func snapshot() -> APISnapshot {
-        let usage = engine.contextUsage
-        let roomMode = engine.specs.first?.mode ?? .entertainment
-        return APISnapshot(
-            topic: engine.topic,
-            mode: roomMode.rawValue,
-            modeLabel: roomMode.label,
-            status: engine.status.label,
-            isRunning: engine.isRunning,
-            isPaused: engine.isPaused,
-            turnsCompleted: engine.startedTurns,
-            seats: engine.specs.map { self.seat($0) },
-            messages: engine.displayTurns.map { turn in
-                APISnapshot.Message(
-                    id: turn.id.uuidString,
-                    sequence: turn.sequence,
-                    speaker: turn.speakerName,
-                    speakerID: turn.speakerID,
-                    kind: turn.kind.rawValue,
-                    text: turn.content,
-                    timestamp: turn.timestamp,
-                    toolDetail: turn.toolDetail
-                )
-            },
-            live: engine.liveSeats.map { live in
-                APISnapshot.Live(
-                    seatID: live.id,
-                    isGenerating: live.isGenerating,
-                    text: live.text,
-                    reasoning: live.reasoning,
-                    activity: live.activity,
-                    toolLog: live.toolLog,
-                    stats: live.stats
-                )
-            },
-            notices: engine.notices.suffix(12).map { $0 },
-            error: engine.lastError,
-            contextTokens: usage.tokens,
-            contextWindow: usage.window,
-            contextFraction: usage.fraction,
-            compactThreshold: engine.configuration.compactThreshold,
-            attachments: engine.attachments.map { document in
-                APIAttachment(
-                    id: document.id.uuidString,
-                    name: document.name,
-                    kind: document.kind.rawValue,
-                    summary: document.summary,
-                    tokens: document.estimatedTokens,
-                    wasTruncated: document.wasTruncated,
-                    imageBase64: document.kind.isImage
-                        ? document.imageData?.base64EncodedString() : nil
-                )
-            },
-            canAttach: engine.canAttachFiles,
-            imagesAllowed: engine.allSeatsSupportVision,
-            availablePersonas: PersonaCatalog.styles(for: roomMode).map {
-                APIPersona(
-                    id: $0.id, name: $0.name, category: $0.group, summary: $0.summary,
-                    emoji: $0.emoji, isAnalyst: $0.isAnalyst)
-            },
-            serverTime: Date.now,
-            research: engine.researchStatus(),
-            report: engine.researchReport().map { report in
-                APISnapshot.ReportSummary(
-                    question: report.question,
-                    producedAt: report.producedAt,
-                    stopReason: report.stopReason,
-                    labelledClaims: report.labelledStatements,
-                    isLabelled: report.isLabelled,
-                    missingSections: report.missingSections,
-                    markdown: report.markdown())
-            }
-        )
-    }
-
-    private func seat(_ spec: AgentSpec) -> APISnapshot.Seat {
-        let persona = spec.personaStyle
-        return APISnapshot.Seat(
-            id: spec.id,
-            name: spec.displayName,
-            personaEmoji: spec.personaStyle.emoji,
-            model: spec.modelID,
-            modelShortName: spec.modelLabel,
-            backend: spec.backend.rawValue,
-            backendLabel: spec.backend.label,
-            personaID: spec.personaID,
-            personaName: persona.name,
-            personaSummary: persona.summary,
-            thinking: spec.thinking.rawValue,
-            thinkingDetail: spec.thinking.detail,
-            temperature: spec.temperature,
-            topP: spec.topP,
-            topK: spec.topK,
-            minP: spec.minP,
-            presencePenalty: spec.presencePenalty,
-            repetitionPenalty: spec.repetitionPenalty,
-            maxTokens: spec.maxTokens,
-            webSearch: spec.webSearchEnabled,
-            vision: spec.visionSupport.allowsImages,
-            endpoint: spec.backend == .openAIResponses ? spec.openAI.baseURL : nil,
-            apiModel: spec.backend == .openAIResponses ? spec.openAI.model : nil
-        )
-    }
-
     // MARK: - Events
 
     private func subscribe(_ stream: HTTPServer.EventStream) -> [String] {
@@ -612,7 +506,7 @@ public final class APIServer {
         // A fresh connection is handed the current state immediately, so a page that has
         // just loaded, or reloaded, does not have to wait for the next turn to see anything.
         // It is returned rather than sent so the server can put the response head first.
-        return [encode(snapshot()) ?? "{}"]
+        return [encode(service.snapshot()) ?? "{}"]
     }
 
     /// One task per connection, writing each new turn as it is published.
@@ -628,7 +522,7 @@ public final class APIServer {
                     self.broadcast(
                         self.encode(MessageEnvelope(turn: turn)) ?? "{}", event: "turn")
                 }
-                self.broadcast(self.encode(self.snapshot()) ?? "{}", event: "snapshot")
+                self.broadcast(self.encode(self.service.snapshot()) ?? "{}", event: "snapshot")
             }
         }
         startTokenFeed()

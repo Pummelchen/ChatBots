@@ -195,7 +195,7 @@ struct ResearchEngineTests {
         await engine.waitUntilFinished()
 
         let server = APIServer(engine: engine, port: 7799)
-        let snapshot = server.snapshot()
+        let snapshot = server.engineService.snapshot()
         #expect(snapshot.research != nil)
         #expect(snapshot.report != nil)
         #expect(snapshot.report?.isLabelled == true)

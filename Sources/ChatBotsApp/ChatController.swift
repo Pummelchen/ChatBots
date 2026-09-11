@@ -165,7 +165,6 @@ public final class ChatController: ObservableObject {
 
     public init(
         specs: [AgentSpec] = AgentSpec.SeatRoster.specs(),
-        configuration: ConversationEngine.Configuration = .init(),
         initialTopic: String = ChatController.defaultTopic,
         initialModeratorDraft: String = "",
         initialShowReasoning: Bool = true
@@ -800,17 +799,6 @@ public final class ChatController: ObservableObject {
         // Loading a model is the engine's business and happens on its first turn. A client
         // cannot reach a seat's engine, so there is nothing to warm from here.
         errorBanner = nil
-    }
-
-    /// No longer used; kept out of the way while the client settles.
-    private func legacyWarmUp(_ agentID: String) {
-        Task {
-            do {
-                try await Task.sleep(for: .milliseconds(1))
-            } catch {
-                await MainActor.run { self.errorBanner = error.localizedDescription }
-            }
-        }
     }
 
     // MARK: - Derived
