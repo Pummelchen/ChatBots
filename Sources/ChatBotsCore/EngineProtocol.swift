@@ -63,6 +63,17 @@ public enum EngineRequest: Sendable, Hashable, Codable {
     case deleteSavedConversation(id: String)
     /// Begin a new conversation, with a new record on disk.
     case newConversation
+    /// The line-ups worth offering for a mode, and the ready-made scenarios.
+    ///
+    /// A read rather than a table compiled into each front end, so the two cannot drift: a
+    /// roster added here appears in the app and the browser without either being rebuilt.
+    case listRosters(DiscussionMode)
+    case listScenarios(DiscussionMode)
+    /// Apply a line-up to the seats, in order. `seed` reproduces a random draw, and is echoed
+    /// back in the log so a line-up can be shared and repeated.
+    case applyRoster(id: String, seed: UInt64)
+    /// Put a scenario's question, mode, line-up and budget in place in one step.
+    case applyScenario(id: String)
 
     /// A partial seat change, so the sender says what it means to alter rather than sending a
     /// whole seat back and relying on the receiver to notice what differs.
@@ -106,6 +117,10 @@ public enum EngineReply: Sendable, Codable {
     case report(String)
     /// The saved conversations, as a list of summaries.
     case savedConversations([SavedConversationSummary])
+    /// The line-ups for a mode.
+    case rosters([Roster])
+    /// The ready-made scenarios for a mode.
+    case scenarios([Scenario])
     /// The command was understood and refused. Distinct from a transport failure: "the topic
     /// cannot be changed once the conversation has started" is an answer, not an error.
     case refused(String)
@@ -125,6 +140,16 @@ public enum EngineReply: Sendable, Codable {
     /// so a front end shows it and carries on.
     public var refusal: String? {
         if case .refused(let reason) = self { return reason }
+        return nil
+    }
+
+    public var rosters: [Roster]? {
+        if case .rosters(let list) = self { return list }
+        return nil
+    }
+
+    public var scenarios: [Scenario]? {
+        if case .scenarios(let list) = self { return list }
         return nil
     }
 }

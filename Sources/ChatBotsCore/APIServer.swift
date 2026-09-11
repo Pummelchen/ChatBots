@@ -279,6 +279,10 @@ public struct APICommand: Codable, Sendable {
     /// A base64 document, for a front end that cannot do multipart uploads.
     public var filename: String?
     public var content: String?
+    /// A line-up or scenario identifier.
+    public var id: String?
+    /// A seed for a random line-up, when the caller wants a particular draw rather than any.
+    public var seed: UInt64?
 }
 
 /// Serves the engine over HTTP.
@@ -405,6 +409,12 @@ public final class APIServer {
             return HTTPResponse(
                 contentType: "text/markdown; charset=utf-8", body: Data(report.markdown.utf8))
 
+        case ("GET", "/api/rosters"):
+            return .json(RosterLibrary.rosters(for: mode(from: request)))
+
+        case ("GET", "/api/scenarios"):
+            return .json(ScenarioLibrary.scenarios(for: mode(from: request)))
+
         default:
             break
         }
@@ -420,6 +430,18 @@ public final class APIServer {
     }
 
     /// Turn an HTTP request into an engine request.
+    /// The mode a query asks about, defaulting to entertainment.
+    ///
+    /// Used only by the two list endpoints, because they answer questions about a library
+    /// rather than commands about the conversation. Everything else asks the engine what mode
+    /// it is in, which is the only place that can answer.
+    private func mode(from request: HTTPRequest) -> DiscussionMode {
+        guard let raw = request.string("mode"), let mode = DiscussionMode(rawValue: raw) else {
+            return .entertainment
+        }
+        return mode
+    }
+
     private func translate(_ request: HTTPRequest) -> EngineRequest? {
         switch (request.method, request.path) {
         case ("GET", "/api/state"): return .fetchState
@@ -463,6 +485,16 @@ public final class APIServer {
             else { return .setMode(.entertainment) }
             return .setMode(mode)
 
+        case ("POST", "/api/roster"):
+            guard let body = request.json(APICommand.self), let id = body.id else { return nil }
+            // A seed the caller supplies reproduces a draw; one it does not supply is made
+            // here and reported, so every draw is repeatable whether or not it was planned.
+            return .applyRoster(id: id, seed: body.seed ?? RosterLibrary.freshSeed())
+
+        case ("POST", "/api/scenario"):
+            guard let id = request.json(APICommand.self)?.id else { return nil }
+            return .applyScenario(id: id)
+
         case ("POST", "/api/research/budget"):
             guard let raw = request.json(APICommand.self)?.value,
                 let depth = ResearchBudget.Depth(rawValue: raw)
@@ -503,6 +535,10 @@ public final class APIServer {
             return HTTPResponse(
                 contentType: "text/markdown; charset=utf-8", body: Data(markdown.utf8))
         case .savedConversations(let list):
+            return .json(list)
+        case .rosters(let list):
+            return .json(list)
+        case .scenarios(let list):
             return .json(list)
         case .refused(let reason):
             // A refusal is an answer, so it is 409 rather than 500 — the client shows the
