@@ -37,10 +37,14 @@ public final class AgentPaneState: ObservableObject, Identifiable {
     /// Stable identity. `spec.id` is captured once because the spec is now mutable
     /// (the thinking level changes from the pane) and this must stay nonisolated.
     public nonisolated let id: String
+    /// Position in the conversation, driving the seat's colour and symbol. Stable for the
+    /// life of the pane, and independent of how many seats exist.
+    public nonisolated let seatIndex: Int
 
-    init(spec: AgentSpec) {
+    init(spec: AgentSpec, seatIndex: Int) {
         self.spec = spec
         self.id = spec.id
+        self.seatIndex = seatIndex
     }
 
     func beginTurn() {
@@ -120,11 +124,11 @@ public final class ChatController: ObservableObject {
     private var pumpTasks: [Task<Void, Never>] = []
 
     public init(
-        specs: [AgentSpec] = [.seatA(), .seatB()],
+        specs: [AgentSpec] = AgentSpec.SeatRoster.specs(),
         configuration: ConversationEngine.Configuration = .init()
     ) {
         let registry = WebToolbox.makeRegistry()
-        let panes = specs.map { AgentPaneState(spec: $0) }
+        let panes = specs.enumerated().map { AgentPaneState(spec: $0.element, seatIndex: $0.offset) }
 
         // One engine per seat = one independent model instance per seat. Swapping in a
         // different checkpoint later is a change to `specs`, nothing else.
@@ -424,6 +428,12 @@ public final class ChatController: ObservableObject {
     /// Steering turns accepted but not yet read by any model.
     public var pendingSteeringIDs: Set<UUID> {
         Set(engine.queuedSteering.map(\.id))
+    }
+
+    /// Which seat a speaker id belongs to, or nil for the moderator and app turns.
+    public func seatIndex(forSpeaker speakerID: String?) -> Int? {
+        guard let speakerID else { return nil }
+        return panes.first { $0.id == speakerID }?.seatIndex
     }
 
     public var contextEstimate: Int {

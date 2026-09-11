@@ -107,8 +107,8 @@ func introductionMentionsTopicAndRoster() {
 
     #expect(text.contains("Why are eggs not round?"))
     #expect(text.contains("2 different LLMs"))
-    #expect(text.contains("Agent A"))
-    #expect(text.contains("Agent B"))
+    #expect(text.contains("Agent 1"))
+    #expect(text.contains("Agent 2"))
     // The moderator explicitly asked for no further rules beyond topic + intro.
     #expect(text.contains("Rules: there are none beyond the topic"))
 }
@@ -119,9 +119,9 @@ func systemMessageListsCounterparts() {
     let specB = AgentSpec.seatB()
     let message = PromptBuilder.systemMessage(for: specA, others: [specB], topic: "Eggs")
 
-    #expect(message.contains("You are Agent A"))
-    #expect(message.contains("Agent B"))
-    #expect(!message.contains("The other participant(s): Agent A"))
+    #expect(message.contains("You are Agent 1"))
+    #expect(message.contains("Agent 2"))
+    #expect(!message.contains("The other participant(s): Agent 1"))
 }
 
 @Test("A turn prompt is a valid system+user pair carrying every tagged log entry")
@@ -131,7 +131,7 @@ func promptCarriesTaggedLog() {
         topic: "Eggs",
         turns: [
             Turn(sequence: 1, speakerName: "Moderator", kind: .topic, content: "Why are eggs not round?"),
-            Turn(sequence: 2, speakerName: "Agent B", kind: .chat, content: "Because of oviposition."),
+            Turn(sequence: 2, speakerName: "Agent 2", kind: .chat, content: "Because of oviposition."),
             Turn(sequence: 3, speakerName: "Moderator", kind: .steering, content: "What about ostriches?"),
         ]
     )
@@ -144,9 +144,9 @@ func promptCarriesTaggedLog() {
 
     let body = prompt[1].content
     #expect(body.contains("[Moderator — topic]\nWhy are eggs not round?"))
-    #expect(body.contains("[Agent B]\nBecause of oviposition."))
+    #expect(body.contains("[Agent 2]\nBecause of oviposition."))
     #expect(body.contains("[Moderator]\nWhat about ostriches?"))
-    #expect(body.contains("It is your turn — Agent A"))
+    #expect(body.contains("It is your turn — Agent 1"))
 }
 
 @Test("Tool turns and thinking are kept out of the prompt log")
@@ -156,7 +156,7 @@ func promptExcludesToolTurns() {
         turns: [
             Turn(sequence: 1, speakerName: "Moderator", kind: .topic, content: "Why?"),
             Turn(
-                sequence: 2, speakerID: "Agent A", speakerName: "Agent A", kind: .tool,
+                sequence: 2, speakerID: "Agent 1", speakerName: "Agent 1", kind: .tool,
                 content: "web_search: 3 results", toolDetail: "secret payload"),
         ]
     )
@@ -177,7 +177,7 @@ func seatsAlternate() async {
 
     let chatTurns = engine.conversation.turns.filter { $0.kind == .chat }
     #expect(chatTurns.count == 4)
-    #expect(chatTurns.map(\.speakerName) == ["Agent A", "Agent B", "Agent A", "Agent B"])
+    #expect(chatTurns.map(\.speakerName) == ["Agent 1", "Agent 2", "Agent 1", "Agent 2"])
     // Two turns each — the loop ran the configured 4 turns, not more.
     #expect(await stubA.prompts.count == 2)
     #expect(await stubB.prompts.count == 2)
@@ -207,10 +207,10 @@ func counterpartMessageIsVisible() async {
     let prompts = await stubB.prompts
     #expect(!prompts.isEmpty)
     // Seat B's first turn must contain seat A's first message.
-    #expect(prompts[0][1].content.contains("[Agent A]\nA1"))
+    #expect(prompts[0][1].content.contains("[Agent 1]\nA1"))
     // And its own prior message on the second turn.
     #expect(prompts.count > 1)
-    #expect(prompts[1][1].content.contains("[Agent B]\nB1"))
+    #expect(prompts[1][1].content.contains("[Agent 2]\nB1"))
 }
 
 @MainActor

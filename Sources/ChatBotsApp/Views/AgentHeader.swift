@@ -22,6 +22,10 @@ import SwiftUI
 /// the status line, or whether the seat is generating.
 struct PaneHeader: View {
     let spec: AgentSpec
+    /// Seat position, for the colour and symbol.
+    let seatIndex: Int
+    /// Drop the sampler row and show a condensed readout instead.
+    let isCompact: Bool
     /// Backend may only change before the conversation begins.
     let canChangeBackend: Bool
     let statusText: String
@@ -35,7 +39,7 @@ struct PaneHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Image(systemName: AgentTheme.symbol(for: spec.id))
+                Image(systemName: AgentTheme.symbol(forSeat: seatIndex))
                     .foregroundStyle(tint)
                     .font(.system(size: 15))
 
@@ -72,8 +76,13 @@ struct PaneHeader: View {
                 statusChip
             }
 
-            HStack(spacing: 9) {
-                Label(String(format: "temp %.2f", spec.temperature), systemImage: "thermometer.medium")
+            if isCompact {
+                CompactAgentSettings(spec: spec, palette: palette)
+            }
+
+            if !isCompact {
+                HStack(spacing: 9) {
+                    Label(String(format: "temp %.2f", spec.temperature), systemImage: "thermometer.medium")
                 Label("top-p \(String(format: "%.2f", spec.topP))", systemImage: "chart.bar")
                 Label("top-k \(spec.topK)", systemImage: "list.number")
                 Label("min-p \(String(format: "%.1f", spec.minP))", systemImage: "line.diagonal")
@@ -88,10 +97,11 @@ struct PaneHeader: View {
                 if spec.webSearchEnabled {
                     Label("web", systemImage: "globe")
                 }
-                Spacer(minLength: 0)
+                    Spacer(minLength: 0)
+                }
+                .font(.system(size: 9.5, design: .rounded))
+                .foregroundStyle(palette.textTertiary)
             }
-            .font(.system(size: 9.5, design: .rounded))
-            .foregroundStyle(palette.textTertiary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)

@@ -14,8 +14,11 @@ struct ChatPane: View {
     let pendingSteeringIDs: Set<UUID>
     let showReasoning: Bool
     let contextEstimate: Int
+    /// True when the pane is narrower than a comfortable column, so the header drops its
+    /// sampler row instead of being clipped.
+    var isCompact: Bool = false
 
-    private var tint: Color { AgentTheme.tint(for: pane.spec.id, palette: palette) }
+    private var tint: Color { AgentTheme.tint(forSeat: pane.seatIndex, palette: palette) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,6 +39,8 @@ struct ChatPane: View {
         // text streams. See PaneHeader for why that matters.
         PaneHeader(
             spec: pane.spec,
+            seatIndex: pane.seatIndex,
+            isCompact: isCompact,
             canChangeBackend: controller.turns.isEmpty,
             statusText: pane.statusText,
             isGenerating: pane.isGenerating,
@@ -59,7 +64,8 @@ struct ChatPane: View {
                 ForEach(turns) { turn in
                     TurnRow(
                         turn: turn,
-                        isOwn: turn.speakerID == pane.spec.id,
+                        seatIndex: controller.seatIndex(forSpeaker: turn.speakerID),
+                        isOwn: controller.seatIndex(forSpeaker: turn.speakerID) == pane.seatIndex,
                         isPending: pendingSteeringIDs.contains(turn.id)
                     )
                 }
@@ -87,7 +93,7 @@ struct ChatPane: View {
                 WaitingRow(name: pane.spec.displayName, tint: tint, activity: pane.activity)
             } else {
                 HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: AgentTheme.symbol(for: pane.spec.id))
+                    Image(systemName: AgentTheme.symbol(forSeat: pane.seatIndex))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(tint)
                         .frame(width: 18)

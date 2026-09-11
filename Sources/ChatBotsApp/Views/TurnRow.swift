@@ -17,6 +17,8 @@ import SwiftUI
 struct TurnRow: View {
     @Environment(\.themePalette) private var palette
     let turn: Turn
+    /// The speaker's seat position, when known; the id is parsed as a fallback.
+    let seatIndex: Int?
     let isOwn: Bool
     let isPending: Bool
 
@@ -27,7 +29,9 @@ struct TurnRow: View {
         case .topic, .steering: AgentTheme.moderatorTint(palette)
         case .introduction: palette.isBlack ? Color(white: 0.16) : Color.secondary
         case .tool: AgentTheme.toolTint(palette)
-        case .chat: AgentTheme.tint(for: turn.speakerID ?? "", palette: palette)
+        case .chat:
+            seatIndex.map { AgentTheme.tint(forSeat: $0, palette: palette) }
+                ?? AgentTheme.tint(for: turn.speakerID ?? "", palette: palette)
         }
     }
 
@@ -35,7 +39,7 @@ struct TurnRow: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: turn.symbol)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(turn.tint(palette))
+                .foregroundStyle(turn.tint(palette, seatIndex: seatIndex))
                 .frame(width: 18)
                 .padding(.top, 2)
 
@@ -43,7 +47,7 @@ struct TurnRow: View {
                 HStack(spacing: 6) {
                     Text(turn.badge)
                         .font(.system(size: 10, weight: .heavy, design: .rounded))
-                        .foregroundStyle(turn.tint(palette))
+                        .foregroundStyle(turn.tint(palette, seatIndex: seatIndex))
                     if isOwn {
                         Text("YOU")
                             .font(.system(size: 9, weight: .bold, design: .rounded))

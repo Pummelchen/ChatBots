@@ -166,33 +166,55 @@ final class ThemeStore: ObservableObject {
 }
 
 enum AgentTheme {
-    /// Deterministic tint per seat, so adding a third LLM later just works.
+    /// One tint per seat position, so a seat's colour is stable no matter what it is
+    /// called and adding a seat never collides with an existing one.
     ///
-    /// The black palette overrides two of these: the system `.teal` and `.indigo` are
-    /// too dim against pure black at small sizes.
-    static func tint(for agentID: String, palette: AppPalette) -> Color {
-        switch agentID {
-        case "Agent A":
-            palette.isBlack ? Color(red: 0.29, green: 0.87, blue: 0.83) : .teal
-        case "Agent B":
-            palette.isBlack ? Color(red: 0.55, green: 0.62, blue: 1.00) : .indigo
-        case "Agent C":
-            .orange
-        case "Agent D":
-            .pink
-        default:
-            .accentColor
-        }
+    /// The black palette needs stronger values: the system `.teal` and `.indigo` are
+    /// nearly invisible against pure black at small sizes.
+    static func tint(forSeat index: Int, palette: AppPalette) -> Color {
+        let normal: [Color] = [.teal, .indigo, .orange, .pink, .purple, .green]
+        let onBlack: [Color] = [
+            Color(red: 0.29, green: 0.87, blue: 0.83),
+            Color(red: 0.55, green: 0.62, blue: 1.00),
+            Color(red: 1.00, green: 0.66, blue: 0.30),
+            Color(red: 1.00, green: 0.55, blue: 0.75),
+            Color(red: 0.78, green: 0.62, blue: 1.00),
+            Color(red: 0.45, green: 0.88, blue: 0.60),
+        ]
+        let ramp = palette.isBlack ? onBlack : normal
+        return ramp[((index % ramp.count) + ramp.count) % ramp.count]
     }
 
-    static func symbol(for agentID: String) -> String {
-        switch agentID {
-        case "Agent A": "a.circle.fill"
-        case "Agent B": "b.circle.fill"
-        case "Agent C": "c.circle.fill"
-        case "Agent D": "d.circle.fill"
-        default: "circle.fill"
+    /// Tint by id, for callers that only have a speaker id from the transcript. Matches
+    /// the `Agent N` form; anything else falls back to the neutral text colour.
+    static func tint(for agentID: String, palette: AppPalette) -> Color {
+        guard let index = seatIndex(in: agentID) else {
+            return palette.isBlack ? Color(white: 0.62) : Color.secondary
         }
+        return tint(forSeat: index, palette: palette)
+    }
+
+    /// `"Agent 3"` → `2`. Nil when the id is not in that form.
+    static func seatIndex(in agentID: String) -> Int? {
+        guard agentID.hasPrefix("Agent ") else { return nil }
+        let suffix = agentID.dropFirst("Agent ".count)
+        guard let number = Int(suffix), number >= 1 else { return nil }
+        return number - 1
+    }
+
+    /// One symbol per seat position, cycling if there are more seats than symbols.
+    static func symbol(forSeat index: Int) -> String {
+        let symbols = [
+            "a.circle.fill", "b.circle.fill", "c.circle.fill", "d.circle.fill",
+            "e.circle.fill", "f.circle.fill",
+        ]
+        return symbols[((index % symbols.count) + symbols.count) % symbols.count]
+    }
+
+    /// Symbol by id; see `tint(for:palette:)` for the fallback rule.
+    static func symbol(for agentID: String) -> String {
+        guard let index = seatIndex(in: agentID) else { return "circle.fill" }
+        return symbol(forSeat: index)
     }
 
     static func moderatorTint(_ palette: AppPalette) -> Color {
@@ -219,14 +241,22 @@ enum AgentTheme {
 }
 
 extension Turn {
-    func tint(_ palette: AppPalette) -> AnyShapeStyle {
+    /// The turn's colour.
+    ///
+    /// - Parameter seatIndex: the speaker's position, when the caller knows it. Passing it
+    ///   is preferred because it is exact; otherwise the id is parsed.
+    func tint(_ palette: AppPalette, seatIndex: Int? = nil) -> AnyShapeStyle {
         switch kind {
         case .topic, .steering: AnyShapeStyle(AgentTheme.moderatorTint(palette))
         case .introduction: AgentTheme.systemTint(palette)
         case .tool: AnyShapeStyle(AgentTheme.toolTint(palette))
         case .chat:
-            speakerID.map { AnyShapeStyle(AgentTheme.tint(for: $0, palette: palette)) }
-                ?? palette.textSecondary
+            if let seatIndex {
+                AnyShapeStyle(AgentTheme.tint(forSeat: seatIndex, palette: palette))
+            } else {
+                speakerID.map { AnyShapeStyle(AgentTheme.tint(for: $0, palette: palette)) }
+                    ?? palette.textSecondary
+            }
         }
     }
 

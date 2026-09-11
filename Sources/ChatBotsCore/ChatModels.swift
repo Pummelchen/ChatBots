@@ -233,17 +233,92 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
         public static let thinking = ThinkingMode.medium
     }
 
-    private static func qwen(
-        id: String,
-        modelID: String,
-        shortName: String,
-        personaID: String
+    // MARK: - Seats
+
+    /// How many participants the app is built to run at once.
+    ///
+    /// Nothing in the orchestration is limited to a particular number — turn order is a
+    /// rotation, the transcript is shared, and each seat owns its engine — so the cap is
+    /// only what the layout can show legibly side by side. The unified layout has no such
+    /// limit. Adding a seat beyond this is a matter of extending the palettes.
+    public static let supportedSeatCount = 4
+
+    /// The roster the app builds at launch.
+    ///
+    /// Two today, and the default here is the single place to change that: the controller
+    /// builds one pane, one MLX engine and one API engine per seat, and the turn loop is a
+    /// rotation, so nothing else needs touching. `CHATBOTS_SEATS` overrides it, which is
+    /// how a 3- or 4-seat run is tried out without editing code.
+    public enum SeatRoster {
+        public static let shippingCount = 2
+        public static let environmentKey = "CHATBOTS_SEATS"
+
+        /// The requested count, clamped to what the layout and palettes support.
+        public static func count(
+            environment: [String: String] = ProcessInfo.processInfo.environment
+        ) -> Int {
+            guard let raw = environment[environmentKey], let requested = Int(raw) else {
+                return shippingCount
+            }
+            return max(1, min(requested, supportedSeatCount))
+        }
+
+        /// The seats to build.
+        public static func specs(
+            environment: [String: String] = ProcessInfo.processInfo.environment
+        ) -> [AgentSpec] {
+            makeSeats(count: count(environment: environment))
+        }
+    }
+
+    /// Label for a seat by position: `1` becomes `Agent 1`.
+    public static func seatID(forIndex index: Int) -> String { "Agent \(index + 1)" }
+
+    /// Default styles, one per seat, chosen so that neighbours disagree productively
+    /// rather than so that any particular one is "right".
+    ///
+    /// Seats beyond this list fall back to a deterministic pick, so adding a seat never
+    /// produces four identical participants.
+    public static let defaultPersonaIDs = [
+        "fact-checker",  // 1 — wants a source for every claim
+        "skeptic",  // 2 — doubts the obvious explanation
+        "engineer",  // 3 — reduces it to constraints and trade-offs
+        "empath",  // 4 — asks what it would mean for people
+    ]
+
+    /// The opening seat's default style, kept as a named constant because it is the one
+    /// most code and documentation refers to.
+    public static var defaultPersonaA: String { defaultPersonaIDs[0] }
+    /// The second seat's default style.
+    public static var defaultPersonaB: String { defaultPersonaIDs[1] }
+
+    public static func defaultPersonaID(forIndex index: Int) -> String {
+        if index < defaultPersonaIDs.count { return defaultPersonaIDs[index] }
+        // Deterministic, and skips Neutral so a late seat still has a style.
+        let styled = PersonaLibrary.all.filter { $0.id != PersonaLibrary.neutral.id }
+        guard !styled.isEmpty else { return PersonaLibrary.neutral.id }
+        return styled[index % styled.count].id
+    }
+
+    /// One seat.
+    ///
+    /// - Parameters:
+    ///   - index: position in the conversation, `0`-based. Drives the default id, style
+    ///     and, in the UI, the colour.
+    ///   - modelID: the MLX checkpoint for this seat. Pointing two seats at different
+    ///     checkpoints is the whole reason seats are independent.
+    public static func seat(
+        index: Int,
+        modelID: String = AgentSpec.defaultModelID,
+        personaID: String? = nil,
+        backend: Backend = .mlx
     ) -> AgentSpec {
         AgentSpec(
-            id: id,
-            displayName: id,
+            id: seatID(forIndex: index),
+            displayName: seatID(forIndex: index),
             modelID: modelID,
-            modelShortName: shortName,
+            modelShortName: "Qwen3.5-4B-4bit",
+            backend: backend,
             temperature: QwenSampling.temperature,
             topP: QwenSampling.topP,
             topK: QwenSampling.topK,
@@ -252,35 +327,58 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
             repetitionPenalty: QwenSampling.repetitionPenalty,
             maxTokens: QwenSampling.maxOutputTokens,
             thinking: QwenSampling.thinking,
-            personaID: personaID
+            personaID: personaID ?? defaultPersonaID(forIndex: index)
         )
     }
 
-    /// Seat A — opens the conversation, and by default argues from evidence.
+    /// A full roster. `makeSeats(2)` is what the app ships with today; `makeSeats(4)` is
+    /// ready and is covered by tests.
+    public static func makeSeats(
+        count: Int = 2,
+        modelIDs: [String]? = nil,
+        personaIDs: [String]? = nil
+    ) -> [AgentSpec] {
+        let clamped = max(1, min(count, supportedSeatCount))
+        return (0..<clamped).map { index in
+            seat(
+                index: index,
+                modelID: modelIDs?[safe: index] ?? defaultModelID,
+                personaID: personaIDs?[safe: index]
+            )
+        }
+    }
+
+    /// Seat 1 — opens the conversation.
     public static func seatA(
         modelID: String = AgentSpec.defaultModelID,
-        personaID: String = defaultPersonaA
+        personaID: String = defaultPersonaIDs[0]
     ) -> AgentSpec {
-        qwen(
-            id: "Agent A", modelID: modelID, shortName: "Qwen3.5-4B-4bit",
-            personaID: personaID)
+        seat(index: 0, modelID: modelID, personaID: personaID)
     }
 
-    /// Seat B — identical sampler and, by default, identical weights to seat A, but a
-    /// *separate* model instance. Point `modelID` at another checkpoint to mix LLMs.
+    /// Seat 2.
     public static func seatB(
         modelID: String = AgentSpec.defaultModelID,
-        personaID: String = defaultPersonaB
+        personaID: String = defaultPersonaIDs[1]
     ) -> AgentSpec {
-        qwen(
-            id: "Agent B", modelID: modelID, shortName: "Qwen3.5-4B-4bit",
-            personaID: personaID)
+        seat(index: 1, modelID: modelID, personaID: personaID)
     }
 
-    /// The two default styles are chosen to disagree productively rather than to be
-    /// arbitrary: one wants a source, the other doubts the consensus.
-    public static let defaultPersonaA = "fact-checker"
-    public static let defaultPersonaB = "skeptic"
+    /// Seat 3 — unused by default, ready to add.
+    public static func seatC(
+        modelID: String = AgentSpec.defaultModelID,
+        personaID: String = defaultPersonaIDs[2]
+    ) -> AgentSpec {
+        seat(index: 2, modelID: modelID, personaID: personaID)
+    }
+
+    /// Seat 4 — unused by default, ready to add.
+    public static func seatD(
+        modelID: String = AgentSpec.defaultModelID,
+        personaID: String = defaultPersonaIDs[3]
+    ) -> AgentSpec {
+        seat(index: 3, modelID: modelID, personaID: personaID)
+    }
 
     /// A separate instance of the same weights still deserves a distinct sampling
     /// seed-stream, otherwise the two seats converge on identical phrasing.
@@ -457,5 +555,13 @@ public enum ChatBotsError: LocalizedError, Sendable {
         case .toolFailed(let message): "Tool failed: \(message)"
         case .cancelled: "Cancelled."
         }
+    }
+}
+
+
+extension Array {
+    /// Bounds-checked lookup, for optional per-seat configuration lists.
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }

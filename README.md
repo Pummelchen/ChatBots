@@ -189,6 +189,47 @@ removing the modifier from one view at a time until the freezes stopped.
 
 Instead, **Edit ▸ Copy Conversation (⇧⌘C)** copies the whole transcript as plain text.
 
+### Roster size: ready for 3 or 4
+
+The app ships with **two** seats, and the number is one constant:
+
+```swift
+AgentSpec.SeatRoster.shippingCount   // 2
+```
+
+Nothing else is written for two participants. Turn order is a rotation
+(`seatCursor % seats.count`), the transcript is shared, each seat owns its own engines, and
+the palette and per-seat defaults are generated per index — so raising the count is a
+configuration change, not a refactor. Try it without editing code:
+
+```bash
+CHATBOTS_SEATS=4 open dist/ChatBots.app     # or: CHATBOTS_SEATS=4 .build/release/ChatBots
+```
+
+What is already in place for a larger roster:
+
+* `AgentSpec.makeSeats(count:)` builds 1–4 seats with distinct ids (`Agent 1`…), distinct
+  default personas, distinct sampling seeds, and optional per-seat `modelIDs`/`personaIDs`
+  lists. `seatA()`–`seatD()` are conveniences over it.
+* Tinting and symbols are by **seat index**, not by parsing an id, so a fifth colour is one
+  array entry. `AgentTheme.tint(forSeat:palette:)` cycles if there are more seats than
+  colours rather than colliding.
+* Default styles for seats 3 and 4 (engineer, empath) are chosen to disagree with the
+  first two rather than to repeat them.
+* The split layout adapts: one seat fills the window, two sit side by side when there is
+  room, and three or four form a grid whose column count is driven by the available width
+  (`380pt` per pane). Panes below that width switch their header to a compact form instead
+  of overflowing. The unified window mode has no such limit and is the better view for
+  three or four seats.
+* `RosterTests` covers all of it: rotation through 3 and 4 seats, cross-seat context (seat
+  4 reading seats 1–3), the introduction naming every participant, distinct personas and
+  seeds, per-seat models, clamping a bad count, and the environment override.
+
+Two things are deliberately **not** done, because they are only needed when a seat is
+actually added: the persona library's defaults are picked by index rather than tuned for
+four-way conversation, and the grid gives up draggable dividers (a grid cannot have them)
+in exchange for panes that stay legible.
+
 ### Two backends, selectable per seat
 
 Each seat runs on either engine, chosen from the `MLX ▾` control next to the persona:

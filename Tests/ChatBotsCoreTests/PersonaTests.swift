@@ -69,7 +69,7 @@ struct PersonaPromptTests {
             topic: "Why are eggs not round?",
             turns: [
                 Turn(sequence: 1, speakerName: "Moderator", kind: .topic, content: "Why?"),
-                Turn(sequence: 2, speakerName: "Agent B", kind: .chat, content: "Because."),
+                Turn(sequence: 2, speakerName: "Agent 2", kind: .chat, content: "Because."),
             ]
         )
     }
@@ -133,7 +133,7 @@ struct PersonaPromptTests {
         // The log is the second (user) message; it must read the same for every seat.
         let log = prompt[1].content
         #expect(log.contains("[Moderator — topic]\nWhy?"))
-        #expect(log.contains("[Agent B]\nBecause."))
+        #expect(log.contains("[Agent 2]\nBecause."))
         #expect(!log.contains(PersonaLibrary.persona(id: "historian").directive))
     }
 
