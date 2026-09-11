@@ -732,6 +732,50 @@ cutting that tenth away and leaving a white sliver wherever the mask and the art
 not line up exactly. Verified by asking the system for the finished app's icon
 (`NSWorkspace.icon(forFile:)`), which returns the artwork with macOS's mask applied.
 
+## Installing on another Mac
+
+For a Mac that has nothing set up for development, from a Terminal:
+
+```
+bash tools/install.sh
+```
+
+It checks the machine (Apple silicon, macOS 14+, ~8 GB free, internet), installs a Swift
+toolchain if there is none, downloads the models, builds the app, loads a model once to
+prove the whole chain works, and leaves a double-clickable launcher.
+
+Run it again at any time — every step repairs rather than duplicating, so an interrupted
+download continues and a half-finished install is fixed rather than repeated.
+
+**What it does about each hurdle**
+
+| Hurdle | What the script does |
+| --- | --- |
+| No Swift | Runs `xcode-select --install` and waits for it. Command Line Tools are enough — no full Xcode |
+| 3 GB download | Resumable, one file at a time, with each file's size checked against the server. An error page is removed rather than resumed onto |
+| Interrupted | Re-running continues from the partial file. A file whose size does not match is detected, not accepted |
+| Looks fine but doesn't run | Loads a model and generates tokens at the end. Finding out *then* is the whole point |
+| Appears to hang forever | The self-test is killed after 5 minutes with an explanation, since a held GPU can make model loading wait indefinitely |
+| Wants to just open it | Creates `~/Applications/ChatBots.command` |
+
+It is written for someone who does not read shell scripts: every step announces itself, a
+failure says what to do next rather than only what broke, and the run is logged to
+`.install.log`. The installer stops early if an Intel Mac or macOS 13 or older would make
+the app useless anyway, and says so — a download that cannot work is worse than a refusal.
+
+**Two things worth knowing**
+
+* **Keep the project folder where it is.** The models live inside it (`models/`) and the
+  launcher points at it. Moving or deleting the folder breaks the launcher; re-running the
+  installer from the new location fixes it.
+* **No Apple Developer certificate is involved.** The app is built on the Mac that runs it,
+  so it is not quarantined and no signing or notarisation is needed. Copying a built app
+  between Macs is a different matter — that *would* need signing to avoid Gatekeeper.
+
+The app also works with no local models at all: point it at any OpenAI-compatible server
+(click "API"). With LM Studio on the same Mac that is `http://localhost:1234/v1`, and the
+3 GB download can be skipped entirely.
+
 ## Where the models live
 
 Checkpoints are kept in **`models/` in the project folder**, not in the shared Hugging

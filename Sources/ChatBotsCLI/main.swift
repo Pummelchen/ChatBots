@@ -25,6 +25,7 @@ struct Options {
     var sessionProbe = false
     var compactThreshold: Double?
     var exportSample = false
+    var check = false
     var contextWindow: Int?
     var keepRecent: Int?
     /// Cap on answer tokens per turn; `nil` keeps the seat's own budget.
@@ -83,6 +84,7 @@ struct Options {
             case "--memory-probe": options.memoryProbe = true
             case "--session-probe": options.sessionProbe = true
             case "--export-sample": options.exportSample = true
+            case "--check": options.check = true
             case "--compact-threshold": options.compactThreshold = Double(next() ?? "")
             case "--context-window": options.contextWindow = Int(next() ?? "")
             case "--compact-keep": options.keepRecent = Int(next() ?? "")
@@ -171,8 +173,41 @@ func header(_ title: String) {
 
 // Model storage lives in the project's `models/` folder; set before any engine loads.
 let modelsRoot = ModelStore.prepare()
-
 let options = Options.parse(Array(CommandLine.arguments.dropFirst()))
+
+// The self-test an installer runs: it proves the runtime, the Metal library and the
+// checkpoint all work together on this machine, and it does so without needing to read or
+// interpret a conversation.
+if options.check {
+    let spec = AgentSpec.seat(index: 0, modelID: options.modelA ?? AgentSpec.defaultModelID)
+    log("Checking seat A: \(spec.modelID)")
+    let engine = MLXEngine(spec: spec)
+    do {
+        try await engine.load()
+        let window = await engine.contextWindow
+        log("  model loaded — context window \(window) tokens")
+        let started = Date()
+        let reply = try await engine.generate(
+            messages: [
+                .init(role: .system, content: "You are terse."),
+                .init(role: .user, content: "Reply with the single word: ready"),
+            ],
+            tools: [], onToolCall: { _, _ in }, onEvent: { _ in })
+        let seconds = Date().timeIntervalSince(started)
+        let trimmed = reply.trimmingCharacters(in: .whitespacesAndNewlines)
+        log(String(format: "  generated %d characters in %.1fs", trimmed.count, seconds))
+        if trimmed.isEmpty {
+            FileHandle.standardError.write(Data("check failed: the model produced no output\n".utf8))
+            exit(1)
+        }
+        log("Check passed — the app is ready to run")
+        exit(0)
+    } catch {
+        FileHandle.standardError.write(
+            Data("check failed: \(error.localizedDescription)\n".utf8))
+        exit(1)
+    }
+}
 
 // Printing the export format, with no model involved: handy for checking what a saved
 // conversation looks like, and for support.

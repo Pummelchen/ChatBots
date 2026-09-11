@@ -6,3 +6,11 @@ dist/
 
 # Downloaded checkpoints (multi-GB local data, never committed)
 models/
+
+# Installer output. These are logs and caches rather than sources, and they contain
+# machine-specific paths.
+.install.log
+.install-build.log
+.install-check.log
+models/.huggingface-file-list.txt
+models/.hf-model.json
