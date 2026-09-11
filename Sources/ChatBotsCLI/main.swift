@@ -27,6 +27,11 @@ struct Options {
     var exportSample = false
     var check = false
     var checkTransport = false
+    var checkClient = false
+    /// webtransport, http, or both. Both by default, so the website and the app can each be
+    /// run against the same engine while the app is being moved onto the new channel.
+    var transport = "both"
+    var transportPort: UInt16 = 7790
     var serve = false
     var mode = DiscussionMode.entertainment
     var listCharacters = false
@@ -95,6 +100,10 @@ struct Options {
             case "--export-sample": options.exportSample = true
             case "--check": options.check = true
             case "--check-transport": options.checkTransport = true
+            case "--check-client": options.checkClient = true
+            case "--transport": options.transport = next() ?? "both"
+            case "--transport-port":
+                if let value = UInt16(next() ?? "") { options.transportPort = value }
             case "--serve": options.serve = true
             case "--attach": options.attachments.append(next() ?? "")
             case "--seed": options.seed = true
@@ -216,6 +225,41 @@ let options = Options.parse(Array(CommandLine.arguments.dropFirst()))
 // The transport check runs before anything else, and needs no model: it starts a real
 // WebTransport server and drives it with a real client, so a broken channel is found here
 // rather than in the app.
+// A client-only mode, so the transport can be tested across two processes rather than one.
+// An in-process check can pass while a real client cannot connect at all — which is exactly
+// what happened here, and is the reason this exists.
+if options.checkClient {
+    let directory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        .appending(path: ".run")
+    _ = try? CertificateStore.loadOrCreate(in: directory)
+    var configuration = WebTransportEngineClient.Configuration()
+    configuration.port = options.transportPort
+    let client = WebTransportEngineClient(configuration: configuration)
+    var connected = false
+    var last = "?"
+    for attempt in 0..<8 {
+        do {
+            try await client.connect()
+            connected = true
+            break
+        } catch {
+            last = error.localizedDescription
+            try? await Task.sleep(for: .milliseconds(500 * (attempt + 1)))
+        }
+    }
+    guard connected else {
+        print("client: could NOT connect to 127.0.0.1:\(options.transportPort)")
+        print("  \(last)")
+        exit(3)
+    }
+    let snapshot = try? await client.state()
+    print("client: connected cross-process")
+    print("  topic: \(snapshot?.topic ?? "none")")
+    print("  seats: \(snapshot?.seats.map(\.name).joined(separator: ", ") ?? "none")")
+    await client.disconnect()
+    exit(0)
+}
+
 if options.checkTransport {
     let directory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         .appending(path: ".run")
@@ -560,8 +604,35 @@ if !options.attachments.isEmpty {
     log("  state   : GET  /api/state")
     log("  events  : GET  /api/events  (server-sent events)")
     log("  control : POST /api/start | /api/pause | /api/resume | /api/stop | /api/reset")
+
+    // The WebTransport endpoint, for the desktop app. Caddy and the website keep using HTTP:
+    // browsers speak that, and it is what Caddy is for.
+    var transportServer: WebTransportEngineServer?
+    if options.transport == "webtransport" || options.transport == "both" {
+        let runDirectory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appending(path: ".run")
+        do {
+            let identity = try CertificateStore.loadOrCreate(in: runDirectory)
+            var configuration = WebTransportEngineServer.Configuration()
+            configuration.port = options.transportPort
+            let server = WebTransportEngineServer(
+                service: server.engineService, identity: identity, configuration: configuration)
+            try await server.start()
+            transportServer = server
+            log("  app     : webtransport://127.0.0.1:\(options.transportPort)")
+            log("  cert    : \(identity.fingerprintDisplay)")
+        } catch {
+            // Not fatal: the website works without it, and saying so is better than refusing
+            // to start at all.
+            log("  app     : WebTransport unavailable — \(error.localizedDescription)")
+        }
+    } else {
+        log("  app     : not served (--transport \(options.transport))")
+    }
+
     log("  models  : \(specs.map(\.backendLabel).joined(separator: ", "))")
     log("Press Control-C to stop.")
+    _ = transportServer
 
     // Keep the process alive; the HTTP listener runs on its own queue.
     while true {

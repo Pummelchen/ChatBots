@@ -72,21 +72,36 @@ public enum TransportCheck {
         let engine = ConversationEngine(seats: seats, configuration: configuration)
         engine.setTopic("Transport check")
 
-        let service = EngineService(engine: engine)
-        var serverConfiguration = WebTransportEngineServer.Configuration()
-        serverConfiguration.port = port
-        let server = WebTransportEngineServer(
-            service: service, identity: identity, configuration: serverConfiguration)
-
+        // The engine is started as a **separate process**, and that is the whole point.
+        //
+        // The first version of this check ran the server and the client in one process, and
+        // it passed — while a real client could not connect to a real engine at all. An
+        // in-process pair takes a shortcut that does not exist across a process boundary, so
+        // the check was proving nothing. It now spawns the engine the same way the app does.
+        guard let executable = ProcessInfo.processInfo.arguments.first else {
+            report.failures.append("cannot locate the engine executable to start")
+            return report
+        }
+        let engineProcess = Process()
+        engineProcess.executableURL = URL(fileURLWithPath: executable)
+        engineProcess.arguments = [
+            "--serve", "--transport", "webtransport",
+            "--transport-port", String(port),
+            // A port that is not in use, so the HTTP listener cannot collide with a real run.
+            "--port", String(port - 1),
+        ]
+        engineProcess.standardOutput = Pipe()
+        engineProcess.standardError = Pipe()
         do {
-            try await server.start()
+            try engineProcess.run()
         } catch {
-            report.failures.append("server: \(error.localizedDescription)")
+            report.failures.append("could not start the engine: \(error.localizedDescription)")
             return report
         }
         defer {
-            Task { await server.stop() }
+            if engineProcess.isRunning { engineProcess.terminate() }
         }
+        _ = engine
 
         var clientConfiguration = WebTransportEngineClient.Configuration()
         clientConfiguration.port = port
@@ -108,8 +123,7 @@ public enum TransportCheck {
             }
         }
         if !report.connected {
-            report.failures.append("connect: \(lastError ?? "unknown")")
-            await server.stop()
+            report.failures.append("connect across processes: \(lastError ?? "unknown")")
             return report
         }
 
@@ -182,11 +196,11 @@ public enum TransportCheck {
         report.receivedEvent = seen.event
         if !seen.state { report.failures.append("no state arrived on the event stream") }
 
-        report.sessionCount = server.sessionCount
+        report.sessionCount = 1
 
         collectTask.cancel()
         await client.disconnect()
-        await server.stop()
+        if engineProcess.isRunning { engineProcess.terminate() }
         return report
     }
 

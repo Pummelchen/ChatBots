@@ -60,6 +60,7 @@ public final class WebTransportEngineServer {
     private var listener: WebTransportListeningServer?
     private var acceptTask: Task<Void, Never>?
     private var eventTask: Task<Void, Never>?
+    private var transcriptTask: Task<Void, Never>?
     /// One continuation per subscribed session, so each has its own buffer and a stalled
     /// client costs only its own events.
     private var subscribers: [UUID: AsyncStream<EngineEvent>.Continuation] = [:]
@@ -98,6 +99,7 @@ public final class WebTransportEngineServer {
         }
 
         startEventPump()
+        startTranscriptPump()
         acceptTask = Task { [weak self] in
             await self?.acceptLoop()
         }
@@ -108,6 +110,8 @@ public final class WebTransportEngineServer {
         acceptTask = nil
         eventTask?.cancel()
         eventTask = nil
+        transcriptTask?.cancel()
+        transcriptTask = nil
         for continuation in subscribers.values { continuation.finish() }
         subscribers.removeAll()
         if let listener {
@@ -284,6 +288,24 @@ public final class WebTransportEngineServer {
             return nil
         default:
             return nil
+        }
+    }
+
+    /// Push a whole fresh state whenever the shared log changes.
+    ///
+    /// The output deltas carry the text as it is written, but they are fragments: a client
+    /// cannot rebuild the transcript, the statistics or the notices from them. The log
+    /// changing is the moment those are worth re-sending, and it happens once per turn rather
+    /// than once per token — so a client gets smooth text between turns and an authoritative
+    /// state at each one.
+    private func startTranscriptPump() {
+        transcriptTask?.cancel()
+        transcriptTask = Task { [weak self] in
+            guard let self else { return }
+            for await _ in self.service.transcriptUpdates {
+                if Task.isCancelled { return }
+                self.broadcastState()
+            }
         }
     }
 
