@@ -106,6 +106,12 @@ public struct APISnapshot: Codable, Sendable {
         /// `token`, `reasoning`, `tool` or `started`.
         public var kind: String
 
+        public init(agentID: String, text: String, kind: String) {
+            self.agentID = agentID
+            self.text = text
+            self.kind = kind
+        }
+
         public var isOutput: Bool { kind == "token" }
         public var isReasoning: Bool { kind == "reasoning" }
         public var isTool: Bool { kind == "tool" }
