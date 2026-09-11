@@ -132,6 +132,35 @@ public enum ModelStore {
             || contents.contains { $0.hasSuffix(".safetensors.index.json") }
     }
 
+    /// The project directory, found by walking up from the working directory or the bundle
+    /// until a `Package.swift` or a `models/` folder appears.
+    ///
+    /// Public so anything that needs a project-relative file — the local secrets file, for
+    /// instance — resolves it the same way the models folder is resolved, rather than each
+    /// caller inventing its own rule.
+    public static func projectRoot() -> URL? {
+        var candidates: [URL] = [URL(fileURLWithPath: FileManager.default.currentDirectoryPath)]
+        if let bundle = Bundle.main.bundleURL as URL? {
+            candidates.append(bundle)
+            candidates.append(bundle.deletingLastPathComponent())
+        }
+        let manager = FileManager.default
+        for start in candidates {
+            var directory = start
+            for _ in 0..<6 {
+                if manager.fileExists(atPath: directory.appending(path: "Package.swift").path)
+                    || manager.fileExists(atPath: directory.appending(path: "models").path)
+                {
+                    return directory
+                }
+                let parent = directory.deletingLastPathComponent()
+                if parent.path == directory.path { break }
+                directory = parent
+            }
+        }
+        return nil
+    }
+
     /// The context window declared by a checkpoint's own config, if that checkpoint is on
     /// disk. `max_position_embeddings` lives under `text_config` for the Qwen 3.5 wrapper
     /// and at the top level for a plain text model.

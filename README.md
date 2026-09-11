@@ -813,6 +813,53 @@ cutting that tenth away and leaving a white sliver wherever the mask and the art
 not line up exactly. Verified by asking the system for the finished app's icon
 (`NSWorkspace.icon(forFile:)`), which returns the artwork with macOS's mask applied.
 
+## Model naming
+
+A model is called what its maker calls it, not what its API slug happens to be. A server
+reports `deepseek-v4-flash`; the interface shows **DeepSeek V4.1 Flash**.
+
+The name is derived through `ModelNames.friendly` rather than stored per seat, so the header,
+the settings sheet, the web interface and the export cannot disagree — and a model the app has
+never heard of still gets a readable label (`llama-3-8b-instruct` → "Llama 3 8b Instruct")
+rather than a blank or a raw slug. A server prefix is ignored, so the same model reached
+through different hosts is labelled the same.
+
+| Identifier | Shown as |
+| --- | --- |
+| `deepseek-v4-flash` | DeepSeek V4.1 Flash |
+| `deepseek-v4-pro` | DeepSeek V4.1 Pro |
+| `gpt-4o-mini` | GPT-4o mini |
+| `claude-sonnet-4` | Claude Sonnet 4 |
+
+## API keys, and where they live
+
+A key is **not compiled into the source**. A key in a repository is a public key the moment
+the repository is — and GitHub refuses the push anyway: its secret scanning blocked exactly
+that while this was being written. So a key is read, in order, from:
+
+1. the **endpoint itself**, if you typed one into the interface;
+2. the **environment** (`DEEPSEEK_API_KEY`, `TAVILY_API_KEY`);
+3. **`.secrets.env`** in the project root — **gitignored**, so it never enters a commit.
+
+```
+# .secrets.env   (gitignored, chmod 600)
+DEEPSEEK_API_KEY=sk-...
+TAVILY_API_KEY=tvly-dev-...
+```
+
+That is the practical route on a desktop: present and working, but never committed. A fresh
+clone without the file simply has no DeepSeek key, which the interface reports rather than
+failing silently.
+
+**The key is only ever sent to its own host.** `api.deepseek.com` is compared *exactly*, not
+by substring — the first version used `contains("api.deepseek.com")`, which also matches
+`api.deepseek.com.evil.test`, a lookalike domain someone could register. A built-in key is a
+convenience; sending it to whoever registers a similar host is the one way that convenience
+becomes a disclosure. There is a test for the lookalike.
+
+The Tavily dev key is still compiled in, since it is a low-value search key that has always
+been public in this repository. Treat it as public.
+
 ## Cloud models: what works, and what was measured
 
 The API backend speaks the **OpenAI Responses API** (`POST /v1/responses`), not the older

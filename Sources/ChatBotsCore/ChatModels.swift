@@ -431,7 +431,25 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
     public var backendLabel: String {
         switch backend {
         case .mlx: modelShortName
-        case .openAIResponses: openAI.shortModelName
+        // Through the naming table, so the header says "DeepSeek V4.1 Flash" rather than the
+        // server's slug. Keeping this in one place means the header, the settings sheet and
+        // the web interface cannot disagree about what a model is called.
+        case .openAIResponses: ModelNames.friendly(openAI.model)
+        }
+    }
+
+    /// What to call this seat's model on screen.
+    ///
+    /// Derived rather than stored, so a model is never displayed as a raw server id like
+    /// `deepseek-v4-pro` in one place and a friendly name in another — and so a model the app
+    /// has never heard of still gets a readable label instead of a blank. `modelShortName` is
+    /// used for the local checkpoint, whose own naming is already friendly.
+    public var modelLabel: String {
+        switch backend {
+        case .mlx:
+            return modelShortName
+        case .openAIResponses:
+            return ModelNames.friendly(openAI.model)
         }
     }
 

@@ -144,12 +144,16 @@ struct OpenAIResponsesTests {
         #expect(endpoint.model == "gpt-4o-mini")
     }
 
-    @Test("A model name is shown shortened, or left alone when there is nothing to strip")
+    @Test("A model is named through the table, or tidied up when it is unknown")
     func shortModelName() {
+        // Superseded by `ModelNames`: an identifier is mapped to the name its maker uses
+        // where one is known, and otherwise readably prettified. The old behaviour — strip
+        // the quantisation suffix and show the slug — left a raw identifier on screen.
+        #expect(OpenAIEndpoint(model: "gpt-4o-mini").shortModelName == "GPT-4o mini")
+        #expect(OpenAIEndpoint(model: "deepseek-v4-flash").shortModelName == "DeepSeek V4.1 Flash")
         #expect(
             OpenAIEndpoint(model: "mlx-community/Qwen3.5-4B-MLX-4bit").shortModelName
-                == "Qwen3.5-4B")
-        #expect(OpenAIEndpoint(model: "gpt-4o-mini").shortModelName == "gpt-4o-mini")
+                == "Qwen3 5 4b Mlx 4bit")
     }
 
     @Test("SSE lines are parsed only when they carry data")

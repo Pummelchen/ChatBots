@@ -546,7 +546,7 @@ public final class APIServer {
             id: spec.id,
             name: spec.displayName,
             model: spec.modelID,
-            modelShortName: spec.modelShortName,
+            modelShortName: spec.modelLabel,
             backend: spec.backend.rawValue,
             backendLabel: spec.backend.label,
             personaName: persona.name,

@@ -20,3 +20,6 @@ models/.hf-model.json
 
 # Device captures from tools/capture-devices.py (regenerate rather than commit)
 captures/
+
+# Local API keys. Never committed, by design: a key in a repository is a public key.
+.secrets.env

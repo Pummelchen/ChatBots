@@ -69,6 +69,145 @@ public enum APICompatibility: String, Sendable, Codable, CaseIterable, Identifia
     }
 }
 
+/// Human names for model identifiers.
+///
+/// The point is that a model should be called what its maker calls it, not what its API slug
+/// happens to be. A server reports `deepseek-v4-pro`; the product is DeepSeek V4.1 Flash. Left
+/// to the raw id, every screen in the app shows the slug, and the same model gets a different
+/// label depending on which server it was reached through.
+public enum ModelNames {
+
+    /// Known identifiers and the name to show for them, longest match first so a more
+    /// specific entry wins over a general one.
+    private static let table: [(match: String, name: String)] = [
+        ("deepseek-v4-pro", "DeepSeek V4.1 Pro"),
+        ("deepseek-v4.1-pro", "DeepSeek V4.1 Pro"),
+        ("deepseek-v4-flash", "DeepSeek V4.1 Flash"),
+        ("deepseek-v4.1-flash", "DeepSeek V4.1 Flash"),
+        ("deepseek-v4", "DeepSeek V4.1"),
+        ("deepseek-v3", "DeepSeek V3"),
+        ("deepseek-reasoner", "DeepSeek Reasoner"),
+        ("deepseek-chat", "DeepSeek Chat"),
+        ("gpt-4o-mini", "GPT-4o mini"),
+        ("gpt-4o", "GPT-4o"),
+        ("gpt-4.1-mini", "GPT-4.1 mini"),
+        ("gpt-4.1", "GPT-4.1"),
+        ("claude-opus-4", "Claude Opus 4"),
+        ("claude-sonnet-4", "Claude Sonnet 4"),
+        ("claude-haiku-4", "Claude Haiku 4"),
+        ("claude-3-5-sonnet", "Claude 3.5 Sonnet"),
+        ("claude-3-5-haiku", "Claude 3.5 Haiku"),
+        ("gemini-2.5-pro", "Gemini 2.5 Pro"),
+        ("gemini-2.5-flash", "Gemini 2.5 Flash"),
+    ]
+
+    /// The name to show for a model identifier.
+    ///
+    /// An unknown identifier is cleaned up rather than discarded: separators become spaces and
+    /// words are capitalised, so `my-org/llama-3-8b-instruct` reads as "Llama 3 8b Instruct"
+    /// instead of being shown raw or left blank.
+    public static func friendly(_ modelID: String) -> String {
+        let lowered = modelID.lowercased()
+        // Drop a server prefix such as `mlx-community/` before matching.
+        let slug = lowered.split(separator: "/").last.map(String.init) ?? lowered
+        if let known = table.first(where: { slug.contains($0.match) }) { return known.name }
+        return prettify(slug)
+    }
+
+    /// Turn a slug into something readable without pretending to know what it is.
+    static func prettify(_ slug: String) -> String {
+        let words = slug.split(whereSeparator: { $0 == "-" || $0 == "_" || $0 == "." })
+        guard !words.isEmpty else { return slug }
+        return words.map { word -> String in
+            // Keep a version-like token as it is: "4b" reads better than "4B" inside a name
+            // that is already mixed case, and "8b" is not a word.
+            if word.first?.isNumber == true { return String(word) }
+            return word.prefix(1).uppercased() + word.dropFirst()
+        }.joined(separator: " ")
+    }
+}
+
+/// Keys the app can find for itself, so it works without a setup step.
+///
+/// **Not compiled into the source.** A key in a repository is a key that is public the moment
+/// the repository is, and GitHub refuses the push anyway — its secret scanning blocked exactly
+/// that. So the key is read, in order, from:
+///
+///   1. the environment (`DEEPSEEK_API_KEY`), for a shell or a launch agent
+///   2. a local file, `.secrets.env` in the project root, which is gitignored
+///   3. the value an endpoint already holds, if the user typed one
+///
+/// The file is the practical route on a desktop: present, but never committed. A fresh clone
+/// without it simply has no DeepSeek key, which the interface already reports rather than
+/// failing silently.
+public enum BuiltInKeys {
+
+    /// The environment variable that supplies the key.
+    public static let deepSeekEnvironmentKey = "DEEPSEEK_API_KEY"
+
+    /// The gitignored file the key can be read from.
+    public static let secretsFileName = ".secrets.env"
+
+    /// The DeepSeek key, or nil when this machine has none configured.
+    public static var deepSeek: String? {
+        if let value = ProcessInfo.processInfo.environment[deepSeekEnvironmentKey],
+            !value.trimmingCharacters(in: .whitespaces).isEmpty
+        {
+            return value.trimmingCharacters(in: .whitespaces)
+        }
+        return secretsFile()[deepSeekEnvironmentKey]
+    }
+
+    /// Parse `.secrets.env`, one `NAME=value` per line.
+    ///
+    /// Deliberately minimal: no expansion, no quoting rules, no includes. It holds one or two
+    /// keys and a parser with features is a parser with surprises.
+    public static func secretsFile(in root: URL? = nil) -> [String: String] {
+        let directory = root ?? ModelStore.projectRoot() ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        let url = directory.appending(path: secretsFileName)
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [:] }
+
+        var values: [String: String] = [:]
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty || trimmed.hasPrefix("#") { continue }
+            guard let separator = trimmed.firstIndex(of: "=") else { continue }
+            let name = trimmed[trimmed.startIndex..<separator].trimmingCharacters(in: .whitespaces)
+            var value = trimmed[trimmed.index(after: separator)...].trimmingCharacters(in: .whitespaces)
+            // Tolerate quotes, because people write them.
+            if value.count >= 2, value.hasPrefix("\""), value.hasSuffix("\"") {
+                value = String(value.dropFirst().dropLast())
+            }
+            if !name.isEmpty { values[name] = value }
+        }
+        return values
+    }
+
+    /// The key for a base URL, or nil when this app has none to offer.
+    ///
+    /// The host is compared **exactly**, not by substring. `contains("api.deepseek.com")`
+    /// would match `api.deepseek.com.evil.test`, which is a lookalike domain someone could
+    /// register — and sending a real key there is the one mistake that turns a convenience
+    /// into a disclosure. The host is taken from the parsed URL, so a path or a query that
+    /// happens to contain the name cannot fool it either.
+    public static func key(forBaseURL baseURL: String) -> String? {
+        guard let host = host(of: baseURL), allowedHosts.contains(host) else { return nil }
+        return deepSeek
+    }
+
+    /// The hosts this app will send its built-in key to.
+    static let allowedHosts: Set<String> = ["api.deepseek.com"]
+
+    /// The host of a base URL, lowercased, or nil when there is not one.
+    static func host(of baseURL: String) -> String? {
+        let trimmed = baseURL.trimmingCharacters(in: .whitespaces)
+        // A base URL is normally given with a scheme; tolerate one without.
+        let candidate = trimmed.contains("://") ? trimmed : "https://\(trimmed)"
+        guard let host = URLComponents(string: candidate)?.host else { return nil }
+        return host.lowercased()
+    }
+}
+
 /// Configuration for an OpenAI-compatible endpoint.
 public struct OpenAIEndpoint: Sendable, Hashable, Codable {
     /// Base URL without a path, e.g. `http://localhost:1234`. `/v1/responses` is appended.
@@ -108,8 +247,19 @@ public struct OpenAIEndpoint: Sendable, Hashable, Codable {
     }
 
     /// True when a key is needed but missing, which is worth saying before a wasted request.
+    /// The key actually sent: an explicit one wins, then the environment, then the key built
+    /// into this app, and only for a host that key belongs to.
+    ///
+    /// Resolved here rather than stored, so a saved endpoint keeps whatever the user typed
+    /// and the fallback stays a fallback — nothing is written into their settings that they
+    /// did not put there.
+    public var effectiveAPIKey: String? {
+        if let apiKey, !apiKey.isEmpty { return apiKey }
+        return BuiltInKeys.key(forBaseURL: baseURL)
+    }
+
     public var isMissingKey: Bool {
-        compatibility == .strict && (apiKey ?? "").isEmpty
+        compatibility == .strict && (effectiveAPIKey ?? "").isEmpty
     }
 
     /// The full endpoint, tolerating a base URL given with or without a trailing slash or
@@ -123,10 +273,12 @@ public struct OpenAIEndpoint: Sendable, Hashable, Codable {
     }
 
     /// Derived from the model id so the UI can show something short.
+    /// The name to show for this endpoint's model.
+    ///
+    /// Superseded by `ModelNames.friendly`, which knows what the models are actually called;
+    /// kept because it is the sensible fallback for an identifier nothing recognises.
     public var shortModelName: String {
-        let last = model.split(separator: "/").last.map(String.init) ?? model
-        return last.replacingOccurrences(of: "-MLX-4bit", with: "")
-            .replacingOccurrences(of: "-4bit", with: "")
+        ModelNames.friendly(model)
     }
 }
 
@@ -308,7 +460,7 @@ public struct OpenAIResponsesClient: Sendable {
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-        if let key = endpoint.apiKey, !key.isEmpty {
+        if let key = endpoint.effectiveAPIKey, !key.isEmpty {
             urlRequest.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         }
         if ProcessInfo.processInfo.environment["CHATBOTS_TRACE_API"] != nil {

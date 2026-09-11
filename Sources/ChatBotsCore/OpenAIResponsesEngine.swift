@@ -139,7 +139,9 @@ public actor OpenAIResponsesEngine: LLMEngine {
             throw OpenAIResponsesError.badURL(spec.openAI.baseURL)
         }
         var request = URLRequest(url: url)
-        if let key = spec.openAI.apiKey, !key.isEmpty {
+        // The reachability probe must authenticate the same way the real request does,
+        // including the built-in key, or a working endpoint would look unreachable.
+        if let key = spec.openAI.effectiveAPIKey, !key.isEmpty {
             request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         }
         let (data, response) = try await URLSession.shared.data(for: request)

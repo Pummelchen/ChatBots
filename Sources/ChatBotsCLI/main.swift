@@ -510,7 +510,7 @@ if !options.attachments.isEmpty {
     log("  state   : GET  /api/state")
     log("  events  : GET  /api/events  (server-sent events)")
     log("  control : POST /api/start | /api/pause | /api/resume | /api/stop | /api/reset")
-    log("  models  : \(specs.map(\.modelShortName).joined(separator: ", "))")
+    log("  models  : \(specs.map(\.backendLabel).joined(separator: ", "))")
     log("Press Control-C to stop.")
 
     // Keep the process alive; the HTTP listener runs on its own queue.

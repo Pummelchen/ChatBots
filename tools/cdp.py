@@ -23,6 +23,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import sys
 import socket
 import struct
 import time
@@ -190,16 +191,39 @@ class Chrome:
         self.socket = _WebSocket(target["webSocketDebuggerUrl"])
 
     def stop(self) -> None:
+        """Shut down only the browser this instance started.
+
+        Terminates by PID, never by name. A name-based kill would take out the Chrome a
+        person is actually using, which is exactly the sort of collateral damage a capture
+        tool must never cause — and the flag check below makes that mistake impossible even
+        if this code is edited later.
+        """
         if self.socket:
             self.socket.close()
             self.socket = None
         if self.process:
-            self.process.terminate()
-            try:
-                self.process.wait(timeout=5)
-            except Exception:
-                self.process.kill()
+            pid = self.process.pid
+            if self._is_our_headless_instance(pid):
+                self.process.terminate()
+                try:
+                    self.process.wait(timeout=5)
+                except Exception:
+                    self.process.kill()
+            else:
+                # Refuse rather than risk closing someone's browser.
+                print(f"  refusing to terminate pid {pid}: not the headless instance", file=sys.stderr)
             self.process = None
+
+    @staticmethod
+    def _is_our_headless_instance(pid: int) -> bool:
+        """True only for a headless Chrome carrying this run's private profile."""
+        import subprocess
+        try:
+            out = subprocess.run(["ps", "-p", str(pid), "-o", "command="],
+                                 capture_output=True, text=True, timeout=5).stdout
+        except Exception:
+            return False
+        return "--headless" in out and "chatbots-cdp" in out
 
     def call(self, method: str, params: dict | None = None) -> dict:
         """Send a command and wait for its reply, ignoring events."""
