@@ -146,6 +146,21 @@ struct SavedConversationsSheet: View {
                         ? "Replace what is on screen with this conversation"
                         : "Stop the conversation before opening another one")
 
+                if let link = controller.shareLink(for: item.id) {
+                    Button {
+                        // A link rather than an attachment: the point of it is that the other
+                        // person opens it and can replay the argument.
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(link.absoluteString, forType: .string)
+                    } label: {
+                        Label("Copy link", systemImage: "link")
+                            .scaledFont(size: 11)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help("Copy a read-only link that replays this conversation in a browser")
+                }
+
                 Button {
                     confirmingDelete = item
                 } label: {

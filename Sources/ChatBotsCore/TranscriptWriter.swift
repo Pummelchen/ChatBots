@@ -46,8 +46,8 @@ public enum TranscriptWriter {
     /// each message.
     public static func label(for turn: Turn) -> String {
         switch turn.kind {
-        case .topic: "MODERATOR — TOPIC"
-        case .steering: "MODERATOR"
+        case .topic: "\(turn.speakerName.uppercased()) — TOPIC"
+        case .steering: turn.speakerName.uppercased()
         case .direction: "RESEARCH MODERATOR — ASSIGNMENT"
         case .introduction: "SETUP"
         case .summary: "CONDENSED EARLIER DISCUSSION"

@@ -31,6 +31,8 @@ public struct UserSettings: Codable, Sendable, Equatable {
     /// than re-read from disk because extraction is the slow part and the original file may
     /// have moved or changed since.
     public var attachments: [AttachedDocument]
+    /// Who the human moderator is: their name, and the persona their interjections read as.
+    public var moderator: ModeratorIdentity
 
     public init(
         version: Int = UserSettings.currentVersion,
@@ -39,7 +41,8 @@ public struct UserSettings: Codable, Sendable, Equatable {
         showReasoning: Bool = true,
         seats: [AgentSpec],
         seatCount: Int? = nil,
-        attachments: [AttachedDocument] = []
+        attachments: [AttachedDocument] = [],
+        moderator: ModeratorIdentity = ModeratorIdentity()
     ) {
         self.version = version
         self.topic = topic
@@ -48,6 +51,7 @@ public struct UserSettings: Codable, Sendable, Equatable {
         self.seats = seats
         self.seatCount = seatCount ?? seats.count
         self.attachments = attachments
+        self.moderator = moderator
     }
 
     /// Decode field by field, defaulting anything absent.
@@ -68,6 +72,11 @@ public struct UserSettings: Codable, Sendable, Equatable {
         self.seatCount = try container.decodeIfPresent(Int.self, forKey: .seatCount)
             ?? self.seats.count
         self.attachments = try container.decodeIfPresent([AttachedDocument].self, forKey: .attachments) ?? []
+        // A payload from before the human had an identity keeps the default one, which is
+        // exactly what it was using.
+        self.moderator =
+            try container.decodeIfPresent(ModeratorIdentity.self, forKey: .moderator)
+            ?? ModeratorIdentity()
     }
 
     /// Defaults for a first run, or after a stored payload could not be used.

@@ -200,6 +200,8 @@ public final class ConversationEngine {
     private var seats: [Seat]
 
     private var seatCursor = 0
+    /// Who the human moderator is, for the room and for the transcript.
+    public var moderator = ModeratorIdentity()
     private var turnsCompleted = 0
     /// Prompt tokens the last completed turn actually sent, and how much of that was
     /// transcript text — together they let the next prompt be predicted rather than
@@ -551,7 +553,7 @@ public final class ConversationEngine {
 
         let turn = Turn(
             sequence: nextSequence(),
-            speakerName: "Moderator",
+            speakerName: moderator.speakerName,
             kind: .steering,
             content: trimmed
         )
@@ -561,7 +563,11 @@ public final class ConversationEngine {
             publishTranscript()  // visible immediately, marked pending by the UI
             note("Queued — \(nextSpeakerID()) will pick it up at the next turn boundary.")
         } else {
-            queuedSteering.append(turn)
+            // Into the log and *not* into the queue. The queue is "not yet delivered to the
+            // models"; this turn is in the log they are about to be given, so queueing it as well
+            // delivered it twice — once now and once when the queue was drained at the first turn
+            // boundary. The duplicate reached the prompt, where it read as the moderator saying
+            // the same thing twice.
             conversation.turns.append(turn)
             publishTranscript()
             if generationTask == nil, status != .stopped {
@@ -791,7 +797,8 @@ public final class ConversationEngine {
         let prompt = PromptBuilder.prompt(
             for: liveSpec,
             others: seats.map(\.spec).filter { $0.id != liveSpec.id },
-            conversation: conversation
+            conversation: conversation,
+            moderator: moderator
         )
 
         startedTurns += 1
@@ -1040,26 +1047,43 @@ public final class ConversationEngine {
         (conversation.turns + queuedSteering).sorted { $0.sequence < $1.sequence }
     }
 
+    /// Write the opening: the question, and the brief that explains the rules.
+    ///
+    /// Written once and idempotently, so restarting a stopped conversation does not write a
+    /// second brief — and so a conversation *started* by the moderator typing a message still
+    /// gets one. The previous version bailed out entirely if the log already held a steering
+    /// turn, which meant the "type a message to begin" path had no brief at all: the seats were
+    /// given a question and no rules, no roster and no statement of what the conversation was.
+    ///
+    /// No topic turn is written in that case, because the message that started the conversation
+    /// *is* the question; writing both would show it twice, which is the bug this replaced.
     private func seedOpeningTurns() {
-        guard !conversation.turns.contains(where: { $0.kind == .steering }) else { return }
-        guard !conversation.turns.contains(where: { $0.kind == .topic }) else { return }
-        let topicTurn = Turn(
-            sequence: nextSequence(),
-            speakerName: "Moderator",
-            kind: .topic,
-            content: conversation.topic
-        )
-        conversation.turns.append(topicTurn)
-
-        let intro = PromptBuilder.introduction(specs: specs, topic: conversation.topic)
-        conversation.turns.append(
-            Turn(
-                sequence: nextSequence(),
-                speakerName: "System",
-                kind: .introduction,
-                content: intro
+        let alreadyAsked = conversation.turns.contains {
+            $0.kind == .topic || $0.kind == .steering
+        }
+        if !alreadyAsked {
+            conversation.turns.append(
+                Turn(
+                    sequence: nextSequence(),
+                    speakerName: moderator.speakerName,
+                    kind: .topic,
+                    content: conversation.topic
+                )
             )
-        )
+        }
+
+        if !conversation.turns.contains(where: { $0.kind == .introduction }) {
+            let intro = PromptBuilder.introduction(
+                specs: specs, topic: conversation.topic, moderator: moderator)
+            conversation.turns.append(
+                Turn(
+                    sequence: nextSequence(),
+                    speakerName: "System",
+                    kind: .introduction,
+                    content: intro
+                )
+            )
+        }
         publishTranscript()
     }
 

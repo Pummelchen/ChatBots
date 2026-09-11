@@ -78,6 +78,8 @@ public enum EngineRequest: Sendable, Hashable, Codable {
     case castVote(turnID: String, verdict: AudienceVote.Verdict?)
     /// Forget every vote.
     case clearVotes
+    /// Who the human moderator is: their name, and how their interjections should read.
+    case setModerator(ModeratorIdentity)
 
     /// A partial seat change, so the sender says what it means to alter rather than sending a
     /// whole seat back and relying on the receiver to notice what differs.

@@ -354,15 +354,40 @@ struct ControlBar: View {
 /// Moderator strip — one input, delivered to both models.
 struct ModeratorBar: View {
     @Environment(\.themePalette) private var palette
+    @EnvironmentObject private var zoom: ZoomStore
     @ObservedObject var controller: ChatController
+    @State private var showIdentity = false
+
+    /// The human's own name, so the bar says who is speaking rather than only what the role is.
+    private var who: String {
+        let name = controller.lastSnapshot?.moderatorName ?? ModeratorIdentity.defaultName
+        let persona = controller.lastSnapshot?.moderatorPersona ?? "Neutral"
+        return persona == "Neutral" ? name : "\(name) · \(persona)"
+    }
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
-                Label("Moderator", systemImage: "person.wave.2.fill")
-                    .scaledFont(size: 10.5, weight: .semibold, design: .rounded)
-                    .foregroundStyle(AgentTheme.moderatorTint(palette))
-                Text("Goes into the shared log — both models read it.")
+                HStack(spacing: 5) {
+                    Label(who, systemImage: "person.wave.2.fill")
+                        .scaledFont(size: 10.5, weight: .semibold, design: .rounded)
+                        .foregroundStyle(AgentTheme.moderatorTint(palette))
+                        .lineLimit(1)
+                    Button {
+                        showIdentity = true
+                    } label: {
+                        Image(systemName: "pencil")
+                            .scaledFont(size: 9)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(palette.textTertiary)
+                    .help("Set your name, and how your interjections read")
+                    .sheet(isPresented: $showIdentity) {
+                        ModeratorIdentitySheet(controller: controller) { showIdentity = false }
+                            .environmentObject(zoom)
+                    }
+                }
+                Text("Goes into the shared log — every participant reads it.")
                     .scaledFont(size: 9.5)
                     .foregroundStyle(palette.textTertiary)
             }

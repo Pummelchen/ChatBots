@@ -18,7 +18,9 @@ public enum PromptBuilder {
     // MARK: - Introduction
 
     /// The shared opening brief. Shown in both panes and sent to both models.
-    public static func introduction(specs: [AgentSpec], topic: String) -> String {
+    public static func introduction(
+        specs: [AgentSpec], topic: String, moderator: ModeratorIdentity = ModeratorIdentity()
+    ) -> String {
         let roster = specs
             .map { "- \($0.displayName) — \($0.modelShortName)" }
             .joined(separator: "\n")
@@ -38,9 +40,27 @@ public enum PromptBuilder {
         whatever was said last — and say what you actually think. Keep each contribution \
         focused rather than exhaustive.
 
-        A human moderator may interject at any time. Messages marked [Moderator] come from \
-        the human and override everything else. \(searchRule(count: specs.count))
+        \(moderatorParagraph(moderator, count: specs.count))
         """
+    }
+
+    /// The moderator's paragraph in the opening brief.
+    ///
+    /// Here rather than in each seat's system message because the brief is already the place the
+    /// moderator is described, and saying it twice per prompt would cost twice as much to say
+    /// the same thing. A moderator who has chosen no name and no persona gets exactly the
+    /// sentence this has always been.
+    static func moderatorParagraph(_ moderator: ModeratorIdentity, count: Int) -> String {
+        let who = moderator.speakerName
+        var text = "A human moderator may interject at any time. Messages marked [\(who)] come "
+        text += "from the human and override everything else. "
+        // Who is asking, and how they argue — the "human moderator" role is weaker to work for
+        // than a person whose method is named.
+        if let style = moderator.briefing(mode: .entertainment) {
+            text += style
+        }
+        text += "\(searchRule(count: count))"
+        return text
     }
 
     private static func searchRule(count: Int) -> String {
@@ -54,7 +74,10 @@ public enum PromptBuilder {
 
     /// The system message for one seat. Identical for every turn so the prompt prefix
     /// stays stable (and cacheable); the seat's own identity is the only difference.
-    public static func systemMessage(for spec: AgentSpec, others: [AgentSpec], topic: String) -> String {
+    public static func systemMessage(
+        for spec: AgentSpec, others: [AgentSpec], topic: String,
+        moderator: ModeratorIdentity = ModeratorIdentity()
+    ) -> String {
         // Named by their display name, so a seat the moderator renamed is referred to by
         // that name by the models too.
         let counterpart = others
@@ -100,9 +123,12 @@ public enum PromptBuilder {
     public static func tag(for turn: Turn) -> String {
         switch turn.kind {
         case .topic:
-            return "[Moderator — topic]"
+            return "[\(turn.speakerName) — topic]"
         case .steering:
-            return "[Moderator]"
+            // The human's own name, so a moderator who has chosen one is a person in the log
+            // rather than a role. Falls back to "Moderator", which is what every transcript
+            // written before they could choose says.
+            return "[\(turn.speakerName)]"
         case .direction:
             // The research moderator, not the human. Named the same way the final report is,
             // so the two things the moderator authors read as one voice — the app's — and the
@@ -319,12 +345,14 @@ public enum PromptBuilder {
         for spec: AgentSpec,
         others: [AgentSpec],
         conversation: Conversation,
-        steering: [Turn] = []
+        steering: [Turn] = [],
+        moderator: ModeratorIdentity = ModeratorIdentity()
     ) -> [PromptMessage] {
         var messages: [PromptMessage] = [
             .init(
                 role: .system,
-                content: systemMessage(for: spec, others: others, topic: conversation.topic)
+                content: systemMessage(
+                    for: spec, others: others, topic: conversation.topic, moderator: moderator)
             )
         ]
 

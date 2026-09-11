@@ -239,7 +239,12 @@ struct EngineServiceTests {
         let (service, engine) = makeService()
         let reply = await service.handle(.steer("Stay on the shell question."))
         #expect(reply.snapshot != nil)
-        #expect(engine.queuedSteering.contains { $0.content.contains("shell question") })
+        // An idle engine takes the message straight into the log, because that is the log the
+        // seats are about to be given; it is *not* also queued, which is what delivered it to
+        // the prompt twice. The queue is for a message typed while a turn is being generated,
+        // and the mid-turn test covers that.
+        #expect(engine.conversation.turns.contains { $0.content.contains("shell question") })
+        #expect(!engine.queuedSteering.contains { $0.content.contains("shell question") })
     }
 
     @Test("The reasoning preference is held by the service")

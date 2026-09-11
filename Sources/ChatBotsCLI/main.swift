@@ -759,9 +759,9 @@ let transcriptTask = Task {
             guard turn.kind != .tool else { continue }
             let label: String
             switch turn.kind {
-            case .topic: label = "MODERATOR · TOPIC"
+            case .topic: label = "\(turn.speakerName.uppercased()) · TOPIC"
             case .introduction: label = "SETUP"
-            case .steering: label = "MODERATOR"
+            case .steering: label = turn.speakerName.uppercased()
             case .direction: label = "RESEARCH MODERATOR — ASSIGNMENT"
             case .tool: label = "TOOL"
             case .summary: label = "CONDENSED EARLIER DISCUSSION"

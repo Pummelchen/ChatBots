@@ -131,6 +131,19 @@ public enum WebAssets {
 </main>
 
 <footer class="bar footer">
+  <details class="you">
+    <summary id="you-summary" title="Who you are, as the room sees you">You</summary>
+    <div class="you-panel">
+      <label>Name
+        <input id="mod-name" type="text" maxlength="40" placeholder="Moderator" autocomplete="off">
+      </label>
+      <label>Reads as
+        <select id="mod-persona"></select>
+      </label>
+      <p class="note">The participants are told who is asking and how to read an interruption. It never writes your messages.</p>
+    </div>
+  </details>
+
   <textarea id="message" rows="1" placeholder="Message…"></textarea>
   <button id="send" class="primary" disabled>Send</button>
   <div class="spacer"></div>
@@ -655,6 +668,44 @@ body[data-layout="thread"] #thread { display: flex; }
 .msg-body p { margin: 0 0 0.6em; }
 .msg-body p:last-child { margin-bottom: 0; }
 .msg-body code { font-family: ui-monospace, Menlo, monospace; font-size: 0.92em; background: var(--bg-sunken); padding: 0 4px; border-radius: 4px; }
+
+.you { position: relative; flex: 0 0 auto; }
+.you > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: var(--font-small);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.you > summary::-webkit-details-marker { display: none; }
+.you[open] > summary { color: var(--text); border-color: var(--mod); }
+.you-panel {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: min(320px, calc(var(--vw) - 24px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+.you-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: var(--font-small);
+  color: var(--text-secondary);
+}
+.you-panel input, .you-panel select { width: 100%; }
+.you-panel .note { margin: 0; font-size: var(--font-tiny); }
 
 .vote-row {
   display: flex;
@@ -1338,8 +1389,8 @@ body[data-view="phone"] {
 
   function labelFor(message) {
     switch (message.kind) {
-      case "topic": return "MODERATOR · TOPIC";
-      case "steering": return "MODERATOR";
+      case "topic": return String(message.speaker || "Moderator").toUpperCase() + " · TOPIC";
+      case "steering": return String(message.speaker || "Moderator").toUpperCase();
       case "direction": return "RESEARCH MODERATOR · ASSIGNMENT";
       case "summary": return "CONDENSED EARLIER DISCUSSION";
       case "tool": return "TOOL";
@@ -1642,6 +1693,7 @@ body[data-view="phone"] {
     drawAttachments();
     drawContext();
     drawResearch();
+    drawIdentity();
     if (first && next.messages.length && state.follow) scrollToBottom();
   }
 
@@ -2011,10 +2063,74 @@ body[data-view="phone"] {
         await refreshKept();
       };
 
-      actions.append(open, remove);
+      const link = document.createElement("button");
+      link.className = "small";
+      link.textContent = "Link";
+      link.title = "Copy a read-only link to this conversation";
+      link.onclick = async () => {
+        // The engine tells us where it is listening; falling back to this page's own origin
+        // covers the case of a browser reaching the app through a proxy or another host.
+        const base = (state.snapshot && state.snapshot.shareBase) || window.location.origin;
+        const url = `${base}/s/${item.id}`;
+        try {
+          await navigator.clipboard.writeText(url);
+          toast("Link copied.");
+        } catch {
+          // Clipboard access needs a secure context; showing the link is the honest fallback
+          // rather than reporting a copy that did not happen.
+          window.prompt("Copy this link:", url);
+        }
+      };
+
+      actions.append(open, link, remove);
       row.append(text, actions);
       body.append(row);
     }
+  }
+
+  // ── Who the moderator is ─────────────────────────────────────────────────────────
+
+  function saveIdentity() {
+    run(() => api.post("/api/moderator", {
+      name: $("mod-name").value.trim() || "Moderator",
+      personaID: $("mod-persona").value,
+    }));
+  }
+
+  /**
+   * Fill the moderator's identity controls from the state.
+   *
+   * Only while the panel is closed or the field is untouched: the engine is the source of truth,
+   * but overwriting a half-typed name on the next poll would make the field unusable.
+   */
+  function drawIdentity() {
+    const s = state.snapshot;
+    if (!s) return;
+
+    const select = $("mod-persona");
+    if (select.options.length !== s.availablePersonas.length + 1) {
+      select.textContent = "";
+      const neutral = document.createElement("option");
+      neutral.value = "neutral";
+      neutral.textContent = "Neutral — no style imposed";
+      select.append(neutral);
+      for (const persona of s.availablePersonas) {
+        const option = document.createElement("option");
+        option.value = persona.id;
+        option.textContent = `${persona.emoji} ${persona.name}`;
+        select.append(option);
+      }
+    }
+    // The engine reports the display name; the select needs the identifier.
+    const style = s.availablePersonas.find((p) => p.name === s.moderatorPersona);
+    const identifier = s.moderatorPersona.startsWith("Neutral") ? "neutral" : (style ? style.id : "neutral");
+    if (document.activeElement !== select) select.value = identifier;
+
+    if (document.activeElement !== $("mod-name")) {
+      $("mod-name").value = s.moderatorName || "";
+    }
+    const persona = s.moderatorPersona.startsWith("Neutral") ? "" : ` · ${s.moderatorPersona}`;
+    $("you-summary").textContent = `You: ${s.moderatorName || "Moderator"}${persona}`;
   }
 
   // ── Line-up and scenarios ────────────────────────────────────────────────────────
@@ -2140,6 +2256,10 @@ body[data-view="phone"] {
     });
 
     $("votes-clear").onclick = () => run(() => api.post("/api/votes/clear"));
+    // Applied on change rather than behind a Save button: it takes effect from the next turn,
+    // so there is nothing to protect the user from and a button would only be a step to forget.
+    $("mod-name").addEventListener("change", saveIdentity);
+    $("mod-persona").addEventListener("change", saveIdentity);
     $("save").onclick = save;
     $("attach").onclick = () => $("files").click();
     $("files").onchange = (event) => addFiles([...event.target.files]);

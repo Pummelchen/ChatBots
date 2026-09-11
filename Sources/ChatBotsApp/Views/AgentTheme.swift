@@ -270,8 +270,8 @@ extension Turn {
 
     var badge: String {
         switch kind {
-        case .topic: "TOPIC"
-        case .steering: "MODERATOR"
+        case .topic: "\(speakerName.uppercased()) · TOPIC"
+        case .steering: speakerName.uppercased()
         case .direction: "ASSIGNMENT"
         case .introduction: "SETUP"
         case .summary: "CONDENSED"

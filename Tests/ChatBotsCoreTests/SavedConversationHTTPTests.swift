@@ -39,18 +39,15 @@ private actor KeptStub: LLMEngine {
     }
 }
 
-/// Ports handed out one at a time.
-///
-/// The first version derived a port from `UUID().uuidString.hashValue % 90`, which is not
-/// distinct between two tests running in parallel — and swift-testing runs them in parallel — so
-/// two servers occasionally picked the same port and one of them silently served nothing.
-/// Nondeterminism in a test fixture is indistinguishable from a bug in the code under test.
-@MainActor private var nextTestPort = 7_900
-
 /// A server on a port of its own, with its own store, so tests cannot see each other.
 ///
-/// Retries on the next port if this one is taken: another process on the machine may hold it, and
-/// a test that fails because something else is listening is a test that lies.
+/// Ports come from the shared allocator rather than from `UUID().uuidString.hashValue % 90`,
+/// which was not distinct between two tests running in parallel — so two servers occasionally
+/// took the same port and one served nothing. Nondeterminism in a fixture is indistinguishable
+/// from a bug in the code under test.
+///
+/// The retry is for whatever else is on the machine: a test that fails because something else is
+/// listening is a test that lies.
 @MainActor
 private func liveServer(topic: String = "A question worth keeping")
     async throws -> (APIServer, ConversationEngine, URLSession, String)
@@ -68,9 +65,8 @@ private func liveServer(topic: String = "A question worth keeping")
             .appending(path: "kept-\(UUID().uuidString)"))
     let session = URLSession(configuration: .ephemeral)
     for _ in 0..<8 {
-        let port = nextTestPort
-        nextTestPort += 1
-        let server = APIServer(engine: engine, store: store, port: UInt16(port))
+        let port = allocateTestPort()
+        let server = APIServer(engine: engine, store: store, port: port)
         try server.start()
         // `start()` returning is not evidence that anything is listening; a taken port is
         // reported asynchronously. Asking is the only way to know.

@@ -305,6 +305,23 @@ func steeringStartsIdleConversation() async {
     #expect(engine.conversation.topic == "Why are eggs not round?")
     #expect(engine.conversation.turns.contains { $0.kind == .steering })
     #expect(await stubA.prompts.isEmpty == false)
+
+    // The message that started the conversation is the question, so there is no second copy of
+    // it — and the opening brief is still written. Starting this way used to produce neither:
+    // the brief was skipped because the log already held a steering turn, and the message was
+    // delivered to the prompt twice, once from the log and once from the steering queue.
+    let turns = engine.conversation.turns
+    #expect(!turns.contains { $0.kind == .topic }, "the message is the question, not a second copy")
+    #expect(turns.contains { $0.kind == .introduction }, "the brief explains the rules to the seats")
+    #expect(turns.filter { $0.kind == .steering }.count == 1, "the message appears once in the log")
+
+    let prompt = (await stubA.prompts.first ?? []).map(\.content).joined(separator: "\n")
+    let occurrences = prompt.components(separatedBy: "Why are eggs not round?").count - 1
+    // Three is correct: the topic in the seat's system message, the topic line in the opening
+    // brief, and the moderator's own message in the log. Four would mean the message had been
+    // delivered twice — which is what happened while it was also sitting in the steering queue.
+    #expect(occurrences == 3, "the question reached the prompt \(occurrences) times")
+    #expect(prompt.contains("open discussion"))
 }
 
 @MainActor

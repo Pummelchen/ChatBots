@@ -177,20 +177,28 @@ public final class ChatController: ObservableObject {
     private var isApplyingRemoteState = false
     /// The last state the engine reported. Read-only properties answer from here, so there is
     /// one source for what the engine currently thinks.
-    private var lastSnapshot: APISnapshot?
+    /// The last whole state from the engine, for the views that show something the controller
+    /// does not republish field by field.
+    public private(set) var lastSnapshot: APISnapshot?
 
     /// Called whenever anything the user set changes, so it can be written to disk.
     var onSettingsChanged: (() -> Void)?
+    /// The moderator's identity as restored from settings, pushed to the engine when the
+    /// connection comes up. The engine is a separate process and does not read the app's
+    /// preferences, so somebody has to tell it.
+    public private(set) var restoredModerator = ModeratorIdentity()
 
     public init(
         specs: [AgentSpec] = AgentSpec.SeatRoster.specs(),
         initialTopic: String = ChatController.defaultTopic,
         initialModeratorDraft: String = "",
-        initialShowReasoning: Bool = true
+        initialShowReasoning: Bool = true,
+        initialModerator: ModeratorIdentity = ModeratorIdentity()
     ) {
         self.topic = initialTopic
         self.moderatorDraft = initialModeratorDraft
         self.showReasoning = initialShowReasoning
+        self.restoredModerator = initialModerator
 
         // No engine is built here any more. The seats are drawn from the given specs so the
         // window has something to show before the connection is up, and the engine's own
@@ -240,6 +248,12 @@ public final class ChatController: ObservableObject {
         // The current state first, so the interface is correct before any event arrives.
         if let snapshot = try? await client.state() {
             apply(snapshot)
+        }
+        // Then what this app knows that the engine does not: a freshly started engine has the
+        // default moderator, and the user's own name and persona live in this app's settings.
+        if !restoredModerator.isDefault {
+            _ = try? await client.send(.setModerator(restoredModerator))
+            if let snapshot = try? await client.state() { apply(snapshot) }
         }
         startPumps()
 
@@ -1101,6 +1115,18 @@ public final class ChatController: ObservableObject {
         }
     }
 
+    /// Where this engine's HTTP server is, so a share link can be built without being told a
+    /// port. Nil when the engine is WebTransport-only, and then there is nothing to share to.
+    public var shareBase: String? {
+        guard let base = lastSnapshot?.shareBase, !base.isEmpty else { return nil }
+        return base
+    }
+
+    /// A read-only link to one kept conversation, if the engine has a page to serve.
+    public func shareLink(for id: String) -> URL? {
+        shareBase.flatMap { URL(string: "\($0)/s/\(id)") }
+    }
+
     /// Whether a kept conversation can be opened right now. Loading replaces the transcript, so
     /// it is refused while a turn is generating rather than silently discarding that turn.
     public var canLoadSavedConversation: Bool { !isRunning }
@@ -1162,6 +1188,39 @@ public final class ChatController: ObservableObject {
 
     /// Whether who is in the room, and what they are asked, can still be changed.
     public var canChangeLineup: Bool { !isRunning }
+
+    // MARK: - The human moderator
+
+    /// The moderator's chosen persona, or neutral.
+    ///
+    /// The engine reports the persona's *display* name, because that is what a person reads;
+    /// the picker needs the identifier, so it is resolved back through the same library the
+    /// engine used. An unknown name falls back to neutral rather than to a wrong persona.
+    public var moderatorPersonaID: String {
+        guard let reported = lastSnapshot?.moderatorPersona else { return PersonaLibrary.neutral.id }
+        if reported == PersonaCatalog.style(
+            id: PersonaLibrary.neutral.id, mode: mode, seatIndex: 0
+        ).name {
+            return PersonaLibrary.neutral.id
+        }
+        return availablePersonas.first { $0.name == reported }?.id ?? PersonaLibrary.neutral.id
+    }
+
+    /// The personas this mode offers, for the identity picker.
+    public var availablePersonas: [APIPersona] { lastSnapshot?.availablePersonas ?? [] }
+
+    public func setModerator(name: String, personaID: String) {
+        errorBanner = nil
+        let identity = ModeratorIdentity(name: name, personaID: personaID)
+        // Kept here as well as in the engine, because the engine will not remember it across a
+        // restart and this is the only place that will.
+        restoredModerator = identity
+        saveSettings()
+        run { client in
+            let reply = try await client.send(.setModerator(identity))
+            if let reason = reply.refusal { await MainActor.run { self.errorBanner = reason } }
+        }
+    }
 
     // MARK: - The audience
 

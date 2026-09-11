@@ -27,7 +27,8 @@ struct ChatBotsApp: App {
             specs: store.settings.seats,
             initialTopic: store.settings.topic,
             initialModeratorDraft: store.settings.moderatorDraft,
-            initialShowReasoning: store.settings.showReasoning
+            initialShowReasoning: store.settings.showReasoning,
+            initialModerator: store.settings.moderator
         )
         // Source material is restored before any turn can run.
         _ = restored.setAttachments(store.settings.attachments)
@@ -39,7 +40,8 @@ struct ChatBotsApp: App {
                 moderatorDraft: restored?.moderatorDraft ?? "",
                 showReasoning: restored?.showReasoning ?? true,
                 seats: restored?.currentSeats ?? AgentSpec.SeatRoster.specs(),
-                attachments: restored?.attachments ?? []
+                attachments: restored?.attachments ?? [],
+                moderator: restored?.restoredModerator ?? ModeratorIdentity()
             )
         }
         restored.onSettingsChanged = { [weak store] in

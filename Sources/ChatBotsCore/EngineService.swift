@@ -21,6 +21,13 @@ public final class EngineService {
     /// is held here because both front ends share one conversation.
     public var showReasoning = true
 
+    /// Where the HTTP server is reachable, when there is one.
+    ///
+    /// Set by whatever started the server, because only it knows the port. It travels in the
+    /// snapshot so a client can offer a share link without being told a second address — and so
+    /// a WebTransport-only engine honestly reports that there is nothing to share to.
+    public var shareBase: String?
+
     /// Where conversations are kept between runs.
     public let store: ConversationStore
 
@@ -173,6 +180,14 @@ public final class EngineService {
             engine.clearVotes()
             return .state(snapshot())
 
+        // ── The human moderator ──────────────────────────────────────────────────────
+        case .setModerator(let identity):
+            // Changeable while a conversation runs, unlike the topic: who is speaking is not a
+            // property of the question, and a moderator who is halfway through an investigation
+            // under the wrong name should be able to fix it.
+            engine.moderator = identity
+            return .state(snapshot())
+
         // ── Saved conversations ──────────────────────────────────────────────────────
         case .listSavedConversations:
             return .savedConversations(store.list().map(Self.summary))
@@ -240,8 +255,16 @@ public final class EngineService {
             engine.updateSeat(spec)
             names.append(PersonaCatalog.style(id: personaID, mode: mode, seatIndex: index).name)
         }
-        // Said out loud, because a draw nobody can see is a draw nobody can repeat.
-        engine.note("Line-up: \(described) — \(names.joined(separator: ", ")).")
+        // Said out loud, because a draw nobody can see is a draw nobody can repeat. And when
+        // the room is smaller than the line-up, said out loud that people were left out: a log
+        // reading "The starting line-up — Research Moderator, Economist" looks like a two-person
+        // line-up rather than a four-person one in a two-seat room.
+        var line = "Line-up: \(described) — \(names.joined(separator: ", "))."
+        if personaIDs.count > names.count {
+            line += " The room holds \(engine.specs.count), so "
+            line += "\(personaIDs.count - names.count) of the \(personaIDs.count) were left out."
+        }
+        engine.note(line)
         return .state(snapshot())
     }
 
@@ -393,6 +416,13 @@ public final class EngineService {
             },
             serverTime: .now,
             research: engine.researchStatus(),
+            moderatorName: engine.moderator.speakerName,
+            moderatorPersona: PersonaCatalog.style(
+                id: engine.moderator.personaID,
+                mode: roomMode,
+                seatIndex: 0
+            ).name,
+            shareBase: shareBase,
             votes: engine.conversation.votes.map { vote in
                 APISnapshot.Vote(
                     turnID: vote.turnID.uuidString, seatID: vote.seatID,

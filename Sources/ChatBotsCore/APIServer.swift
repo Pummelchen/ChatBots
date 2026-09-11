@@ -94,6 +94,13 @@ public struct APISnapshot: Codable, Sendable {
     /// The research session, when there is one. Nil in entertainment, where there is no
     /// budget and no end condition on purpose.
     public var research: ResearchStatus?
+    /// What the room calls the human moderator, and how their interjections read.
+    public var moderatorName: String
+    public var moderatorPersona: String
+    /// Where this engine's HTTP server is listening, so a client can build a share link without
+    /// being told a port. Nil when there is no HTTP server — a WebTransport-only engine has
+    /// nothing for a browser to open.
+    public var shareBase: String?
     /// The audience's votes, one per contribution.
     public var votes: [Vote]
     /// The scorecard, best first.
@@ -327,6 +334,9 @@ public final class APIServer {
         self.engine = engine
         self.port = port
         self.service = EngineService(engine: engine, store: store)
+        // The page and the snapshot both need the address, and this is the only place that
+        // knows the port it was given.
+        self.service.shareBase = "http://127.0.0.1:\(port)"
     }
 
     /// The shared dispatch, so a caller can treat both transports alike.
@@ -394,6 +404,13 @@ public final class APIServer {
     }
 
     private func route(_ request: HTTPRequest) async -> HTTPResponse {
+        // A conversation somebody can open, with replay controls. Checked before the switch
+        // because the path is a prefix rather than a fixed route, and transport-specific rather
+        // than an engine command: it is a page, and the engine does not render pages.
+        if request.method == "GET", request.path.hasPrefix("/s/") {
+            return sharedPage(id: String(request.path.dropFirst(3)))
+        }
+
         // Transport-specific, and none of it is the engine's business.
         switch (request.method, request.path) {
         case ("GET", "/api/health"):
@@ -462,6 +479,36 @@ public final class APIServer {
     }
 
     /// Turn an HTTP request into an engine request.
+    /// A kept conversation as a standalone read-only page.
+    ///
+    /// 404 rather than a blank page for an id that names nothing: a shared link that opens an
+    /// empty conversation is indistinguishable from one whose transcript was lost, and the
+    /// reader has no way to tell which happened.
+    private func sharedPage(id: String) -> HTTPResponse {
+        guard let uuid = UUID(uuidString: id), let record = service.store.conversation(id: uuid)
+        else {
+            // A page that says so, rather than a bare 404 body: the reader followed a link
+            // somebody sent them, and "no conversation with that link" is the answer they need.
+            let missing = [
+                "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">",
+                "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+                "<title>No conversation with that link</title></head>",
+                "<body style=\"font:15px/1.5 -apple-system,system-ui,sans-serif;max-width:640px;"
+                    + "margin:60px auto;padding:0 16px\">",
+                "<h1 style=\"font-size:19px\">No conversation with that link</h1>",
+                "<p>It may have been deleted, or the link may have been copied incompletely.</p>",
+                "</body></html>",
+            ].joined(separator: "\n")
+            return HTTPResponse(
+                status: 404, contentType: "text/html; charset=utf-8",
+                body: Data(missing.utf8))
+        }
+        let base = "http://127.0.0.1:\(port)"
+        return HTTPResponse(
+            contentType: "text/html; charset=utf-8",
+            body: Data(SharedConversationPage.html(record, shareBase: base).utf8))
+    }
+
     /// The mode a query asks about, defaulting to entertainment.
     ///
     /// Used only by the two list endpoints, because they answer questions about a library
@@ -537,6 +584,13 @@ public final class APIServer {
 
         case ("POST", "/api/votes/clear"):
             return .clearVotes
+
+        case ("POST", "/api/moderator"):
+            guard let body = request.json(APICommand.self) else { return nil }
+            return .setModerator(
+                ModeratorIdentity(
+                    name: body.name ?? ModeratorIdentity.defaultName,
+                    personaID: body.personaID ?? PersonaLibrary.neutral.id))
 
         case ("POST", "/api/research/budget"):
             guard let raw = request.json(APICommand.self)?.value,
