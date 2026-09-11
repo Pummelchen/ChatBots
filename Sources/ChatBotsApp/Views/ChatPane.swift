@@ -7,6 +7,7 @@ import ChatBotsCore
 import SwiftUI
 
 struct ChatPane: View {
+    @EnvironmentObject private var zoom: ZoomStore
     @Environment(\.themePalette) private var palette
     @ObservedObject var pane: AgentPaneState
     @ObservedObject var controller: ChatController
@@ -98,18 +99,18 @@ struct ChatPane: View {
             } else {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: AgentTheme.symbol(forSeat: pane.seatIndex))
-                        .font(.system(size: 13, weight: .semibold))
+                        .scaledFont(size: 13, weight: .semibold)
                         .foregroundStyle(tint)
-                        .frame(width: 18)
+                        .frame(width: 18 * zoom.scale)
                         .padding(.top, 2)
 
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 6) {
                             Text(pane.spec.id.uppercased())
-                                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                                .scaledFont(size: 10, weight: .heavy, design: .rounded)
                                 .foregroundStyle(tint)
                             Text("streaming")
-                                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                                .scaledFont(size: 9, weight: .semibold, design: .rounded)
                                 .foregroundStyle(palette.textSecondary)
                             Spacer(minLength: 0)
                         }
@@ -125,13 +126,13 @@ struct ChatPane: View {
                         // written into the log.
                         ForEach(Array(pane.liveBlocks.enumerated()), id: \.offset) { _, block in
                             Text(block)
-                                .font(.system(size: 12.5))
+                                .scaledFont(size: 12.5)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         if !pane.liveText.isEmpty {
                             Text(pane.liveText)
-                                .font(.system(size: 12.5))
+                                .scaledFont(size: 12.5)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
@@ -150,9 +151,9 @@ struct ChatPane: View {
                     ForEach(Array(pane.toolLog.enumerated()), id: \.offset) { _, entry in
                         HStack(spacing: 5) {
                             Image(systemName: "globe")
-                                .font(.system(size: 9))
+                                .scaledFont(size: 9)
                             Text(entry)
-                                .font(.system(size: 10, design: .monospaced))
+                                .scaledFont(size: 10, design: .monospaced)
                                 .lineLimit(2)
                         }
                         .foregroundStyle(AgentTheme.toolTint(palette))
@@ -166,13 +167,13 @@ struct ChatPane: View {
     private var emptyState: some View {
         VStack(spacing: 8) {
             Image(systemName: "bubble.left.and.bubble.right")
-                .font(.system(size: 26))
+                .scaledFont(size: 26)
                 .foregroundStyle(palette.textTertiary)
             Text("Nothing yet")
-                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .scaledFont(size: 13, weight: .medium, design: .rounded)
                 .foregroundStyle(palette.textSecondary)
             Text("Set a topic and press Start. Both models will appear here.")
-                .font(.system(size: 11))
+                .scaledFont(size: 11)
                 .foregroundStyle(palette.textTertiary)
                 .multilineTextAlignment(.center)
         }
@@ -212,7 +213,7 @@ struct ChatPane: View {
                 controller.compactNow()
             } label: {
                 Label("Condense", systemImage: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 9.5))
+                    .scaledFont(size: 9.5)
             }
             .buttonStyle(.link)
             .disabled(controller.isRunning || controller.turns.isEmpty)
@@ -220,7 +221,7 @@ struct ChatPane: View {
             Label(contextLabel, systemImage: "text.book.closed")
                 .help("Prompt size against this seat's context window; the log is condensed when it crosses the threshold, so the beginning of the discussion is never silently dropped")
         }
-        .font(.system(size: 9.5, design: .rounded))
+        .scaledFont(size: 9.5, design: .rounded)
         .foregroundStyle(palette.textTertiary)
         .padding(.horizontal, 12)
         .padding(.vertical, 5)

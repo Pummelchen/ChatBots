@@ -6,7 +6,11 @@ import SwiftUI
 struct ContentView: View {
     @Environment(\.themePalette) private var palette
     @EnvironmentObject private var theme: ThemeStore
+    @EnvironmentObject private var zoom: ZoomStore
     @ObservedObject var controller: ChatController
+
+    @State private var hud: Int?
+    @State private var hudDismissal: Task<Void, Never>?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -17,10 +21,33 @@ struct ContentView: View {
             ModeratorBar(controller: controller)
         }
         // Minimums only — no maximum — so the window can be dragged to any size.
-        .frame(minWidth: 720, idealWidth: 1280, minHeight: 480, idealHeight: 780)
+        // Minimums only — no maximum — so the window can be dragged to any size. The floor
+        // rises with the text size, since a window that fits at 100% clips at 200%.
+        .frame(
+            minWidth: 700 * zoom.scale, idealWidth: 1280, minHeight: 460, idealHeight: 780
+        )
         .safeAreaInset(edge: .top, spacing: 0) {
             if let message = controller.errorBanner {
                 ErrorBanner(message: message) { controller.errorBanner = nil }
+            }
+        }
+        .overlay(alignment: .top) {
+            if let hud {
+                ZoomHUD(percent: hud)
+                    .padding(.top, 90)
+                    .transition(.opacity.combined(with: .scale(scale: 0.94)))
+            }
+        }
+        // Report the new size, then fade. The previous value is optional so the first
+        // appearance — which is just the saved setting being restored — shows nothing.
+        .onChange(of: zoom.percent) { previous, current in
+            guard previous != nil else { return }
+            hudDismissal?.cancel()
+            withAnimation(.easeOut(duration: 0.12)) { hud = current }
+            hudDismissal = Task {
+                try? await Task.sleep(for: .seconds(1.1))
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeIn(duration: 0.25)) { hud = nil }
             }
         }
     }
@@ -167,7 +194,7 @@ struct ErrorBanner: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(AgentTheme.failure)
             Text(message)
-                .font(.system(size: 12))
+                .scaledFont(size: 12)
                 .foregroundStyle(palette.text)
             Spacer(minLength: 0)
             Button {

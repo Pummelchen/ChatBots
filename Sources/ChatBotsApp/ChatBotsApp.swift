@@ -57,9 +57,13 @@ struct ChatBotsApp: App {
         }
     }
     @StateObject private var theme = ThemeStore()
+    @StateObject private var zoom = ZoomStore()
 
-    /// Below this the two panes stop being usable side by side.
-    private static let minimumWindowSize = NSSize(width: 720, height: 480)
+    /// Below this the two panes stop being usable side by side. Scaled with the text size:
+    /// at 200% text the same 720 points would clip every label, so the floor rises with it.
+    private var minimumWindowSize: NSSize {
+        NSSize(width: 720 * zoom.scale, height: 480 * (1 + (zoom.scale - 1) * 0.5))
+    }
 
     var body: some Scene {
         // The title bar is left fully standard: close / minimize / zoom, double-click to
@@ -71,6 +75,7 @@ struct ChatBotsApp: App {
                 .environmentObject(theme)
                 .environmentObject(endpoints)
                 .environmentObject(settings)
+                .environmentObject(zoom)
                 // Restore each seat's saved endpoint before any turn can run.
                 .task { controller.applyAPIEndpoints(endpoints) }
                 // The black theme is dark-only regardless of the Mac's setting; the
@@ -136,6 +141,20 @@ struct ChatBotsApp: App {
                     }
                 }
                 .pickerStyle(.inline)
+
+                Divider()
+
+                Divider()
+
+                Button("Bigger Text") { zoom.step(larger: true) }
+                    .keyboardShortcut("+", modifiers: .command)
+                    .disabled(!zoom.canEnlarge)
+                Button("Smaller Text") { zoom.step(larger: false) }
+                    .keyboardShortcut("-", modifiers: .command)
+                    .disabled(!zoom.canReduce)
+                Button("Actual Text Size") { zoom.reset() }
+                    .keyboardShortcut("0", modifiers: .command)
+                    .disabled(zoom.percent == zoom.resetPercent)
 
                 Divider()
 

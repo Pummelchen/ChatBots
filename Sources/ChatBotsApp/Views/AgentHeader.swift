@@ -49,7 +49,7 @@ struct PaneHeader: View {
             HStack(spacing: 8) {
                 Image(systemName: AgentTheme.symbol(forSeat: seatIndex))
                     .foregroundStyle(tint)
-                    .font(.system(size: 15))
+                    .scaledFont(size: 15)
 
                 VStack(alignment: .leading, spacing: 1) {
                     EditableSeatName(
@@ -61,7 +61,7 @@ struct PaneHeader: View {
                         onCommit: onRename
                     )
                     Text(spec.backendLabel)
-                        .font(.system(size: 10.5, design: .monospaced))
+                        .scaledFont(size: 10.5, design: .monospaced)
                         .foregroundStyle(palette.textSecondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -95,25 +95,34 @@ struct PaneHeader: View {
             }
 
             if !isCompact {
-                HStack(spacing: 9) {
-                    Label(String(format: "temp %.2f", spec.temperature), systemImage: "thermometer.medium")
-                Label("top-p \(String(format: "%.2f", spec.topP))", systemImage: "chart.bar")
-                Label("top-k \(spec.topK)", systemImage: "list.number")
-                Label("min-p \(String(format: "%.1f", spec.minP))", systemImage: "line.diagonal")
-                if let presence = spec.presencePenalty {
-                    Label("pres \(String(format: "%.1f", abs(presence)))", systemImage: "arrow.uturn.backward")
-                        .help("Presence penalty \(String(format: "%.1f", abs(presence))) (stored as \(String(format: "%.2f", presence)) for MLX, which subtracts it)")
+                // The sampler readout in a single line. At large text sizes it cannot fit
+                // across the pane, so it scrolls rather than wrapping: a `Label` wraps its
+                // text before it truncates, which broke labels like "temp 1.00" across two
+                // lines. Scrolling keeps every value reachable.
+                ScrollView(.horizontal) {
+                    HStack(spacing: 9) {
+                        Label(String(format: "temp %.2f", spec.temperature), systemImage: "thermometer.medium")
+                        Label("top-p \(String(format: "%.2f", spec.topP))", systemImage: "chart.bar")
+                        Label("top-k \(spec.topK)", systemImage: "list.number")
+                        Label("min-p \(String(format: "%.1f", spec.minP))", systemImage: "line.diagonal")
+                        if let presence = spec.presencePenalty {
+                            Label("pres \(String(format: "%.1f", abs(presence)))", systemImage: "arrow.uturn.backward")
+                                .help("Presence penalty \(String(format: "%.1f", abs(presence))) (stored as \(String(format: "%.2f", presence)) for MLX, which subtracts it)")
+                        }
+                        if let repetition = spec.repetitionPenalty, repetition != 1.0 {
+                            Label("rep \(String(format: "%.2f", repetition))", systemImage: "repeat")
+                        }
+                        Label("max \(Format.tokens(spec.maxTokens)) tok", systemImage: "text.alignleft")
+                        if spec.webSearchEnabled {
+                            Label("web", systemImage: "globe")
+                        }
+                    }
+                    // One line each, always.
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
                 }
-                if let repetition = spec.repetitionPenalty, repetition != 1.0 {
-                    Label("rep \(String(format: "%.2f", repetition))", systemImage: "repeat")
-                }
-                Label("max \(Format.tokens(spec.maxTokens)) tok", systemImage: "text.alignleft")
-                if spec.webSearchEnabled {
-                    Label("web", systemImage: "globe")
-                }
-                    Spacer(minLength: 0)
-                }
-                .font(.system(size: 9.5, design: .rounded))
+                .scrollIndicators(.hidden)
+                .scaledFont(size: 9.5, design: .rounded)
                 .foregroundStyle(palette.textTertiary)
             }
         }
@@ -129,6 +138,7 @@ struct PaneHeader: View {
 
 /// A seat's state: a dot plus a short label.
 struct StatusChip: View {
+    @EnvironmentObject private var zoom: ZoomStore
     let text: String
     let isGenerating: Bool
     let palette: AppPalette
@@ -137,9 +147,9 @@ struct StatusChip: View {
         HStack(spacing: 5) {
             Circle()
                 .fill(isGenerating ? AgentTheme.ok : AgentTheme.dotIdle(palette))
-                .frame(width: 7, height: 7)
+                .frame(width: 7 * zoom.scale, height: 7 * zoom.scale)
             Text(text)
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .scaledFont(size: 10, weight: .medium, design: .rounded)
                 .foregroundStyle(palette.textSecondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -170,9 +180,9 @@ struct PaneThinkingControl: View {
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: mode.symbol)
-                    .font(.system(size: 9))
+                    .scaledFont(size: 9)
                 Text("think: \(mode.label)")
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .scaledFont(size: 10, weight: .medium, design: .rounded)
             }
         }
         .menuStyle(.borderlessButton)
@@ -213,7 +223,7 @@ struct CompactAgentSettings: View {
             }
             Spacer(minLength: 0)
         }
-        .font(.system(size: 9.5, design: .rounded))
+        .scaledFont(size: 9.5, design: .rounded)
         .foregroundStyle(palette.textTertiary)
         .help(description)
     }
@@ -262,9 +272,9 @@ struct PersonaControl: View {
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "theatermasks")
-                    .font(.system(size: 9))
+                    .scaledFont(size: 9)
                 Text(persona.name)
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .scaledFont(size: 10, weight: .medium, design: .rounded)
                     .lineLimit(1)
             }
         }
@@ -283,16 +293,22 @@ struct PersonaSummary: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "theatermasks")
-                .font(.system(size: 10))
+                .scaledFont(size: 10)
             ForEach(Array(specs.enumerated()), id: \.offset) { index, spec in
                 if index > 0 {
                     Image(systemName: "arrow.left.arrow.right")
-                        .font(.system(size: 8))
+                        .scaledFont(size: 8)
                         .foregroundStyle(palette.textTertiary)
                 }
                 Text("\(spec.id): \(spec.persona.name)")
-                    .font(.system(size: 10.5, weight: .medium, design: .rounded))
+                    .scaledFont(size: 10.5, weight: .medium, design: .rounded)
                     .foregroundStyle(AgentTheme.tint(for: spec.id, palette: palette))
+                    // One line each: at large text sizes this summary cannot fit, and a
+                    // name broken across two lines reads worse than a shorter one. The
+                    // per-seat control in each pane carries the full value anyway, and the
+                    // tooltip has both.
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
         }
         .help(specs.map { "\($0.id) — \($0.persona.name): \($0.persona.summary)" }
@@ -321,9 +337,9 @@ struct BackendControl: View {
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: spec.backend == .mlx ? "cpu" : "network")
-                    .font(.system(size: 9))
+                    .scaledFont(size: 9)
                 Text(spec.backend.shortLabel)
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .scaledFont(size: 10, weight: .medium, design: .rounded)
             }
         }
         .menuStyle(.borderlessButton)
@@ -356,18 +372,18 @@ struct EndpointBar: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "network")
-                .font(.system(size: 9))
+                .scaledFont(size: 9)
                 .foregroundStyle(palette.textTertiary)
 
             Text("\(spec.openAI.baseURL) · \(spec.openAI.model)")
-                .font(.system(size: 9.5, design: .monospaced))
+                .scaledFont(size: 9.5, design: .monospaced)
                 .foregroundStyle(palette.textTertiary)
                 .lineLimit(1)
                 .truncationMode(.middle)
 
             if spec.webSearchEnabled {
                 Label("web tools unavailable on this backend", systemImage: "exclamationmark.triangle")
-                    .font(.system(size: 9.5, design: .rounded))
+                    .scaledFont(size: 9.5, design: .rounded)
                     .foregroundStyle(AgentTheme.warning)
             }
 
@@ -403,7 +419,7 @@ struct EditableSeatName: View {
             if isRenaming {
                 TextField(seatKind, text: $draft)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .scaledFont(size: 14, weight: .semibold, design: .rounded)
                     .frame(minWidth: 60, maxWidth: 220)
                     .focused($focused)
                     .onSubmit { onCommit(draft) }
@@ -420,7 +436,7 @@ struct EditableSeatName: View {
                     }
             } else {
                 Text(name)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .scaledFont(size: 14, weight: .semibold, design: .rounded)
                     .lineLimit(1)
                     .contentShape(Rectangle())
                     .onTapGesture(count: 2) {

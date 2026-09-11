@@ -15,6 +15,7 @@ import SwiftUI
 /// messages appear identically on both sides. Only the active seat adds a live,
 /// in-progress row underneath.
 struct TurnRow: View {
+    @EnvironmentObject private var zoom: ZoomStore
     @Environment(\.themePalette) private var palette
     let turn: Turn
     /// The speaker's seat position, when known; the id is parsed as a fallback.
@@ -38,19 +39,19 @@ struct TurnRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: turn.symbol)
-                .font(.system(size: 13, weight: .semibold))
+                .scaledFont(size: 13, weight: .semibold)
                 .foregroundStyle(turn.tint(palette, seatIndex: seatIndex))
-                .frame(width: 18)
+                .frame(width: 18 * zoom.scale)
                 .padding(.top, 2)
 
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
                     Text(turn.badge)
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .scaledFont(size: 10, weight: .heavy, design: .rounded)
                         .foregroundStyle(turn.tint(palette, seatIndex: seatIndex))
                     if isOwn {
                         Text("YOU")
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .scaledFont(size: 9, weight: .bold, design: .rounded)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
                             .background(wash.opacity(0.15), in: Capsule())
@@ -61,20 +62,20 @@ struct TurnRow: View {
                             Image(systemName: "clock")
                             Text("queued")
                         }
-                        .font(.system(size: 9, weight: .semibold, design: .rounded))
+                        .scaledFont(size: 9, weight: .semibold, design: .rounded)
                         .foregroundStyle(AgentTheme.warning)
                     }
                     Spacer(minLength: 0)
                 }
 
                 Text(turn.content)
-                    .font(.system(size: 12.5, design: .default))
+                    .scaledFont(size: 12.5, design: .default)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let detail = turn.toolDetail, !detail.isEmpty {
                     Text(detail)
-                        .font(.system(size: 10.5, design: .monospaced))
+                        .scaledFont(size: 10.5, design: .monospaced)
                         .foregroundStyle(palette.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                 }
@@ -107,11 +108,11 @@ struct ReasoningBlock: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: expanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 9, weight: .bold))
+                        .scaledFont(size: 9, weight: .bold)
                     Image(systemName: "brain")
-                        .font(.system(size: 10))
+                        .scaledFont(size: 10)
                     Text(expanded ? "Thinking" : "Thinking — \(Format.summarise(text, limit: 60))")
-                        .font(.system(size: 11, design: .rounded))
+                        .scaledFont(size: 11, design: .rounded)
                         .lineLimit(1)
                     Spacer(minLength: 0)
                 }
@@ -122,7 +123,7 @@ struct ReasoningBlock: View {
 
             if expanded {
                 Text(text)
-                    .font(.system(size: 11, design: .monospaced))
+                    .scaledFont(size: 11, design: .monospaced)
                     .foregroundStyle(palette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(8)
@@ -148,7 +149,7 @@ struct WaitingRow: View {
             ProgressView()
                 .controlSize(.small)
             Text("\(name) \(activity.isEmpty ? "is thinking" : activity)")
-                .font(.system(size: 12, design: .rounded))
+                .scaledFont(size: 12, design: .rounded)
                 .foregroundStyle(tint)
             Spacer(minLength: 0)
         }

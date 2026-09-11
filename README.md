@@ -236,6 +236,30 @@ removing the modifier from one view at a time until the freezes stopped.
 
 Instead, **Edit ▸ Copy Conversation (⇧⌘C)** copies the whole transcript as plain text.
 
+### Text size
+
+⌘+ makes all text bigger and ⌘− smaller, in steps from 85% to 200%; ⌘0 returns to 100%.
+The same items are in the View menu. A brief overlay shows the new percentage, which
+matters because these keys have no other visible effect and it would otherwise be unclear
+whether a press registered — especially at the ends of the range, where nothing changes.
+
+Every piece of text in both panes and in the status bars follows the setting. Layout
+follows it too, which is the part that is easy to get wrong: scaling text inside a
+fixed-width row clips labels and overlaps controls. So spacing, the icon columns beside each
+seat name, and the API sheet all scale through the same value.
+
+Two details worth knowing:
+
+* **The window does not resize.** ⌘+ changes the text, not the window — the same as every
+  other Mac app. The window's *minimum* size is what rises with the text size, so the app
+  cannot be shrunk to a size where the two-pane layout is unusable at large text. Resize as
+  you like for more room.
+* **The sampler readout scrolls rather than wraps.** A SwiftUI `Label` wraps its text
+  before truncating, which broke values like "temp 1.00" across two lines at large sizes.
+  The row now scrolls, so every value stays reachable instead of being clipped.
+
+The setting persists with the rest of the preferences.
+
 ### Settings are saved as you change them
 
 Everything you set is written when you change it, so a relaunch — or a crash, or a force

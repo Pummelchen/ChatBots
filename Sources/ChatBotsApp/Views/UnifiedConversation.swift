@@ -59,11 +59,11 @@ struct UnifiedConversation: View {
             ForEach(controller.panes) { pane in
                 HStack(spacing: 8) {
                     Image(systemName: AgentTheme.symbol(for: pane.spec.id))
-                        .font(.system(size: 11))
+                        .scaledFont(size: 11)
                         .foregroundStyle(AgentTheme.tint(for: pane.spec.id, palette: palette))
 
                     Text(pane.spec.displayName)
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .scaledFont(size: 11, weight: .semibold, design: .rounded)
 
                     BackendControl(
                         spec: pane.spec,
@@ -143,13 +143,13 @@ struct UnifiedConversation: View {
     private var emptyState: some View {
         VStack(spacing: 8) {
             Image(systemName: "bubble.left.and.bubble.right")
-                .font(.system(size: 26))
+                .scaledFont(size: 26)
                 .foregroundStyle(palette.textTertiary)
             Text("Nothing yet")
-                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .scaledFont(size: 13, weight: .medium, design: .rounded)
                 .foregroundStyle(palette.textSecondary)
             Text("Set a topic and press Start. Both models will post here.")
-                .font(.system(size: 11))
+                .scaledFont(size: 11)
                 .foregroundStyle(palette.textTertiary)
                 .multilineTextAlignment(.center)
         }
@@ -171,7 +171,7 @@ struct UnifiedConversation: View {
                 controller.compactNow()
             } label: {
                 Label("Condense", systemImage: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 9.5))
+                    .scaledFont(size: 9.5)
             }
             .buttonStyle(.link)
             .disabled(controller.isRunning || controller.turns.isEmpty)
@@ -184,7 +184,7 @@ struct UnifiedConversation: View {
                 systemImage: "text.book.closed"
             )
         }
-        .font(.system(size: 9.5, design: .rounded))
+        .scaledFont(size: 9.5, design: .rounded)
         .foregroundStyle(palette.textTertiary)
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
@@ -273,13 +273,13 @@ struct ThreadMessage: View {
         HStack(spacing: 5) {
             if isModerator {
                 Image(systemName: turn?.symbol ?? "person.wave.2.fill")
-                    .font(.system(size: 9))
+                    .scaledFont(size: 9)
             }
             Text(isModerator ? name.uppercased() : name)
-                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                .scaledFont(size: 10, weight: .heavy, design: .rounded)
             if turn == nil {
                 Text("streaming")
-                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .scaledFont(size: 9, weight: .semibold, design: .rounded)
                     .foregroundStyle(palette.textSecondary)
             }
             if isPending {
@@ -287,7 +287,7 @@ struct ThreadMessage: View {
                     Image(systemName: "clock")
                     Text("queued")
                 }
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .scaledFont(size: 9, weight: .semibold, design: .rounded)
                 .foregroundStyle(AgentTheme.warning)
             }
         }
@@ -301,7 +301,7 @@ struct ThreadMessage: View {
                 // reason given at the top of this file.
                 ForEach(Array(liveBlocks.enumerated()), id: \.offset) { _, block in
                     Text(block)
-                        .font(.system(size: 12.5))
+                        .scaledFont(size: 12.5)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -309,7 +309,7 @@ struct ThreadMessage: View {
                     WaitingLine(name: name, tint: tint, activity: activity)
                 } else if !text.isEmpty {
                     Text(text)
-                        .font(.system(size: 12.5))
+                        .scaledFont(size: 12.5)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -342,11 +342,11 @@ struct SetupBlock: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: expanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 9, weight: .bold))
+                        .scaledFont(size: 9, weight: .bold)
                     Image(systemName: "info.circle")
-                        .font(.system(size: 10))
+                        .scaledFont(size: 10)
                     Text("Setup — the topic and the brief both models received")
-                        .font(.system(size: 10.5, design: .rounded))
+                        .scaledFont(size: 10.5, design: .rounded)
                     Spacer(minLength: 0)
                 }
                 .foregroundStyle(palette.textSecondary)
@@ -356,7 +356,7 @@ struct SetupBlock: View {
 
             if expanded {
                 Text(text)
-                    .font(.system(size: 11))
+                    .scaledFont(size: 11)
                     .foregroundStyle(palette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(8)
@@ -378,7 +378,7 @@ private struct WaitingLine: View {
         HStack(spacing: 8) {
             ProgressView().controlSize(.small)
             Text("\(name) \(activity.isEmpty ? "is thinking" : activity)")
-                .font(.system(size: 11.5, design: .rounded))
+                .scaledFont(size: 11.5, design: .rounded)
                 .foregroundStyle(tint)
             Spacer(minLength: 0)
         }

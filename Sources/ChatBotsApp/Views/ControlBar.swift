@@ -6,6 +6,7 @@ import SwiftUI
 struct ControlBar: View {
     @Environment(\.themePalette) private var palette
     @EnvironmentObject private var theme: ThemeStore
+    @EnvironmentObject private var zoom: ZoomStore
     @EnvironmentObject private var endpoints: APIEndpointStore
     @ObservedObject var controller: ChatController
     @State private var showNotes = false
@@ -17,12 +18,12 @@ struct ControlBar: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Label("Topic", systemImage: "text.bubble")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .scaledFont(size: 11, weight: .semibold, design: .rounded)
                     .foregroundStyle(palette.textSecondary)
 
                 TextField("What should the models discuss?", text: $controller.topic)
                     .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 13))
+                    .scaledFont(size: 13)
                     .disabled(controller.isRunning)
                     .onSubmit { if controller.canStart { controller.startOrRestart() } }
 
@@ -42,7 +43,9 @@ struct ControlBar: View {
 
                 Toggle(isOn: cloudOnlyBinding) {
                     Label("Cloud only", systemImage: "cloud")
-                        .font(.system(size: 11))
+                        .scaledFont(size: 11)
+                        .lineLimit(1)
+                        .fixedSize()
                 }
                 .toggleStyle(.switch)
                 .controlSize(.mini)
@@ -52,7 +55,7 @@ struct ControlBar: View {
                     showEndpoints = true
                 } label: {
                     Label("API", systemImage: "network")
-                        .font(.system(size: 11))
+                        .scaledFont(size: 11)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -60,6 +63,9 @@ struct ControlBar: View {
                 .sheet(isPresented: $showEndpoints) {
                     APIEndpointsSheet(controller: controller) { showEndpoints = false }
                         .environmentObject(endpoints)
+                        // A sheet is a separate presentation context, so it does not
+                        // inherit the window's environment objects.
+                        .environmentObject(zoom)
                 }
 
                 Picker("Layout", selection: $theme.windowMode) {
@@ -89,7 +95,11 @@ struct ControlBar: View {
 
                 Toggle(isOn: $controller.showReasoning) {
                     Label("Show thinking", systemImage: "brain")
-                        .font(.system(size: 11))
+                        // One line: a wrapped toggle label makes the switch jump position
+                        // as the text size changes.
+                        .lineLimit(1)
+                        .fixedSize()
+                        .scaledFont(size: 11)
                 }
                 .toggleStyle(.switch)
                 .controlSize(.mini)
@@ -178,14 +188,14 @@ struct ControlBar: View {
                 .fill(dotColour)
                 .frame(width: 8, height: 8)
             Text(status.label)
-                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .scaledFont(size: 11, weight: .medium, design: .rounded)
             if controller.isRunning {
                 ProgressView()
                     .controlSize(.mini)
                     .scaleEffect(0.7)
             }
             Text("· \(controller.turns.filter { $0.kind == .chat }.count) messages")
-                .font(.system(size: 10.5, design: .rounded))
+                .scaledFont(size: 10.5, design: .rounded)
                 .foregroundStyle(palette.textSecondary)
         }
         .padding(.horizontal, 10)
@@ -224,7 +234,7 @@ struct ControlBar: View {
             }
         } label: {
             Label("\(controller.notices.count)", systemImage: "list.bullet.rectangle")
-                .font(.system(size: 11))
+                .scaledFont(size: 11)
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
@@ -241,10 +251,10 @@ struct ModeratorBar: View {
         HStack(alignment: .bottom, spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
                 Label("Moderator", systemImage: "person.wave.2.fill")
-                    .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                    .scaledFont(size: 10.5, weight: .semibold, design: .rounded)
                     .foregroundStyle(AgentTheme.moderatorTint(palette))
                 Text("Goes into the shared log — both models read it.")
-                    .font(.system(size: 9.5))
+                    .scaledFont(size: 9.5)
                     .foregroundStyle(palette.textTertiary)
             }
             .frame(width: 170, alignment: .leading)
@@ -256,7 +266,7 @@ struct ModeratorBar: View {
             )
             .textFieldStyle(.roundedBorder)
             .lineLimit(1...4)
-            .font(.system(size: 12.5))
+            .scaledFont(size: 12.5)
             .onSubmit { controller.sendModeratorMessage() }
 
             Button {

@@ -8,6 +8,7 @@ import ChatBotsCore
 import SwiftUI
 
 struct APIEndpointsSheet: View {
+    @EnvironmentObject private var zoom: ZoomStore
     @EnvironmentObject private var store: APIEndpointStore
     @ObservedObject var controller: ChatController
     let dismiss: () -> Void
@@ -29,7 +30,7 @@ struct APIEndpointsSheet: View {
             Divider()
             footer
         }
-        .frame(width: 560, height: 560)
+        .frame(width: 560 * zoom.scale, height: 560 * zoom.scale)
     }
 
     private var header: some View {
@@ -38,9 +39,9 @@ struct APIEndpointsSheet: View {
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 2) {
                 Text("OpenAI-compatible endpoints")
-                    .font(.system(size: 13, weight: .semibold))
+                    .scaledFont(size: 13, weight: .semibold)
                 Text("Any /v1 URL: a local server, or a cloud provider. Applied from each seat's next turn.")
-                    .font(.system(size: 11))
+                    .scaledFont(size: 11)
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
@@ -59,7 +60,7 @@ struct APIEndpointsSheet: View {
                 Image(systemName: AgentTheme.symbol(forSeat: seat))
                     .foregroundStyle(AgentTheme.tint(forSeat: seat, palette: .original))
                 Text(pane.spec.displayName)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .scaledFont(size: 12, weight: .semibold, design: .rounded)
                 Spacer(minLength: 0)
                 Toggle("Use API", isOn: useAPIBinding(seat))
                     .toggleStyle(.switch)
@@ -68,27 +69,27 @@ struct APIEndpointsSheet: View {
 
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 8, verticalSpacing: 6) {
                 GridRow {
-                    Text("URL").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text("URL").scaledFont(size: 11).foregroundStyle(.secondary)
                     TextField("https://api.openai.com or http://localhost:1234",
                               text: baseURLBinding(seat))
                         .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 11.5, design: .monospaced))
+                        .scaledFont(size: 11.5, design: .monospaced)
                 }
                 GridRow {
-                    Text("Model").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text("Model").scaledFont(size: 11).foregroundStyle(.secondary)
                     TextField("gpt-4o-mini, gpt-5, qwen35 …", text: modelBinding(seat))
                         .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 11.5, design: .monospaced))
+                        .scaledFont(size: 11.5, design: .monospaced)
                 }
                 GridRow {
-                    Text("API key").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text("API key").scaledFont(size: 11).foregroundStyle(.secondary)
                     SecureField(store.keys[seat].isEmpty ? "not needed for a local server" : "",
                                 text: keyBinding(seat))
                         .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 11.5, design: .monospaced))
+                        .scaledFont(size: 11.5, design: .monospaced)
                 }
                 GridRow {
-                    Text("Parameters").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text("Parameters").scaledFont(size: 11).foregroundStyle(.secondary)
                     Picker("", selection: compatibilityBinding(seat)) {
                         ForEach(APICompatibility.allCases) { option in
                             Text(option.label).tag(option)
@@ -103,7 +104,7 @@ struct APIEndpointsSheet: View {
 
             HStack(spacing: 10) {
                 Text(store.endpoint(forSeat: seat).responsesURL?.absoluteString ?? "no URL yet")
-                    .font(.system(size: 10, design: .monospaced))
+                    .scaledFont(size: 10, design: .monospaced)
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -111,7 +112,7 @@ struct APIEndpointsSheet: View {
                 if seat > 0 {
                     Button("Copy seat 1") { store.mirrorSeat(0) }
                         .buttonStyle(.link)
-                        .font(.system(size: 10))
+                        .scaledFont(size: 10)
                 }
             }
 
@@ -119,7 +120,7 @@ struct APIEndpointsSheet: View {
                 Label(
                     "Web tools are unavailable on the API backend",
                     systemImage: "exclamationmark.triangle")
-                    .font(.system(size: 10.5))
+                    .scaledFont(size: 10.5)
                     .foregroundStyle(.orange)
             }
         }
@@ -132,7 +133,7 @@ struct APIEndpointsSheet: View {
     private var footer: some View {
         HStack(spacing: 10) {
             Text("Keys are stored in the macOS Keychain. \(APIEndpointStore.apiKeyEnvironmentKey) overrides them.")
-                .font(.system(size: 10))
+                .scaledFont(size: 10)
                 .foregroundStyle(.secondary)
             Spacer(minLength: 0)
             Button("Done") { dismiss() }
