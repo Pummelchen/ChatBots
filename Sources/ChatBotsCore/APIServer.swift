@@ -95,6 +95,23 @@ public struct APISnapshot: Codable, Sendable {
     /// The finished report, when the session produced one.
     public var report: ReportSummary?
 
+    /// One fragment of a model's output, as streamed.
+    ///
+    /// The API sends these between snapshots so a client can show a reply being written
+    /// rather than receiving whole answers. Small on purpose: a turn can produce thousands of
+    /// tokens, and a snapshot per token would be kilobytes each time.
+    public struct OutputDelta: Codable, Sendable {
+        public var agentID: String
+        public var text: String
+        /// `token`, `reasoning`, `tool` or `started`.
+        public var kind: String
+
+        public var isOutput: Bool { kind == "token" }
+        public var isReasoning: Bool { kind == "reasoning" }
+        public var isTool: Bool { kind == "tool" }
+        public var isStart: Bool { kind == "started" }
+    }
+
     public struct ResearchStatus: Codable, Sendable {
         public var depth: String
         public var budgetSummary: String
@@ -733,20 +750,20 @@ public final class APIServer {
                 switch event {
                 case .token(let agentID, let text):
                     self.broadcast(
-                        self.encode(Delta(agentID: agentID, text: text, kind: "token")) ?? "{}",
+                        self.encode(APISnapshot.OutputDelta(agentID: agentID, text: text, kind: "token")) ?? "{}",
                         event: "delta")
                 case .reasoning(let agentID, let text):
                     self.broadcast(
-                        self.encode(Delta(agentID: agentID, text: text, kind: "reasoning")) ?? "{}",
+                        self.encode(APISnapshot.OutputDelta(agentID: agentID, text: text, kind: "reasoning")) ?? "{}",
                         event: "delta")
                 case .toolCall(let agentID, let name, let query):
                     self.broadcast(
-                        self.encode(Delta(agentID: agentID, text: "\\(name)(\\(query))", kind: "tool"))
-                            ?? "{}",
+                        self.encode(APISnapshot.OutputDelta(
+                            agentID: agentID, text: "\(name)(\(query))", kind: "tool")) ?? "{}",
                         event: "delta")
                 case .turnStarted(let agentID, _):
                     self.broadcast(
-                        self.encode(Delta(agentID: agentID, text: "", kind: "started")) ?? "{}",
+                        self.encode(APISnapshot.OutputDelta(agentID: agentID, text: "", kind: "started")) ?? "{}",
                         event: "delta")
                 default:
                     // Everything else is reflected in the snapshot that follows the turn.
@@ -756,13 +773,7 @@ public final class APIServer {
         }
     }
 
-    /// One fragment of a model's output.
-    private struct Delta: Encodable {
-        var agentID: String
-        var text: String
-        /// token, reasoning, tool or started.
-        var kind: String
-    }
+
 
     private struct MessageEnvelope: Encodable {
         var turn: APISnapshot.Message
