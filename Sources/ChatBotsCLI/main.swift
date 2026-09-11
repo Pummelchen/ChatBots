@@ -22,6 +22,7 @@ struct Options {
     var benchmark = false
     var solo = false
     var memoryProbe = false
+    var sessionProbe = false
     /// Cap on answer tokens per turn; `nil` keeps the seat's own budget.
     var maxTokens: Int?
     /// Thinking level for both seats; `nil` keeps the preset (medium).
@@ -76,6 +77,7 @@ struct Options {
                 options.thinking = mode
             case "--benchmark": options.benchmark = true
             case "--memory-probe": options.memoryProbe = true
+            case "--session-probe": options.sessionProbe = true
             case "--solo": options.solo = true
             case "--help", "-h":
                 print(Self.usage)
@@ -249,6 +251,46 @@ func runBenchmark() async {
 
 if options.benchmark {
     await runBenchmark()
+    exit(0)
+}
+
+// Measures what keeping one conversation alive across turns would save: three prompts
+// that share a growing prefix, through one engine, with prefill reported each time.
+if options.sessionProbe {
+    let engine = engines[0]
+    try? await engine.load()
+    var turns: [PromptMessage] = [
+        .init(role: .system, content: "You are a participant in a discussion about eggs.")
+    ]
+    log("session probe — one engine, three prompts sharing a growing prefix")
+    if let results = try? await engine.sessionReuseProbe() {
+        log("  one ChatSession, three successive calls:")
+        for (index, result) in results.enumerated() {
+            log(
+                String(
+                    format: "    call %d: prefilled %d tok in %.2fs",
+                    index + 1, result.prefilled, result.prefillSeconds))
+        }
+    }
+    for turn in 1...3 {
+        turns.append(
+            .init(
+                role: turn == 1 ? .user : .assistant,
+                content: turn == 1
+                    ? "Why are bird eggs ovoid rather than spherical? Answer in one sentence."
+                    : "And what does that imply for shell thickness? Answer in one sentence."))
+        _ = try? await engine.generate(
+            messages: turns, tools: [], onToolCall: { _, _ in }, onEvent: { _ in })
+        if let stats = await engine.lastStats {
+            log(
+                String(
+                    format: "  turn %d: prompt %d tok, prefill %.2fs (%.0f tok/s), gen %.1f tok/s",
+                    turn, stats.promptTokens, stats.prefillSeconds,
+                    stats.prefillTokensPerSecond, stats.tokensPerSecond))
+        }
+        // The reply would be appended as an assistant message in the real loop.
+        turns.append(.init(role: .assistant, content: "…"))
+    }
     exit(0)
 }
 
