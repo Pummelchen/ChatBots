@@ -31,6 +31,21 @@ struct ControlBar: View {
                 statusPill
                 Spacer(minLength: 0)
 
+                Picker("Layout", selection: $theme.windowMode) {
+                    ForEach(WindowMode.allCases) { mode in
+                        Label(mode.shortLabel, systemImage: mode.symbol).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                .help(
+                    "\(theme.windowMode.label) — "
+                        + (theme.windowMode == .split
+                            ? "one pane per model"
+                            : "one conversation, like a chat")
+                )
+
                 Picker("Theme", selection: $theme.mode) {
                     ForEach(ThemeMode.allCases) { mode in
                         Label(mode.label, systemImage: mode.symbol).tag(mode)

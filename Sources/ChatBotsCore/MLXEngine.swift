@@ -397,7 +397,14 @@ public actor MLXEngine: LLMEngine {
             )
         }
 
-        let final = Self.clean(answer, spec: spec)
+        let scrubbed = Self.stripFabricatedToolSyntax(answer)
+        if scrubbed.removedLines > 0 {
+            FileHandle.standardError.write(
+                Data(
+                    "[ChatBots] \(agentID) stripped \(scrubbed.removedLines) line(s) of fabricated tool syntax from the answer\n"
+                        .utf8))
+        }
+        let final = Self.clean(scrubbed.text, spec: spec)
         if stats.generationTokens == 0 {
             stats.seconds = Date().timeIntervalSince(started)
         }
@@ -466,6 +473,31 @@ public actor MLXEngine: LLMEngine {
     /// the least surprising way to force an answer. It is a real truncation and the UI
     /// says so.
     static let forcedThinkingExit = "\n</think>\n"
+
+    /// Remove fabricated tool-call syntax the model may have written as plain text.
+    ///
+    /// Observed once in a long GUI conversation: a seat that had been calling `web_search`
+    /// successfully began emitting `[web_search]` / `query: …` as body text, imitating
+    /// both the tool protocol and this app's own `[Speaker]` log tags. Fabricated tool
+    /// syntax is never useful to a reader, so it is stripped and reported rather than
+    /// shown as content — the model's *real* tool calls never reach here, they are parsed
+    /// and dispatched by the session.
+    public static func stripFabricatedToolSyntax(_ text: String) -> (text: String, removedLines: Int) {
+        let markers = ["[web_search]", "[fetch_page]", "<tool_call>", "</tool_call>"]
+        var kept: [String] = []
+        var removed = 0
+        for line in text.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            let isMarker = markers.contains { trimmed.hasPrefix($0) }
+            let isQueryLine = trimmed.hasPrefix("query:") || trimmed.hasPrefix("Query:")
+            if isMarker || isQueryLine {
+                removed += 1
+            } else {
+                kept.append(line)
+            }
+        }
+        return (kept.joined(separator: "\n"), removed)
+    }
 
     /// Drop a stray delimiter or an echoed speaker tag the model may have emitted.
     private static func clean(_ text: String, spec: AgentSpec) -> String {

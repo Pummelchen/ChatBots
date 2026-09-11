@@ -29,6 +29,37 @@ enum ThemeMode: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// How the conversation is laid out.
+enum WindowMode: String, CaseIterable, Identifiable, Sendable {
+    /// One pane per seat, side by side. Each seat keeps its own scroll position.
+    case split
+    /// A single conversation, newest at the bottom, like a messaging app.
+    case unified
+
+    public var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .split: "Side by side"
+        case .unified: "Single thread"
+        }
+    }
+
+    var shortLabel: String {
+        switch self {
+        case .split: "Split"
+        case .unified: "Thread"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .split: "rectangle.split.2x1"
+        case .unified: "bubble.left.and.bubble.right"
+        }
+    }
+}
+
 /// Every colour the UI draws with, resolved for one theme.
 ///
 /// The original palette uses dynamic system colours, so text and surfaces follow the
@@ -125,6 +156,7 @@ extension View {
 @MainActor
 final class ThemeStore: ObservableObject {
     @AppStorage("themeMode") var mode: ThemeMode = .original
+    @AppStorage("windowMode") var windowMode: WindowMode = .split
 
     var palette: AppPalette { AppPalette.resolve(mode) }
 

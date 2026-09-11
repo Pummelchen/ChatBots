@@ -110,6 +110,10 @@ public final class ChatController: ObservableObject {
 
     public let panes: [AgentPaneState]
 
+    /// Bumped when the single-thread view should follow the newest message. One signal for
+    /// the whole thread rather than one per seat, because the thread is a single list.
+    @Published public private(set) var threadScrollSignal = 0
+
     // MARK: Internals
 
     public let engine: ConversationEngine
@@ -216,6 +220,7 @@ public final class ChatController: ObservableObject {
 
         case .turnStarted(let agentID, _):
             flush()  // the previous turn's tail must land before its row is cleared
+            threadScrollSignal += 1
             for pane in panes {
                 if pane.spec.id == agentID {
                     pane.beginTurn()
@@ -226,6 +231,7 @@ public final class ChatController: ObservableObject {
 
         case .turnFinished(let agentID, _, let stats):
             flush()
+            threadScrollSignal += 1
             if let pane = pane(agentID) {
                 pane.lastStats = stats
                 pane.endTurn()

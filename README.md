@@ -34,6 +34,7 @@ hallucinated.
 | **Moderator box** | Your message goes into the shared log — **both** models read it |
 | **Show thinking** | Streams each model's `<think>` block into its own pane (never into the log) |
 | **Models ▸ Load …** | Pre-loads weights, optionally per seat |
+| **Layout** | `Split` (two panes) or `Thread` (one chat-style conversation) |
 | **Theme** | `Original` (default) follows the Mac's appearance; `Black` is flat pure-black |
 
 Moderator messages typed *while a model is generating* are queued, shown as `queued`,
@@ -207,6 +208,26 @@ when a ceiling does bite the pane says so rather than hiding the truncation. Lev
 map to the nearest native template flag (`enable_thinking: false` for Off, plus a
 `reasoning_effort` hint for checkpoints that understand one), so the same control stays
 meaningful if a seat is pointed at another model family.
+
+### Two window modes
+
+A **Layout** switch in the bar (and View ▸ Window Layout) toggles between:
+
+* **Side by side** (`Split`, the default) — one pane per seat, each with its own scroll
+  position and its own header.
+* **Single thread** (`Thread`) — one conversation, newest at the bottom, attributed and
+  tinted by speaker, the way a group chat reads. The per-seat headers collapse into a
+  two-line settings strip above the thread, and each message is aligned to its own side
+  (Agent B right, Agent A left, the moderator centred and neutral).
+
+Both modes render the same shared log from the same controller, so switching mid
+conversation is lossless and instant. The choice is stored with
+`@AppStorage("windowMode")` and survives relaunch.
+
+Unified mode obeys the same two rules as the panes, for the same measured reasons: no
+`.textSelection` on anything it rebuilds while text streams, and no `Menu` rebuilt on
+streaming updates. Its settings strip depends on the seats' specs rather than their
+streaming text, which is what keeps the thinking controls safe to put there.
 
 ### Themes
 

@@ -77,6 +77,15 @@ struct ChatBotsApp: App {
             // A theme is a view setting on macOS, so it belongs in View as well as in the
             // bar. SwiftUI supplies Minimize/Zoom/Enter Full Screen after this group.
             CommandGroup(after: .toolbar) {
+                Picker("Window Layout", selection: $theme.windowMode) {
+                    ForEach(WindowMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+                .pickerStyle(.inline)
+
+                Divider()
+
                 Picker("Theme", selection: $theme.mode) {
                     ForEach(ThemeMode.allCases) { mode in
                         Text(mode.label).tag(mode)

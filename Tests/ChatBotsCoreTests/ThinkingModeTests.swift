@@ -154,3 +154,49 @@ private extension String {
         return chunks
     }
 }
+
+@Suite("Fabricated tool syntax")
+struct FabricatedToolSyntaxTests {
+
+    @Test("Fabricated tool markers and query lines are dropped")
+    func stripsFabricatedCalls() {
+        let raw = """
+            I should look this up.
+
+            [web_search]
+            query: egg shape oviduct mechanism
+            query: human egg shape
+
+            [Agent B]
+            Let me search more.
+
+            So the ovoid shape is a compromise.
+            """
+        let result = MLXEngine.stripFabricatedToolSyntax(raw)
+        // [web_search] plus the two query: lines.
+        #expect(result.removedLines == 3)
+        #expect(!result.text.contains("[web_search]"))
+        #expect(!result.text.contains("query:"))
+        #expect(result.text.contains("I should look this up."))
+        #expect(result.text.contains("So the ovoid shape is a compromise."))
+    }
+
+    @Test("Ordinary prose that mentions a tool name is untouched")
+    func keepsNormalText() {
+        let raw = """
+            I could not reach the web_search tool, so this is from memory.
+            The query: style phrasing below is part of my sentence.
+            """
+        let result = MLXEngine.stripFabricatedToolSyntax(raw)
+        #expect(result.removedLines == 0)
+        #expect(result.text == raw)
+    }
+
+    @Test("A clean answer is returned unchanged")
+    func cleanAnswerUntouched() {
+        let raw = "Eggs are ovoid because the shell resists pressure better that way."
+        let result = MLXEngine.stripFabricatedToolSyntax(raw)
+        #expect(result.removedLines == 0)
+        #expect(result.text == raw)
+    }
+}

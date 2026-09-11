@@ -266,6 +266,9 @@ public struct RepetitionDetector: Sendable {
         self.minimumWords = minimumWords
     }
 
+    /// The rate measured on the most recent `ingest`, for diagnostics.
+    public private(set) var lastRate: Double = 0
+
     /// Feed generated text. Returns `true` once the output looks degenerate.
     public mutating func ingest(_ text: String) -> Bool {
         words.append(contentsOf: Self.normalise(text))
@@ -283,7 +286,8 @@ public struct RepetitionDetector: Sendable {
             if !seen.insert(phrase).inserted { repeats += 1 }
         }
         guard total > 0 else { return false }
-        return Double(repeats) / Double(total) >= threshold
+        lastRate = Double(repeats) / Double(total)
+        return lastRate >= threshold
     }
 
     private static func normalise(_ text: String) -> [String] {

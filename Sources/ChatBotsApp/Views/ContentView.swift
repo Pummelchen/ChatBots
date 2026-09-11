@@ -5,13 +5,14 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(\.themePalette) private var palette
+    @EnvironmentObject private var theme: ThemeStore
     @ObservedObject var controller: ChatController
 
     var body: some View {
         VStack(spacing: 0) {
             ControlBar(controller: controller)
             Divider()
-            AgentPanes(controller: controller)
+            ConversationLayout(controller: controller, mode: theme.windowMode)
             Divider()
             ModeratorBar(controller: controller)
         }
@@ -21,6 +22,24 @@ struct ContentView: View {
             if let message = controller.errorBanner {
                 ErrorBanner(message: message) { controller.errorBanner = nil }
             }
+        }
+    }
+}
+
+/// Swaps the conversation between the two window modes.
+///
+/// Both modes render the same shared log from the same controller; only the arrangement
+/// differs, so switching mid-conversation is lossless and instant.
+struct ConversationLayout: View {
+    @ObservedObject var controller: ChatController
+    let mode: WindowMode
+
+    var body: some View {
+        switch mode {
+        case .split:
+            AgentPanes(controller: controller)
+        case .unified:
+            UnifiedConversation(controller: controller)
         }
     }
 }
