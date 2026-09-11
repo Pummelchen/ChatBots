@@ -23,6 +23,19 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cp "$BIN/ChatBots" "$APP/Contents/MacOS/ChatBots"
 
+# The engine travels with the app. The app is a client of the engine rather than containing
+# one, so something has to run the engine, and a shipped app that depended on a developer
+# checkout being present would be useless to anyone who installed it.
+#
+# It sits in MacOS/ rather than Resources/ because it is an executable. The app finds it by
+# looking beside its own binary, which is where this puts it.
+if [ -x "$BIN/chatbots-cli" ]; then
+  cp "$BIN/chatbots-cli" "$APP/Contents/MacOS/chatbots-cli"
+else
+  echo "    ! chatbots-cli was not built; the app will not be able to start an engine" >&2
+  echo "      Build it with: swift build -c $CONFIG --product chatbots-cli" >&2
+fi
+
 # swift-transformers and swift-crypto ship resources as SwiftPM bundles next to the
 # binary. MLX's default.metallib is fetched separately, because mlx-swift's SwiftPM
 # build does not compile the Metal kernels (see tools/fetch-metal.sh).

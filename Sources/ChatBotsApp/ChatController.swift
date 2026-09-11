@@ -120,7 +120,7 @@ public final class ChatController: ObservableObject {
     // MARK: Inputs
 
     @Published public var topic: String {
-        didSet { saveSettings() }
+        didSet { if !isApplyingRemoteState { saveSettings() } }
     }
     @Published public var moderatorDraft: String {
         didSet { saveSettings() }
@@ -128,7 +128,7 @@ public final class ChatController: ObservableObject {
     /// Streams the models' thinking blocks into the panes (a view concern; whether the
     /// model thinks at all is per-seat, see `AgentSpec.thinking`).
     @Published public var showReasoning: Bool {
-        didSet { saveSettings() }
+        didSet { if !isApplyingRemoteState { saveSettings() } }
     }
 
     // MARK: Outputs
@@ -146,8 +146,19 @@ public final class ChatController: ObservableObject {
 
     // MARK: Internals
 
-    public let engine: ConversationEngine
+    /// The connection to the engine. The app is a client of one now rather than containing
+    /// it, so this is the only way anything reaches a model.
+    public private(set) var client: WebTransportEngineClient?
+    /// What the engine says it is doing, so the interface can show a failure rather than
+    /// nothing happening.
+    @Published public private(set) var engineConnection: String?
     private var pumpTasks: [Task<Void, Never>] = []
+    /// True while a state from the engine is being applied, so the property observers do not
+    /// mistake it for a user edit and save it back.
+    private var isApplyingRemoteState = false
+    /// The last state the engine reported. Read-only properties answer from here, so there is
+    /// one source for what the engine currently thinks.
+    private var lastSnapshot: APISnapshot?
 
     /// Called whenever anything the user set changes, so it can be written to disk.
     var onSettingsChanged: (() -> Void)?
@@ -162,31 +173,90 @@ public final class ChatController: ObservableObject {
         self.topic = initialTopic
         self.moderatorDraft = initialModeratorDraft
         self.showReasoning = initialShowReasoning
-        let registry = WebToolbox.makeRegistry()
-        let panes = specs.enumerated().map { AgentPaneState(spec: $0.element, seatIndex: $0.offset) }
 
-        // One engine per seat = one independent model instance per seat. Swapping in a
-        // different checkpoint later is a change to `specs`, nothing else.
-        let seats = zip(specs, panes).map { spec, pane in
-            // Both backends are constructed up front: an MLX seat keeps its weights loaded
-            // even while the OpenAI backend is selected, and vice versa.
-            let stateHandler: @Sendable (EngineState) -> Void = { state in
-                Task { @MainActor in
-                    pane.engineState = state
-                }
-            }
-            return ConversationEngine.Seat(
-                spec: spec,
-                mlx: MLXEngine(spec: spec, toolRegistry: registry, onStateChange: stateHandler),
-                openAI: OpenAIResponsesEngine(spec: spec, onStateChange: stateHandler)
-            )
+        // No engine is built here any more. The seats are drawn from the given specs so the
+        // window has something to show before the connection is up, and the engine's own
+        // state replaces them as soon as the first snapshot arrives.
+        self.panes = specs.enumerated().map {
+            AgentPaneState(spec: $0.element, seatIndex: $0.offset)
         }
-
-        self.panes = panes
-        self.engine = ConversationEngine(seats: seats, configuration: configuration)
-        startPumps()
         startFlushLoop()
         observeSeatSettings()
+    }
+
+    // MARK: - Connecting
+
+    /// Attach to an engine and start drawing from it.
+    ///
+    /// Called once the supervisor reports an engine answering. Everything the interface shows
+    /// comes from here: the transcript, the status, the seat settings, the statistics and the
+    /// streamed output.
+    public func connect(host: String = "127.0.0.1", port: UInt16) async {
+        disconnect()
+
+        var configuration = WebTransportEngineClient.Configuration()
+        configuration.host = host
+        configuration.port = port
+        let client = WebTransportEngineClient(configuration: configuration)
+        self.client = client
+
+        // The event stream delivers states and output fragments; it is started before the
+        // first request so nothing that happens in between is missed.
+        var lastError: String?
+        for attempt in 0..<8 {
+            do {
+                try await client.connect()
+                lastError = nil
+                break
+            } catch {
+                lastError = error.localizedDescription
+                try? await Task.sleep(for: .milliseconds(400 * (attempt + 1)))
+            }
+        }
+        guard client.isConnected else {
+            engineConnection = lastError ?? "Could not reach the engine."
+            return
+        }
+        engineConnection = nil
+
+        // The current state first, so the interface is correct before any event arrives.
+        if let snapshot = try? await client.state() {
+            apply(snapshot)
+        }
+        startPumps()
+
+        // A safety net, not the primary path.
+        //
+        // Pushed states should arrive whenever the log changes, and they are what keeps the
+        // transcript live. But a push that silently fails leaves a window that looks
+        // connected and never updates — the worst kind of failure, because nothing is
+        // obviously wrong. Polling is cheap here (one small request a second on loopback) and
+        // it turns that into a slow refresh rather than a frozen window.
+        pumpTasks.append(
+            Task { [weak self] in
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(1))
+                    guard let self, !Task.isCancelled else { return }
+                    if let snapshot = try? await client.state() {
+                        self.apply(snapshot)
+                    }
+                    // A reader that stopped is why the window would otherwise never update.
+                    if let error = client.readerError {
+                        self.engineConnection = "Live updates stopped: \(error)"
+                    }
+                }
+            }
+        )
+    }
+
+    /// Stop drawing from the engine. The engine itself is the supervisor's business.
+    public func disconnect() {
+        for task in pumpTasks { task.cancel() }
+        pumpTasks.removeAll()
+        if let client {
+            Task { await client.disconnect() }
+        }
+        client = nil
     }
 
     /// Save the user's settings.
@@ -231,53 +301,114 @@ public final class ChatController: ObservableObject {
     // MARK: - Stream consumption
 
     private func startPumps() {
+        // Two pumps, because the engine sends two shapes of thing: a whole state whenever
+        // something changes, and fragments of output as a model writes.
+        //
+        // The state is authoritative and slow-moving; the fragments are fast and partial. The
+        // transcript, the statistics and the seat settings come from states, so they cannot
+        // drift. The visible text comes from fragments, so it arrives as it is written rather
+        // than in whole answers — which is what the pacing below turns into a smooth reveal.
         pumpTasks.append(
             Task { [weak self] in
-                guard let stream = self?.engine.transcriptUpdates else { return }
-                for await turns in stream {
-                    guard let self else { return }
-                    self.turns = turns
-                }
-            }
-        )
-
-        pumpTasks.append(
-            Task { [weak self] in
-                guard let stream = self?.engine.statusUpdates else { return }
-                for await status in stream {
-                    guard let self else { return }
-                    self.status = status
-                    // Do not clear panes while text is still being revealed: stopping or
-                    // pausing should not swallow the end of a reply mid-sentence. The
-                    // pacer finishes it and clears the pane itself.
-                    if !status.isActive && !self.isDisplayingAnything {
-                        for pane in self.panes where !pane.isAwaitingDisplayClear {
-                            pane.endTurn()
-                        }
+                guard let client = self?.client, let events = client.events else { return }
+                for await event in events {
+                    guard let self, !Task.isCancelled else { return }
+                    switch event {
+                    case .state(let snapshot):
+                        self.apply(snapshot)
+                    case .output(let delta):
+                        self.apply(delta)
                     }
                 }
             }
         )
+    }
 
-        pumpTasks.append(
-            Task { [weak self] in
-                guard let stream = self?.engine.noticeUpdates else { return }
-                for await notices in stream {
-                    guard let self else { return }
-                    self.notices = notices
+    /// Take a whole state from the engine.
+    ///
+    /// Deliberately does not touch the pane's visible text: the pacer owns that, and
+    /// overwriting it mid-reveal would make the reply jump. Everything else is the engine's
+    /// to decide.
+    private func apply(_ snapshot: APISnapshot) {
+        lastSnapshot = snapshot
+        turns = snapshot.messages.map { message in
+            Turn(
+                id: UUID(uuidString: message.id) ?? UUID(),
+                sequence: message.sequence,
+                speakerID: message.speakerID,
+                speakerName: message.speaker,
+                kind: Turn.Kind(rawValue: message.kind) ?? .chat,
+                content: message.text,
+                toolDetail: message.toolDetail,
+                timestamp: message.timestamp)
+        }
+        if !snapshot.topic.isEmpty, topic != snapshot.topic {
+            isApplyingRemoteState = true
+            topic = snapshot.topic
+            isApplyingRemoteState = false
+        }
+        status = RunStatus(
+            label: snapshot.status, isRunning: snapshot.isRunning, isPaused: snapshot.isPaused,
+            error: snapshot.error)
+        notices = snapshot.notices
+        if let error = snapshot.error { errorBanner = error }
+
+        // Seat settings are the engine's, so a change made in another front end appears here.
+        for (index, seat) in snapshot.seats.enumerated() where index < panes.count {
+            let pane = panes[index]
+            if pane.spec.displayName != seat.name { pane.spec.displayName = seat.name }
+            if let personaID = seat.personaID, pane.spec.personaID != personaID {
+                pane.spec.personaID = personaID
+            }
+            if pane.spec.thinking.rawValue != seat.thinking,
+                let thinking = ThinkingMode(rawValue: seat.thinking)
+            {
+                pane.spec.thinking = thinking
+            }
+            if let backend = AgentSpec.Backend(rawValue: seat.backend) {
+                pane.spec.backend = backend
+            }
+            // Statistics arrive with the live view, and are kept until the next turn starts.
+            if let stats = snapshot.live.first(where: { $0.seatID == seat.id })?.stats {
+                pane.lastStats = stats
+                if let activity = snapshot.live.first(where: { $0.seatID == seat.id })?.activity {
+                    pane.activity = activity
                 }
             }
-        )
+            // The client cannot see whether weights are loaded, only whether anything is
+            // being produced. `ready` is the honest description of "the engine is answering".
+            pane.engineState = .ready
+        }
+    }
 
-        pumpTasks.append(
-            Task { [weak self] in
-                guard let stream = self?.engine.events else { return }
-                for await event in stream {
-                    guard let self else { return }
-                    self.apply(event)
-                }
-            }
-        )
+    /// Take one fragment of streamed output.
+    ///
+    /// Converted into the same event the in-process engine used to deliver, so the pacing,
+    /// the block handling and the rate sampling below are unchanged.
+    private func apply(_ delta: APISnapshot.OutputDelta) {
+        switch delta.kind {
+        case "token":
+            apply(.token(agentID: delta.agentID, text: delta.text))
+        case "reasoning":
+            apply(.reasoning(agentID: delta.agentID, text: delta.text))
+        case "tool":
+            // Sent as one string because a fragment has one text field; split back into the
+            // name and the query the display logic expects.
+            let parts = delta.text.split(separator: "(", maxSplits: 1)
+            apply(
+                .toolCall(
+                    agentID: delta.agentID,
+                    name: String(parts.first ?? ""),
+                    query: parts.count > 1
+                        ? String(parts[1]).trimmingCharacters(in: CharacterSet(charactersIn: ")"))
+                        : ""))
+        case "started":
+            // The prompt itself is not sent to a client — it is the engine's rendering of the
+            // log and can be enormous. The pacer only needs to know a turn has begun.
+            pane(delta.agentID)?.beginTurn()
+        default:
+            break
+        }
     }
 
     private func apply(_ event: TurnEvent) {
@@ -443,25 +574,25 @@ public final class ChatController: ObservableObject {
 
     public func startOrRestart() {
         errorBanner = nil
-        if status.isActive {
-            engine.stop()
+        // Stop and reset first when there is something to clear, then start. The engine
+        // refuses to start without a topic, so the topic is set before the start rather than
+        // being assumed to have arrived already.
+        run { client in
+            if self.status.isActive { _ = try await client.send(.stop) }
+            if !self.turns.isEmpty { _ = try await client.send(.reset) }
+            _ = try await client.send(.setTopic(self.topic))
+            _ = try await client.send(.start)
         }
-        if !turns.isEmpty {
-            engine.reset()
-        }
-        engine.start(topic: topic)
     }
 
     public func togglePause() {
-        if status.isPaused {
-            engine.resume()
-        } else {
-            engine.pause()
+        run { client in
+            _ = try await client.send(self.status.isPaused ? .resume : .pause)
         }
     }
 
     public func stop() {
-        engine.stop()
+        run { client in _ = try await client.send(.stop) }
         // An explicit stop means stop: drop whatever is still queued rather than continuing
         // to type it out.
         for pane in panes {
@@ -471,7 +602,7 @@ public final class ChatController: ObservableObject {
     }
 
     public func reset() {
-        engine.reset()
+        run { client in _ = try await client.send(.reset) }
         // Drop anything still queued for display: a fresh conversation must not begin by
         // revealing the tail of the one that was just cleared.
         for pane in panes {
@@ -485,20 +616,33 @@ public final class ChatController: ObservableObject {
     public func sendModeratorMessage() {
         let text = moderatorDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        engine.steer(text)
+        run { client in _ = try await client.send(.steer(text)) }
         moderatorDraft = ""
     }
 
     /// Change one seat's thinking level. Applies from its next turn.
     public func setThinking(_ mode: ThinkingMode, for agentID: String) {
-        guard var spec = engine.specs.first(where: { $0.id == agentID }) else { return }
-        spec.thinking = mode
-        if let seat = engine.seatEngine(for: agentID) {
-            Task { await seat.setThinking(mode) }
+        run { client in
+            _ = try await client.send(
+                .updateSeat(.init(seatID: agentID, thinking: mode)))
         }
-        if let pane = pane(agentID) {
-            pane.spec = spec
-            saveSettings()
+    }
+
+    /// Send one command and apply whatever the engine answers with.
+    ///
+    /// Every command answers with the whole state, so the interface never has to guess what
+    /// changed — and a refusal arrives the same way as a success, carrying the reason.
+    private func run(_ body: @escaping (WebTransportEngineClient) async throws -> Void) {
+        guard let client else {
+            engineConnection = "Not connected to the engine."
+            return
+        }
+        Task { [weak self] in
+            do {
+                try await body(client)
+            } catch {
+                self?.engineConnection = error.localizedDescription
+            }
         }
     }
 
@@ -510,7 +654,7 @@ public final class ChatController: ObservableObject {
     public func transcriptAsText(exportedAt: Date = Date.now) -> String {
         TranscriptWriter.text(
             topic: topic,
-            turns: engine.displayTurns,
+            turns: turns,
             participants: currentSeats,
             exportedAt: exportedAt
         )
@@ -573,8 +717,9 @@ public final class ChatController: ObservableObject {
         spec.displayName = trimmed.isEmpty ? panes[index].seatKind : trimmed
         panes[index].spec = spec
 
-        if let seat = engine.seatEngine(for: agentID) {
-            Task { await seat.setDisplayName(spec.displayName) }
+        run { client in
+            _ = try await client.send(
+                .updateSeat(.init(seatID: agentID, name: spec.displayName)))
         }
         saveSettings()
         return true
@@ -585,32 +730,36 @@ public final class ChatController: ObservableObject {
 
     /// Change one seat's style. Applies from its next turn.
     public func setPersona(_ personaID: String, for agentID: String) {
-        guard var spec = engine.specs.first(where: { $0.id == agentID }) else { return }
-        spec.personaID = personaID
-        if let seat = engine.seatEngine(for: agentID) {
-            Task { await seat.setPersona(personaID) }
+        // The engine reseats the style and answers with the whole state, so the pane is
+        // updated from the reply rather than from a local guess at what changed.
+        run { client in
+            _ = try await client.send(
+                .updateSeat(.init(seatID: agentID, personaID: personaID)))
         }
-        if let pane = pane(agentID) {
-            pane.spec = spec
-            saveSettings()
-        }
+        pane(agentID)?.spec.personaID = personaID
+        saveSettings()
     }
 
     /// Point one seat at a backend. Only offered before the conversation starts, because
     /// switching mid-thread would change a participant's identity part-way through.
     public func setBackend(_ backend: AgentSpec.Backend, for agentID: String) {
-        engine.setBackend(backend, for: agentID)
-        guard var spec = engine.specs.first(where: { $0.id == agentID }) else { return }
-        spec.backend = backend
-        pane(agentID)?.spec = spec
+        run { client in
+            _ = try await client.send(
+                .updateSeat(.init(seatID: agentID, backend: backend)))
+        }
+        pane(agentID)?.spec.backend = backend
     }
 
     /// Point one seat at a different server or model id.
     public func setEndpoint(_ endpoint: OpenAIEndpoint, for agentID: String) {
-        engine.setEndpoint(endpoint, for: agentID)
-        guard var spec = engine.specs.first(where: { $0.id == agentID }) else { return }
-        spec.openAI = endpoint
-        pane(agentID)?.spec = spec
+        run { client in
+            _ = try await client.send(
+                .updateSeat(
+                    .init(
+                        seatID: agentID, backend: .openAIResponses, baseURL: endpoint.baseURL,
+                        apiModel: endpoint.model, apiKey: endpoint.apiKey)))
+        }
+        pane(agentID)?.spec.openAI = endpoint
     }
 
     /// Push every seat's configured endpoint into its engine.
@@ -618,8 +767,16 @@ public final class ChatController: ObservableObject {
     /// Called whenever the endpoint settings change and once at launch, so a seat is ready
     /// before it is asked for a turn.
     func applyAPIEndpoints(_ store: APIEndpointStore) {
-        for (index, pane) in panes.enumerated() {
-            engine.setEndpoint(store.endpoint(forSeat: index), for: pane.id)
+        for (index, pane) in panes.enumerated() where index < panes.count {
+            let endpoint = store.endpoint(forSeat: index)
+            pane.spec.openAI = endpoint
+            run { client in
+                _ = try await client.send(
+                    .updateSeat(
+                        .init(
+                            seatID: pane.id, baseURL: endpoint.baseURL,
+                            apiModel: endpoint.model, apiKey: endpoint.apiKey)))
+            }
         }
     }
 
@@ -640,11 +797,16 @@ public final class ChatController: ObservableObject {
     }
 
     public func warmUp(_ agentID: String) {
+        // Loading a model is the engine's business and happens on its first turn. A client
+        // cannot reach a seat's engine, so there is nothing to warm from here.
         errorBanner = nil
-        guard let seatEngine = engine.seatEngine(for: agentID) else { return }
+    }
+
+    /// No longer used; kept out of the way while the client settles.
+    private func legacyWarmUp(_ agentID: String) {
         Task {
             do {
-                try await seatEngine.load()
+                try await Task.sleep(for: .milliseconds(1))
             } catch {
                 await MainActor.run { self.errorBanner = error.localizedDescription }
             }
@@ -660,8 +822,18 @@ public final class ChatController: ObservableObject {
     public var isRunning: Bool { status.isActive }
 
     /// Steering turns accepted but not yet read by any model.
+    ///
+    /// Judged from the transcript: a steering turn with no answer after it is still pending.
+    /// The engine used to answer this directly; over the client the log is the only thing
+    /// both ends share, and it is enough to answer the question.
     public var pendingSteeringIDs: Set<UUID> {
-        Set(engine.queuedSteering.map(\.id))
+        var pending: Set<UUID> = []
+        var answered = false
+        for turn in turns.reversed() {
+            if turn.kind == .chat { answered = true }
+            if turn.kind == .steering, !answered { pending.insert(turn.id) }
+        }
+        return pending
     }
 
     /// Which seat a speaker id belongs to, or nil for the moderator and app turns.
@@ -673,13 +845,44 @@ public final class ChatController: ObservableObject {
     /// How full the context is, for the footer. Includes the compaction threshold so the
     /// bar can show where the log will be condensed rather than the reader having to guess.
     public var contextUsage: (tokens: Int, window: Int, fraction: Double) {
-        engine.contextUsage
+        guard let snapshot = lastSnapshot else { return (0, 0, 0) }
+        return (snapshot.contextTokens, snapshot.contextWindow, snapshot.contextFraction)
     }
 
     // MARK: - Source material
 
     /// Documents and images the moderator has added.
-    public var attachments: [AttachedDocument] { engine.attachments }
+    /// The files the engine is holding.
+    ///
+    /// Rebuilt from the state rather than kept separately, so the app and the engine cannot
+    /// disagree about what is attached. The extracted text is the engine's and is not sent
+    /// back, so a rebuilt document carries its summary and token count but not its body —
+    /// which is all the interface shows.
+    public var attachments: [AttachedDocument] {
+        (lastSnapshot?.attachments ?? []).map { attachment in
+            AttachedDocument(
+                id: UUID(uuidString: attachment.id) ?? UUID(),
+                name: attachment.name,
+                kind: DocumentKind(rawValue: attachment.kind) ?? .plainText,
+                text: "",
+                byteCount: 0,
+                pageCount: nil,
+                wasTruncated: attachment.wasTruncated,
+                imageData: attachment.imageBase64.flatMap { Data(base64Encoded: $0) })
+        }
+    }
+
+    /// Push the attachment set to the engine.
+    ///
+    /// Adding a file already happened over the request channel, so this only reconciles the
+    /// engine with the app's view — it removes what is gone. Adding here would re-upload.
+    private func syncAttachments(_ documents: [AttachedDocument]) {
+        let wanted = Set(documents.map(\.id.uuidString))
+        let present = Set((lastSnapshot?.attachments ?? []).map(\.id))
+        for missing in present.subtracting(wanted) {
+            run { client in _ = try await client.send(.removeAttachment(id: missing)) }
+        }
+    }
 
     /// True when every seat's model can accept images, which is what decides whether the
     /// image part of the interface is offered at all. A conversation where one participant
@@ -757,7 +960,7 @@ public final class ChatController: ObservableObject {
             }
         }
         accepted = documents
-        engine.setAttachments(current)
+        syncAttachments(current)
         // A failure alongside successes is reported without hiding the successes.
         errorBanner = failures.isEmpty ? nil : failures.joined(separator: "\n")
         saveSettings()
@@ -767,16 +970,20 @@ public final class ChatController: ObservableObject {
     /// Seed the attached material at launch, before any turn can run.
     @discardableResult
     public func setAttachments(_ documents: [AttachedDocument]) -> Bool {
-        engine.setAttachments(documents)
+        // Uploads happen over the request channel, so this reconciles rather than sends: a
+        // document the engine has not been told about cannot be added from here, because its
+        // text is not on this side of the wire.
+        syncAttachments(documents)
+        return true
     }
 
     public func removeAttachment(_ id: UUID) {
-        engine.setAttachments(attachments.filter { $0.id != id })
+        syncAttachments(attachments.filter { $0.id != id })
         saveSettings()
     }
 
     public func removeAllAttachments() {
-        engine.setAttachments([])
+        syncAttachments([])
         saveSettings()
     }
 
@@ -790,11 +997,11 @@ public final class ChatController: ObservableObject {
     }
 
     /// Where the log gets condensed, for display.
-    public var compactThreshold: Double { engine.configuration.compactThreshold }
+    public var compactThreshold: Double { lastSnapshot?.compactThreshold ?? 0.7 }
 
     /// Condense the log now, rather than waiting for the threshold.
     public func compactNow() {
         errorBanner = nil
-        engine.compactNow()
+        run { client in _ = try await client.send(.compact) }
     }
 }

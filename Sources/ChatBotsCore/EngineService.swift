@@ -282,6 +282,26 @@ public final class EngineService {
 
     /// The engine's event stream, for a transport to forward.
     public var events: AsyncStream<TurnEvent> { engine.events }
+
+    /// Watch the shared log. See `ConversationEngine.observeTranscript` for why this is a
+    /// callback rather than a stream.
+    public func observeTranscript(_ body: @escaping ([Turn]) -> Void) -> UUID {
+        engine.observeTranscript(body)
+    }
+
+    public func stopObservingTranscript(_ id: UUID) {
+        engine.stopObservingTranscript(id)
+    }
+
+    /// Watch the models' output. A callback for the same reason as the transcript.
+    @discardableResult
+    public func observeEvents(_ body: @escaping (TurnEvent) -> Void) -> UUID {
+        engine.observeEvents(body)
+    }
+
+    public func stopObservingEvents(_ id: UUID) {
+        engine.stopObservingEvents(id)
+    }
     /// The shared log, for a transport that reports changes rather than deltas.
     public var transcriptUpdates: AsyncStream<[Turn]> { engine.transcriptUpdates }
 

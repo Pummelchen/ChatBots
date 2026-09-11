@@ -50,6 +50,29 @@ public enum RunStatus: Sendable, Equatable {
         }
     }
 
+    /// Rebuild a status from the line the API reports.
+    ///
+    /// A client cannot see the engine's enum, so the status crosses as text. This turns it
+    /// back, which keeps every view reading the same type whether the engine is local or
+    /// across a socket.
+    public init(label: String, isRunning: Bool, isPaused: Bool, error: String? = nil) {
+        if let error, !error.isEmpty {
+            self = .failed(error)
+        } else if isPaused {
+            self = .paused
+        } else if isRunning {
+            // The exact turn number is cosmetic; the important part is that it is active.
+            let number = Int(label.split(separator: " ").last.map(String.init) ?? "") ?? 0
+            self = .running(turn: number)
+        } else if label.hasPrefix("Stopped") {
+            self = .stopped
+        } else if label.hasPrefix("Turn limit") {
+            self = .limitReached
+        } else {
+            self = .idle
+        }
+    }
+
     public var isActive: Bool {
         switch self {
         case .preparing, .running: true
@@ -141,6 +164,10 @@ public final class ConversationEngine {
     private var eventContinuation: AsyncStream<TurnEvent>.Continuation!
     private var statusContinuation: AsyncStream<RunStatus>.Continuation!
     private var transcriptContinuation: AsyncStream<[Turn]>.Continuation!
+    /// Everyone watching the log. See `observeTranscript`.
+    private var transcriptObservers: [UUID: ([Turn]) -> Void] = [:]
+    /// Everyone watching the output. See `observeEvents`.
+    private var eventObservers: [UUID: (TurnEvent) -> Void] = [:]
 
     /// Every token, tool call and note, in order.
     /// Every token, tool call and note, in order.
@@ -1055,6 +1082,27 @@ public final class ConversationEngine {
 
     private func publishTranscript() {
         transcriptContinuation?.yield(displayTurns)
+        let turns = displayTurns
+        for observer in transcriptObservers.values { observer(turns) }
+    }
+
+    /// Watch the shared log.
+    ///
+    /// A callback rather than a stream, because there is more than one watcher — the HTTP API
+    /// and the WebTransport server both need to know when the log changes — and an
+    /// `AsyncStream` gives its single iterator to whoever takes it first. The second reader
+    /// gets nothing at all, silently.
+    ///
+    /// Returns a token to remove the observer with.
+    @discardableResult
+    public func observeTranscript(_ body: @escaping ([Turn]) -> Void) -> UUID {
+        let id = UUID()
+        transcriptObservers[id] = body
+        return id
+    }
+
+    public func stopObservingTranscript(_ id: UUID) {
+        transcriptObservers[id] = nil
     }
 
     private func publishEvent(_ event: TurnEvent) {
@@ -1062,6 +1110,25 @@ public final class ConversationEngine {
         // reads snapshots sees replies being written without having to consume the stream.
         record(event)
         eventContinuation?.yield(event)
+        // And to every watcher, for the same reason as the transcript: more than one transport
+        // consumes these, and a stream would serve only whichever asked first.
+        for observer in eventObservers.values { observer(event) }
+    }
+
+    /// Watch tokens, tool calls and notes.
+    ///
+    /// A callback for the same reason as `observeTranscript`: the HTTP API and the
+    /// WebTransport server both forward these, and an `AsyncStream` would give the lot to one
+    /// of them and nothing to the other.
+    @discardableResult
+    public func observeEvents(_ body: @escaping (TurnEvent) -> Void) -> UUID {
+        let id = UUID()
+        eventObservers[id] = body
+        return id
+    }
+
+    public func stopObservingEvents(_ id: UUID) {
+        eventObservers[id] = nil
     }
 
     private func setStatus(_ status: RunStatus) {

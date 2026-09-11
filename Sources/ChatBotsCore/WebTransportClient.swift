@@ -162,6 +162,11 @@ public final class WebTransportEngineClient {
 
     // MARK: - Events
 
+    /// Why the reader stopped, if it stopped rather than being cancelled. A reader that exits
+    /// silently leaves a connected-looking client that never updates, which is the hardest
+    /// kind of failure to notice.
+    public private(set) var readerError: String?
+
     /// Read frames until the stream ends, routing each to its destination.
     private func read(from stream: WebTransportBidirectionalStream) async {
         var buffer = Data()
@@ -170,9 +175,13 @@ public final class WebTransportEngineClient {
             do {
                 chunk = try await stream.receive()
             } catch {
+                readerError = error.localizedDescription
                 break
             }
-            if chunk.isEmpty { break }
+            if chunk.isEmpty {
+                readerError = readerError ?? "the engine closed the stream"
+                break
+            }
             buffer.append(chunk)
 
             while true {

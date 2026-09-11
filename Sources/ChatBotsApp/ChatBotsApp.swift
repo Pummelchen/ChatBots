@@ -54,11 +54,24 @@ struct ChatBotsApp: App {
         _settings = StateObject(wrappedValue: store)
         _controller = StateObject(wrappedValue: restored)
 
+        // The engine is a separate process that this app starts and owns. The supervisor
+        // finds it, starts it, waits for it to answer over WebTransport, and stops it on quit.
+        let runDirectory: URL =
+            Bundle.main.executableURL?
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appending(path: ".run")
+            ?? URL(fileURLWithPath: NSTemporaryDirectory()).appending(path: "chatbots-run")
+        _supervisor = StateObject(
+            wrappedValue: EngineSupervisor(logURL: runDirectory.appending(path: "app-engine.log")))
+
         AppDelegate.flush = { [weak store] in
             guard let store else { return }
             store.saveNow(snapshot())
         }
     }
+    @StateObject private var supervisor: EngineSupervisor
     @StateObject private var theme = ThemeStore()
     @StateObject private var zoom = ZoomStore()
 
@@ -81,6 +94,20 @@ struct ChatBotsApp: App {
                 .environmentObject(zoom)
                 // Restore each seat's saved endpoint before any turn can run.
                 .task { controller.applyAPIEndpoints(endpoints) }
+                // Start the engine, then attach to it. The window draws the saved seats
+                // immediately and the engine's own state replaces them as soon as the first
+                // snapshot arrives, so a slow start shows the interface rather than a blank
+                // window.
+                .task {
+                    await supervisor.start()
+                    await controller.connect(port: supervisor.configuration.port)
+                    if case .failed(let reason) = supervisor.state {
+                        controller.errorBanner = reason
+                    }
+                }
+                // The engine is this app's child, so quitting stops it. An engine the app did
+                // not start is left alone — the supervisor knows which it is.
+                .onDisappear { supervisor.stop() }
                 // The black theme is dark-only regardless of the Mac's setting; the
                 // original theme follows the system.
                 .preferredColorScheme(theme.mode == .black ? .dark : nil)

@@ -59,8 +59,8 @@ public final class WebTransportEngineServer {
 
     private var listener: WebTransportListeningServer?
     private var acceptTask: Task<Void, Never>?
-    private var eventTask: Task<Void, Never>?
-    private var transcriptTask: Task<Void, Never>?
+    private var eventObserver: UUID?
+    private var transcriptObserver: UUID?
     /// One continuation per subscribed session, so each has its own buffer and a stalled
     /// client costs only its own events.
     private var subscribers: [UUID: AsyncStream<EngineEvent>.Continuation] = [:]
@@ -108,10 +108,14 @@ public final class WebTransportEngineServer {
     public func stop() async {
         acceptTask?.cancel()
         acceptTask = nil
-        eventTask?.cancel()
-        eventTask = nil
-        transcriptTask?.cancel()
-        transcriptTask = nil
+        if let eventObserver {
+            service.stopObservingEvents(eventObserver)
+            self.eventObserver = nil
+        }
+        if let transcriptObserver {
+            service.stopObservingTranscript(transcriptObserver)
+            self.transcriptObserver = nil
+        }
         for continuation in subscribers.values { continuation.finish() }
         subscribers.removeAll()
         if let listener {
@@ -149,18 +153,17 @@ public final class WebTransportEngineServer {
         // limitation. See EngineProtocol for the full account.
         guard let stream = try? await session.acceptBidirectionalStream() else { return }
 
+        // This session is subscribed the moment its stream exists.
+        //
+        // There was a separate subscription step — the server waited to accept a second
+        // stream before sending anything — and it was the reason the desktop app showed a
+        // conversation that never updated. Nothing ever opened that second stream, so the
+        // server waited forever while the client waited for events, and the only thing that
+        // eventually moved the window was the polling safety net. Since replies and events are
+        // told apart by their frame tag, no negotiation is needed at all.
         let (events, continuation) = AsyncStream<EngineEvent>.makeStream(
             bufferingPolicy: .bufferingNewest(256))
         subscribers[id] = continuation
-        defer {
-            continuation.finish()
-            subscribers[id] = nil
-        }
-
-        // The current state first, so a client that has just connected can draw something
-        // without waiting for a change.
-        await send(.event(.state(service.snapshot())), on: stream)
-
         let writer = Task { [weak self] in
             guard let self else { return }
             for await event in events {
@@ -168,7 +171,15 @@ public final class WebTransportEngineServer {
                 await self.send(.event(event), on: stream)
             }
         }
-        defer { writer.cancel() }
+        defer {
+            writer.cancel()
+            continuation.finish()
+            subscribers[id] = nil
+        }
+
+        // The current state first, so a client that has just connected can draw something
+        // without waiting for a change.
+        await send(.event(.state(service.snapshot())), on: stream)
 
         var buffer = Data()
         while !Task.isCancelled {
@@ -251,19 +262,13 @@ public final class WebTransportEngineServer {
 
     /// Forward the engine's events to every subscribed session.
     private func startEventPump() {
-        eventTask?.cancel()
-        eventTask = Task { [weak self] in
-            guard let self else { return }
-            // The engine hands its events to whoever is reading, and the API server may be
-            // reading the same stream for the website. Both are consumers of the same
-            // `events` sequence, which is a stored property built once, so neither takes it
-            // from the other.
-            for await event in self.service.events {
-                if Task.isCancelled { return }
-                guard let forwarded = Self.translate(event) else { continue }
-                for continuation in self.subscribers.values {
-                    continuation.yield(forwarded)
-                }
+        // An observer rather than a stream: the API server forwards these to the website at the
+        // same time, and an `AsyncStream` would hand the whole sequence to whichever of them
+        // asked first.
+        eventObserver = service.observeEvents { [weak self] event in
+            guard let self, let forwarded = Self.translate(event) else { return }
+            for continuation in self.subscribers.values {
+                continuation.yield(forwarded)
             }
         }
     }
@@ -299,13 +304,9 @@ public final class WebTransportEngineServer {
     /// than once per token — so a client gets smooth text between turns and an authoritative
     /// state at each one.
     private func startTranscriptPump() {
-        transcriptTask?.cancel()
-        transcriptTask = Task { [weak self] in
-            guard let self else { return }
-            for await _ in self.service.transcriptUpdates {
-                if Task.isCancelled { return }
-                self.broadcastState()
-            }
+        transcriptObserver = service.observeTranscript { [weak self] _ in
+            // Called on the main actor by the engine, so the broadcast is safe to do here.
+            self?.broadcastState()
         }
     }
 

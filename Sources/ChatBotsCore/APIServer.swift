@@ -27,6 +27,8 @@ public struct APISnapshot: Codable, Sendable {
         public var modelShortName: String
         public var backend: String
         public var backendLabel: String
+        /// The persona's identifier, so a client can populate a picker from a snapshot.
+        public var personaID: String?
         public var personaName: String
         public var personaSummary: String
         public var thinking: String
@@ -290,7 +292,7 @@ public final class APIServer {
     private let service: EngineService
     private var server: HTTPServer?
     private var feedTask: Task<Void, Never>?
-    private var tokenTask: Task<Void, Never>?
+    private var tokenObserver: UUID?
     private var streams: [HTTPServer.EventStream] = []
 
     public init(engine: ConversationEngine, port: UInt16 = 7788) {
@@ -326,8 +328,10 @@ public final class APIServer {
     public func stop() {
         feedTask?.cancel()
         feedTask = nil
-        tokenTask?.cancel()
-        tokenTask = nil
+        if let tokenObserver {
+            service.stopObservingEvents(tokenObserver)
+            self.tokenObserver = nil
+        }
         for stream in streams { stream.close() }
         streams.removeAll()
         server?.stop()
@@ -581,6 +585,7 @@ public final class APIServer {
             modelShortName: spec.modelLabel,
             backend: spec.backend.rawValue,
             backendLabel: spec.backend.label,
+            personaID: spec.personaID,
             personaName: persona.name,
             personaSummary: persona.summary,
             thinking: spec.thinking.rawValue,
@@ -642,16 +647,12 @@ public final class APIServer {
     /// The reasoning stream is carried too, so a client can show the thinking blocks the
     /// desktop app shows.
     private func startTokenFeed() {
-        tokenTask?.cancel()
-        tokenTask = Task { [weak self] in
+        // Watched rather than read from the stream, because the WebTransport server forwards
+        // the same events to the desktop app and an `AsyncStream` would give the whole
+        // sequence to one of them and nothing to the other.
+        tokenObserver = service.observeEvents { [weak self] event in
             guard let self else { return }
-            // The engine has one event stream and hands every event to whoever is reading it,
-            // so opening a second reader would steal events from the first. Reading the same
-            // stream that drives the transcript would therefore be wrong; the engine exposes
-            // this stream precisely so a second consumer can see what the first saw.
-            for await event in self.engine.events {
-                if Task.isCancelled { return }
-                switch event {
+            switch event {
                 case .token(let agentID, let text):
                     self.broadcast(
                         self.encode(APISnapshot.OutputDelta(agentID: agentID, text: text, kind: "token")) ?? "{}",
@@ -669,10 +670,9 @@ public final class APIServer {
                     self.broadcast(
                         self.encode(APISnapshot.OutputDelta(agentID: agentID, text: "", kind: "started")) ?? "{}",
                         event: "delta")
-                default:
-                    // Everything else is reflected in the snapshot that follows the turn.
-                    break
-                }
+            default:
+                // Everything else is reflected in the snapshot that follows the turn.
+                break
             }
         }
     }
