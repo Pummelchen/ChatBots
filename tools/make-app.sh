@@ -47,10 +47,18 @@ shopt -u nullglob
 
 # The app icon, built from the master artwork in the app target.
 #
-# macOS applies its own rounded mask to app icons, so the artwork is used as drawn rather
-# than pre-cropped to a transparent rounded rectangle: masking it here would have meant
-# cutting about a tenth of the image away to remove the white ring the artwork already has
-# around its rounded square.
+# The master has a transparent surround: its rounded square sits on nothing, rather than on a
+# white background that would show as a pale frame around the icon in the Dock. It was
+# produced from the original artwork, which was opaque with the rounded square drawn on white,
+# by flood-filling that background to transparent from each corner. Redo it the same way if the
+# artwork is ever replaced:
+#
+#   magick AppIcon-1024.png -alpha set -fuzz 12% -fill none \
+#     -draw 'alpha 0,0 floodfill' -draw 'alpha 1253,0 floodfill' \
+#     -draw 'alpha 0,1253 floodfill' -draw 'alpha 1253,1253 floodfill' AppIcon-1024.png
+#
+# The flood fill rather than a global "remove white" matters: the robots have white eyes, and
+# replacing every white pixel would hollow them out.
 ICON_MASTER="$ROOT/Sources/ChatBotsApp/Resources/AppIcon-1024.png"
 if [[ -f "$ROOT/Resources/AppIcon.icns" ]]; then
   cp "$ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
