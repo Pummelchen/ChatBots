@@ -189,7 +189,10 @@ Instead, **Edit ▸ Copy Conversation (⇧⌘C)** copies the whole transcript as
 ### Thinking controls
 
 Each pane header has its own thinking control (`think: Medium`), so the two seats can run
-different reasoning budgets side by side. Levels: **Off**, **Minimal** (128 reasoning
+different reasoning budgets side by side. Note that the control's *menu* could not be
+exercised by the automated GUI checks — synthetic `CGEvent` clicks and accessibility
+presses do not open SwiftUI menus — so it was verified only by rendering, by its tooltip,
+and by confirming that the label and engine both follow the seat's mode. Levels: **Off**, **Minimal** (128 reasoning
 tokens), **Low** (512), **Medium** (2,048, the default), **High** (8,192) and
 **Unlimited** (no ceiling). A change applies from that seat's next turn.
 
