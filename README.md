@@ -294,6 +294,37 @@ swift run chatbots-cli --model-a mlx-community/Qwen3.5-4B-MLX-4bit \
 Any checkpoint `mlx-swift-lm` can load will work. Vocabularies may differ between
 models — that is fine here, because each seat tokenizes its own prompt.
 
+## Known issue: intermittent GPU crash
+
+There is an **unresolved, intermittent crash** in MLX's Metal layer. It appears roughly
+once every few conversations in the GUI, as `Segmentation fault: 11` while the faulting
+stack is entirely inside MLX:
+
+```
+mlx::core::fast::CustomKernel::eval_gpu(...)
+mlx::core::gpu::eval(...)  ->  mlx::core::async_eval(...)
+```
+
+What has been ruled out, by measurement rather than assumption:
+
+* **Not memory.** `chatbots-cli --memory-probe` shows 4.5 GB of a 23.3 GB limit in use
+  with only ~126 MB of buffer cache, holding steady across turns. There is no pressure.
+* **Not two seats generating at once.** All MLX entry points now go through `MLXGate`
+  (see "One MLX caller at a time"), and the turn loop is sequential besides.
+* **Not the CLI.** Three consecutive 8-turn `chatbots-cli` runs complete cleanly with no
+  crash reports.
+* **Not the transcript fix.** The freeze described below is a separate, solved problem.
+
+The remaining correlation is that it has only been observed in the **GUI**, which renders
+its window through Metal at the same time MLX is evaluating. That points at a race inside
+MLX's Metal command-encoder handling — it aborts constructing a compute command encoder,
+which is exactly what a second concurrent user of the Metal device would disturb. It is
+not reachable from application code: everything this app controls is already serialised,
+so it needs a fix in [mlx-swift](https://github.com/ml-explore/mlx-swift) /
+[mlx](https://github.com/ml-explore/mlx).
+
+If you hit it, relaunching is safe — the only cost is the conversation in flight.
+
 ## Known limits
 
 * Turn order is fixed alternation; models cannot skip or address each other by name.

@@ -9,6 +9,7 @@
 
 import ChatBotsCore
 import Foundation
+import MLX
 
 // MARK: - Arguments
 
@@ -20,6 +21,7 @@ struct Options {
     var tavilyKey: String?
     var benchmark = false
     var solo = false
+    var memoryProbe = false
     /// Cap on visible answer tokens per turn; `nil` keeps every seat's own budget.
     var maxTokens: Int?
 
@@ -40,6 +42,7 @@ struct Options {
             case "--key": options.tavilyKey = next()
             case "--max-tokens": options.maxTokens = Int(next() ?? "")
             case "--benchmark": options.benchmark = true
+            case "--memory-probe": options.memoryProbe = true
             case "--solo": options.solo = true
             case "--help", "-h":
                 print(Self.usage)
@@ -69,6 +72,7 @@ struct Options {
               --max-tokens <n>     Cap answer tokens per turn
               --benchmark          Measure seat throughput instead of chatting
               --solo               With --benchmark: measure seat A only, then exit
+              --memory-probe       Report MLX GPU memory across loading and turns
 
         Seat A and seat B are separate model instances with independent sampling
         parameters, so a headless run exercises exactly the same path as the GUI.
@@ -197,6 +201,36 @@ func runBenchmark() async {
 
 if options.benchmark {
     await runBenchmark()
+    exit(0)
+}
+
+if options.memoryProbe {
+    let mib = 1024.0 * 1024.0
+    func report(_ label: String) {
+        log(String(
+            format: "  %-22@ active=%7.1f MiB  cache=%7.1f MiB  peak=%7.1f MiB  gpuLimit=%7.1f MiB  memLimit=%7.1f MiB",
+            label as NSString,
+            Double(GPU.activeMemory) / mib,
+            Double(GPU.cacheMemory) / mib,
+            Double(GPU.peakMemory) / mib,
+            Double(GPU.memoryLimit) / mib,
+            Double(Memory.memoryLimit) / mib))
+    }
+    log("GPU memory (one seat, then both, then a turnaround):")
+    report("start")
+    _ = await loadSeat(engines[0], label: "A")
+    report("after load A")
+    _ = await loadSeat(engines[1], label: "B")
+    report("after load B")
+    let prompt = [
+        PromptMessage(role: .system, content: "Answer briefly."),
+        PromptMessage(role: .user, content: "Name three shapes."),
+    ]
+    for turn in 1...3 {
+        _ = try? await engines[turn % 2].generate(
+            messages: prompt, tools: [], onToolCall: { _, _ in }, onEvent: { _ in })
+        report("after turn \(turn)")
+    }
     exit(0)
 }
 
