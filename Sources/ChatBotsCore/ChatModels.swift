@@ -86,6 +86,10 @@ public struct Conversation: Sendable {
 // MARK: - Participant
 
 /// Static description of one LLM seat at the table.
+///
+/// Sampling lives on the seat, not in the engine, so two seats can run different
+/// checkpoints *and* different samplers. `QwenSampling` is the shared preset used by the
+/// two default Qwen seats.
 public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
     /// Stable id (also the seat label used in prompts, e.g. "Agent A").
     public var id: String
@@ -96,8 +100,26 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
     public var modelShortName: String
     public var temperature: Double
     public var topP: Double
+    /// Keep only this many most-likely tokens. `0` disables the cut.
+    public var topK: Int
+    /// Drop tokens below this probability mass, relative to the best token. `0` disables.
+    public var minP: Double
+    /// Presence penalty, **in MLX's sign convention**: MLX *subtracts* this from a token's
+    /// logit, so a negative value discourages repeating a token that has already appeared.
+    /// (OpenAI's `presence_penalty` takes the same negative value in this convention; UIs
+    /// such as LM Studio show it as a positive magnitude.)
+    public var presencePenalty: Double?
+    /// Repetition penalty, a multiplier. `1.0` is neutral; above `1` penalises, below
+    /// `1` rewards.
+    public var repetitionPenalty: Double?
+    /// Maximum tokens to generate. When `thinkingBudget` is `0` this is the whole
+    /// output budget, thinking included.
     public var maxTokens: Int
-    /// Floor for tokens the model may spend thinking before it is pushed to answer.
+    /// Extra headroom granted for a reasoning block, on top of `maxTokens`.
+    ///
+    /// `0` means "`maxTokens` is the entire output budget", which is how the Qwen preset
+    /// below is configured. Raising it only makes sense for a seat whose budgeting is
+    /// tracked separately from its answer length.
     public var thinkingBudget: Int
     /// Whether this seat may call the web-search tools.
     public var webSearchEnabled: Bool
@@ -114,8 +136,12 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
         modelShortName: String = "Qwen3.5-4B-4bit",
         temperature: Double = 0.75,
         topP: Double = 0.95,
+        topK: Int = 0,
+        minP: Double = 0.0,
+        presencePenalty: Double? = nil,
+        repetitionPenalty: Double? = nil,
         maxTokens: Int = 1024,
-        thinkingBudget: Int = 2048,
+        thinkingBudget: Int = 0,
         webSearchEnabled: Bool = true,
         reasoning: ReasoningMode = .stream,
         persona: String = ""
@@ -126,6 +152,10 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
         self.modelShortName = modelShortName
         self.temperature = temperature
         self.topP = topP
+        self.topK = topK
+        self.minP = minP
+        self.presencePenalty = presencePenalty
+        self.repetitionPenalty = repetitionPenalty
         self.maxTokens = maxTokens
         self.thinkingBudget = thinkingBudget
         self.webSearchEnabled = webSearchEnabled
@@ -136,25 +166,70 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
     public static let defaultModelID = "mlx-community/Qwen3.5-4B-MLX-4bit"
 
 
-    /// Seat A — the default opening speaker.
-    public static func seatA(modelID: String = AgentSpec.defaultModelID) -> AgentSpec {
+    /// Sampling settings shared by every Qwen seat.
+    ///
+    /// Declared once and applied to both seats so the two models are configured
+    /// identically — the point of the experiment is to watch how they converse, not to
+    /// have them differ in sampler.
+    ///
+    /// | Setting | Value |
+    /// | --- | --- |
+    /// | Thinking | on (`enable_thinking: true`) |
+    /// | Temperature | 1.0 |
+    /// | Top P | 0.95 |
+    /// | Top K | 20 |
+    /// | Min P | 0.0 |
+    /// | Presence penalty | 1.5 (UI convention) → `-1.5` for MLX |
+    /// | Repetition penalty | 1.0 (neutral) |
+    /// | Max output tokens | 32,768 |
+    public enum QwenSampling {
+        public static let thinking = true
+        public static let temperature = 1.0
+        public static let topP = 0.95
+        public static let topK = 20
+        public static let minP = 0.0
+        /// Displayed as 1.5 in the UI. MLX *subtracts* the value it is given, so a
+        /// positive `1.5` would reward tokens already in the context — the opposite of a
+        /// presence penalty. The sign is flipped here, in one place.
+        public static let presencePenaltyMagnitude = 1.5
+        public static let presencePenalty = -presencePenaltyMagnitude
+        /// MLX multiplies by this, and `1.0` is neutral, so this is deliberately a no-op.
+        public static let repetitionPenalty = 1.0
+        public static let maxOutputTokens = 32_768
+    }
+
+    private static func qwen(
+        id: String,
+        modelID: String,
+        shortName: String
+    ) -> AgentSpec {
         AgentSpec(
-            id: "Agent A",
-            displayName: "Agent A",
-            modelID: modelID
+            id: id,
+            displayName: id,
+            modelID: modelID,
+            modelShortName: shortName,
+            temperature: QwenSampling.temperature,
+            topP: QwenSampling.topP,
+            topK: QwenSampling.topK,
+            minP: QwenSampling.minP,
+            presencePenalty: QwenSampling.presencePenalty,
+            repetitionPenalty: QwenSampling.repetitionPenalty,
+            maxTokens: QwenSampling.maxOutputTokens,
+            // `maxTokens` above is the whole output budget, thinking included.
+            thinkingBudget: 0,
+            reasoning: QwenSampling.thinking ? .stream : .off
         )
     }
 
-    /// Seat B — same weights as A by default, but a *separate* model instance with its
-    /// own sampling parameters. Change `modelID` here to mix in a different LLM.
+    /// Seat A — the default opening speaker.
+    public static func seatA(modelID: String = AgentSpec.defaultModelID) -> AgentSpec {
+        qwen(id: "Agent A", modelID: modelID, shortName: "Qwen3.5-4B-4bit")
+    }
+
+    /// Seat B — identical settings and, by default, identical weights to seat A, but a
+    /// *separate* model instance. Point `modelID` at another checkpoint to mix LLMs.
     public static func seatB(modelID: String = AgentSpec.defaultModelID) -> AgentSpec {
-        AgentSpec(
-            id: "Agent B",
-            displayName: "Agent B",
-            modelID: modelID,
-            temperature: 0.85,
-            topP: 0.95
-        )
+        qwen(id: "Agent B", modelID: modelID, shortName: "Qwen3.5-4B-4bit")
     }
 
     /// A separate instance of the same weights still deserves a distinct sampling

@@ -188,15 +188,22 @@ public actor MLXEngine: LLMEngine {
         let toolSpecs = tools.isEmpty ? nil : tools.map { Self.toolSpec(for: $0) }
         let toolRegistry = self.toolRegistry
 
-        // `maxTokens` is what the model may *emit*, thinking included; give the
-        // thinking block its own headroom so a long thought cannot eat the answer.
+        // `maxTokens` is what the model may emit, thinking included; `thinkingBudget` is
+        // extra headroom on top and is 0 for the Qwen preset, making maxTokens the whole
+        // budget. Sampling mirrors the seat's spec exactly.
         var mutableParameters = GenerateParameters(
             maxTokens: spec.thinkingBudget + spec.maxTokens,
             temperature: Float(spec.temperature),
             topP: Float(spec.topP),
+            topK: spec.topK,
+            minP: Float(spec.minP),
             seed: spec.samplingSeed
         )
-        mutableParameters.repetitionPenalty = 1.05
+        // Both penalties are optional in the spec; `nil` leaves MLX's default (off).
+        // Note MLX *subtracts* `presencePenalty`, so the spec stores it already signed.
+        mutableParameters.presencePenalty = spec.presencePenalty.map(Float.init)
+        mutableParameters.presenceContextSize = 256
+        mutableParameters.repetitionPenalty = spec.repetitionPenalty.map(Float.init)
         mutableParameters.repetitionContextSize = 256
         let parameters = mutableParameters
         let additionalContext = spec.reasoning.templateContext
@@ -214,6 +221,9 @@ public actor MLXEngine: LLMEngine {
 
         let emitReasoning = spec.reasoning == .stream
         var answer = ""
+        /// Set when this turn produced reasoning text, so an empty answer can be
+        /// explained as "ran out of budget while thinking" rather than silence.
+        var stripperSpentItsBudget = false
         var stats = TurnStats()
         let started = Date()
 
@@ -227,14 +237,16 @@ public actor MLXEngine: LLMEngine {
         // Nested functions capture their context by reference, which the compiler
         // correctly refuses to send across `await`. Returning the segment and folding
         // it here keeps every mutation in this actor's isolation.
-        func emit(_ segment: ThinkingStripper.Segment) async -> String {
+        // Reports one stripped segment. This is a nested function that only forwards
+        // events; it deliberately neither reads nor writes the turn's mutable state, which
+        // the compiler rejects across `await` (and which was a real data-race finding).
+        func report(_ segment: ThinkingStripper.Segment) async {
             if !segment.reasoning.isEmpty, emitReasoning {
                 await onEvent(.reasoning(agentID: agentID, text: segment.reasoning))
             }
             if !segment.answer.isEmpty {
                 await onEvent(.token(agentID: agentID, text: segment.answer))
             }
-            return segment.answer
         }
 
         // Both seats compute on the GPU. This is not a preference: Qwen 3.5's
@@ -276,7 +288,10 @@ public actor MLXEngine: LLMEngine {
                 try Task.checkCancellation()
                 switch generation {
                 case .chunk(let text):
-                    answer += await emit(stripper.process(text))
+                    let segment = stripper.process(text)
+                    if !segment.reasoning.isEmpty { stripperSpentItsBudget = true }
+                    answer += segment.answer
+                    await report(segment)
 
                 case .toolCall(let call):
                     toolCalls.append(call)
@@ -296,7 +311,10 @@ public actor MLXEngine: LLMEngine {
             }
 
             // A held-back partial delimiter must still be attributed to this round.
-            answer += await emit(stripper.finalize())
+            let tail = stripper.finalize()
+            if !tail.reasoning.isEmpty { stripperSpentItsBudget = true }
+            answer += tail.answer
+            await report(tail)
 
             guard !toolCalls.isEmpty, toolSpecs != nil, round < maxToolRounds else { break rounds }
             round += 1
@@ -333,12 +351,15 @@ public actor MLXEngine: LLMEngine {
         if stats.generationTokens == 0 {
             stats.seconds = Date().timeIntervalSince(started)
         }
-        if final.isEmpty, stats.stopReason == "length" {
+        // A reasoning model can burn the entire budget inside `<think>` and emit no
+        // answer at all. That is legitimate behaviour, not an error, but the user must be
+        // told — otherwise the pane just stays empty with no explanation.
+        if final.isEmpty, stripperSpentItsBudget {
             await onEvent(
                 .toolFailure(
                     agentID: agentID,
                     name: "generation",
-                    message: "the model spent its whole token budget without producing an answer — raise max tokens"
+                    message: "spent the whole \(spec.thinkingBudget + spec.maxTokens)-token budget thinking and produced no answer — raise the limit or turn thinking off"
                 )
             )
         }
@@ -353,9 +374,15 @@ public actor MLXEngine: LLMEngine {
         guard !didLogConfiguration else { return }
         didLogConfiguration = true
         let context = loadedContextWindow
+        let sampler = String(
+            format: "temp=%.2f topP=%.2f topK=%d minP=%.2f presence=%@ repetition=%@ maxOut=%d",
+            spec.temperature, spec.topP, spec.topK, spec.minP,
+            spec.presencePenalty.map { String(format: "%.2f", $0) } ?? "off",
+            spec.repetitionPenalty.map { String(format: "%.2f", $0) } ?? "off",
+            spec.thinkingBudget + spec.maxTokens)
         FileHandle.standardError.write(
             Data(
-                "[ChatBots] \(spec.id) \(spec.modelID) ready — context \(context) tok, reasoning \(spec.reasoning.rawValue)\n"
+                "[ChatBots] \(spec.id) \(spec.modelID) ready — context \(context) tok, reasoning \(spec.reasoning.rawValue)\n[ChatBots] \(spec.id) sampler: \(sampler)\n"
                     .utf8)
         )
     }

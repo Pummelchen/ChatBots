@@ -132,6 +132,40 @@ One thing worth knowing if you edit the layout: `.windowResizability(.contentMin
 combined with a fixed `.frame(...)` silently pins the window to exactly one size. The
 scene uses `.contentSize` and the content view declares minimums only.
 
+### Sampling settings
+
+Both seats ship with the same sampler, declared once in `AgentSpec.QwenSampling`:
+
+| Setting | Value |
+| --- | --- |
+| Thinking | on (`enable_thinking: true`) |
+| Temperature | 1.0 |
+| Top P | 0.95 |
+| Top K | 20 |
+| Min P | 0.0 |
+| Presence penalty | 1.5 (UI convention) |
+| Repetition penalty | 1.0 (neutral) |
+| Max output tokens | 32,768 |
+
+Two details worth knowing:
+
+* **Presence penalty is signed.** MLX *subtracts* the value it is given, so a positive
+  `1.5` would reward tokens already in the context — a repetition *bonus*. The preset
+  stores `-1.5`, which is what the UI's "1.5" means. The sign is flipped in exactly one
+  place (`QwenSampling.presencePenalty`) with a comment, and the pane header prints the
+  magnitude so it matches the number you asked for. Verified by log: `presence=-1.50`.
+* **Max output tokens is the whole budget, thinking included.** `thinkingBudget` is `0`,
+  so 32,768 is a single cap rather than 32,768 *plus* a thinking allowance. A reasoning
+  model can in principle spend all of it inside `<think>` and emit no answer; if that
+  happens the pane now says so explicitly instead of just staying empty.
+
+The effective sampler is printed to stderr once per seat at startup, so a run can be
+audited:
+
+```
+[ChatBots] Agent A sampler: temp=1.00 topP=0.95 topK=20 minP=0.00 presence=-1.50 repetition=1.00 maxOut=32768
+```
+
 ### Themes
 
 `Original` is the default and uses the system's dynamic colours, so it follows the Mac's

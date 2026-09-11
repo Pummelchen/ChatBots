@@ -52,10 +52,20 @@ struct ChatPane: View {
                 statusChip
             }
 
-            HStack(spacing: 10) {
+            HStack(spacing: 9) {
                 Label(String(format: "temp %.2f", pane.spec.temperature), systemImage: "thermometer.medium")
                 Label("top-p \(String(format: "%.2f", pane.spec.topP))", systemImage: "chart.bar")
-                Label("max \(pane.spec.maxTokens) tok", systemImage: "text.alignleft")
+                Label("top-k \(pane.spec.topK)", systemImage: "list.number")
+                Label("min-p \(String(format: "%.1f", pane.spec.minP))", systemImage: "line.diagonal")
+                if let presence = pane.spec.presencePenalty {
+                    // Shown as the UI magnitude (positive), not MLX's signed value.
+                    Label("pres \(String(format: "%.1f", abs(presence)))", systemImage: "arrow.uturn.backward")
+                        .help("Presence penalty \(String(format: "%.1f", abs(presence))) (stored as \(String(format: "%.2f", presence)) for MLX, which subtracts it)")
+                }
+                if let repetition = pane.spec.repetitionPenalty, repetition != 1.0 {
+                    Label("rep \(String(format: "%.2f", repetition))", systemImage: "repeat")
+                }
+                Label("max \(Format.tokens(pane.spec.maxTokens)) tok", systemImage: "text.alignleft")
                 if pane.spec.webSearchEnabled {
                     Label("web", systemImage: "globe")
                 }
