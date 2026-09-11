@@ -45,7 +45,11 @@ let package = Package(
         .executableTarget(
             name: "ChatBots",
             dependencies: ["ChatBotsCore"],
-            path: "Sources/ChatBotsApp"
+            path: "Sources/ChatBotsApp",
+            // The icon master travels with the app (usable at runtime, e.g. an About
+            // panel). The bundle's actual icon is the .icns, installed by
+            // tools/make-app.sh as CFBundleIconFile.
+            resources: [.copy("Resources/AppIcon-1024.png")]
         ),
 
         // MARK: - Headless verification

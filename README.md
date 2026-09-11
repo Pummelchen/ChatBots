@@ -578,6 +578,20 @@ false` on a seat to deny it tools entirely.
 
 ---
 
+## App icon
+
+The icon is the master artwork at `Sources/ChatBotsApp/Resources/AppIcon-1024.png`.
+`tools/make-app.sh` turns it into `AppIcon.icns` (every size macOS asks for, 16 pt to
+512 pt at 2×) and installs it as the bundle's `CFBundleIconFile`, so rebuilding the app is
+enough — there is no separate icon step.
+
+It is used **as drawn, not pre-masked**. macOS applies its own rounded mask to app icons,
+and this artwork already has a rounded square with a white ring around it, about 10% of the
+image in from each edge. Cropping to a transparent rounded rectangle would have meant
+cutting that tenth away and leaving a white sliver wherever the mask and the artwork did
+not line up exactly. Verified by asking the system for the finished app's icon
+(`NSWorkspace.icon(forFile:)`), which returns the artwork with macOS's mask applied.
+
 ## Where the models live
 
 Checkpoints are kept in **`models/` in the project folder**, not in the shared Hugging
