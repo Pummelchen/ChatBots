@@ -230,6 +230,41 @@ actually added: the persona library's defaults are picked by index rather than t
 four-way conversation, and the grid gives up draggable dividers (a grid cannot have them)
 in exchange for panes that stay legible.
 
+### Using cloud LLMs
+
+An **API** button in the bar opens endpoint settings, and a **Cloud only** switch skips the
+local models entirely. Each seat gets its own endpoint — a `/v1` URL, a model name, and a
+key — so the two seats can be different providers, or both the same server.
+
+```
+URL     https://api.openai.com/v1        (or http://localhost:1234, or any /v1)
+Model   gpt-4o-mini                      (whatever the provider calls it)
+API key sk-…                             (empty for a local server)
+```
+
+"Copy seat 1" mirrors one seat onto the rest, for the usual case of one server for both.
+Changes apply from each seat's next turn, so the sheet can be opened mid-conversation.
+Settings persist between launches, and `OPENAI_API_KEY` overrides the stored key.
+
+Two details that would otherwise cost you a confusing debugging session:
+
+* **Keys go in the macOS Keychain**, not in `UserDefaults` beside the rest of the settings.
+  A key sitting in a plist ends up in backups and in `defaults read`. If a strict endpoint
+  has no key, the seat says so instead of firing a request that can only 401.
+* **`Parameters` selects the vendor.** OpenAI validates strictly and rejects anything
+  outside its published schema, so `OpenAI (strict)` sends only standard fields — while
+  `Extended` also sends `top_k`, `min_p` and `repetition_penalty`, which LM Studio accepts
+  and OpenAI would 400 on. It is inferred from the URL and can be overridden.
+
+What you give up on an API seat: **web search**. `web_search` and `fetch_page` are
+dispatched in-process by the MLX engine, so an API-backed seat has no tools and both the
+pane and the API sheet say so.
+
+One behaviour worth knowing, which bites reasoning models specifically: the token cap
+covers thinking *and* the answer. On a 60-token budget a reasoning model spent all 571 of
+its tokens thinking and emitted nothing — the same failure the local backend has. Give
+cloud reasoning models room (`max output tokens` is 32,768 by default here).
+
 ### Two backends, selectable per seat
 
 Each seat runs on either engine, chosen from the `MLX ▾` control next to the persona:

@@ -37,6 +37,38 @@ public enum OpenAIResponsesError: LocalizedError, Sendable {
     }
 }
 
+/// Which parameters an endpoint will accept.
+///
+/// The Responses API's schema is fixed but not every implementation tolerates unknown
+/// keys: OpenAI itself validates strictly and rejects anything outside its schema, while
+/// local engines (LM Studio) accept extensions. Sending `top_k` to OpenAI is a 400, so the
+/// choice has to be explicit rather than assumed.
+public enum APICompatibility: String, Sendable, Codable, CaseIterable, Identifiable {
+    /// OpenAI proper: only parameters in the published schema.
+    case strict
+    /// Local engines: also send `top_k`, `min_p` and `repetition_penalty`.
+    case extended
+
+    public var id: String { rawValue }
+
+    public var label: String {
+        switch self {
+        case .strict: "OpenAI (strict)"
+        case .extended: "Extended (LM Studio et al.)"
+        }
+    }
+
+    /// A sensible default from the URL: anything that is not OpenAI is probably local.
+    public static func inferred(fromBaseURL baseURL: String) -> APICompatibility {
+        let lowered = baseURL.lowercased()
+        let isOpenAI =
+            lowered.contains("api.openai.com")
+            || lowered.contains("openai.azure.com")
+            || lowered.contains("openrouter.ai")
+        return isOpenAI ? .strict : .extended
+    }
+}
+
 /// Configuration for an OpenAI-compatible endpoint.
 public struct OpenAIEndpoint: Sendable, Hashable, Codable {
     /// Base URL without a path, e.g. `http://localhost:1234`. `/v1/responses` is appended.
@@ -46,15 +78,38 @@ public struct OpenAIEndpoint: Sendable, Hashable, Codable {
     public var model: String
     /// Optional bearer token. Local servers usually need none; OpenAI requires one.
     public var apiKey: String?
+    /// Which parameters this endpoint accepts.
+    public var compatibility: APICompatibility
 
     public init(
         baseURL: String = "http://localhost:1234",
         model: String = "mlx-community/Qwen3.5-4B-MLX-4bit",
-        apiKey: String? = nil
+        apiKey: String? = nil,
+        compatibility: APICompatibility? = nil
     ) {
         self.baseURL = baseURL
         self.model = model
         self.apiKey = apiKey
+        self.compatibility = compatibility ?? APICompatibility.inferred(fromBaseURL: baseURL)
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let baseURL = try container.decodeIfPresent(String.self, forKey: .baseURL) ?? "http://localhost:1234"
+        self.baseURL = baseURL
+        self.model =
+            try container.decodeIfPresent(String.self, forKey: .model)
+            ?? "mlx-community/Qwen3.5-4B-MLX-4bit"
+        self.apiKey = try container.decodeIfPresent(String.self, forKey: .apiKey)
+        // Older saved settings predate the field; infer from the URL.
+        self.compatibility =
+            try container.decodeIfPresent(APICompatibility.self, forKey: .compatibility)
+            ?? APICompatibility.inferred(fromBaseURL: baseURL)
+    }
+
+    /// True when a key is needed but missing, which is worth saying before a wasted request.
+    public var isMissingKey: Bool {
+        compatibility == .strict && (apiKey ?? "").isEmpty
     }
 
     /// The full endpoint, tolerating a base URL given with or without a trailing slash or
@@ -251,13 +306,18 @@ public struct OpenAIResponsesClient: Sendable {
     }
 
     /// `data: {...}` → `{...}`, or nil for comments, blank lines and other SSE fields.
-    static func dataPayload(from line: String) -> String? {
+    public static func dataPayload(from line: String) -> String? {
         guard line.hasPrefix("data:") else { return nil }
         let payload = line.dropFirst("data:".count).trimmingCharacters(in: .whitespaces)
         return payload.isEmpty ? nil : payload
     }
 
-    private func body(for request: Request) -> [String: Any] {
+    /// The JSON body for a request.
+    ///
+    /// Public so the shape actually put on the wire can be asserted in tests: whether the
+    /// local-only parameters are included is exactly the kind of detail that silently
+    /// breaks against a stricter server.
+    public func body(for request: Request) -> [String: Any] {
         var body: [String: Any] = [
             "model": endpoint.model,
             "input": request.input,
@@ -268,13 +328,18 @@ public struct OpenAIResponsesClient: Sendable {
         }
         if let temperature = request.temperature { body["temperature"] = temperature }
         if let topP = request.topP { body["top_p"] = topP }
-        if let topK = request.topK, topK > 0 { body["top_k"] = topK }
-        if let minP = request.minP { body["min_p"] = minP }
+        // Extensions: harmless where understood, a 400 on OpenAI proper.
+        if endpoint.compatibility == .extended {
+            if let topK = request.topK, topK > 0 { body["top_k"] = topK }
+            if let minP = request.minP { body["min_p"] = minP }
+        }
         // The Responses API uses OpenAI's sign convention for the presence penalty: a
         // positive value discourages repetition. The seat stores MLX's signed value, so it
         // is negated here — the mirror image of what MLXEngine does.
         if let presencePenalty = request.presencePenalty { body["presence_penalty"] = -presencePenalty }
-        if let repetitionPenalty = request.repetitionPenalty { body["repetition_penalty"] = repetitionPenalty }
+        if endpoint.compatibility == .extended, let repetitionPenalty = request.repetitionPenalty {
+            body["repetition_penalty"] = repetitionPenalty
+        }
         if let maxOutputTokens = request.maxOutputTokens {
             body["max_output_tokens"] = maxOutputTokens
         }
@@ -287,7 +352,7 @@ public struct OpenAIResponsesClient: Sendable {
         return body
     }
 
-    static func usage(from event: [String: Any]) -> OpenAIUsage {
+    public static func usage(from event: [String: Any]) -> OpenAIUsage {
         let response = event["response"] as? [String: Any] ?? event
         let usage = response["usage"] as? [String: Any] ?? [:]
         let inputDetails = usage["input_tokens_details"] as? [String: Any] ?? [:]
@@ -300,7 +365,7 @@ public struct OpenAIResponsesClient: Sendable {
         )
     }
 
-    static func failureMessage(from event: [String: Any]) -> String {
+    public static func failureMessage(from event: [String: Any]) -> String {
         let response = event["response"] as? [String: Any] ?? event
         if let error = response["error"] as? [String: Any],
             let message = error["message"] as? String

@@ -11,6 +11,7 @@ import SwiftUI
 @main
 struct ChatBotsApp: App {
     @StateObject private var controller = ChatController()
+    @StateObject private var endpoints = APIEndpointStore()
 
     init() {
         // Before any engine loads: point model storage at the project's `models/` folder
@@ -30,6 +31,9 @@ struct ChatBotsApp: App {
             ContentView(controller: controller)
                 .themePalette(theme.palette)
                 .environmentObject(theme)
+                .environmentObject(endpoints)
+                // Restore each seat's saved endpoint before any turn can run.
+                .task { controller.applyAPIEndpoints(endpoints) }
                 // The black theme is dark-only regardless of the Mac's setting; the
                 // original theme follows the system.
                 .preferredColorScheme(theme.mode == .black ? .dark : nil)

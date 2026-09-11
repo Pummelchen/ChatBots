@@ -49,6 +49,13 @@ public actor OpenAIResponsesEngine: LLMEngine {
 
     public func load() async throws {
         onStateChange(.loading(progress: 0))
+        // A strict endpoint with no key will only ever 401, so say so before trying.
+        if spec.openAI.isMissingKey {
+            let message =
+                "\(spec.openAI.baseURL) needs an API key — set one in the API sheet, or export OPENAI_API_KEY"
+            onStateChange(.failed(message))
+            throw OpenAIResponsesError.streamFailed(message)
+        }
         do {
             let models = try await availableModels()
             guard !models.isEmpty else {
@@ -214,12 +221,5 @@ extension ThinkingMode {
         case .medium: "medium"
         case .high, .unlimited: "high"
         }
-    }
-}
-
-extension AgentSpec {
-    /// Whether this seat's tools work on its backend. Used by the UI to warn honestly.
-    public var toolsWorkOnBackend: Bool {
-        backend == .mlx
     }
 }

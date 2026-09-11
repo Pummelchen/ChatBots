@@ -405,6 +405,32 @@ public final class ChatController: ObservableObject {
         pane(agentID)?.spec = spec
     }
 
+    /// Push every seat's configured endpoint into its engine.
+    ///
+    /// Called whenever the endpoint settings change and once at launch, so a seat is ready
+    /// before it is asked for a turn.
+    func applyAPIEndpoints(_ store: APIEndpointStore) {
+        for (index, pane) in panes.enumerated() {
+            engine.setEndpoint(store.endpoint(forSeat: index), for: pane.id)
+        }
+    }
+
+    /// Route every seat through the API, or back to the local models.
+    ///
+    /// The point of the API backend is that local weights need not be involved at all, so
+    /// this is a single switch rather than one per seat.
+    func useAPIForAllSeats(_ useAPI: Bool, store: APIEndpointStore) {
+        for pane in panes {
+            setBackend(useAPI ? .openAIResponses : .mlx, for: pane.id)
+        }
+        applyAPIEndpoints(store)
+    }
+
+    /// True when no seat is using the local MLX models.
+    public var isCloudOnly: Bool {
+        !panes.isEmpty && panes.allSatisfy { $0.spec.backend == .openAIResponses }
+    }
+
     public func warmUp(_ agentID: String) {
         errorBanner = nil
         guard let seatEngine = engine.seatEngine(for: agentID) else { return }

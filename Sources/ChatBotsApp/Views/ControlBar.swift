@@ -6,8 +6,10 @@ import SwiftUI
 struct ControlBar: View {
     @Environment(\.themePalette) private var palette
     @EnvironmentObject private var theme: ThemeStore
+    @EnvironmentObject private var endpoints: APIEndpointStore
     @ObservedObject var controller: ChatController
     @State private var showNotes = false
+    @State private var showEndpoints = false
 
     private var status: RunStatus { controller.status }
 
@@ -37,6 +39,28 @@ struct ControlBar: View {
                 }
 
                 Spacer(minLength: 0)
+
+                Toggle(isOn: cloudOnlyBinding) {
+                    Label("Cloud only", systemImage: "cloud")
+                        .font(.system(size: 11))
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .help("Skip the local models entirely and route every seat through its API endpoint")
+
+                Button {
+                    showEndpoints = true
+                } label: {
+                    Label("API", systemImage: "network")
+                        .font(.system(size: 11))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help("Configure an OpenAI-compatible /v1 endpoint per seat")
+                .sheet(isPresented: $showEndpoints) {
+                    APIEndpointsSheet(controller: controller) { showEndpoints = false }
+                        .environmentObject(endpoints)
+                }
 
                 Picker("Layout", selection: $theme.windowMode) {
                     ForEach(WindowMode.allCases) { mode in
@@ -158,6 +182,13 @@ struct ControlBar: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
         .background(palette.raised, in: Capsule())
+    }
+
+    private var cloudOnlyBinding: Binding<Bool> {
+        Binding(
+            get: { controller.isCloudOnly },
+            set: { controller.useAPIForAllSeats($0, store: endpoints) }
+        )
     }
 
     private var dotColour: Color {
