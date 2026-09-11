@@ -165,6 +165,18 @@ public actor OpenAIResponsesEngine: LLMEngine {
     // MARK: - Generation
 
     @discardableResult
+    /// Images the seat was given, refreshed by the orchestrator each turn.
+    public func setAttachments(_ documents: [AttachedDocument]) async {
+        images = documents.compactMap { document in
+            guard let mediaType = document.imageMediaType,
+                let base64 = document.imageBase64
+            else { return nil }
+            return OpenAIResponsesClient.ImageAttachment(mediaType: mediaType, base64: base64)
+        }
+    }
+
+    private var images: [OpenAIResponsesClient.ImageAttachment] = []
+
     public func generate(
         messages: [PromptMessage],
         tools: [any ToolProvider],
@@ -198,7 +210,8 @@ public actor OpenAIResponsesEngine: LLMEngine {
             repetitionPenalty: spec.repetitionPenalty,
             maxOutputTokens: spec.serverOutputCap,
             includeReasoning: spec.thinking.thinks,
-            reasoningEffort: spec.thinking.reasoningEffort
+            reasoningEffort: spec.thinking.reasoningEffort,
+            images: spec.visionSupport.allowsImages ? images : []
         )
 
         let client = OpenAIResponsesClient(endpoint: spec.openAI)

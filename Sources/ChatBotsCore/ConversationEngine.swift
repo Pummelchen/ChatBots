@@ -551,6 +551,10 @@ public final class ConversationEngine {
 
         // Built from the engine's live configuration, not the spec captured at
         // construction, so a persona or thinking change made in the UI takes effect here.
+        // The source material reaches a seat through two channels: text goes into the
+        // prompt, images go to the engine. Both are refreshed each turn so adding a file
+        // before the conversation starts is enough.
+        await seat.engine.setAttachments(conversation.attachments)
         let liveSpec = await seat.engine.currentSpec
         currentSpeakerName = liveSpec.displayName
         let prompt = PromptBuilder.prompt(

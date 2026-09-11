@@ -152,6 +152,33 @@ public struct AttachedDocument: Identifiable, Sendable, Equatable, Codable {
     }
 }
 
+extension AttachedDocument {
+    /// The media type for an attached image, from its bytes rather than its filename.
+    ///
+    /// The extension can lie — a `.png` that is really a JPEG is common — and servers
+    /// validate the declared type, so the magic bytes are what is believed.
+    public var imageMediaType: String? {
+        guard kind.isImage, let data = imageData, data.count >= 4 else { return nil }
+        let bytes = [UInt8](data.prefix(12))
+        if bytes.starts(with: [0x89, 0x50, 0x4E, 0x47]) { return "image/png" }
+        if bytes.starts(with: [0xFF, 0xD8, 0xFF]) { return "image/jpeg" }
+        if bytes.starts(with: [0x47, 0x49, 0x46, 0x38]) { return "image/gif" }
+        if bytes.starts(with: [0x42, 0x4D]) { return "image/bmp" }
+        if bytes.count >= 12, bytes[0..<4] == [0x52, 0x49, 0x46, 0x46],
+            bytes[8..<12] == [0x57, 0x45, 0x42, 0x50]
+        {
+            return "image/webp"
+        }
+        if bytes.starts(with: [0x49, 0x49, 0x2A, 0x00]) || bytes.starts(with: [0x4D, 0x4D, 0x00, 0x2A]) {
+            return "image/tiff"
+        }
+        return nil
+    }
+
+    /// The image as base64, for an API that takes a data URL.
+    public var imageBase64: String? { imageData?.base64EncodedString() }
+}
+
 /// Why a file could not be added.
 public enum DocumentError: LocalizedError, Equatable {
     case unsupportedType(String)

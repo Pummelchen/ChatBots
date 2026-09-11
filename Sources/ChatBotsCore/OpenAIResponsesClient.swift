@@ -169,6 +169,19 @@ public struct OpenAIResponsesClient: Sendable {
     /// Everything a request can set. Mirrors the app's seat configuration; fields the
     /// endpoint does not understand are simply included and ignored by servers that do
     /// not know them (the Responses API is extensible by design).
+    /// One attached image, ready to send.
+    public struct ImageAttachment: Sendable, Hashable {
+        public var mediaType: String
+        public var base64: String
+
+        public init(mediaType: String, base64: String) {
+            self.mediaType = mediaType
+            self.base64 = base64
+        }
+
+        public var dataURL: String { "data:\(mediaType);base64,\(base64)" }
+    }
+
     public struct Request: Sendable {
         public var instructions: String?
         public var input: String
@@ -187,6 +200,8 @@ public struct OpenAIResponsesClient: Sendable {
         /// LM Studio accepts a JSON-schema-ish `reasoning` object; `effort` maps to the
         /// app's thinking levels where supported.
         public var reasoningEffort: String?
+        /// Images to send with the prompt. Non-empty only for a seat that can see.
+        public var images: [ImageAttachment] = []
 
         public init(
             instructions: String? = nil,
@@ -199,7 +214,8 @@ public struct OpenAIResponsesClient: Sendable {
             repetitionPenalty: Double? = nil,
             maxOutputTokens: Int? = nil,
             includeReasoning: Bool = false,
-            reasoningEffort: String? = nil
+            reasoningEffort: String? = nil,
+            images: [ImageAttachment] = []
         ) {
             self.instructions = instructions
             self.input = input
@@ -212,6 +228,7 @@ public struct OpenAIResponsesClient: Sendable {
             self.maxOutputTokens = maxOutputTokens
             self.includeReasoning = includeReasoning
             self.reasoningEffort = reasoningEffort
+            self.images = images
         }
     }
 
@@ -381,10 +398,26 @@ public struct OpenAIResponsesClient: Sendable {
     /// Public so the shape actually put on the wire can be asserted in tests: whether the
     /// local-only parameters are included is exactly the kind of detail that silently
     /// breaks against a stricter server.
+    /// The `input` field: a plain string, or content blocks when an image is attached.
+    ///
+    /// Images cannot travel in a string, so the whole input has to change shape — a message
+    /// array whose user turn carries `input_text` and `input_image` parts. Sent as a data URL
+    /// so there is no second request and no file the server has to be able to reach.
+    static func encodeInput(_ text: String, images: [ImageAttachment]) -> Any {
+        guard !images.isEmpty else { return text }
+        var content: [[String: Any]] = [
+            ["type": "input_text", "text": text]
+        ]
+        for image in images {
+            content.append(["type": "input_image", "image_url": image.dataURL])
+        }
+        return [["role": "user", "content": content]]
+    }
+
     public func body(for request: Request) -> [String: Any] {
         var body: [String: Any] = [
             "model": endpoint.model,
-            "input": request.input,
+            "input": Self.encodeInput(request.input, images: request.images),
             "stream": true,
         ]
         if let instructions = request.instructions, !instructions.isEmpty {

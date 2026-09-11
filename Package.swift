@@ -32,6 +32,9 @@ let package = Package(
             name: "ChatBotsCore",
             dependencies: [
                 .product(name: "MLXLLM", package: "mlx-swift-lm"),
+                // The vision side of the same library: a checkpoint with a vision tower is
+                // loaded through this so images can actually be turned into model input.
+                .product(name: "MLXVLM", package: "mlx-swift-lm"),
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
                 .product(name: "MLXHuggingFace", package: "mlx-swift-lm"),
                 .product(name: "HuggingFace", package: "swift-huggingface"),

@@ -216,14 +216,36 @@ An unrecognised API model counts as *unknown*, not as supported: the interface d
 offer images on a guess. Images are read as bytes and kept as-is — no conversion is
 attempted, since there is nothing to convert them to that would cost less.
 
-**Status: image *detection* is complete, image *transmission* is not.** The capability
-answer above is real and decides whether the image formats appear in the open panel, and an
-image that is added is extracted, stored, persisted and shown on its chip. What is not yet
-wired up is sending the bytes: the API path needs an `input_image` content block in the
-request, and the local path needs its engine to load through `VLMModelFactory` and pass a
-`UserInput` carrying the image rather than a plain text prompt. Until then an image sits in
-the source list without reaching the models, so **prefer documents** — they are the cheaper
-path anyway, and they already work.
+#### Status: images now reach the models
+
+Both paths send the bytes:
+
+* **Local (MLX)** — the checkpoint declares a vision tower (297 vision tensors), and it is
+  now loaded through `VLMModelFactory` rather than the text factory. That was the missing
+  step: the container loaded fine before, it simply had no image processor, so images could
+  never become input. The image rides on the user message as `UserInput.Image`, decoded from
+  bytes on the model's side of the actor boundary.
+* **API** — with an image attached, `input` becomes content blocks (`input_text` +
+  `input_image` with a base64 data URL) instead of a bare string. With no image it stays a
+  string, so nothing changes for text-only models.
+
+Verified by hand rather than asserted: a drawn green triangle on cream produced "A green
+triangle on a pale background", and a red circle produced "A circle, red". The control run —
+the same question with no image — answered that it could not see one, which is what rules out
+a lucky guess. Both seats see it, and refer to it in the conversation.
+
+Two limits worth knowing:
+
+* **A server accepting `input_image` does not mean the model can see.** DeepSeek accepts the
+  parameter and then replies "I cannot view the image." Nothing in the API reports this, so
+  the app still relies on the capability detection above; if a seat is wrongly thought able
+  to see, images are sent and ignored rather than visibly failing.
+* **The media type is read from the image's magic bytes, not its filename**, because a JPEG
+  named `.png` is common and servers validate the declared type.
+
+Historical note — before this, image *detection* was complete and image *transmission* was
+not, which is worth recording because the interface looked identical either way: the interface showed an image on its chip either way, so
+whether it reached the model was invisible.
 
 Material is kept with the preferences, so it survives a relaunch without being re-read —
 and the extraction is the slow part. **Clear** keeps the source material, so starting the

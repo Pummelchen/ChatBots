@@ -29,6 +29,7 @@ struct Options {
     var serve = false
     var mode = DiscussionMode.entertainment
     var listCharacters = false
+    var attachments: [String] = []
     var listRoles = false
     var port = 7788
     var contextWindow: Int?
@@ -91,6 +92,7 @@ struct Options {
             case "--export-sample": options.exportSample = true
             case "--check": options.check = true
             case "--serve": options.serve = true
+            case "--attach": options.attachments.append(next() ?? "")
             case "--list-characters": options.listCharacters = true
             case "--list-roles": options.listRoles = true
             case "--mode":
@@ -467,6 +469,24 @@ if options.serve {
         ConversationEngine.Seat(spec: spec, mlx: mlx, openAI: OpenAIResponsesEngine(spec: spec))
     }
     let engine = ConversationEngine(seats: seats, configuration: configuration)
+
+// Source material, read the same way the app reads it.
+if !options.attachments.isEmpty {
+    DocumentIngestorProvider.install(SystemDocumentExtractor.ingestor)
+    let (documents, failures) = SystemDocumentExtractor.add(
+        urls: options.attachments.map { URL(fileURLWithPath: $0) })
+    for failure in failures { log("  attachment refused: \(failure)") }
+    guard engine.setAttachments(documents) else {
+        log("  attachments must be added before the conversation starts")
+        exit(2)
+    }
+    for document in documents {
+        log("  attached: \(document.name) — \(document.summary)")
+    }
+    if documents.contains(where: { $0.kind.isImage }) {
+        log("  images allowed: \(engine.allSeatsSupportVision)")
+    }
+}
     if !options.topic.isEmpty { _ = engine.setTopic(options.topic) }
     for (index, spec) in specs.enumerated() where engine.attachments.isEmpty {
         _ = index
@@ -532,6 +552,24 @@ let seats = zip(specs, engines).map { spec, mlx in
     )
 }
 let engine = ConversationEngine(seats: seats, configuration: configuration)
+
+// Source material, read the same way the app reads it.
+if !options.attachments.isEmpty {
+    DocumentIngestorProvider.install(SystemDocumentExtractor.ingestor)
+    let (documents, failures) = SystemDocumentExtractor.add(
+        urls: options.attachments.map { URL(fileURLWithPath: $0) })
+    for failure in failures { log("  attachment refused: \(failure)") }
+    guard engine.setAttachments(documents) else {
+        log("  attachments must be added before the conversation starts")
+        exit(2)
+    }
+    for document in documents {
+        log("  attached: \(document.name) — \(document.summary)")
+    }
+    if documents.contains(where: { $0.kind.isImage }) {
+        log("  images allowed: \(engine.allSeatsSupportVision)")
+    }
+}
 
 // Render the log as it grows, printing each entry once.
 var printedTurnIDs = Set<UUID>()

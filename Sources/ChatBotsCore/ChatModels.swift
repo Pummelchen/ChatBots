@@ -573,6 +573,12 @@ public protocol LLMEngine: Sendable {
     /// Rename this seat. Takes effect on its next turn, and on what the models are told
     /// each participant is called.
     func setDisplayName(_ name: String) async
+    /// Give this seat the moderator's source material.
+    ///
+    /// Only images matter to an engine — text documents reach the model through the prompt —
+    /// and an engine that cannot see simply ignores them, which is the same thing as a seat
+    /// whose model has no vision.
+    func setAttachments(_ documents: [AttachedDocument]) async
     /// Ask this seat to condense a transcript into a compact digest.
     ///
     /// Used to reclaim context without losing what was said. Implementations must not use
@@ -606,6 +612,7 @@ extension LLMEngine {
     public func setThinking(_ mode: ThinkingMode) async {}
     public func setPersona(_ personaID: String) async {}
     public func setDisplayName(_ name: String) async {}
+    public func setAttachments(_ documents: [AttachedDocument]) async {}
 
     /// Engines that cannot summarise simply decline.
     public func compact(prompt: String, maxTokens: Int) async throws -> String { "" }

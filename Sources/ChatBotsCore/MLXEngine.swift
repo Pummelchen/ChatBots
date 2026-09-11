@@ -9,10 +9,12 @@
 // downloader and a `swift-transformers` tokenizer for a model id. Weights are cached
 // by the hub client, so the second `load()` on an already-downloaded model is local.
 
+import CoreImage
 import Foundation
 import HuggingFace
 import MLXLLM
 import MLXLMCommon
+import MLXVLM
 import MLXHuggingFace
 import Tokenizers
 
@@ -77,6 +79,24 @@ public actor MLXEngine: LLMEngine {
     /// Rename this seat. Takes effect on its next turn.
     public func setDisplayName(_ name: String) {
         currentDisplayName = name
+    }
+
+    /// The moderator's images, as raw bytes.
+    ///
+    /// Bytes rather than `CIImage`/`UserInput.Image` because neither is `Sendable`, and the
+    /// generate path crosses into the model's own isolation. `Data` crosses cleanly and is
+    /// decoded on the far side, where the image is going to be used anyway.
+    private var imageData: [Data] = []
+
+    public func setAttachments(_ documents: [AttachedDocument]) async {
+        imageData = documents.filter { $0.kind.isImage }.compactMap { document in
+            guard let data = document.imageData, CIImage(data: data) != nil else {
+                FileHandle.standardError.write(
+                    Data("[ChatBots] \(spec.id) could not read the attached image \(document.name)\n".utf8))
+                return nil
+            }
+            return data
+        }
     }
 
     /// The style this seat will use on its next turn.
@@ -149,6 +169,15 @@ public actor MLXEngine: LLMEngine {
                     FileHandle.standardError.write(
                         Data("[ChatBots] \(spec.id) loading \(spec.modelID) from \(local.path)\n".utf8))
                     let tokenizerLoader: any TokenizerLoader = #huggingFaceTokenizerLoader()
+                    // A checkpoint with a vision tower is loaded through the vision factory,
+                    // which assembles the same `ModelContainer` but also builds the image
+                    // processor. Loading a vision checkpoint through the text factory is
+                    // what left images unusable before: the container was fine, it simply
+                    // had no way to turn bytes into the patches the model expects.
+                    if ModelStore.declaresVision(for: spec.modelID) == true {
+                        return try await VLMModelFactory.shared.loadContainer(
+                            from: local, using: tokenizerLoader)
+                    }
                     return try await LLMModelFactory.shared.loadContainer(
                         from: local, using: tokenizerLoader)
                 }
@@ -397,16 +426,35 @@ public actor MLXEngine: LLMEngine {
         // anyway). Apple GPUs are shared, so two seats coexist; when they generate at
         // the same time they time-share rather than overlap. The orchestrator's turn
         // loop is sequential, so in practice one seat is always idle.
+        var isToolRound = false
         rounds: while true {
             reasoningTokens = 0
             repetition = RepetitionDetector()
             let entriesForRound = promptEntries
+            // Captured before the closure: `container.perform` runs off the actor, so it can
+            // see neither the engine's properties nor a mutable local.
+            let imagesForRound: [Data] = isToolRound ? [] : imageData
             let stream = await container.perform {
                 context -> AsyncThrowingStream<Generation, Error> in
-                let messagesForRound = entriesForRound.map { entry in
-                    Chat.Message(
+                // Images ride on the user message itself. They are attached only while the
+                // prompt is still the opening one: after a tool round the log already
+                // contains the image turn, and re-sending it would both duplicate it in the
+                // KV cache and confuse a template that expects one image token run.
+                let attachImages = !imagesForRound.isEmpty
+                var lastUserIndex: Int? = attachImages
+                    ? entriesForRound.lastIndex { $0.role == "user" } : nil
+                // Decoded here, inside the model's isolation, from bytes that crossed it.
+                let decodedImages: [UserInput.Image] = imagesForRound.compactMap { data in
+                    CIImage(data: data).map { UserInput.Image.ciImage($0) }
+                }
+
+                let messagesForRound = entriesForRound.enumerated().map { index, entry in
+                    let isImageHost = lastUserIndex == index
+                    if isImageHost { lastUserIndex = nil }
+                    return Chat.Message(
                         role: Chat.Message.Role(rawValue: entry.role) ?? .user,
                         content: entry.content,
+                        images: isImageHost ? decodedImages : [],
                         tool: entry.toolResultID.map { .result(id: $0) }
                             ?? (entry.toolCalls.isEmpty ? nil : .calls(entry.toolCalls))
                     )
