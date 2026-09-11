@@ -86,7 +86,14 @@ public final class WebTransportEngineServer {
             // Loopback only, which is also what the self-signed identity requires. A
             // certificate nobody can verify must not be reachable from the network.
             localOnly: true,
-            identity: .pkcs12(data: identity.pkcs12, passphrase: identity.passphrase),
+            // The prompt-free path. A PKCS#12 bundle would be resolved with
+            // `SecPKCS12Import`, which reaches into the login keychain and asks for its
+            // password on every launch; the certificate-chain form builds the identity with
+            // `SecIdentityCreate` from bytes we already hold, and touches nothing.
+            identity: .certificateChain(
+                chainDER: identity.certificateChainDER,
+                privateKeyDER: identity.privateKeyDER,
+                keyKind: .rsa(sizeInBits: 2048)),
             admission: .default,
             transportLimits: .default)
 
