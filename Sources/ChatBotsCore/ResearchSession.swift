@@ -100,6 +100,14 @@ public enum ResearchStop: String, Sendable, Hashable, Codable {
     /// The remaining disagreement is one more discussion cannot settle — a missing
     /// measurement, not a failure to communicate.
     case evidenceExhausted
+    /// Every part of the question has been addressed and nothing is left in dispute.
+    ///
+    /// Not derived from the counters, because it is not a fact about how much has been spent
+    /// but about what has been covered: the moderator reads the transcript and finds nothing it
+    /// would point the room at. Reaching this before the budget is the point of having a
+    /// moderator at all — spending the remaining rounds restating findings nobody disputes is
+    /// the failure the moderator exists to prevent.
+    case answered
     /// The moderator stopped it.
     case stoppedByModerator
 
@@ -116,6 +124,8 @@ public enum ResearchStop: String, Sendable, Hashable, Codable {
         case .converged: "The analysts have converged and further discussion is not adding anything."
         case .evidenceExhausted:
             "What remains in dispute cannot be settled by more discussion — it needs evidence nobody has gathered."
+        case .answered:
+            "Every part of the question has been addressed and nothing remains in dispute."
         case .stoppedByModerator: "The moderator stopped the investigation."
         }
     }
@@ -169,9 +179,16 @@ public struct ResearchSession: Sendable, Hashable, Codable {
     }
 
     /// End the session by hand.
-    public mutating func stopByModerator() {
-        guard stop == .running else { return }
-        stop = .stoppedByModerator
+    public mutating func stopByModerator() { finish(.stoppedByModerator) }
+
+    /// End the session for a reason the counters cannot see.
+    ///
+    /// A latch rather than a returned value, so the reason survives to the report: "the
+    /// moderator found nothing left to ask" has to reach the reader, and a stop that is only
+    /// computed at the moment of checking would be lost by the next turn.
+    public mutating func finish(_ reason: ResearchStop) {
+        guard stop == .running, reason != .running else { return }
+        stop = reason
     }
 
     /// Whether the session is over, checking the clock as well as the counters.

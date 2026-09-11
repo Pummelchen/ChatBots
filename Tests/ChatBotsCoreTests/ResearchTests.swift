@@ -327,3 +327,129 @@ struct SynthesisPromptTests {
         #expect(prompt.contains("[Agent 1] a distinctive claim"))
     }
 }
+
+// MARK: - Traceability
+
+@Suite("A report's claims can be traced to an analyst")
+struct ReportAttributionTests {
+
+    private let analysts = ["Economist", "Statistician", "Legal Analyst"]
+
+    private func report(_ body: String) -> ResearchReport {
+        ResearchReporting.parse(
+            body,
+            question: "A question",
+            participants: analysts,
+            stopReason: "the budget was reached",
+            budgetSummary: "quick",
+            rounds: 3,
+            searches: 0)
+    }
+
+    @Test("A trailing attribution names the analyst")
+    func trailingAttribution() {
+        let parsed = report(
+            """
+            ## Key Findings
+
+            - FACT: registrations rose 18 percent — Economist
+            - SOURCED: the filing puts capital cost at 4,200 euros (Economist)
+            - INFERENCE: the interval includes flat growth [Statistician]
+            """)
+        let findings = parsed.sections.first { $0.title == "Key Findings" }
+        #expect(findings?.statements.map(\.attribution) == ["Economist", "Economist", "Statistician"])
+        #expect(parsed.isTraceable)
+    }
+
+    @Test("A single analyst named in the sentence is an attribution")
+    func nameInTheSentence() {
+        let parsed = report(
+            """
+            ## Evidence
+
+            - FACT: the Statistician's sample was drawn from one registry.
+            """)
+        #expect(parsed.sections.first?.statements.first?.attribution == "Statistician")
+    }
+
+    @Test("Two analysts in one sentence is left unattributed rather than guessed between")
+    func twoNamesAreNotAGuess() {
+        let parsed = report(
+            """
+            ## Evidence
+
+            - INFERENCE: the Economist and the Statistician disagree about the interval.
+            """)
+        #expect(parsed.sections.first?.statements.first?.attribution == nil)
+        #expect(parsed.unattributedStatements == 1)
+    }
+
+    @Test("Prose after a dash is not read as a name")
+    func proseIsNotAName() {
+        // The failure this guards against is the worst one available: manufacturing an invented
+        // attribution out of ordinary prose, and then reporting it as a fabrication.
+        let parsed = report(
+            """
+            ## Assumptions
+
+            - ASSUMPTION: the plan is funded - the capital cost was never measured
+            - OPINION: entry is unattractive — the capital cost was never measured
+            """)
+        let assumptions = parsed.sections.first
+        #expect(assumptions?.statements.allSatisfy { $0.attribution == nil } == true)
+        #expect(parsed.inventedAttributions.isEmpty)
+    }
+
+    @Test("A claim attributed to somebody who was not in the room is named as such")
+    func inventedAttribution() {
+        let parsed = report(
+            """
+            ## Key Findings
+
+            - SOURCED: the market is growing 20 percent a year — Dr Smith
+            - FACT: the filing is two years old — Economist
+            """)
+        #expect(parsed.inventedAttributions == ["Dr Smith"])
+        #expect(parsed.isTraceable == false)
+        #expect(parsed.unattributedStatements == 0)
+        let markdown = parsed.markdown()
+        #expect(markdown.contains("Dr Smith (not an analyst)"))
+        #expect(markdown.contains("not among the analysts"))
+    }
+
+    @Test("An unattributed claim is marked rather than silently kept")
+    func unattributedIsVisible() {
+        let parsed = report(
+            """
+            ## Key Findings
+
+            - FACT: registration data rose.
+            - FACT: margins fell — Economist
+            """)
+        #expect(parsed.unattributedStatements == 1)
+        #expect(parsed.isTraceable == false)
+        let markdown = parsed.markdown()
+        #expect(markdown.contains("— unattributed"))
+        #expect(markdown.contains("1 of 2 claims name no analyst"))
+    }
+
+    @Test("A fully attributed report carries no traceability warning")
+    func aCleanReportSaysNothing() {
+        let parsed = report(
+            """
+            ## Key Findings
+
+            - FACT: registrations rose — Economist
+            - SOURCED: the filing puts cost at 4,200 euros — Economist
+            """)
+        #expect(parsed.isTraceable)
+        #expect(!parsed.markdown().contains("**Traceability.**"))
+    }
+
+    @Test("A report with no labels at all is not called traceable")
+    func anUnlabelledReportIsNotTraceable() {
+        let parsed = report("## Executive Summary\n\nEntry looks unattractive.")
+        #expect(parsed.labelledStatements == 0)
+        #expect(parsed.isTraceable == false)
+    }
+}

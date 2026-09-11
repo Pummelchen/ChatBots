@@ -702,6 +702,23 @@ public final class ConversationEngine {
                 break
             }
 
+            // And it stops when the moderator has nothing left to point at, whether or not the
+            // budget would have allowed more. The moderator's own decision criteria say it
+            // concludes when the sub-questions are addressed and further work would not move
+            // the answer; that is a better reason to stop than a clock, and it is the whole
+            // point of having a moderator rather than a timer. Guarded on `rounds > 0` so a
+            // session cannot conclude before anyone has spoken.
+            if let session = conversation.research, session.rounds > 0,
+                !ResearchReading.read(seats: specs, turns: conversation.turns).hasOpenWork
+            {
+                conversation.research?.finish(.answered)
+                let reason = ResearchStop.answered
+                note("Research finished — \(reason.explanation)")
+                await writeReport(reason: reason)
+                setStatus(.limitReached)
+                break
+            }
+
             if turnsCompleted >= configuration.maxTurns {
                 note(
                     "Turn limit (\(configuration.maxTurns)) reached — steer, raise the limit, or clear."

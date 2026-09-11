@@ -241,7 +241,6 @@ extension StoredConversation {
     }
 
     public func conversation() -> Conversation {
-        var rebuilt = Conversation(topic: topic, turns: turns_)
-        return rebuilt
+        Conversation(topic: topic, turns: turns_)
     }
 }

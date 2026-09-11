@@ -54,6 +54,12 @@ public struct ResearchStatement: Sendable, Hashable, Codable {
     /// The claim itself.
     public var text: String
     /// Which analyst produced it, so the report identifies who to ask.
+    ///
+    /// Filled by the parser from the ways a writer actually attributes a claim — a trailing
+    /// "— Economist", a "(Statistician)", or a single analyst named in the sentence. It is the
+    /// name **as written**, which may be somebody who was not in the room; whether it names a
+    /// real analyst is a question about the report rather than about the statement, because it
+    /// needs the participant list, so it is answered by `ResearchReport.inventedAttributions`.
     public var attribution: String?
 
     public init(basis: Basis, text: String, attribution: String? = nil) {
@@ -156,6 +162,53 @@ public struct ResearchReport: Sendable, Hashable, Codable {
         return Self.requiredSections.filter { !present.contains($0) }
     }
 
+    // MARK: Traceability
+
+    /// Claims that name nobody, so the reader cannot tell who to ask about them.
+    ///
+    /// The moderator's evidence standard is that every finding must be traceable to a named
+    /// analyst. A synthesis is the one document where an unattributed claim is dangerous: it
+    /// reads exactly like a finding, and there is no analyst behind it to check with.
+    public var unattributedStatements: Int {
+        sections.reduce(0) { total, section in
+            total + section.statements.filter { $0.attribution == nil }.count
+        }
+    }
+
+    /// Attributions naming somebody who was not among the analysts, in the order they appear.
+    ///
+    /// A model asked to attribute its findings will sometimes supply a plausible author. Naming
+    /// them is the point: an invented attribution is worse than none, because it looks like
+    /// provenance.
+    public var inventedAttributions: [String] {
+        let known = Set(participants.map { $0.lowercased() })
+        var seen: [String] = []
+        for section in sections {
+            for statement in section.statements {
+                guard let who = statement.attribution, !known.contains(who.lowercased()),
+                    !seen.contains(where: { $0.lowercased() == who.lowercased() })
+                else { continue }
+                seen.append(who)
+            }
+        }
+        return seen
+    }
+
+    /// Whether every claim can be traced to an analyst who was actually there.
+    public var isTraceable: Bool {
+        labelledStatements > 0 && unattributedStatements == 0 && inventedAttributions.isEmpty
+    }
+
+    /// How a claim's author is shown beside it, if it has one worth showing.
+    ///
+    /// An unreadable author is printed rather than hidden: silently dropping it would leave the
+    /// reader unable to see that the model tried to attribute the claim and got it wrong.
+    func attributionSuffix(for statement: ResearchStatement) -> String {
+        guard let who = statement.attribution else { return " _— unattributed_" }
+        let known = participants.contains { $0.lowercased() == who.lowercased() }
+        return known ? " _— \(who)_" : " _— \(who) (not an analyst)_"
+    }
+
     /// The report as markdown, which is what a front end shows and what Save writes.
     ///
     /// Markdown rather than plain text because the sections and the labels are structure, and
@@ -171,6 +224,24 @@ public struct ResearchReport: Sendable, Hashable, Codable {
         }
 
         out += "---\n\n"
+        if !isTraceable {
+            // Stated before the findings rather than after them: a reader who has already
+            // trusted a claim is not helped by learning at the bottom that it has no author.
+            out += "**Traceability.** "
+            var problems: [String] = []
+            if unattributedStatements > 0 {
+                problems.append(
+                    "\(unattributedStatements) of \(labelledStatements) claims name no analyst, "
+                        + "so there is nobody to check them with")
+            }
+            if !inventedAttributions.isEmpty {
+                problems.append(
+                    "these claims name somebody who was not among the analysts: "
+                        + inventedAttributions.joined(separator: ", "))
+            }
+            out += problems.joined(separator: "; ") + ".\n\n"
+        }
+
         out += "**Claim labels.** "
         out += ResearchStatement.Basis.allCases
             .map { "\($0.rawValue) = \($0.explanation)" }
@@ -180,7 +251,7 @@ public struct ResearchReport: Sendable, Hashable, Codable {
         for section in sections where !section.isEmpty {
             out += "## \(section.title)\n\n"
             for statement in section.statements {
-                let who = statement.attribution.map { " _— \($0)_" } ?? ""
+                let who = attributionSuffix(for: statement)
                 out += "- **\(statement.basis.rawValue):** \(statement.text)\(who)\n"
             }
             for line in section.lines {
@@ -304,7 +375,7 @@ public enum ResearchReporting {
                 : line
             if body.isEmpty { continue }
 
-            if let statement = parseStatement(body) {
+            if let statement = parseStatement(body, participants: participants) {
                 currentStatements.append(statement)
             } else {
                 currentLines.append(body)
@@ -362,7 +433,7 @@ public enum ResearchReporting {
     }
 
     /// Read a label off the front of a claim, if there is one.
-    static func parseStatement(_ body: String) -> ResearchStatement? {
+    static func parseStatement(_ body: String, participants: [String] = []) -> ResearchStatement? {
         // Strip the markdown emphasis the prompt's own example uses, so "**FACT:**" and
         // "FACT:" are both understood.
         let cleaned = body
@@ -376,6 +447,71 @@ public enum ResearchReporting {
         guard let basis = ResearchStatement.Basis(rawValue: label) else { return nil }
         let text = cleaned[cleaned.index(after: colon)...].trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return nil }
-        return ResearchStatement(basis: basis, text: text)
+        return ResearchStatement(
+            basis: basis, text: text, attribution: attribution(in: text, participants: participants))
+    }
+
+    // MARK: Reading an attribution out of a claim
+
+    /// Who a claim is attributed to, from the ways a writer actually attributes one.
+    ///
+    /// Tolerant, for the same reason the rest of the parser is: a model that attributes in a
+    /// shape nobody anticipated still produced a claim worth keeping, and the worst outcome is
+    /// calling it unattributed rather than losing it. What the parser will not do is guess
+    /// between two named analysts — a claim that mentions the Economist and the Statistician is
+    /// left unattributed, because picking one would be inventing provenance rather than reading
+    /// it.
+    static func attribution(in text: String, participants: [String]) -> String? {
+        guard !participants.isEmpty else { return nil }
+
+        // A trailing slot is unambiguous, and wins over a name in the body: a claim can discuss
+        // several analysts and still end with "— Economist".
+        if let trailing = trailingAttribution(in: text) {
+            return participants.first { $0.lowercased() == trailing.lowercased() } ?? trailing
+        }
+
+        let lowered = text.lowercased()
+        let mentioned = participants.filter { lowered.contains($0.lowercased()) }
+        return mentioned.count == 1 ? mentioned[0] : nil
+    }
+
+    /// A name in a trailing slot: "… — Economist", "… (Economist)", "… [Economist]".
+    private static func trailingAttribution(in text: String) -> String? {
+        var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        while let last = trimmed.last, ".,;:!?".contains(last) { trimmed.removeLast() }
+
+        if let last = trimmed.last, last == "]" || last == ")" {
+            let open: Character = last == "]" ? "[" : "("
+            if let start = trimmed.lastIndex(of: open) {
+                let inner = String(trimmed[trimmed.index(after: start)..<trimmed.index(before: trimmed.endIndex)])
+                let candidate = inner.trimmingCharacters(in: .whitespaces)
+                if isNameLike(candidate) { return candidate }
+            }
+        }
+
+        // An em dash or en dash, which is what a writer reaches for to hang an attribution off
+        // a sentence. A plain hyphen is not accepted: "cost - return trade-off" ends in prose,
+        // and reading that as a name would manufacture an invented attribution out of nothing.
+        for dash in ["—", "–"] {
+            guard let range = trimmed.range(of: dash, options: .backwards) else { continue }
+            let candidate = String(trimmed[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+            if isNameLike(candidate) { return candidate }
+        }
+        return nil
+    }
+
+    /// Whether a trailing fragment reads as a name rather than as the rest of a sentence.
+    ///
+    /// Every word capitalised, at most four of them, no sentence punctuation. This is the check
+    /// that keeps "— the capital cost was never measured" from being read as an analyst called
+    /// "the capital cost was never measured".
+    private static func isNameLike(_ candidate: String) -> Bool {
+        guard !candidate.isEmpty, candidate.count <= 60 else { return false }
+        guard !candidate.contains("."), !candidate.contains(","), !candidate.contains(";") else {
+            return false
+        }
+        let words = candidate.split(separator: " ")
+        guard (1...4).contains(words.count) else { return false }
+        return words.allSatisfy { $0.first?.isUppercase == true }
     }
 }

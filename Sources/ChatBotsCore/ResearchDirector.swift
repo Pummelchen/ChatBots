@@ -301,6 +301,25 @@ public struct ResearchDirector: Sendable {
         ResearchSubQuestion.allCases.first { (covered[$0] ?? []).isEmpty }
     }
 
+    /// Whether the moderator has anything left that it would point the room at.
+    ///
+    /// Deliberately *not* the same question as `direction().seatID == nil`. That is nil in two
+    /// different situations — the investigation is complete, or the only analyst who fits the
+    /// open question has just spoken — and they need opposite answers. "Not now" must not end a
+    /// research session; "nothing left" is the best reason there is to end one.
+    ///
+    /// The bar is deliberately high: every one of the ten subjects covered, no unsupported
+    /// claim outstanding, no live disagreement, and nobody sitting idle. A run that clears all
+    /// four has genuinely answered the question, and spending its remaining budget would only
+    /// restate findings nobody disputes.
+    public var hasOpenWork: Bool {
+        if !unsupported.isEmpty { return true }
+        if conflicts.contains(where: { !settled.contains($0.key) }) { return true }
+        if unanswered != nil { return true }
+        if quietestSeatIgnoring(settledQuestions: settled) != nil { return true }
+        return false
+    }
+
     /// Which sub-question a contribution is about, from its wording.
     ///
     /// Several can be present; the first match in the enum's order is taken, because a
@@ -433,11 +452,16 @@ public struct ResearchDirector: Sendable {
                 subQuestion: nil)
         }
 
-        // 5. Nothing in particular to direct. The rotation is the honest answer.
+        // 5. Nothing in particular to direct. Either the investigation has nothing left, or the
+        // open question went to whoever could take it last turn and there is nobody else who
+        // fits it. The rotation is the honest answer to both; the two are told apart here only
+        // so the log says which one it was.
         return ResearchDirection(
             seatID: nil,
             instruction: "",
-            reason: "nothing outstanding; the rotation stands",
+            reason: hasOpenWork
+                ? "the open question has just gone to whoever fits it; the rotation stands"
+                : "nothing outstanding; the rotation stands",
             subQuestion: nil)
     }
 

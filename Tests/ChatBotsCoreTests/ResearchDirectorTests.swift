@@ -592,6 +592,39 @@ struct DirectedEngineTests {
         #expect(!exported.contains("RESEARCH MODERATOR — ASSIGNMENT\n[Moderator]"))
     }
 
+    @Test("The session ends when the moderator has nothing left to point at")
+    func theSessionEndsWhenNothingIsOutstanding() async {
+        // One contribution that touches all ten subjects and gives a basis for itself. Two
+        // analysts, one turn each, and the moderator has nothing left to ask — so the session
+        // concludes rather than spending the rest of its budget restating findings nobody
+        // disputes.
+        let complete = """
+            According to the filings, the cost is 12 percent of a million units. Our competitors             are feasible, customers face regulation, and the forecast rests on one assumption             and a small sample.
+            """
+        let (engine, _) = directedEngine(contribution: complete, rounds: 20)
+        engine.start(topic: "A question")
+        await engine.waitUntilFinished()
+
+        #expect(engine.researchSession?.stop == .answered)
+        #expect((engine.researchSession?.rounds ?? 0) < 20, "it must stop before the budget")
+        #expect(
+            engine.researchReport()?.stopReason.contains("Every part of the question") == true,
+            "and the report must say why, or the reader cannot tell this from running out")
+    }
+
+    @Test("A session that has not covered the question does not conclude early")
+    func anIncompleteSessionKeepsGoing() async {
+        // Nothing covered, nothing sourced. The moderator has open work, so the session must
+        // not claim the question is answered — the failure this guards against is a run that
+        // stops after one turn and reports that there was nothing to find.
+        let (engine, _) = directedEngine(contribution: "Yes, but what about the other thing?")
+        engine.start(topic: "A question")
+        await engine.waitUntilFinished()
+
+        #expect(engine.researchSession?.stop != .answered)
+        #expect(engine.conversation.turns.filter { $0.kind == .chat }.count >= 2)
+    }
+
     @Test("An entertainment run is not directed at all")
     func entertainmentIsNotDirected() async {
         let specs = AgentSpec.makeSeats(count: 3)
