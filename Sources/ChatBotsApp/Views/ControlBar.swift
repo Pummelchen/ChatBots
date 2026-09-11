@@ -41,9 +41,14 @@ struct ControlBar: View {
                 .fixedSize()
                 .disabled(controller.isRunning)
                 .help("A show, or an investigation with a budget and a report")
-
-                transport
             }
+
+            // The actions have their own row. They used to share the topic's, which left eight
+            // buttons competing with a text field for the width and every one of them collapsing
+            // to an ellipsis: "St…", "Sa…", "K…", "Cl…". A control whose label cannot be read is
+            // worse than no control, because the tooltip is the only way to find out what it
+            // does and nobody hovers over a button they cannot identify.
+            actionRow
 
             AttachmentBar(controller: controller)
 
@@ -135,8 +140,24 @@ struct ControlBar: View {
         .background(palette.surface)
     }
 
-    // MARK: Transport
+    // MARK: Actions
 
+    /// Everything that *does* something, on one line that is theirs.
+    ///
+    /// Grouped rather than run together — starting and stopping the conversation, then the things
+    /// you do with the transcript, then the models — because eight undifferentiated buttons is a
+    /// row you have to read every time.
+    private var actionRow: some View {
+        HStack(spacing: 6) {
+            transport
+            Divider().frame(height: 16)
+            transcriptActions
+            Spacer(minLength: 8)
+            modelsMenu
+        }
+    }
+
+    /// Start, pause and stop: what the conversation is doing.
     private var transport: some View {
         HStack(spacing: 6) {
             Button {
@@ -148,7 +169,8 @@ struct ControlBar: View {
                 )
             }
             .buttonStyle(.borderedProminent)
-            .disabled(!controller.canStart)
+            .controlSize(.small)
+                        .disabled(!controller.canStart)
             .help("Load both models and begin the conversation")
 
             Button {
@@ -157,7 +179,8 @@ struct ControlBar: View {
                 Label(status.isPaused ? "Resume" : "Pause", systemImage: status.isPaused ? "play.fill" : "pause.fill")
             }
             .buttonStyle(.bordered)
-            .disabled(!status.isActive && !status.isPaused)
+            .controlSize(.small)
+                        .disabled(!status.isActive && !status.isPaused)
             .keyboardShortcut("p", modifiers: [.command, .shift])
 
             Button {
@@ -166,16 +189,23 @@ struct ControlBar: View {
                 Label("Stop", systemImage: "stop.fill")
             }
             .buttonStyle(.bordered)
-            .disabled(!status.isActive && !status.isPaused)
+            .controlSize(.small)
+                        .disabled(!status.isActive && !status.isPaused)
             .keyboardShortcut(".", modifiers: .command)
+        }
+    }
 
+    /// Save, reopen, line-up, report, clear: what you do with the transcript.
+    private var transcriptActions: some View {
+        HStack(spacing: 6) {
             Button {
                 controller.saveConversation()
             } label: {
                 Label("Save", systemImage: "square.and.arrow.down")
             }
             .buttonStyle(.bordered)
-            .disabled(controller.turns.isEmpty)
+            .controlSize(.small)
+                        .disabled(controller.turns.isEmpty)
             .help("Save the full conversation log to a text file")
 
             Button {
@@ -184,7 +214,8 @@ struct ControlBar: View {
                 Label("Kept", systemImage: "clock.arrow.circlepath")
             }
             .buttonStyle(.bordered)
-            .help("Reopen a conversation the engine kept, or start a new one")
+            .controlSize(.small)
+                        .help("Reopen a conversation the engine kept, or start a new one")
             .sheet(isPresented: $showSaved) {
                 SavedConversationsSheet(controller: controller) { showSaved = false }
                     // A sheet is a separate presentation context, so it does not inherit the
@@ -198,7 +229,8 @@ struct ControlBar: View {
                 Label("Line-up", systemImage: "person.3.sequence")
             }
             .buttonStyle(.bordered)
-            .help("Choose who is in the room, or let the app choose")
+            .controlSize(.small)
+                        .help("Choose who is in the room, or let the app choose")
             .sheet(isPresented: $showLineup) {
                 LineupSheet(controller: controller) { showLineup = false }
                     .environmentObject(zoom)
@@ -211,7 +243,8 @@ struct ControlBar: View {
                     Label("Report", systemImage: "doc.text.magnifyingglass")
                 }
                 .buttonStyle(.borderedProminent)
-                .help("The report the investigation produced")
+            .controlSize(.small)
+                            .help("The report the investigation produced")
                 .sheet(isPresented: $showReport) {
                     ReportSheet(controller: controller) { showReport = false }
                         .environmentObject(zoom)
@@ -224,22 +257,25 @@ struct ControlBar: View {
                 Label("Clear", systemImage: "trash")
             }
             .buttonStyle(.bordered)
-            .disabled(controller.isRunning)
+            .controlSize(.small)
+                        .disabled(controller.isRunning)
             .help("Forget the transcript. Loaded models stay in memory.")
-
-            Menu {
-                ForEach(controller.panes) { pane in
-                    Button("Load \(pane.spec.displayName) — \(pane.spec.modelShortName)") {
-                        controller.warmUp(pane.spec.id)
-                    }
-                }
-            } label: {
-                Label("Models", systemImage: "cpu")
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-            .help("Pre-load weights so the first turn starts immediately")
         }
+    }
+
+    private var modelsMenu: some View {
+        Menu {
+            ForEach(controller.panes) { pane in
+                Button("Load \(pane.spec.displayName) — \(pane.spec.modelShortName)") {
+                    controller.warmUp(pane.spec.id)
+                }
+            }
+        } label: {
+            Label("Models", systemImage: "cpu")
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .help("Pre-load weights so the first turn starts immediately")
     }
 
     // MARK: Status
