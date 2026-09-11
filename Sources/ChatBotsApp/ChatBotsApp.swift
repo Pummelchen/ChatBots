@@ -1,7 +1,8 @@
 // ChatBotsApp — application entry point
 //
-// A plain SwiftUI `App`. `WindowConfigurator` attaches to the key window once so the
-// two-pane layout opens at a sensible size; nothing here reaches into the engine.
+// A plain SwiftUI `App`. `WindowConfigurator` attaches to the key window so the
+// two-pane layout opens at a sensible size and picks up the theme; nothing here reaches
+// into the engine.
 
 import AppKit
 import ChatBotsCore
@@ -12,8 +13,14 @@ struct ChatBotsApp: App {
     @StateObject private var controller = ChatController()
     @StateObject private var theme = ThemeStore()
 
+    /// Below this the two panes stop being usable side by side.
+    private static let minimumWindowSize = NSSize(width: 720, height: 480)
+
     var body: some Scene {
-        Window("ChatBots — two local LLMs, one conversation", id: "main") {
+        // The title bar is left fully standard: close / minimize / zoom, double-click to
+        // zoom, drag to move, drag edges to resize. `WindowConfigurator` only sets the
+        // appearance and the first-launch frame.
+        Window("ChatBots", id: "main") {
             ContentView(controller: controller)
                 .themePalette(theme.palette)
                 .environmentObject(theme)
@@ -23,27 +30,91 @@ struct ChatBotsApp: App {
                 .background(WindowConfigurator(palette: theme.palette))
         }
         .defaultSize(width: 1280, height: 780)
-        .windowResizability(.contentMinSize)
+        // `.contentMinSize` would cap the window at the content's maximum size — with a
+        // fixed frame in the view that caps it at exactly one size, which is what made
+        // the window refuse to resize. `.contentSize` lets the window grow freely and
+        // derives its *minimum* from the content, which is what we want.
+        .windowResizability(.contentSize)
         .commands {
-            CommandGroup(after: .newItem) {
-                Button("Pause / Resume") { controller.togglePause() }
-                    .keyboardShortcut("p", modifiers: [.command, .shift])
-                Button("Stop") { controller.stop() }
+            CommandGroup(replacing: .newItem) {}
+
+            CommandGroup(after: .saveItem) {
+                Button("Clear Conversation") { controller.reset() }
+                    .keyboardShortcut("k", modifiers: .command)
+                    .disabled(controller.isRunning)
+
+                Divider()
+
+                Button("Start Conversation") { controller.startOrRestart() }
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .disabled(!controller.canStart)
+                Button(controller.status.isPaused ? "Resume" : "Pause") {
+                    controller.togglePause()
+                }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
+                .disabled(!controller.status.isActive && !controller.status.isPaused)
+                Button("Stop Conversation") { controller.stop() }
                     .keyboardShortcut(".", modifiers: .command)
+                    .disabled(!controller.status.isActive && !controller.status.isPaused)
+
+                Divider()
+
+                Button("Send Moderator Message") { controller.sendModeratorMessage() }
+                    .keyboardShortcut(.return, modifiers: [.command, .shift])
+                    .disabled(
+                        controller.moderatorDraft
+                            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+
+            // A theme is a view setting on macOS, so it belongs in View as well as in the
+            // bar. SwiftUI supplies Minimize/Zoom/Enter Full Screen after this group.
+            CommandGroup(after: .toolbar) {
+                Picker("Theme", selection: $theme.mode) {
+                    ForEach(ThemeMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+                .pickerStyle(.inline)
+            }
+
+            CommandGroup(replacing: .help) {
+                Button("ChatBots Help") { HelpWindow.show() }
             }
         }
     }
 }
 
-/// Positions, darkens and focuses the window on first appearance.
+/// Opens a small standard About-panel-style help window.
+enum HelpWindow {
+    @MainActor
+    static func show() {
+        let alert = NSAlert()
+        alert.messageText = "ChatBots"
+        alert.informativeText = """
+            Two local LLMs discuss a topic you set, with you as moderator.
+
+            Start / Restart   ⌘↩
+            Pause / Resume    ⇧⌘P
+            Stop              ⌘.
+            Clear transcript  ⌘K
+            Steer both models ⇧⌘↩
+
+            Both models run in-process on the GPU via MLX. Your moderator messages go \
+            into the shared log, so both models read them.
+            """
+        alert.addButton(withTitle: "OK")
+        alert.alertStyle = .informational
+        alert.runModal()
+    }
+}
+
+/// Applies the window appearance and first-launch frame.
 ///
-/// Applies the window geometry and appearance.
-///
-/// SwiftUI has no window appearance API, so the `NSWindow` is configured here. The
-/// appearance and background are set as well as in SwiftUI so the titlebar and any
-/// gutter around the split view match the theme. For the black theme the window
-/// appearance is pinned to dark, because a light-mode Mac would otherwise give the
-/// titlebar light chrome above an all-black window.
+/// Appearance is set at the AppKit level as well as in SwiftUI, because a SwiftUI
+/// background alone leaves the titlebar and the split-view gutter in the system
+/// appearance. Beyond that the window is a completely standard macOS window: it is
+/// resizable, minimizable, zoomable and fullscreen-capable, and SwiftUI's `Window` scene
+/// handles frame autosave so the size and position survive relaunch.
 struct WindowConfigurator: NSViewRepresentable {
     let palette: AppPalette
 
@@ -52,8 +123,14 @@ struct WindowConfigurator: NSViewRepresentable {
         DispatchQueue.main.async {
             guard let window = view.window else { return }
             window.title = "ChatBots"
+            window.contentMinSize = NSSize(width: 720, height: 480)
+            window.collectionBehavior.insert(.fullScreenPrimary)
+            // Traffic lights are only hidden by `.fullSizeContentView`; make sure nothing
+            // has turned them off.
+            for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+                window.standardWindowButton(button)?.isHidden = false
+            }
             applyAppearance(to: window)
-            window.setContentSize(NSSize(width: 1280, height: 780))
             Self.fitOnScreen(window)
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
@@ -68,9 +145,9 @@ struct WindowConfigurator: NSViewRepresentable {
 
     /// Sizes and centres the window so it always fits the screen it opens on.
     ///
-    /// `center()` alone is not enough: at 1280pt wide the window is wider than a 13"
-    /// MacBook's default 1131pt desktop, and centring it then leaves its right edge —
-    /// which is where the second pane and the theme picker live — off-screen.
+    /// `center()` alone is not enough: a 1280pt-wide window on a 1512pt-wide desktop,
+    /// centred, can still hang its right edge — where the second pane and the theme
+    /// picker live — past the display boundary.
     private static func fitOnScreen(_ window: NSWindow) {
         guard let screen = window.screen ?? NSScreen.main else {
             window.center()
@@ -98,6 +175,7 @@ struct WindowConfigurator: NSViewRepresentable {
             window.appearance = nil
             window.backgroundColor = .windowBackgroundColor
             window.titlebarAppearsTransparent = false
+            window.isOpaque = true
         }
     }
 }

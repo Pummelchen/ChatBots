@@ -110,17 +110,20 @@ struct ChatPane: View {
                 }
                 .padding(12)
             }
+            // Only follow real growth. Animating a scroll per token fights the layout
+            // and is a common cause of stutter while a model streams.
             .onChange(of: turns.count) { _, _ in scrollToBottom(proxy) }
-            .onChange(of: pane.liveText) { _, _ in scrollToBottom(proxy) }
+            .onChange(of: pane.liveText.count) { _, count in
+                guard count > 0 else { return }
+                scrollToBottom(proxy)
+            }
         }
     }
 
     private static let liveAnchor = "live-turn-anchor"
 
     private func scrollToBottom(_ proxy: ScrollViewProxy) {
-        withAnimation(.easeOut(duration: 0.15)) {
-            proxy.scrollTo(Self.liveAnchor, anchor: .bottom)
-        }
+        proxy.scrollTo(Self.liveAnchor, anchor: .bottom)
     }
 
     @ViewBuilder

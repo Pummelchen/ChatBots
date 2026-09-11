@@ -75,14 +75,16 @@ public actor MLXEngine: LLMEngine {
             onStateChange(.loading(progress: 0))
             let progressBox = ProgressBox()
 
-            return try await #huggingFaceLoadModelContainer(
-                configuration: ModelConfiguration(id: spec.modelID)
-            ) { progress in
-                let fraction =
-                    progress.totalUnitCount > 0
-                    ? Double(progress.completedUnitCount) / Double(progress.totalUnitCount)
-                    : 0
-                progressBox.report(fraction, to: onStateChange)
+            return try await MLXGate.exclusive {
+                try await #huggingFaceLoadModelContainer(
+                    configuration: ModelConfiguration(id: spec.modelID)
+                ) { progress in
+                    let fraction =
+                        progress.totalUnitCount > 0
+                        ? Double(progress.completedUnitCount) / Double(progress.totalUnitCount)
+                        : 0
+                    progressBox.report(fraction, to: onStateChange)
+                }
             }
         }
         loadingTask = task
@@ -146,6 +148,30 @@ public actor MLXEngine: LLMEngine {
         onEvent: @escaping @Sendable (TurnEvent) async -> Void
     ) async throws -> String {
         try await load()
+
+        // Held across the whole turn, not just the model call: the token stream keeps
+        // evaluating on the GPU as it is consumed, so the slot must not be handed on
+        // until that stream is drained. Release is explicit so ordering is
+        // deterministic even on the error path.
+        await MLXGate.shared.acquire()
+        do {
+            let text = try await generateExclusively(
+                messages: messages, tools: tools, onToolCall: onToolCall, onEvent: onEvent)
+            await MLXGate.shared.release()
+            return text
+        } catch {
+            await MLXGate.shared.release()
+            throw error
+        }
+    }
+
+    /// The body of `generate`, run while holding the MLX gate.
+    private func generateExclusively(
+        messages: [PromptMessage],
+        tools: [any ToolProvider],
+        onToolCall: @escaping @Sendable (String, String) async -> Void,
+        onEvent: @escaping @Sendable (TurnEvent) async -> Void
+    ) async throws -> String {
         guard let container else { throw ChatBotsError.engineNotLoaded }
         try Task.checkCancellation()
 
@@ -390,6 +416,54 @@ public actor MLXEngine: LLMEngine {
             }
         }
         return ""
+    }
+}
+
+/// Serialises every Metal-touching operation in the process.
+///
+/// Two MLX model instances are loaded here, and MLX's Metal backend is not safe to
+/// drive from two places at once: running a second evaluation while another is in flight
+/// aborts inside `mlx::core::metal::Device::get_command_encoder` /
+/// `fast::CustomKernel::eval_gpu` with `EXC_BAD_ACCESS`, which showed up as
+/// `Segmentation fault: 11` crash reports. Weight loading is serialised for the same
+/// reason — two concurrent loads each build command encoders and compile kernels.
+///
+/// This costs almost nothing in practice: a conversation turn needs the previous
+/// speaker's text to exist, so the turn loop is sequential anyway, and the GPU
+/// serialises concurrent work rather than overlapping it (measured: each seat at exactly
+/// 50% of its solo rate). It also makes the `--benchmark` mode honest.
+actor MLXGate {
+    static let shared = MLXGate()
+
+    private var busy = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func acquire() async {
+        if !busy {
+            busy = true
+            return
+        }
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+
+    func release() {
+        if waiters.isEmpty {
+            busy = false
+        } else {
+            // Hand the slot straight to the next waiter; `busy` stays true.
+            waiters.removeFirst().resume()
+        }
+    }
+
+    /// Run `body` with exclusive access to MLX.
+    static func exclusive<T: Sendable>(
+        _ body: @Sendable () async throws -> T
+    ) async rethrows -> T {
+        await shared.acquire()
+        defer { Task { await shared.release() } }
+        return try await body()
     }
 }
 

@@ -15,7 +15,8 @@ struct ContentView: View {
             Divider()
             ModeratorBar(controller: controller)
         }
-        .frame(minWidth: 900, minHeight: 620)
+        // Minimums only — no maximum — so the window can be dragged to any size.
+        .frame(minWidth: 720, idealWidth: 1280, minHeight: 480, idealHeight: 780)
         .safeAreaInset(edge: .top, spacing: 0) {
             if let message = controller.errorBanner {
                 ErrorBanner(message: message) { controller.errorBanner = nil }
@@ -44,7 +45,6 @@ struct AgentPanes: View {
                     showReasoning: controller.showReasoning,
                     contextEstimate: controller.contextEstimate
                 )
-                .layoutPriority(1)
             }
         }
     }

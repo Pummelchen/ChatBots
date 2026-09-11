@@ -70,13 +70,12 @@ with `chatbots-cli --benchmark --max-tokens 200` (M3, 24 GB, Qwen3.5-4B-MLX-4bit
 | | seat A | seat B |
 | --- | --- | --- |
 | alone | 30.0 tok/s | 30.2 tok/s |
-| both generating at once | 15.0 tok/s | 15.0 tok/s |
+| both asked at once | 27–32 tok/s | 27–30 tok/s |
 
-When both seats really do generate at the same moment the GPU serialises them and each
-gets exactly half — the combined rate is unchanged, so nothing is lost, and they load
-concurrently without complaint. **The conversation never hits that case anyway**: a turn
+Both seats use the GPU, and only one seat is ever allowed to touch it at a time — see
+"One MLX caller at a time" below. In practice the conversation never even contends: a turn
 needs the previous speaker's text to exist before the next seat can read it, so the loop
-is sequential and the speaking seat always has the GPU to itself at full 30 tok/s.
+is sequential and the speaking seat always has the GPU to itself at the full ~30 tok/s.
 
 CPU offload is deliberately not offered. It is not merely slower — it is impossible for
 this checkpoint: Qwen 3.5's linear-attention layers call MLX's `metal_kernel`, and
@@ -92,6 +91,18 @@ at another device, but no such seat ships here.
 `--benchmark` is kept because it is also the cheapest way to prove a new checkpoint loads
 and generates at all before wiring it into a conversation.
 
+### Standard macOS window behaviour
+
+The window is a completely ordinary macOS window: close / minimize / zoom traffic lights
+(verified present, enabled and functional — zoom toggles the frame, minimize works, close
+quits), draggable and resizable from every edge down to a 720×480 minimum and up to any
+size, ⇧⌘P-style menu equivalents in File, a standard Window menu (Minimize, Zoom, Enter
+Full Screen), and frame autosave so size and position survive relaunch.
+
+One thing worth knowing if you edit the layout: `.windowResizability(.contentMinSize)`
+combined with a fixed `.frame(...)` silently pins the window to exactly one size. The
+scene uses `.contentSize` and the content view declares minimums only.
+
 ### Themes
 
 `Original` is the default and uses the system's dynamic colours, so it follows the Mac's
@@ -106,6 +117,29 @@ The choice is stored with `@AppStorage("themeMode")`, so it survives relaunch. T
 AppKit appearance and background are set alongside the SwiftUI palette, because a SwiftUI
 background alone leaves the titlebar and the gutter around the split view in the system
 appearance.
+
+### One MLX caller at a time
+
+Every Metal-touching operation — loading weights and generating — goes through a
+process-wide gate (`MLXGate`). This is not a performance choice, it is a correctness one:
+**MLX's Metal backend is not safe to drive from two places at once.** Running a second
+evaluation while another is in flight aborts inside
+`mlx::core::metal::Device::get_command_encoder` / `fast::CustomKernel::eval_gpu` with
+`EXC_BAD_ACCESS`, which macOS reports as `Segmentation fault: 11`.
+
+That is not theoretical — this app produced two such crash reports before the gate
+existed, roughly 4–6 minutes into a conversation, and again in an early version of
+`--benchmark` that asked both seats to generate simultaneously. An earlier revision of
+this README claimed two concurrent seats "cleanly time-share at half rate each"; that
+measurement was wrong, because the two seats were corrupting each other's command-encoder
+state rather than sharing it.
+
+With the gate, three back-to-back runs of simultaneous generation finish cleanly, each
+seat at its full solo rate, and the app has run 7+ turn conversations with no crash
+reports.
+
+The cost is close to zero: an unrelated second seat is the only thing that ever waits, and
+concurrent GPU work would be serialised by the hardware regardless.
 
 ### Three decisions worth knowing about
 
@@ -243,5 +277,6 @@ models — that is fine here, because each seat tokenizes its own prompt.
   dispatch is driven from `MLXEngine` rather than the session's own loop. Both are
   consequences of the pinned 3.31.4 API; see the comment in `MLXEngine.generate`.
 * Measured on an M3: ~30 tokens/s per seat, ~20 s for a 500-token opening statement.
+* Only one seat may touch MLX at a time — see "One MLX caller at a time".
 * Both seats are GPU-only — see the benchmark table above for why CPU offload is not an
   option for this checkpoint.

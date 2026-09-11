@@ -107,6 +107,11 @@ public final class ChatController: ObservableObject {
         self.panes = panes
         self.engine = ConversationEngine(seats: seats, configuration: configuration)
         startPumps()
+        startFlushLoop()
+    }
+
+    deinit {
+        flushTask?.cancel()
     }
 
     // MARK: - Stream consumption
@@ -158,7 +163,28 @@ public final class ChatController: ObservableObject {
 
     private func apply(_ event: TurnEvent) {
         switch event {
+        // Streaming text is buffered and published on a timer. Republishing a growing
+        // string (and re-laying-out the transcript) for every token is what makes a
+        // streaming UI stutter; a turn finishes in well under a frame's worth of tokens
+        // at these rates either way.
+        case .token(let agentID, let text):
+            pending[agentID, default: Delta()].text += text
+
+        case .reasoning(let agentID, let text):
+            pending[agentID, default: Delta()].reasoning += text
+
+        case .toolCall(let agentID, let name, let query):
+            pending[agentID, default: Delta()].activity = "\(name)(\(query.prefix(48)))…"
+
+        case .toolResult(let agentID, let name, let summary, _):
+            pending[agentID, default: Delta()].activity = "reading results…"
+            pane(agentID)?.toolLog.append("\(name) → \(summary)")
+
+        case .toolFailure(let agentID, let name, let message):
+            pane(agentID)?.toolLog.append("\(name) failed: \(message)")
+
         case .turnStarted(let agentID, _):
+            flush()  // the previous turn's tail must land before its row is cleared
             for pane in panes {
                 if pane.spec.id == agentID {
                     pane.beginTurn()
@@ -167,30 +193,50 @@ public final class ChatController: ObservableObject {
                 }
             }
 
-        case .token(let agentID, let text):
-            pane(agentID)?.liveText += text
-
-        case .reasoning(let agentID, let text):
-            pane(agentID)?.liveReasoning += text
-
-        case .toolCall(let agentID, let name, let query):
-            pane(agentID)?.activity = "\(name)(\(query.prefix(48)))…"
-
-        case .toolResult(let agentID, let name, let summary, _):
-            pane(agentID)?.activity = "reading results…"
-            pane(agentID)?.toolLog.append("\(name) → \(summary)")
-
-        case .toolFailure(let agentID, let name, let message):
-            pane(agentID)?.toolLog.append("\(name) failed: \(message)")
-
         case .turnFinished(let agentID, _, let stats):
+            flush()
             if let pane = pane(agentID) {
                 pane.lastStats = stats
                 pane.endTurn()
             }
 
         case .turnFailed(_, let message):
+            flush()
             errorBanner = message
+        }
+    }
+
+    /// Buffered token deltas for one seat.
+    private struct Delta {
+        var text = ""
+        var reasoning = ""
+        var activity: String?
+    }
+
+    private var pending: [String: Delta] = [:]
+    private var flushTask: Task<Void, Never>?
+
+    /// Applies buffered deltas to the panes, in one published update per seat.
+    private func flush() {
+        guard !pending.isEmpty else { return }
+        let buffered = pending
+        pending.removeAll(keepingCapacity: true)
+
+        for (agentID, delta) in buffered {
+            guard let pane = pane(agentID) else { continue }
+            if !delta.reasoning.isEmpty { pane.liveReasoning += delta.reasoning }
+            if !delta.text.isEmpty { pane.liveText += delta.text }
+            if let activity = delta.activity { pane.activity = activity }
+        }
+    }
+
+    private func startFlushLoop() {
+        flushTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(40))
+                guard let self else { return }
+                self.flush()
+            }
         }
     }
 
