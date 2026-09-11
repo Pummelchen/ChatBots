@@ -106,6 +106,8 @@ public enum PromptBuilder {
             return "[Moderator]"
         case .introduction:
             return "[System]"
+        case .summary:
+            return "[Earlier discussion — condensed]"
         case .tool:
             return "[Tool result for \(turn.speakerName)]"
         case .chat:
@@ -116,6 +118,57 @@ public enum PromptBuilder {
     /// Tagged body of one logged turn.
     public static func body(for turn: Turn) -> String {
         "\(tag(for: turn))\n\(turn.content)"
+    }
+
+    /// The instruction used to condense a transcript.
+    ///
+    /// Deliberately specific about what to keep: a summary that loses the open questions
+    /// or the participants' positions makes the next turns incoherent, which is worse than
+    /// the truncation it replaces.
+    public static func compactionPrompt(
+        for spec: AgentSpec,
+        turns: [Turn],
+        topic: String,
+        previousSummary: String?,
+        maxWords: Int = 400
+    ) -> String {
+        let transcript = turns
+            .filter { $0.kind != .tool }
+            .map { body(for: $0) }
+            .joined(separator: "\n\n")
+
+        var prompt = """
+            You are condensing the earlier part of a discussion so it can continue without \
+            losing the thread. This is a memory operation, not a contribution: nobody will \
+            read it as your opinion, and you must not add arguments of your own.
+
+            Topic: \(topic)
+            """
+        if let previousSummary, !previousSummary.isEmpty {
+            prompt += """
+
+                An earlier summary already exists. Extend it rather than starting over:
+
+                \(previousSummary)
+                """
+        }
+        prompt += """
+
+            Condense the transcript below into at most \(maxWords) words. Keep, in this order:
+            1. What has been established or agreed, with any numbers or sources named.
+            2. Each participant's position and the reasoning behind it, attributed.
+            3. Open questions and unresolved disagreements.
+            4. Anything the moderator asked for that has not been fully addressed.
+
+            Drop pleasantries, repetition and anything already superseded. Write plain prose, \
+            no headings. If a participant's view changed, record the final one.
+
+            Transcript:
+            \(transcript)
+
+            Summary:
+            """
+        return prompt
     }
 
     /// The full prompt for one seat's next turn.
@@ -141,7 +194,10 @@ public enum PromptBuilder {
         // user turn keeps the role sequence valid for strict chat templates (user /
         // assistant alternation) while still showing every speaker tag.
         var log = conversation.dialogueTurns
-            .filter { $0.kind == .topic || $0.kind == .introduction || $0.kind == .chat || $0.kind == .steering }
+            .filter {
+                $0.kind == .topic || $0.kind == .introduction || $0.kind == .chat
+                    || $0.kind == .steering || $0.kind == .summary
+            }
             .map { body(for: $0) }
             .joined(separator: "\n\n")
 

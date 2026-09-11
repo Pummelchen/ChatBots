@@ -189,6 +189,39 @@ removing the modifier from one view at a time until the freezes stopped.
 
 Instead, **Edit ▸ Copy Conversation (⇧⌘C)** copies the whole transcript as plain text.
 
+### Context: maximum window, and compaction instead of truncation
+
+Both seats run at Qwen 3.5's own maximum context — **262,144 tokens**. The window comes from
+the checkpoint's `config.json` (`max_position_embeddings`) when the model is on disk; an
+API seat uses the same number because no OpenAI-compatible server advertises its window
+through `/v1/models`. It is per-seat, so a future seat on a smaller model gets a smaller
+window automatically.
+
+When a seat's next prompt would reach **70%** of that, older turns are **condensed** rather
+than dropped: the seat about to speak summarises them itself, and the digest replaces them
+in the log.
+
+Why this rather than truncation: the previous behaviour dropped the oldest entries, which
+silently destroyed the beginning of the discussion — exactly the part that establishes what
+is being argued about. A digest keeps the conclusions, each participant's position *with
+its attribution*, open questions, and anything the moderator asked that is still unaddressed.
+
+* The digest appears in the log as its own `CONDENSED` entry, so you can see what replaced
+  the history rather than having it vanish. It is placed **after** the setup brief, not in
+  front of it, and it is folded into later prompts like any other turn.
+* There is only ever one digest: condensing again extends it instead of stacking summaries.
+* The topic, the brief and the digest are never condensed away.
+* A **Condense** button in the pane footer runs it on demand, before a long prompt of your
+  own. The footer also shows the occupancy: `ctx 2.8k/262.1k · 1% (condense at 70%)`.
+* A failed or empty summarisation leaves the log untouched and says so — the conversation
+  continues rather than dying with the summariser.
+
+One implementation note worth recording, because it made the feature silently useless at
+first: the threshold is measured against the **actual prompt** a seat received, not the
+transcript's own text. The rendered system prompt, persona and opening brief add roughly
+**900 tokens** before a single turn is exchanged, so estimating from transcript text alone
+put a 2,000-token window at what was really 1,000 tokens and the trigger never fired.
+
 ### Roster size: ready for 3 or 4
 
 The app ships with **two** seats, and the number is one constant:

@@ -89,6 +89,25 @@ public actor MLXEngine: LLMEngine {
 
     public var contextWindow: Int { loadedContextWindow }
 
+    /// Condense a transcript. Runs as an ordinary turn with no tools, so the seat's own
+    /// sampling and persona apply — which is what makes the digest read like that seat's
+    /// understanding of the discussion rather than a generic extract.
+    public func compact(prompt: String, maxTokens: Int) async throws -> String {
+        var spec = self.spec
+        spec.maxTokens = maxTokens
+        spec.thinking = .off  // summarising is not the place for deliberation
+        let summary = try await generate(
+            messages: [
+                .init(role: .system, content: "You condense discussions faithfully and add nothing."),
+                .init(role: .user, content: prompt),
+            ],
+            tools: [],
+            onToolCall: { _, _ in },
+            onEvent: { _ in }
+        )
+        return summary.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     // MARK: - Loading
 
     public func load() async throws {

@@ -178,6 +178,13 @@ struct ChatPane: View {
 
     // MARK: Footer
 
+    private var contextLabel: String {
+        let usage = controller.contextUsage
+        return Format.context(
+            tokens: usage.tokens, of: usage.window,
+            compactAt: controller.compactThreshold)
+    }
+
     private var footer: some View {
         HStack(spacing: 10) {
             if let stats = pane.lastStats, stats.generationTokens > 0 {
@@ -189,7 +196,17 @@ struct ChatPane: View {
                 Label("no turn yet", systemImage: "speedometer")
             }
             Spacer(minLength: 0)
-            Label("≈\(Format.tokens(contextEstimate)) prompt tok shared", systemImage: "text.book.closed")
+            Button {
+                controller.compactNow()
+            } label: {
+                Label("Condense", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 9.5))
+            }
+            .buttonStyle(.link)
+            .disabled(controller.isRunning || controller.turns.isEmpty)
+            .help("Summarise the older turns now instead of waiting for the threshold")
+            Label(contextLabel, systemImage: "text.book.closed")
+                .help("Prompt size against this seat's context window; the log is condensed when it crosses the threshold, so the beginning of the discussion is never silently dropped")
         }
         .font(.system(size: 9.5, design: .rounded))
         .foregroundStyle(palette.textTertiary)

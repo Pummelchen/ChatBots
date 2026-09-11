@@ -38,6 +38,10 @@ actor StubEngine: LLMEngine {
     func load() async throws {}
     func unload() async {}
 
+    func compact(prompt: String, maxTokens: Int) async throws -> String {
+        "stub digest"
+    }
+
     func generate(
         messages: [PromptMessage],
         tools: [any ToolProvider],

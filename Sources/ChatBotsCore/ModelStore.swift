@@ -132,6 +132,25 @@ public enum ModelStore {
             || contents.contains { $0.hasSuffix(".safetensors.index.json") }
     }
 
+    /// The context window declared by a checkpoint's own config, if that checkpoint is on
+    /// disk. `max_position_embeddings` lives under `text_config` for the Qwen 3.5 wrapper
+    /// and at the top level for a plain text model.
+    public static func declaredContextWindow(for modelID: String, in root: URL? = nil) -> Int? {
+        guard let directory = localCheckpoint(for: modelID, in: root) else { return nil }
+        let config = directory.appending(path: "config.json")
+        guard let data = try? Data(contentsOf: config),
+            let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+
+        let textConfig = root["text_config"] as? [String: Any]
+        for key in ["max_position_embeddings", "max_sequence_length"] {
+            let nested = (textConfig?[key] as? NSNumber)?.intValue
+            let flat = (root[key] as? NSNumber)?.intValue
+            if let value = nested ?? flat, value > 0 { return value }
+        }
+        return nil
+    }
+
     /// The loaded checkpoints on disk, for display.
     public static func availableCheckpoints(in root: URL? = nil) -> [String] {
         let root = root ?? directory()

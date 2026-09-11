@@ -26,6 +26,9 @@ public struct Turn: Identifiable, Sendable, Hashable {
         case steering
         /// A tool round-trip summary (always attached to the agent that ran it).
         case tool
+        /// A model-written digest that replaced older turns to reclaim context. Authored by
+        /// the app on a seat's behalf, so it carries no speaker.
+        case summary
     }
 
     public let id: UUID
@@ -81,6 +84,11 @@ public struct Conversation: Sendable {
     }
 
     public var isEmpty: Bool { dialogueTurns.isEmpty }
+
+    /// The current compaction summary, if the log has been condensed.
+    public var summaryTurn: Turn? {
+        turns.last { $0.kind == .summary }
+    }
 }
 
 // MARK: - Participant
@@ -147,6 +155,12 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
     /// Maximum tokens for the *answer*, reasoning excluded. The hard generation cap is
     /// this plus whatever `thinking` budgets for reasoning.
     public var maxTokens: Int
+    /// The seat's context window, in tokens, when it cannot be discovered.
+    ///
+    /// The MLX backend reads this from the checkpoint's own config; a server does not
+    /// advertise it, so an API seat uses this value. It is the single number the
+    /// auto-compaction threshold is measured against.
+    public var contextWindow: Int
     /// Whether this seat may call the web-search tools.
     public var webSearchEnabled: Bool
     /// How much this seat may think before answering. Changeable at runtime from the pane;
@@ -174,6 +188,7 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
         presencePenalty: Double? = nil,
         repetitionPenalty: Double? = nil,
         maxTokens: Int = 1024,
+        contextWindow: Int = AgentSpec.defaultContextWindow,
         webSearchEnabled: Bool = true,
         thinking: ThinkingMode = .medium,
         personaID: String = PersonaLibrary.neutral.id
@@ -191,12 +206,18 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
         self.presencePenalty = presencePenalty
         self.repetitionPenalty = repetitionPenalty
         self.maxTokens = maxTokens
+        self.contextWindow = contextWindow
         self.webSearchEnabled = webSearchEnabled
         self.thinking = thinking
         self.personaID = personaID
     }
 
     public static let defaultModelID = "mlx-community/Qwen3.5-4B-MLX-4bit"
+
+    /// Qwen 3.5's own maximum context (`max_position_embeddings` in its config). Used both
+    /// as the MLX seat's budget and as the assumed window for an API seat, which no
+    /// OpenAI-compatible server advertises through `/v1/models`.
+    public static let defaultContextWindow = 262_144
 
 
     /// Sampling settings shared by every Qwen seat.
@@ -326,6 +347,7 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
             presencePenalty: QwenSampling.presencePenalty,
             repetitionPenalty: QwenSampling.repetitionPenalty,
             maxTokens: QwenSampling.maxOutputTokens,
+            contextWindow: defaultContextWindow,
             thinking: QwenSampling.thinking,
             personaID: personaID ?? defaultPersonaID(forIndex: index)
         )
@@ -506,6 +528,11 @@ public protocol LLMEngine: Sendable {
     var contextWindow: Int { get async }
     /// Free the weights.
     func unload() async
+    /// Ask this seat to condense a transcript into a compact digest.
+    ///
+    /// Used to reclaim context without losing what was said. Implementations must not use
+    /// tools for this and should return the digest as plain text.
+    func compact(prompt: String, maxTokens: Int) async throws -> String
     /// Run exactly one assistant turn.
     ///
     /// - Parameters:

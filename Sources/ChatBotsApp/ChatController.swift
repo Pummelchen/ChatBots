@@ -356,6 +356,8 @@ public final class ChatController: ObservableObject {
                 lines.append("**\(turn.speakerName):** \(turn.content)")
             case .introduction:
                 continue
+            case .summary:
+                lines.append("> **[condensed earlier discussion]** \(turn.content)")
             case .tool:
                 lines.append("> tool → \(turn.content)")
             case .chat:
@@ -464,5 +466,20 @@ public final class ChatController: ObservableObject {
 
     public var contextEstimate: Int {
         turns.reduce(0) { $0 + max(1, $1.content.count / 4) }
+    }
+
+    /// How full the context is, for the footer. Includes the compaction threshold so the
+    /// bar can show where the log will be condensed rather than the reader having to guess.
+    public var contextUsage: (tokens: Int, window: Int, fraction: Double) {
+        engine.contextUsage
+    }
+
+    /// Where the log gets condensed, for display.
+    public var compactThreshold: Double { engine.configuration.compactThreshold }
+
+    /// Condense the log now, rather than waiting for the threshold.
+    public func compactNow() {
+        errorBanner = nil
+        engine.compactNow()
     }
 }

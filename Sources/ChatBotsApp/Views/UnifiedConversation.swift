@@ -28,7 +28,7 @@ struct UnifiedConversation: View {
         var rows: [ThreadRow] = controller.turns.compactMap { turn in
             switch turn.kind {
             case .introduction, .tool: nil
-            case .topic, .steering, .chat: ThreadRow(turn: turn)
+            case .topic, .steering, .chat, .summary: ThreadRow(turn: turn)
             }
         }
         // An actively generating seat gets a row, with whatever it has produced so far.
@@ -167,7 +167,22 @@ struct UnifiedConversation: View {
                 }
             }
             Spacer(minLength: 0)
-            Label("≈\(Format.tokens(controller.contextEstimate)) prompt tok shared", systemImage: "text.book.closed")
+            Button {
+                controller.compactNow()
+            } label: {
+                Label("Condense", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 9.5))
+            }
+            .buttonStyle(.link)
+            .disabled(controller.isRunning || controller.turns.isEmpty)
+            .help("Summarise the older turns now instead of waiting for the threshold")
+            Label(
+                Format.context(
+                    tokens: controller.contextUsage.tokens,
+                    of: controller.contextUsage.window,
+                    compactAt: controller.compactThreshold),
+                systemImage: "text.book.closed"
+            )
         }
         .font(.system(size: 9.5, design: .rounded))
         .foregroundStyle(palette.textTertiary)

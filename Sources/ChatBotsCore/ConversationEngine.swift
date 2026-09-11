@@ -73,8 +73,16 @@ public final class ConversationEngine {
         public var pace: Duration = .milliseconds(600)
         /// Absolute cap on LLM turns in one conversation.
         public var maxTurns: Int = 40
-        /// Approximate prompt-token ceiling. Oldest chatter is dropped above it.
-        public var softContextLimit: Int = 40_000
+        /// Condense older turns once a seat's prompt reaches this share of its context
+        /// window. The point is to reclaim room *before* the provider truncates, which
+        /// would silently drop the start of the discussion.
+        public var autoCompact: Bool = true
+        /// Fraction of the context window at which compaction runs.
+        public var compactThreshold: Double = 0.7
+        /// How many recent entries to keep verbatim. Older ones are condensed.
+        public var compactKeepRecentTurns: Int = 8
+        /// Token allowance for the digest itself.
+        public var compactSummaryTokens: Int = 900
 
         public init() {}
     }
@@ -158,6 +166,11 @@ public final class ConversationEngine {
 
     private var seatCursor = 0
     private var turnsCompleted = 0
+    /// Prompt tokens the last completed turn actually sent, and how much of that was
+    /// transcript text — together they let the next prompt be predicted rather than
+    /// guessed. Set from `TurnStats.promptTokens`.
+    private var measuredPromptTokens: Int?
+    private var lastMeasuredDialogueTokens = 0
     /// Turns that have begun generating (unlike `turnsCompleted`, counts the current one).
     public private(set) var startedTurns = 0
     private var generationTask: Task<Void, Never>?
@@ -278,6 +291,24 @@ public final class ConversationEngine {
         setStatus(.stopped)
     }
 
+    /// Condense the log on demand.
+    ///
+    /// Runs whether or not the threshold has been reached, which is what makes it usable as
+    /// a "make room now" control before a long prompt of your own.
+    public func compactNow() {
+        guard generationTask == nil else {
+            note("Finish or stop the current turn before compacting.")
+            return
+        }
+        guard let seat = seats.first else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            let compacted = await self.compactIfNeeded(using: seat, force: true)
+            if !compacted { self.note("Nothing to condense yet.") }
+        }
+    }
+
+
     public func reset() {
         stop()
         conversation.turns = []
@@ -370,6 +401,13 @@ public final class ConversationEngine {
         // Deliver anything the moderator typed since the last turn. These enter the
         // shared log here — once — which is why mid-turn steering can never be
         // duplicated or shown to only one seat.
+        // Reclaim context before composing this turn, so the seat that is about to speak
+        // is the one whose window is measured and whose style shapes the digest. Only the
+        // *automatic* path consults the switch; `compactNow` calls this directly.
+        if configuration.autoCompact {
+            await compactIfNeeded(using: seat)
+        }
+
         let pending = drainSteering()
         for turn in pending {
             conversation.turns.append(turn)
@@ -420,6 +458,11 @@ public final class ConversationEngine {
     private func handle(_ event: TurnEvent, from agentID: String) {
         switch event {
         case .turnFinished(let id, let text, let stats):
+            if stats.promptTokens > 0 {
+                measuredPromptTokens = stats.promptTokens
+                lastMeasuredDialogueTokens = conversation.dialogueTurns
+                    .reduce(0) { $0 + max(1, $1.content.count / 4) }
+            }
             let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
             if clean.isEmpty {
                 note("\(id) produced no text (stop: \(stats.stopReason)).")
@@ -433,7 +476,6 @@ public final class ConversationEngine {
                         content: clean
                     )
                 )
-                trimIfNeeded()
                 publishTranscript()
             }
             publish(event)
@@ -462,6 +504,25 @@ public final class ConversationEngine {
     }
 
     // MARK: - Transcript plumbing
+
+    /// Rough prompt size and how full the tightest seat's window is.
+    ///
+    /// Measured from the last prompt a seat actually received, not from the transcript's
+    /// own text. That distinction matters: the system prompt, the persona and the opening
+    /// brief are rendered into every prompt and account for roughly nine hundred tokens
+    /// before a single turn of conversation — enough that estimating from transcript text
+    /// alone made the threshold unreachable. The transcript estimate is used only until a
+    /// first turn has run.
+    public var contextUsage: (tokens: Int, window: Int, fraction: Double) {
+        let dialogue = conversation.dialogueTurns.reduce(0) { $0 + max(1, $1.content.count / 4) }
+        // A completed turn's prompt is the closest thing to ground truth available, plus
+        // the prompt for the turn being composed now.
+        let measured = measuredPromptTokens.map { $0 + dialogue - lastMeasuredDialogueTokens } ?? dialogue
+        let tokens = max(dialogue, measured)
+        let window = seats.map(\.spec.contextWindow).min() ?? AgentSpec.defaultContextWindow
+        let fraction = window > 0 ? Double(tokens) / Double(window) : 0
+        return (tokens, window, fraction)
+    }
 
     /// The log the UI should draw: delivered turns plus any not-yet-delivered steering.
     public var displayTurns: [Turn] {
@@ -507,32 +568,87 @@ public final class ConversationEngine {
         return pending
     }
 
-    /// Drop the oldest chatter when the shared log approaches the context window.
-    /// Topic and introduction are pinned.
-    private func trimIfNeeded() {
-        let total = conversation.dialogueTurns.reduce(0) { $0 + max(1, $1.content.count / 4) }
-        guard total > configuration.softContextLimit else { return }
+    /// Condense older turns when the log approaches the context window.
+    ///
+    /// This replaces dropping the oldest entries, which silently destroyed the beginning of
+    /// the discussion. A digest keeps the thread's conclusions, positions and open
+    /// questions at a fraction of the tokens.
+    ///
+    /// Returns true when compaction ran, so the caller can tell that the transcript has
+    /// been rewritten underneath it.
+    @discardableResult
+    func compactIfNeeded(using seat: Seat, force: Bool = false) async -> Bool {
+        _ = force  // an explicit call always runs; see `compactNow`
 
-        var kept: [Turn] = []
-        var budget = configuration.softContextLimit / 2
-        for turn in conversation.turns.reversed() {
-            if turn.kind == .topic || turn.kind == .introduction || turn.kind == .steering {
-                kept.append(turn)
-                continue
-            }
-            let cost = max(1, turn.content.count / 4)
-            if budget - cost >= 0 {
-                budget -= cost
-                kept.append(turn)
-            }
-        }
-        let trimmed = Array(kept.reversed())
-        if trimmed.count != conversation.turns.count {
+        let spec = await seat.engine.currentSpec
+        let window = spec.contextWindow > 0 ? spec.contextWindow : AgentSpec.defaultContextWindow
+        let usage = contextUsage
+        let tokens = usage.tokens
+        let fraction = Double(tokens) / Double(window)
+        guard force || fraction >= configuration.compactThreshold else { return false }
+
+        let dialogue = conversation.turns.filter { $0.kind != .tool }
+        guard dialogue.count > configuration.compactKeepRecentTurns + 2 else {
+            // Too little to condense usefully — the window is simply small for this topic.
             note(
-                "Context nearly full — dropped the oldest \(conversation.turns.count - trimmed.count) entries."
-            )
-            conversation.turns = trimmed
+                "Prompt is \(tokens) tokens of a \(window)-token window but there is not enough history to condense yet.")
+            return false
         }
+
+        let pinned = Set(
+            dialogue.filter { $0.kind == .topic || $0.kind == .introduction || $0.kind == .summary }
+                .map(\.id))
+        let older = dialogue.dropLast(configuration.compactKeepRecentTurns).filter { !pinned.contains($0.id) }
+        guard !older.isEmpty else { return false }
+
+        let previous = conversation.summaryTurn?.content
+        let prompt = PromptBuilder.compactionPrompt(
+            for: spec, turns: Array(older), topic: conversation.topic, previousSummary: previous)
+
+        note(
+            "Context \(Int(fraction * 100))% full — condensing \(older.count) older entries with \(spec.id).")
+
+        let digest: String
+        do {
+            digest = try await seat.engine.compact(
+                prompt: prompt, maxTokens: configuration.compactSummaryTokens)
+        } catch {
+            note("Compaction with \(spec.id) failed: \(error.localizedDescription)")
+            return false
+        }
+        guard !digest.isEmpty else {
+            note("Compaction with \(spec.id) returned nothing; the log is unchanged.")
+            return false
+        }
+
+        // Replace: drop whatever was condensed, drop any previous summary (it is folded
+        // into the new one), and keep the rest in order.
+        let removedIDs = Set(older.map(\.id))
+        var replacement = conversation.turns.filter { turn in
+            turn.kind != .summary && !removedIDs.contains(turn.id)
+        }
+        let condensed = Turn(
+            sequence: 0,
+            speakerName: "Condensed",
+            kind: .summary,
+            content: digest
+        )
+        // The digest belongs *after* the opening, not in front of it: the topic and brief
+        // are the frame the digest summarises, and a model reading the digest first would
+        // meet the discussion's conclusions before its subject.
+        let pinnedPrefixCount = replacement.prefix { $0.kind == .topic || $0.kind == .introduction }.count
+        replacement.insert(condensed, at: pinnedPrefixCount)
+        // Renumber so ordering stays obvious and unique.
+        replacement = replacement.enumerated().map { index, turn in
+            var copy = turn
+            copy.sequence = index + 1
+            return copy
+        }
+        conversation.turns = replacement
+        publishTranscript()
+        note(
+            "Condensed \(older.count) entries into \(digest.count / 4) tokens; context is now about \(contextUsage.tokens) tokens.")
+        return true
     }
 
     private func publishTranscript() {

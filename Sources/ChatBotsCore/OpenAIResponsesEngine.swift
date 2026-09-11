@@ -36,9 +36,31 @@ public actor OpenAIResponsesEngine: LLMEngine {
 
     public var isLoaded: Bool { ready }
 
+    /// The seat's context window, which no OpenAI-compatible server advertises through
+    /// `/v1/models`.
+    ///
+    /// If the same checkpoint happens to be on disk, its own config is authoritative and
+    /// is preferred — guessing too large here would mean compaction never ran. Otherwise
+    /// the configured value is used.
     public var contextWindow: Int {
-        // The server decides; the UI's context estimate is advisory either way.
-        32_768
+        ModelStore.declaredContextWindow(for: spec.modelID) ?? spec.contextWindow
+    }
+
+    /// Condense a transcript through the same endpoint, with no tools.
+    public func compact(prompt: String, maxTokens: Int) async throws -> String {
+        var spec = self.spec
+        spec.maxTokens = maxTokens
+        spec.thinking = .off
+        let summary = try await generate(
+            messages: [
+                .init(role: .system, content: "You condense discussions faithfully and add nothing."),
+                .init(role: .user, content: prompt),
+            ],
+            tools: [],
+            onToolCall: { _, _ in },
+            onEvent: { _ in }
+        )
+        return summary.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     public var lastStats: TurnStats? { lastStatsValue }

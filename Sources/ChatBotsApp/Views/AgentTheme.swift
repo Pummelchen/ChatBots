@@ -248,7 +248,7 @@ extension Turn {
     func tint(_ palette: AppPalette, seatIndex: Int? = nil) -> AnyShapeStyle {
         switch kind {
         case .topic, .steering: AnyShapeStyle(AgentTheme.moderatorTint(palette))
-        case .introduction: AgentTheme.systemTint(palette)
+        case .introduction, .summary: AgentTheme.systemTint(palette)
         case .tool: AnyShapeStyle(AgentTheme.toolTint(palette))
         case .chat:
             if let seatIndex {
@@ -265,6 +265,7 @@ extension Turn {
         case .topic: "TOPIC"
         case .steering: "MODERATOR"
         case .introduction: "SETUP"
+        case .summary: "CONDENSED"
         case .tool: "TOOL"
         case .chat: speakerName.uppercased()
         }
@@ -275,6 +276,7 @@ extension Turn {
         case .topic: "questionmark.bubble.fill"
         case .steering: "person.wave.2.fill"
         case .introduction: "info.circle.fill"
+        case .summary: "arrow.triangle.2.circlepath"
         case .tool: "globe"
         case .chat: speakerID.map(AgentTheme.symbol(for:)) ?? "bubble.fill"
         }
@@ -288,6 +290,14 @@ enum Format {
 
     static func rate(_ stats: TurnStats) -> String {
         String(format: "%.1f tok/s · %d tok · %.1fs", stats.tokensPerSecond, stats.generationTokens, stats.seconds)
+    }
+
+    /// Context occupancy, with the compaction threshold marked so the reader can see how
+    /// close the log is to being condensed.
+    static func context(tokens used: Int, of window: Int, compactAt: Double) -> String {
+        guard window > 0 else { return "ctx \(tokens(used))" }
+        let percent = Int(Double(used) / Double(window) * 100)
+        return "ctx \(tokens(used))/\(tokens(window)) · \(percent)% (condense at \(Int(compactAt * 100))%)"
     }
 
     /// Generation and prefill side by side.

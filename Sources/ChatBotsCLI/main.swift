@@ -23,6 +23,9 @@ struct Options {
     var solo = false
     var memoryProbe = false
     var sessionProbe = false
+    var compactThreshold: Double?
+    var contextWindow: Int?
+    var keepRecent: Int?
     /// Cap on answer tokens per turn; `nil` keeps the seat's own budget.
     var maxTokens: Int?
     /// Thinking level for both seats; `nil` keeps the preset (medium).
@@ -78,6 +81,9 @@ struct Options {
             case "--benchmark": options.benchmark = true
             case "--memory-probe": options.memoryProbe = true
             case "--session-probe": options.sessionProbe = true
+            case "--compact-threshold": options.compactThreshold = Double(next() ?? "")
+            case "--context-window": options.contextWindow = Int(next() ?? "")
+            case "--compact-keep": options.keepRecent = Int(next() ?? "")
             case "--solo": options.solo = true
             case "--help", "-h":
                 print(Self.usage)
@@ -129,6 +135,7 @@ struct Options {
         if let maxTokens { spec.maxTokens = maxTokens }
         if let thinking { spec.thinking = thinking }
         if let persona { spec.personaID = persona }
+        if let contextWindow { spec.contextWindow = contextWindow }
         spec.backend = backend
         spec.openAI = OpenAIEndpoint(baseURL: baseURL, model: apiModel, apiKey: apiKey)
         return spec
@@ -349,6 +356,8 @@ print("")
 var configuration = ConversationEngine.Configuration()
 configuration.pace = .zero
 configuration.maxTurns = max(1, options.turns)
+if let threshold = options.compactThreshold { configuration.compactThreshold = threshold }
+if let keep = options.keepRecent { configuration.compactKeepRecentTurns = keep }
 
 let seats = zip(specs, engines).map { spec, mlx in
     ConversationEngine.Seat(
@@ -373,6 +382,7 @@ let transcriptTask = Task {
             case .introduction: label = "SETUP"
             case .steering: label = "MODERATOR"
             case .tool: label = "TOOL"
+            case .summary: label = "CONDENSED EARLIER DISCUSSION"
             case .chat: label = turn.speakerName.uppercased()
             }
             header(label)

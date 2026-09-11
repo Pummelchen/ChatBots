@@ -27,7 +27,7 @@ struct TurnRow: View {
     private var wash: Color {
         switch turn.kind {
         case .topic, .steering: AgentTheme.moderatorTint(palette)
-        case .introduction: palette.isBlack ? Color(white: 0.16) : Color.secondary
+        case .introduction, .summary: palette.isBlack ? Color(white: 0.16) : Color.secondary
         case .tool: AgentTheme.toolTint(palette)
         case .chat:
             seatIndex.map { AgentTheme.tint(forSeat: $0, palette: palette) }

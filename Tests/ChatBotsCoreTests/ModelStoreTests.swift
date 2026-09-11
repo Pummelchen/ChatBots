@@ -4,7 +4,7 @@ import ChatBotsCore
 import Foundation
 import Testing
 
-@Suite("ModelStore")
+@Suite("ModelStore", .serialized)
 struct ModelStoreTests {
 
     /// Build a directory that looks like a loadable checkpoint.
@@ -154,12 +154,16 @@ struct ModelStoreTests {
     @Test("prepare() creates the folder and points the hub cache at it")
     func prepareCreatesAndRedirects() throws {
         let root = try temporaryRoot()
+        // Tests run in parallel in one process, so the environment is saved and restored
+        // rather than cleared — clearing it would corrupt a neighbouring test's state.
+        let previous = getenv("HF_HUB_CACHE").map { String(cString: $0) }
         defer {
             try? FileManager.default.removeItem(at: root)
-            unsetenv("HF_HUB_CACHE")
+            if let previous { setenv("HF_HUB_CACHE", previous, 1) } else { unsetenv("HF_HUB_CACHE") }
         }
         unsetenv("HF_HUB_CACHE")
-
+        // Also pass an environment without it, so the check does not depend on the
+        // process-global value at all.
         let prepared = ModelStore.prepare(environment: [ModelStore.environmentKey: root.path])
 
         var isDirectory: ObjCBool = false
@@ -174,13 +178,16 @@ struct ModelStoreTests {
     func prepareRespectsExistingCache() throws {
         let root = try temporaryRoot()
         let elsewhere = try temporaryRoot()
+        let previous = getenv("HF_HUB_CACHE").map { String(cString: $0) }
         defer {
             try? FileManager.default.removeItem(at: root)
             try? FileManager.default.removeItem(at: elsewhere)
-            unsetenv("HF_HUB_CACHE")
+            if let previous { setenv("HF_HUB_CACHE", previous, 1) } else { unsetenv("HF_HUB_CACHE") }
         }
         setenv("HF_HUB_CACHE", elsewhere.path, 1)
 
+        // `prepare` with an environment that already names a cache must leave it alone,
+        // even though the process-global value is whatever the previous test left.
         _ = ModelStore.prepare(environment: [
             ModelStore.environmentKey: root.path,
             "HF_HUB_CACHE": elsewhere.path,
