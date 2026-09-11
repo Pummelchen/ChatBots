@@ -47,6 +47,9 @@
   /* Fallbacks for the first paint, before app.js has measured anything. */
   --vw: 100vw;
   --vh: 100vh;
+  /* The width the layout composes against. Normally the viewport; a forced phone view sets
+     it to a phone's width so the composition is genuinely phone-shaped. */
+  --measure: 100vw;
   --safe-top: 0px;
   --safe-bottom: 0px;
   --safe-left: 0px;
@@ -772,4 +775,25 @@ body[data-device="tablet"] .toggle-text { display: inline; }
 @media (max-width: 600px) {
   .persona-sheet { padding: 0; align-items: flex-end; }
   .persona-sheet-inner { width: 100%; max-height: 88vh; border-radius: 12px 12px 0 0; }
+}
+
+
+/* ── A forced phone view, on a wide screen ────────────────────────────────────────── */
+
+/* `?view=phone` on a desktop browser asks for the phone layout, which means the *shape* of a
+   phone and not merely the single column. Everything is composed against `--measure`, which
+   the client narrows to a phone's width, and the whole page is centred in a soft frame so it
+   reads as a phone rather than as a broken desktop layout. */
+body[data-view="phone"] {
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+
+@media (min-width: 700px) {
+  body[data-view="phone"] {
+    /* A frame, so it is obvious this is deliberate rather than a page that failed to fill
+       the window. */
+    border-inline: 1px solid var(--line);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25), 0 18px 60px rgba(0, 0, 0, 0.45);
+  }
 }

@@ -281,6 +281,35 @@ def main() -> int:
                     if not metrics["messages"]:
                         print("    ! no messages rendered — the capture has no content")
 
+        # The three start scripts depend on the forced views behaving, so they are checked
+        # here rather than assumed: `?view=phone` has to produce a phone-shaped page on a
+        # desktop browser, and `?view=desktop` the two-pane one. That is what
+        # tools/start-web-mobile.sh exists for.
+        print("\nForced views, on a desktop-sized browser:")
+        forced_failures = []
+        with Chrome(CHROME, port=CHROME_PORT + 1) as browser:
+            for view, expected_device, expected_layout, expected_max_width in [
+                ("phone", "phone", "thread", 440),
+                ("desktop", "desktop", "split", 2000),
+            ]:
+                browser.emulate(1440, 900, 2.0, mobile=False)
+                browser.navigate(
+                    f"http://127.0.0.1:{PORT}/?view={view}&capture=1", settle=2.0)
+                metrics = browser.metrics()
+                body_width = browser.evaluate(
+                    "Math.round(document.body.getBoundingClientRect().width)")
+                ok = (metrics["device"] == expected_device
+                      and metrics["layout"] == expected_layout
+                      and body_width <= expected_max_width
+                      and not metrics["overflowing"])
+                print(f"  ?view={view:8s} → device={metrics['device']:8s} "
+                      f"layout={metrics['layout']:7s} body={body_width}pt "
+                      f"{'ok' if ok else 'UNEXPECTED'}")
+                if not ok:
+                    forced_failures.append(view)
+        if forced_failures:
+            print(f"\n  The forced view is wrong for: {', '.join(forced_failures)}")
+
         build_index(rows)
 
         print(f"\n{len(rows)} captured, {failures} failed.")
@@ -291,7 +320,7 @@ def main() -> int:
         else:
             print("No horizontal overflow in any profile.")
         print(f"\nOpen: {OUT / 'index.html'}")
-        return 1 if (failures or overflows) else 0
+        return 1 if (failures or overflows or forced_failures) else 0
     finally:
         if not args.keep_open:
             if caddy:

@@ -35,12 +35,16 @@ The installer is written for a Mac with nothing set up on it. It installs a Swif
 you have none, downloads about 3 GB of models, builds the app, and finishes by loading a model
 and generating a few tokens — so you find out *then* whether it works, not later.
 
-Then either:
+Then pick one, or run all three — they share one conversation engine, so a conversation
+started in the app appears in the browser:
 
 ```bash
-open ~/Applications/ChatBots.command     # the desktop app
-bash tools/start.sh                      # the website, at http://localhost:7788
+bash tools/start-app.sh           # the macOS app, with an API server behind it
+bash tools/start-web-desktop.sh   # the website, two-pane desktop layout
+bash tools/start-web-mobile.sh    # the website, forced into the phone layout
 ```
+
+The desktop app is also at `~/Applications/ChatBots.command`. Each script takes `--help`.
 
 ## Documentation
 
@@ -50,7 +54,7 @@ Full guides are in the **[wiki](https://github.com/Pummelchen/ChatBots/wiki)**:
 | --- | --- |
 | [Installing](https://github.com/Pummelchen/ChatBots/wiki/Installing) | requirements, what the installer does, fixing a failed setup |
 | [Using the desktop app](https://github.com/Pummelchen/ChatBots/wiki/Using-the-desktop-app) | every control, and what it is for |
-| [Using the website](https://github.com/Pummelchen/ChatBots/wiki/Using-the-website) | the browser and phone interface |
+| [Using the website](https://github.com/Pummelchen/ChatBots/wiki/Using-the-website) | the browser and phone interface, and the three start scripts |
 | [Personas](https://github.com/Pummelchen/ChatBots/wiki/Personas) | who can take part, and how to choose |
 | [Running a research session](https://github.com/Pummelchen/ChatBots/wiki/Running-a-research-session) | budgets, and reading the report |
 | [Using cloud models](https://github.com/Pummelchen/ChatBots/wiki/Using-cloud-models) | DeepSeek, LM Studio, or any OpenAI-compatible server |

@@ -217,6 +217,9 @@ public enum WebAssets {
   /* Fallbacks for the first paint, before app.js has measured anything. */
   --vw: 100vw;
   --vh: 100vh;
+  /* The width the layout composes against. Normally the viewport; a forced phone view sets
+     it to a phone's width so the composition is genuinely phone-shaped. */
+  --measure: 100vw;
   --safe-top: 0px;
   --safe-bottom: 0px;
   --safe-left: 0px;
@@ -944,6 +947,27 @@ body[data-device="tablet"] .toggle-text { display: inline; }
   .persona-sheet-inner { width: 100%; max-height: 88vh; border-radius: 12px 12px 0 0; }
 }
 
+
+/* ── A forced phone view, on a wide screen ────────────────────────────────────────── */
+
+/* `?view=phone` on a desktop browser asks for the phone layout, which means the *shape* of a
+   phone and not merely the single column. Everything is composed against `--measure`, which
+   the client narrows to a phone's width, and the whole page is centred in a soft frame so it
+   reads as a phone rather than as a broken desktop layout. */
+body[data-view="phone"] {
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+
+@media (min-width: 700px) {
+  body[data-view="phone"] {
+    /* A frame, so it is obvious this is deliberate rather than a page that failed to fill
+       the window. */
+    border-inline: 1px solid var(--line);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25), 0 18px 60px rgba(0, 0, 0, 0.45);
+  }
+}
+
 """
 
     static let appJS = """
@@ -991,6 +1015,9 @@ body[data-device="tablet"] .toggle-text { display: inline; }
   /// Breakpoints, in CSS pixels. The tablet boundary is the one that matters: below it two
   /// panes are too narrow to read, which is why a phone gets one column.
   const PHONE_MAX = 719;
+  /// How wide a forced phone view is allowed to be, in CSS points. A 430-point column is a
+  /// large phone; wider and it stops reading as one.
+  const PHONE_VIEWPORT_MAX = 430;
   const TABLET_MAX = 1023;
 
   const state = {
@@ -1052,8 +1079,16 @@ body[data-device="tablet"] .toggle-text { display: inline; }
     const height = Math.round(vv ? vv.height : window.innerHeight);
     const root = document.documentElement;
 
-    root.style.setProperty("--vw", width + "px");
+    // A forced phone view on a wide screen composes against a phone-sized width rather than
+    // the browser's. Without this, "phone layout" on a 1400-point window is a very wide page
+    // with the single-column layout — technically correct and nothing like a phone.
+    const composedWidth = (viewMode === "phone" && width > PHONE_VIEWPORT_MAX)
+      ? PHONE_VIEWPORT_MAX
+      : width;
+
+    root.style.setProperty("--vw", composedWidth + "px");
     root.style.setProperty("--vh", height + "px");
+    root.style.setProperty("--measure", composedWidth + "px");
 
     screenInfo.width = width;
     screenInfo.height = height;
@@ -1091,6 +1126,17 @@ body[data-device="tablet"] .toggle-text { display: inline; }
 
     body.dataset.device = device;
     body.dataset.layout = layout;
+    // Recorded separately from `device`, because a *forced* phone view on a wide browser has
+    // to be told apart from a real phone: the page needs to narrow itself, not just switch to
+    // the single-column layout.
+    body.dataset.view = viewMode;
+
+    // The thread container is hidden by an attribute in the markup, and the CSS switches it
+    // on via `data-layout`. The attribute wins over the stylesheet, so the single-column view
+    // has been empty since it was added — on a real phone as much as on a forced view. It is
+    // cleared here, which is the only place that knows which layout is active.
+    const thread = $("thread");
+    if (thread) thread.hidden = layout !== "thread";
 
     for (const [id, mode] of [["view-auto", "auto"], ["view-phone", "phone"], ["view-desktop", "desktop"]]) {
       $(id)?.classList.toggle("on", viewMode === mode);

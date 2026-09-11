@@ -21,6 +21,12 @@
 #   --foreground     stay attached and show logs  (default: same)
 #   --stop           stop whatever is running
 #   --status         report what is running
+#   --open <where>   desktop | mobile | none   (default: none — print the URL)
+#   --view <mode>    auto | phone | desktop    (default: auto)
+#
+# `--view phone` forces the single-column phone layout even in a desktop browser, which is
+# what `start-mobile.sh` uses. The page honours `?view=` on load and remembers nothing, so
+# the mode is a property of the URL rather than of the browser.
 
 set -u
 set -o pipefail
@@ -32,6 +38,8 @@ cd "$ROOT" || exit 1
 PORT=7788
 ENGINE_PORT=7789
 ACTION=run
+OPEN_WHERE=none
+VIEW_MODE=auto
 LOG_DIR="$ROOT/.run"
 ENGINE_LOG="$LOG_DIR/engine.log"
 CADDY_LOG="$LOG_DIR/caddy.log"
@@ -43,6 +51,8 @@ while [ $# -gt 0 ]; do
     --port) PORT="${2:-}"; shift 2 ;;
     --engine) ENGINE_PORT="${2:-}"; shift 2 ;;
     --foreground) ACTION=run; shift ;;
+    --open) OPEN_WHERE="${2:-none}"; shift 2 ;;
+    --view) VIEW_MODE="${2:-auto}"; shift 2 ;;
     --stop) ACTION=stop; shift ;;
     --status) ACTION=status; shift ;;
     -h|--help) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -285,11 +295,21 @@ fi
 
 # ── Ready ────────────────────────────────────────────────────────────────────────────
 
+# A forced view rides in the URL, so the phone layout can be seen on a desktop browser.
+PAGE_URL="http://localhost:$URL_PORT"
+if [ "$VIEW_MODE" != "auto" ]; then
+  PAGE_URL="$PAGE_URL/?view=$VIEW_MODE"
+fi
+
+if [ "$OPEN_WHERE" != "none" ]; then
+  open "$PAGE_URL" 2>/dev/null || true
+fi
+
 cat <<EOF
 
 ${GREEN}${BOLD}ChatBots web interface${OFF}
 
-    ${BOLD}http://localhost:$URL_PORT${OFF}
+    ${BOLD}$PAGE_URL${OFF}
 
 $( [ "$USE_CADDY" -eq 1 ] \
     && echo "    Served by Caddy on port $PORT; the engine is on 127.0.0.1:$ENGINE_PORT (loopback only)." \
@@ -297,6 +317,10 @@ $( [ "$USE_CADDY" -eq 1 ] \
 
     The page drives the same conversation engine as the desktop app, so either can be
     used on its own and both see the same conversation.
+$( [ "$VIEW_MODE" = "phone" ] \
+    && echo "
+    Forcing the ${BOLD}phone layout${OFF}. Switch to Auto or Desktop in the header to leave it." \
+    || true )
 
 ${BOLD}Logs${OFF}
 
