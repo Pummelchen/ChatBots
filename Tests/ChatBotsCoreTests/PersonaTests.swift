@@ -118,8 +118,10 @@ struct PersonaPromptTests {
             for: spec, others: [AgentSpec.seatB()], conversation: conversation())
 
         #expect(neutralPrompt[0].content.count < styledPrompt[0].content.count)
-        #expect(!neutralPrompt[0].content.contains("Your style in this discussion"))
-        #expect(styledPrompt[0].content.contains("Your style in this discussion"))
+        // The heading is mode-aware now — "character" for a show, "role" for an
+        // investigation — so this asserts the directive arrived without pinning the wording.
+        #expect(!neutralPrompt[0].content.contains("in this discussion —"))
+        #expect(styledPrompt[0].content.contains("in this discussion —"))
     }
 
     @Test("A persona changes only the seat's instructions, never the shared log")

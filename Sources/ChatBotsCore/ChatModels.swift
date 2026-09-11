@@ -170,6 +170,11 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
     public var webSearchEnabled: Bool
     /// How much this seat may think before answering. Changeable at runtime from the pane;
     /// `LLMEngine.currentSpec` carries the live value, `spec` the value at construction.
+    /// Whether this seat is taking part in an entertainment session or a research one.
+    ///
+    /// It lives on the seat rather than on the engine because personas are per-seat, and
+    /// because a stored configuration has to know which library its persona id belongs to.
+    public var mode: DiscussionMode
     /// Overrides what this seat's model is assumed to accept, for an API model whose family
     /// cannot be recognised from its id. Nil means "work it out".
     public var visionOverride: VisionSupport?
@@ -198,6 +203,7 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
         maxTokens: Int = 1024,
         contextWindow: Int = AgentSpec.defaultContextWindow,
         visionOverride: VisionSupport? = nil,
+        mode: DiscussionMode = .entertainment,
         webSearchEnabled: Bool = true,
         thinking: ThinkingMode = .medium,
         personaID: String = PersonaLibrary.neutral.id
@@ -217,6 +223,7 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
         self.maxTokens = maxTokens
         self.contextWindow = contextWindow
         self.visionOverride = visionOverride
+        self.mode = mode
         self.webSearchEnabled = webSearchEnabled
         self.thinking = thinking
         self.personaID = personaID
@@ -429,7 +436,25 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
     }
 
     /// The resolved style. Never fails: an unknown id yields `neutral`.
+    ///
+    /// Superseded by `personaStyle`, which resolves through the seat's mode; kept so the
+    /// original library's own lookup remains available.
     public var persona: Persona { PersonaLibrary.persona(id: personaID) }
+
+    /// The persona for this seat in this seat's mode, resolved from the right library.
+    ///
+    /// An id stored for one mode does not resolve in the other, so this falls back to the
+    /// mode's default for the seat rather than handing the model an empty directive.
+    public var personaStyle: PersonaStyle {
+        PersonaCatalog.style(id: personaID, mode: mode, seatIndex: seatOrdinal)
+    }
+
+    /// The seat's ordinal, used only to pick a sensible default persona. Derived from the id
+    /// rather than stored, so it stays stable across launches.
+    private var seatOrdinal: Int {
+        let trailing = id.split(separator: " ").last.flatMap { Int($0) } ?? 1
+        return max(0, trailing - 1)
+    }
 
     public var samplingSeed: UInt64 {
         var hasher = Hasher()

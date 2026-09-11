@@ -27,6 +27,9 @@ struct Options {
     var exportSample = false
     var check = false
     var serve = false
+    var mode = DiscussionMode.entertainment
+    var listCharacters = false
+    var listRoles = false
     var port = 7788
     var contextWindow: Int?
     var keepRecent: Int?
@@ -88,6 +91,17 @@ struct Options {
             case "--export-sample": options.exportSample = true
             case "--check": options.check = true
             case "--serve": options.serve = true
+            case "--list-characters": options.listCharacters = true
+            case "--list-roles": options.listRoles = true
+            case "--mode":
+                let raw = next() ?? ""
+                if let parsed = DiscussionMode(rawValue: raw) {
+                    options.mode = parsed
+                } else {
+                    FileHandle.standardError.write(
+                        Data("unknown mode: \(raw) — try entertainment or research\n".utf8))
+                    exit(2)
+                }
             case "--port": options.port = Int(next() ?? "") ?? options.port
             case "--compact-threshold": options.compactThreshold = Double(next() ?? "")
             case "--context-window": options.contextWindow = Int(next() ?? "")
@@ -247,7 +261,16 @@ if let key = options.tavilyKey {
     setenv("TAVILY_API_KEY", key, 1)
 }
 
-let specs = [options.specA, options.specB]
+var specs = [options.specA, options.specB]
+// The mode decides which library a persona comes from, so it is applied to every seat
+// before anything reads one. A seat holding an identifier from the other library resolves
+// to that mode's default rather than to nothing.
+for index in specs.indices {
+    specs[index].mode = options.mode
+    if !options.mode.owns(personaID: specs[index].personaID) {
+        specs[index].personaID = options.mode.defaultPersonaID(forSeat: index)
+    }
+}
 
 /// One engine per seat. The CLI wires its own so it can route events straight to stdout.
 let registry = WebToolbox.makeRegistry()
@@ -403,6 +426,33 @@ if options.memoryProbe {
             messages: prompt, tools: [], onToolCall: { _, _ in }, onEvent: { _ in })
         report("after turn \(turn)")
     }
+    exit(0)
+}
+
+// Listing the persona libraries, so the pickers are discoverable from the terminal as well
+// as from the interface.
+if options.listCharacters {
+    print("Entertainment cast — \(SocialLibrary.all.count) characters\n")
+    for group in SocialCharacter.Group.allCases {
+        print("\(group.rawValue):")
+        for character in SocialLibrary.all where character.group == group {
+            print("  \(character.emoji) \(character.name.padding(toLength: 24, withPad: " ", startingAt: 0)) \(character.summary)")
+        }
+        print("")
+    }
+    print("Shared styles are also available in both modes: see --list-personas")
+    exit(0)
+}
+if options.listRoles {
+    print("Research analysts — \(AnalystLibrary.all.count) roles\n")
+    for group in AnalystRole.Group.allCases {
+        print("\(group.rawValue):")
+        for role in AnalystLibrary.all where role.group == group {
+            print("  \(role.emoji) \(role.name.padding(toLength: 28, withPad: " ", startingAt: 0)) \(role.summary)")
+        }
+        print("")
+    }
+    print("Default line-up: " + AnalystLibrary.startingLineUp.map(\.name).joined(separator: ", "))
     exit(0)
 }
 

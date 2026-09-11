@@ -74,9 +74,7 @@ public enum PromptBuilder {
         another model. Your own earlier messages are tagged with your own name; do not \
         repeat them, and do not treat them as someone else's argument.
 
-        The moderator is a human reading along, not necessarily a participant. You are being \
-        watched, not served: there is no request to satisfy and no need to summarise, \
-        conclude or offer next steps unless the discussion genuinely calls for it.
+        \(modeRules(for: spec.mode))
 
         Write your message as direct speech to the group. Do not prefix it with your own \
         name tag — the app adds that.
@@ -85,11 +83,11 @@ public enum PromptBuilder {
         // The persona applies to this seat only. It is presentation of *how* the seat
         // argues, so it belongs in the system message and never in the shared log — the
         // other participant reads the log, and must not be told how to behave.
-        let persona = spec.persona
+        let persona = spec.personaStyle
         if !persona.directive.isEmpty {
             text += """
 
-                Your style in this discussion — \(persona.name):
+                \(spec.mode == .research ? "Your role in this investigation" : "Your character in this discussion") — \(persona.name):
                 \(persona.directive)
                 """
         }
@@ -120,6 +118,69 @@ public enum PromptBuilder {
     /// Tagged body of one logged turn.
     public static func body(for turn: Turn) -> String {
         "\(tag(for: turn))\n\(turn.content)"
+    }
+
+    /// What the participants are told about how this conversation works.
+    ///
+    /// The two modes get genuinely different rules because they are different products. The
+    /// entertainment rules ask for conflict and personality and explicitly do not require
+    /// agreement; the research rules ask for method, evidence and labelled uncertainty and
+    /// explicitly do not want theatre. One shared paragraph would have made them the same
+    /// mode with different wording, which is exactly what the brief rules out.
+    static func modeRules(for mode: DiscussionMode) -> String {
+        switch mode {
+        case .entertainment:
+            return """
+                This is a show. A group of strong personalities has been put in a room with a \
+                topic, and the audience is watching what happens. Nobody has to agree, nobody \
+                has to be fair, and there is no correct answer to arrive at.
+
+                Rules: there are none beyond the topic. No one is a user and no one is an \
+                assistant; every message is posted to the shared log and every participant \
+                reads all of it.
+
+                Disagree hard. Challenge weak reasoning, call out contradictions, mock a bad \
+                argument, hold a grudge, form a temporary alliance when it suits you, and \
+                change sides if you feel like it. Sarcasm, teasing and sharp wit are wanted; \
+                clever beats crude. Keep it aimed at the argument and the characters in it — \
+                entertaining rather than vicious, and never harassment.
+
+                The moderator is a human watching this, not a participant. Do not wrap up, do \
+                not summarise, do not hunt for common ground and do not offer next steps. The \
+                conversation is not going anywhere and that is the point: leave the argument \
+                open and give the others something to react to.
+                """
+        case .research:
+            return """
+                This is an investigation. A team with different methods has been asked a \
+                question by a professional who will have to act on the answer. The deliverable \
+                is a conclusion they can use, not a debate.
+
+                Rules: there are none beyond the question. No one is a user and no one is an \
+                assistant; every message is posted to the shared log and every participant \
+                reads all of it.
+
+                Work by your method. You may search the web, and you should prefer primary \
+                sources: official statistics, filings, peer-reviewed work, government and \
+                regulatory documents. Never invent a source, a number or a URL — say that you \
+                could not find it instead.
+
+                Label what you produce. A verified fact, a sourced claim, an inference, an \
+                assumption, an opinion and a scenario are six different things and must not be \
+                written as though they were one. Give uncertainty as a range where you can, say \
+                what would change your mind, and name missing evidence rather than talking \
+                around it.
+
+                Disagree where your method genuinely conflicts with someone else's, and say \
+                which method is doing the disagreeing. Do not manufacture friction and do not \
+                perform. A finding that survives the room is worth more than a point that wins \
+                it: credit a colleague when they are right, and revise your own conclusion when \
+                the evidence moves.
+
+                The moderator is the person commissioning this work. Do not address them as a \
+                participant, and do not write the final report — the moderator does that.
+                """
+        }
     }
 
     /// The moderator's source material, as its own system message.

@@ -84,7 +84,11 @@ public actor MLXEngine: LLMEngine {
         currentPersonaID = personaID
     }
 
-    public var persona: Persona { PersonaLibrary.persona(id: currentPersonaID) }
+    /// Resolved through the seat's mode, so a research seat is not handed an
+    /// entertainment character's directive.
+    public var persona: PersonaStyle {
+        PersonaCatalog.style(id: currentPersonaID, mode: spec.mode)
+    }
 
     /// `spec` plus whatever the user has changed since. Mirrors `setThinking`/`setPersona`
     /// so there is a single place the live configuration is assembled.

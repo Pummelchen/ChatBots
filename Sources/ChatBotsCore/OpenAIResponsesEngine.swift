@@ -81,7 +81,9 @@ public actor OpenAIResponsesEngine: LLMEngine {
     public func setThinking(_ mode: ThinkingMode) { currentThinking = mode }
     public func setPersona(_ personaID: String) { currentPersona = personaID }
 
-    public var persona: Persona { PersonaLibrary.persona(id: currentPersona) }
+    public var persona: PersonaStyle {
+        PersonaCatalog.style(id: currentPersona, mode: spec.mode)
+    }
     public var thinking: ThinkingMode { currentThinking }
 
     public var currentSpec: AgentSpec {

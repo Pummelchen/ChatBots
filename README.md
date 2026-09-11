@@ -551,6 +551,65 @@ already carries the previous name, and a rename mid-thread would leave the share
 attributing turns to two different names for the same participant. Earlier turns keep the
 name they were spoken under rather than being retroactively re-attributed.
 
+### Two modes, two persona philosophies
+
+The brief is explicit that the modes must not share a persona philosophy, and the code takes
+that literally: they are **separate types with separate fields**, not one type with a flag.
+
+| | Reality Show | Research Team |
+| --- | --- | --- |
+| Persona is a… | **social character** | **professional method** |
+| Distinguished by | temperament: dominance, aggression, sarcasm, ego, humour | method, evidence standard, preferred data |
+| Disagreement from | clashing personalities | genuinely different standards of proof |
+| Ends | never | always — a report has to arrive |
+| Rules ask for | conflict, no consensus, no wrapping up | labelled claims, primary sources, revision |
+
+**36 entertainment characters** in five groups — conflict (Alpha, Villain, Contrarian,
+Hothead, Schemer, Manipulator, Diva, Instigator, Jealous One, Grudge Holder), relationships
+(Flirt, Romantic, Heartbreaker, Jealous Lover, Best Friend, Gossip, Peacemaker, Fake Nice
+One), intellectual (Scientist, Philosopher, Lawyer, Fact Checker, Skeptic, Conspiracy
+Theorist, Pragmatist, Idealist), humour (Comedian, Troll, Chaos Agent, Storyteller, Deadpan)
+and ambition (Underdog, Perfectionist, Hustler, Survivor, Overachiever).
+
+**19 analysts** in four groups — evidence and method (Principal Researcher, Fact Checker,
+Skeptic, Methodologist, Statistician, Data Analyst), business and strategy (Strategy
+Consultant, Economist, Investor/VC, CFO, Market Researcher, Competitive Intelligence),
+domain (Technical Expert, Scientist, Industry Expert, Legal/Regulatory) and human
+(Behavioural Scientist, Futurist, Research Moderator).
+
+#### Characters are parameterised, not hand-written
+
+A character is a set of traits and the directive is **generated** from them, so one archetype
+yields many characters without a prompt each:
+
+```swift
+let base = SocialLibrary.character(id: "alpha")
+let intellectual = base.adjusted(ego: .veryHigh, sarcasm: .veryHigh, skepticism: .high)
+let flirtatious = base.adjusted(aggression: .low, humor: .high, empathy: .high)
+```
+
+Both keep the Alpha's identity and read differently, because the traits generate the prose.
+That also makes behaviour testable in a way prose is not: whether the Villain *feels*
+provocative is a judgement call, but whether its aggression exceeds the Peacemaker's is an
+assertion — and the tests assert the orderings, so a later edit that flattens the cast fails
+the build.
+
+Analysts are deliberately **not** parameterised by temperament. There is no aggression dial
+for a Methodologist: a research seat that picks fights is a bug, and the brief's distinction
+only holds if the code enforces it. What varies instead is the evidence standard, which is
+what makes analysts disagree for real reasons.
+
+#### Trying it
+
+```
+chatbots-cli --mode research --list-roles        # the 19 analysts
+chatbots-cli --mode entertainment --list-characters
+chatbots-cli --mode research --turns 4 --topic "Should Company X enter the German EV market?"
+```
+
+`/api/state` reports each seat's resolved persona, so the web interface picks from the
+library for the active mode.
+
 ### Personas
 
 Each seat has its own style, picked from a library of **26 styles plus Neutral**, grouped
