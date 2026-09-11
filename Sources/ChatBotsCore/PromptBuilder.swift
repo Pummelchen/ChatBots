@@ -107,6 +107,8 @@ public enum PromptBuilder {
             return "[System]"
         case .summary:
             return "[Earlier discussion — condensed]"
+        case .report:
+            return "[Research Moderator — final report]"
         case .tool:
             return "[Tool result for \(turn.speakerName)]"
         case .chat:
@@ -339,7 +341,7 @@ public enum PromptBuilder {
         var log = conversation.dialogueTurns
             .filter {
                 $0.kind == .topic || $0.kind == .introduction || $0.kind == .chat
-                    || $0.kind == .steering || $0.kind == .summary
+                    || $0.kind == .steering || $0.kind == .summary || $0.kind == .report
             }
             .map { body(for: $0) }
             .joined(separator: "\n\n")

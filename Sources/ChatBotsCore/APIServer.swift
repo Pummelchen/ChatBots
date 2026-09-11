@@ -82,6 +82,38 @@ public struct APISnapshot: Codable, Sendable {
     public var imagesAllowed: Bool
     public var availablePersonas: [APIPersona]
     public var serverTime: Date
+
+    /// The research session, when there is one. Nil in entertainment, where there is no
+    /// budget and no end condition on purpose.
+    public var research: ResearchStatus?
+    /// The finished report, when the session produced one.
+    public var report: ReportSummary?
+
+    public struct ResearchStatus: Codable, Sendable {
+        public var depth: String
+        public var budgetSummary: String
+        public var rounds: Int
+        public var maxRounds: Int
+        public var searches: Int
+        public var maxSearches: Int
+        public var remainingMinutes: Int
+        public var statusLine: String
+        public var isFinished: Bool
+        public var stopReason: String?
+    }
+
+    public struct ReportSummary: Codable, Sendable {
+        public var question: String
+        public var producedAt: Date
+        public var stopReason: String
+        public var labelledClaims: Int
+        /// True when the model returned a report without the labels that make it usable.
+        public var isLabelled: Bool
+        /// Required sections the report did not cover.
+        public var missingSections: [String]
+        /// The whole report, as markdown, for display and for saving.
+        public var markdown: String
+    }
 }
 
 public struct APIAttachment: Codable, Sendable {
@@ -345,6 +377,25 @@ public final class APIServer {
             broadcast(encode(snapshot()) ?? "{}", event: "snapshot")
             return .json(snapshot())
 
+        case ("POST", "/api/research/budget"):
+            guard let command = request.json(APICommand.self), let raw = command.value,
+                let depth = ResearchBudget.Depth(rawValue: raw)
+            else {
+                return .error("a depth of quick, standard or deep is required", status: 400)
+            }
+            guard engine.setResearchBudget(depth) else {
+                return .error("the budget cannot be changed once the investigation has started", status: 409)
+            }
+            return .json(snapshot())
+
+        case ("GET", "/api/report"):
+            guard let report = engine.researchReport() else {
+                return .error("no report has been produced yet", status: 404)
+            }
+            // Plain markdown rather than JSON, so it can be opened directly in a browser.
+            return HTTPResponse(
+                contentType: "text/markdown; charset=utf-8", body: Data(report.markdown().utf8))
+
         case ("POST", "/api/compact"):
             engine.compactNow()
             return .json(snapshot())
@@ -536,7 +587,18 @@ public final class APIServer {
             availablePersonas: PersonaLibrary.all.map {
                 APIPersona(id: $0.id, name: $0.name, category: $0.category.rawValue, summary: $0.summary)
             },
-            serverTime: Date()
+            serverTime: Date(),
+            research: engine.researchStatus(),
+            report: engine.researchReport().map { report in
+                APISnapshot.ReportSummary(
+                    question: report.question,
+                    producedAt: report.producedAt,
+                    stopReason: report.stopReason,
+                    labelledClaims: report.labelledStatements,
+                    isLabelled: report.isLabelled,
+                    missingSections: report.missingSections,
+                    markdown: report.markdown())
+            }
         )
     }
 

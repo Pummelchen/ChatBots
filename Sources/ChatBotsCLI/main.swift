@@ -31,6 +31,7 @@ struct Options {
     var listCharacters = false
     var attachments: [String] = []
     var seed = false
+    var researchDepth: ResearchBudget.Depth?
     var listRoles = false
     var port = 7788
     var contextWindow: Int?
@@ -95,6 +96,16 @@ struct Options {
             case "--serve": options.serve = true
             case "--attach": options.attachments.append(next() ?? "")
             case "--seed": options.seed = true
+            case "--research":
+                let raw = next() ?? ""
+                if let depth = ResearchBudget.Depth(rawValue: raw) {
+                    options.researchDepth = depth
+                    options.mode = .research
+                } else {
+                    FileHandle.standardError.write(
+                        Data("unknown research budget: \(raw) — try quick, standard or deep\n".utf8))
+                    exit(2)
+                }
             case "--list-characters": options.listCharacters = true
             case "--list-roles": options.listRoles = true
             case "--mode":
@@ -470,7 +481,11 @@ if options.serve {
     let seats = zip(specs, engines).map { spec, mlx in
         ConversationEngine.Seat(spec: spec, mlx: mlx, openAI: OpenAIResponsesEngine(spec: spec))
     }
-    let engine = ConversationEngine(seats: seats, configuration: configuration)
+    var engineConfiguration = configuration
+if let depth = options.researchDepth {
+    engineConfiguration.researchBudget = ResearchBudget.preset(depth)
+}
+let engine = ConversationEngine(seats: seats, configuration: engineConfiguration)
 
 // Source material, read the same way the app reads it.
 if !options.attachments.isEmpty {
@@ -551,7 +566,11 @@ let seats = zip(specs, engines).map { spec, mlx in
         openAI: OpenAIResponsesEngine(spec: spec)
     )
 }
-let engine = ConversationEngine(seats: seats, configuration: configuration)
+var engineConfiguration = configuration
+if let depth = options.researchDepth {
+    engineConfiguration.researchBudget = ResearchBudget.preset(depth)
+}
+let engine = ConversationEngine(seats: seats, configuration: engineConfiguration)
 
 // Source material, read the same way the app reads it.
 if !options.attachments.isEmpty {
@@ -586,6 +605,7 @@ let transcriptTask = Task {
             case .steering: label = "MODERATOR"
             case .tool: label = "TOOL"
             case .summary: label = "CONDENSED EARLIER DISCUSSION"
+            case .report: label = "RESEARCH MODERATOR — FINAL REPORT"
             case .chat: label = turn.speakerName.uppercased()
             }
             header(label)

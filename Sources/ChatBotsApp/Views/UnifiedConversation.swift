@@ -28,7 +28,7 @@ struct UnifiedConversation: View {
         var rows: [ThreadRow] = controller.turns.compactMap { turn in
             switch turn.kind {
             case .introduction, .tool: nil
-            case .topic, .steering, .chat, .summary: ThreadRow(turn: turn)
+            case .topic, .steering, .chat, .summary, .report: ThreadRow(turn: turn)
             }
         }
         // An actively generating seat gets a row, with whatever it has produced so far.

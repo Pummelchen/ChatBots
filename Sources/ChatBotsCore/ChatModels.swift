@@ -29,6 +29,10 @@ public struct Turn: Identifiable, Sendable, Hashable {
         /// A model-written digest that replaced older turns to reclaim context. Authored by
         /// the app on a seat's behalf, so it carries no speaker.
         case summary
+        /// The final report of a research session, written by the moderator seat. Its own
+        /// kind because it is the deliverable rather than a contribution — a front end should
+        /// present it differently, and it is not another message in the argument.
+        case report
     }
 
     public let id: UUID
@@ -80,17 +84,27 @@ public struct Conversation: Sendable {
     /// fed back into each seat's prompt, which is what makes a conversation develop rather
     /// than restart every message.
     public var conflict = ConflictState()
+    /// The research session's budget and progress, for a research run. Nil in entertainment,
+    /// where there is no budget and no end condition on purpose.
+    public var research: ResearchSession?
+    /// The report a finished research session produced, kept so the interface can show it and
+    /// the export can include it.
+    public var report: ResearchReport?
 
     public init(
         topic: String,
         turns: [Turn] = [],
         attachments: [AttachedDocument] = [],
-        conflict: ConflictState = ConflictState()
+        conflict: ConflictState = ConflictState(),
+        research: ResearchSession? = nil,
+        report: ResearchReport? = nil
     ) {
         self.topic = topic
         self.turns = turns
         self.attachments = attachments
         self.conflict = conflict
+        self.research = research
+        self.report = report
     }
 
     /// Turns that an LLM should actually read: history and opening brief, but not

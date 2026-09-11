@@ -573,6 +573,60 @@ already carries the previous name, and a rename mid-thread would leave the share
 attributing turns to two different names for the same participant. Earlier turns keep the
 name they were spoken under rather than being retroactively re-attributed.
 
+### Research sessions end, and produce a report
+
+The modes differ in more than tone: an entertainment conversation is endless by design, while
+a research session **has to stop**. A report that never arrives is not a research session, it
+is an unbounded argument.
+
+**Budgets** — Quick (5–10 min), Standard (20–30), Deep (45–60), or a custom duration with the
+other limits scaled to match:
+
+```
+chatbots-cli --research quick --topic "Should Company X enter the German EV market?"
+```
+
+Three limits are enforced together — wall-clock duration, contributions, and web searches —
+and the duration is re-checked rather than latched, because a session can sit idle between
+turns and the time budget is wall-clock, not thinking time.
+
+**It also stops early, which matters more than the budgets.** A run of contributions that add
+nothing new is read as convergence:
+
+| Stop reason | Meaning |
+| --- | --- |
+| `converged` | the analysts have run out of things to say, not out of time |
+| `durationReached` / `roundsReached` / `searchesReached` | the budget ran out |
+| `stoppedByModerator` | stopped by hand — still owes a report |
+
+Convergence is checked *before* the counters, because "the work is done" is a more useful
+thing to tell the moderator than "the clock ran out". A deeper session tolerates more quiet
+turns before giving up (2/3/4 for quick/standard/deep), since three quiet turns in five
+minutes is a stronger signal than three in an hour.
+
+**The report** has the eleven sections the brief lists, and the claim labels are part of the
+format rather than a stylistic preference: `FACT`, `SOURCED`, `INFERENCE`, `ASSUMPTION`,
+`OPINION`, `SCENARIO`. Only the first two are marked as reliable, and the report says so in
+its own legend. A report read a week later has to say what was asked and how hard it was
+pushed, so it carries the question, the budget, the number of contributions and searches, and
+why it stopped.
+
+Two behaviours worth knowing:
+
+* **The moderator writes it**, which is what the role is for — it has read every contribution
+  and its job is to organise, not to add. If no moderator seat is present, the first seat is
+  asked instead and the substitution is **noted** rather than silent, since producing no
+  report would waste the whole session.
+* **A thin report is usable; one that hides its thinness is not.** If the model returns claims
+  without labels, the report is kept and flagged rather than rejected — the findings are still
+  worth having — and both the interface and the log say so. Sections the report did not cover
+  are listed under "Not covered".
+
+The parser is deliberately tolerant: headings are matched however the model words them
+("Unknowns & Evidence Gaps" and "unknowns/evidence gaps" are the same section) and emphasis
+around labels is stripped, because refusing a whole report over a heading word would throw
+away an entire session's work.
+
 ### The conflict engine (Reality Show)
 
 A reality-show conversation is not a sequence of independent replies. The brief asks that a

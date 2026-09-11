@@ -133,6 +133,30 @@ public enum WebAssets {
   <span id="context" class="note mono">ctx —</span>
 </footer>
 
+<!-- Shown only while a research session is running. -->
+<div id="research-bar" class="research-bar" hidden>
+  <span id="research-depth" class="pill"></span>
+  <span id="research-progress" class="note"></span>
+  <div class="spacer"></div>
+  <div class="seg" role="group" aria-label="Research budget">
+    <button id="depth-quick" title="5–10 minutes">Quick</button>
+    <button id="depth-standard" title="20–30 minutes">Standard</button>
+    <button id="depth-deep" title="45–60 minutes">Deep</button>
+  </div>
+</div>
+
+<!-- The deliverable. Its own panel rather than another message in the argument. -->
+<div id="report-panel" class="report-panel" hidden>
+  <div class="report-head">
+    <b>Research report</b>
+    <span id="report-meta" class="note"></span>
+    <div class="spacer"></div>
+    <button id="report-download" class="small">Download .md</button>
+    <button id="report-close" class="small">Close</button>
+  </div>
+  <div id="report-body" class="report-body"></div>
+</div>
+
 <div id="toast" class="toast" hidden></div>
 <div id="profile-badge" class="profile-badge" hidden></div>
 
@@ -705,6 +729,78 @@ body[data-device="phone"] .footer #message { flex: 1 1 auto; }
 body[data-device="tablet"] .personas { display: inline; }
 body[data-device="tablet"] .toggle-text { display: inline; }
 
+
+/* ── Research session ─────────────────────────────────────────────────────────────── */
+
+/* The budget controls only mean anything before the run, so the bar appears with the
+   session and disappears with the report. */
+.research-bar {
+  display: flex;
+  align-items: center;
+  gap: calc(8px * var(--scale));
+  padding: calc(6px * var(--scale)) var(--pad);
+  background: var(--bg-sunken);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.research-bar .seg button { padding-inline: calc(8px * var(--scale)); }
+
+/* The report is the deliverable, so it takes the space rather than sitting in the log. */
+.report-panel {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(8px + var(--safe-top));
+  bottom: calc(8px + var(--safe-bottom));
+  width: min(760px, calc(var(--vw) - 16px));
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  z-index: 25;
+  overflow: hidden;
+}
+
+.report-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(9px * var(--scale)) var(--pad);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.report-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--pad);
+  font-size: var(--font-small);
+  line-height: 1.55;
+}
+
+.report-body h1 { font-size: calc(17px * var(--scale)); margin: 0 0 10px; }
+.report-body h2 {
+  font-size: calc(14px * var(--scale));
+  margin: 18px 0 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--line);
+}
+.report-body ul { margin: 0 0 8px; padding-left: 1.2em; }
+.report-body li { margin-bottom: 4px; }
+.report-body p { margin: 0 0 8px; }
+/* The claim labels are the point of the format, so they are emphasised. */
+.report-body strong { color: var(--seat-a); }
+
+@media (max-width: 780px) {
+  .report-panel { width: calc(var(--vw) - 12px); }
+  .report-head .spacer { display: none; }
+}
+
 """
 
     static let appJS = """
@@ -1124,6 +1220,7 @@ body[data-device="tablet"] .toggle-text { display: inline; }
     drawSeats();
     drawAttachments();
     drawContext();
+    drawResearch();
     if (first && next.messages.length && state.follow) scrollToBottom();
   }
 
@@ -1212,6 +1309,74 @@ body[data-device="tablet"] .toggle-text { display: inline; }
     }
   }
 
+  /** The research session, while there is one. */
+  function drawResearch() {
+    const s = state.snapshot;
+    const bar = $("research-bar");
+    const research = s.research;
+    if (!research) {
+      bar.hidden = true;
+      // A finished session's report stays available even after the bar goes.
+      if (!s.report) $("report-panel").hidden = true;
+      return;
+    }
+
+    bar.hidden = false;
+    $("research-depth").textContent = `${research.depth} · ${research.budgetSummary}`;
+    $("research-progress").textContent = research.statusLine;
+    // The budget is only settable before the run, so the controls disable with it.
+    const locked = !s.canAttach;
+    for (const [id, depth] of [["depth-quick", "quick"], ["depth-standard", "standard"],
+                               ["depth-deep", "deep"]]) {
+      const button = $(id);
+      button.disabled = locked;
+      button.classList.toggle("on", research.depth.toLowerCase() === depth);
+    }
+
+    if (s.report) showReport(s.report);
+  }
+
+  function showReport(report) {
+    const panel = $("report-panel");
+    panel.hidden = false;
+    // Worth stating plainly: a report whose claims are unlabelled cannot be relied on, and
+    // the reader has to be told rather than left to assume the labels are missing by mistake.
+    const warnings = [];
+    if (!report.isLabelled) warnings.push("no claim labels — treat everything as unverified");
+    if (report.missingSections.length) {
+      warnings.push(`not covered: ${report.missingSections.join(", ")}`);
+    }
+    $("report-meta").textContent =
+      `${report.labelledClaims} labelled claims${warnings.length ? " · " + warnings.join(" · ") : ""}`;
+    $("report-body").innerHTML = markdownToHTML(report.markdown);
+  }
+
+  /** Enough markdown for the report's own format: headings, list items, bold. */
+  function markdownToHTML(markdown) {
+    const escape = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const lines = escape(markdown).split("\\n");
+    let out = "";
+    let inList = false;
+    const closeList = () => { if (inList) { out += "</ul>"; inList = false; } };
+
+    for (const raw of lines) {
+      const line = raw.trimEnd();
+      if (line.startsWith("## ")) { closeList(); out += `<h2>${line.slice(3)}</h2>`; continue; }
+      if (line.startsWith("# ")) { closeList(); out += `<h1>${line.slice(2)}</h1>`; continue; }
+      if (line.startsWith("- ") || line.startsWith("* ")) {
+        if (!inList) { out += "<ul>"; inList = true; }
+        out += `<li>${line.slice(2).replace(/\\*\\*(.+?)\\*\\*/g, "<strong>$1</strong>")}</li>`;
+        continue;
+      }
+      closeList();
+      if (line === "---") { out += "<hr>"; continue; }
+      if (line.trim() === "") continue;
+      out += `<p>${line.replace(/\\*\\*(.+?)\\*\\*/g, "<strong>$1</strong>")}</p>`;
+    }
+    closeList();
+    return out;
+  }
+
   function drawContext() {
     const s = state.snapshot;
     const pct = Math.round(s.contextFraction * 100);
@@ -1277,6 +1442,23 @@ body[data-device="tablet"] .toggle-text { display: inline; }
     $("attach").onclick = () => $("files").click();
     $("files").onchange = (event) => addFiles([...event.target.files]);
 
+    $("depth-quick").onclick = () => setDepth("quick");
+    $("depth-standard").onclick = () => setDepth("standard");
+    $("depth-deep").onclick = () => setDepth("deep");
+    $("report-close").onclick = () => { $("report-panel").hidden = true; };
+    $("report-download").onclick = () => {
+      const report = state.snapshot && state.snapshot.report;
+      if (!report) return;
+      const blob = new Blob([report.markdown], { type: "text/markdown;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      const slug = (report.question || "report").replace(/[^a-zA-Z0-9 ]/g, "").trim()
+        .replace(/\\s+/g, "-").slice(0, 60);
+      a.download = `ChatBots report ${slug}.md`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+
     $("view-auto").onclick = () => setViewMode("auto");
     $("view-phone").onclick = () => setViewMode("phone");
     $("view-desktop").onclick = () => setViewMode("desktop");
@@ -1325,6 +1507,10 @@ body[data-device="tablet"] .toggle-text { display: inline; }
       clearTimeout(timer);
       timer = setTimeout(() => fn(...args), ms);
     };
+  }
+
+  async function setDepth(depth) {
+    await run(() => api.post("/api/research/budget", { value: depth }));
   }
 
   async function send() {

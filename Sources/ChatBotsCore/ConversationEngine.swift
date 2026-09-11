@@ -79,6 +79,8 @@ public final class ConversationEngine {
         public var autoCompact: Bool = true
         /// Fraction of the context window at which compaction runs.
         public var compactThreshold: Double = 0.7
+        /// The budget for a research session. Nil means the mode's default preset.
+        public var researchBudget: ResearchBudget?
         /// How many recent entries to keep verbatim. Older ones are condensed.
         public var compactKeepRecentTurns: Int = 8
         /// Token allowance for the digest itself.
@@ -161,7 +163,7 @@ public final class ConversationEngine {
 
     // MARK: Internals
 
-    public let configuration: Configuration
+    public var configuration: Configuration
     private var seats: [Seat]
 
     private var seatCursor = 0
@@ -362,7 +364,23 @@ public final class ConversationEngine {
 
     /// Begin (or restart after a stop) with the given topic. Every seat is loaded
     /// first, so the first turn is not also a model download.
+    /// Begin a research session, if the mode calls for one.
+    ///
+    /// Started once per conversation and then carried, so restarting does not reset a budget
+    /// the moderator already spent — a session that reset its clock on every Start would never
+    /// reach its end condition.
+    private func beginResearchSessionIfNeeded() {
+        guard !seats.isEmpty, seats[0].spec.mode == .research else { return }
+        guard conversation.research == nil else { return }
+        let budget = configuration.researchBudget
+            ?? ResearchBudget.preset(.standard)
+        conversation.research = ResearchSession(budget: budget)
+        note("Research budget: \(budget.depth.label) — \(budget.depth.summary), "
+            + "\(budget.maxRounds) contributions, \(budget.maxSearches) searches.")
+    }
+
     public func start(topic: String? = nil) {
+        beginResearchSessionIfNeeded()
         if let topic {
             conversation.topic = topic.trimmingCharacters(in: .whitespacesAndNewlines)
         }
@@ -494,6 +512,83 @@ public final class ConversationEngine {
 
     // MARK: - Turn loop
 
+    /// Write the report that ends a research session.
+    ///
+    /// The **moderator** writes it, because that is what the role is for: it has read every
+    /// contribution and its job is to organise, not to add. If no moderator seat is present —
+    /// a two-seat run configured with two analysts — the first seat is asked instead, since a
+    /// report is the deliverable and producing none would waste the whole session. The
+    /// substitution is noted rather than silent.
+    private func writeReport(reason: ResearchStop) async {
+        guard let session = conversation.research else { return }
+
+        let moderator =
+            seats.first { $0.spec.personaID == "research-moderator" }
+            ?? seats.first
+        guard let moderator else { return }
+        if moderator.spec.personaID != "research-moderator" {
+            note("No Research Moderator among the seats, so \(moderator.spec.displayName) is writing the report.")
+        }
+
+        let transcript = conversation.turns
+            .filter { $0.kind == .chat || $0.kind == .tool || $0.kind == .topic }
+            .map { turn -> String in
+                let who = turn.kind == .tool ? "TOOL" : turn.speakerName
+                return "[\(who)] \(turn.content)"
+            }
+            .joined(separator: "\n\n")
+
+        let prompt = ResearchReporting.synthesisPrompt(
+            question: conversation.topic,
+            participants: seats.map { $0.spec.displayName },
+            stopReason: reason.explanation,
+            transcript: transcript)
+
+        note("Writing the report…")
+        let text: String
+        do {
+            text = try await moderator.engine.generate(
+                messages: [
+                    .init(
+                        role: .system,
+                        content: "You are the Research Moderator. You organise findings precisely and add none of your own."),
+                    .init(role: .user, content: prompt),
+                ],
+                tools: [], onToolCall: { _, _ in }, onEvent: { _ in })
+        } catch {
+            note("The report could not be written: \(error.localizedDescription)")
+            return
+        }
+
+        let report = ResearchReporting.parse(
+            text,
+            question: conversation.topic,
+            participants: seats.map { $0.spec.displayName },
+            stopReason: reason.explanation,
+            budgetSummary: "\(session.budget.depth.label) (\(session.budget.depth.summary))",
+            rounds: session.rounds,
+            searches: session.searches)
+
+        conversation.report = report
+        conversation.turns.append(
+            Turn(
+                sequence: nextSequence(),
+                speakerName: "Research Moderator",
+                kind: .report,
+                content: report.markdown()
+            )
+        )
+        publishTranscript()
+
+        if !report.isLabelled {
+            note("The report came back without claim labels, so treat every statement as unverified.")
+        }
+        if !report.missingSections.isEmpty {
+            note("The report did not cover: \(report.missingSections.joined(separator: ", ")).")
+        }
+        note("Report ready — \(report.labelledStatements) labelled claims.")
+    }
+
     private func runLoop() async {
         while !Task.isCancelled {
             if status.isPaused {
@@ -502,6 +597,17 @@ public final class ConversationEngine {
                 }
             }
             if Task.isCancelled { break }
+
+            // A research session stops when its budget says so, and writes its report on the
+            // way out. Checked before another turn is planned, so a finished investigation
+            // does not spend one more contribution restating what it already concluded.
+            if let session = conversation.research, session.isFinished() {
+                let reason = session.evaluate()
+                note("Research finished — \(reason.explanation)")
+                await writeReport(reason: reason)
+                setStatus(.limitReached)
+                break
+            }
 
             if turnsCompleted >= configuration.maxTurns {
                 note(
@@ -622,6 +728,19 @@ public final class ConversationEngine {
                 // importing grudges into it would be the modes sharing a philosophy.
                 // The handler is given an id, not the seat, so the mode is looked up here.
                 let speakerMode = seats.first { $0.spec.id == id }?.spec.mode ?? .entertainment
+                if speakerMode == .research {
+                    // A contribution that brought evidence, changed a position or answered a
+                    // challenge is progress; one that restated a position is not. A run of
+                    // those is what convergence means.
+                    let added = ConflictReader.signals(
+                        in: clean, from: id, others: seats.map(\.spec.id), addressing: nil
+                    ).contains { $0.kind == .newEvidence || $0.kind == .positionChange }
+                    let searchesThisTurn = conversation.turns.last {
+                        $0.kind == .tool && $0.speakerID == id && $0.sequence > sequence - 4
+                    } != nil ? 1 : 0
+                    conversation.research?.record(
+                        searchCount: searchesThisTurn, addedSomething: added)
+                }
                 if speakerMode == .entertainment {
                     let everyone = seats.map(\.spec.id)
                     let signals = ConflictReader.signals(
@@ -694,6 +813,44 @@ public final class ConversationEngine {
         guard turnsCompleted == 0, generationTask == nil else { return false }
         conversation.attachments = documents
         publishTranscript()
+        return true
+    }
+
+    /// The research session, for a front end to show progress.
+    public var researchSession: ResearchSession? { conversation.research }
+
+    /// The report a finished session produced.
+    public func researchReport() -> ResearchReport? { conversation.report }
+
+    /// A status line for the session, or nil outside research.
+    public func researchStatus() -> APISnapshot.ResearchStatus? {
+        guard let session = conversation.research else { return nil }
+        let reason = session.evaluate()
+        return APISnapshot.ResearchStatus(
+            depth: session.budget.depth.label,
+            budgetSummary: session.budget.depth.summary,
+            rounds: session.rounds,
+            maxRounds: session.budget.maxRounds,
+            searches: session.searches,
+            maxSearches: session.budget.maxSearches,
+            remainingMinutes: Int(session.remaining() / 60),
+            statusLine: session.statusLine(),
+            isFinished: reason.isFinished,
+            stopReason: reason == .running ? nil : reason.explanation)
+    }
+
+    /// Set the research budget before the investigation starts.
+    ///
+    /// Refused once it is running: the budget is what the session is being measured against,
+    /// and changing it midway would make the progress meaningless.
+    @discardableResult
+    public func setResearchBudget(_ depth: ResearchBudget.Depth) -> Bool {
+        guard startedTurns == 0, generationTask == nil else { return false }
+        guard seats.contains(where: { $0.spec.mode == .research }) else { return false }
+        let budget = ResearchBudget.preset(depth)
+        configuration.researchBudget = budget
+        conversation.research = ResearchSession(budget: budget)
+        note("Research budget set to \(depth.label) — \(depth.summary).")
         return true
     }
 

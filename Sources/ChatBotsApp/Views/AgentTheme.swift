@@ -221,6 +221,13 @@ enum AgentTheme {
         palette.isBlack ? Color(red: 1.00, green: 0.72, blue: 0.30) : .orange
     }
 
+    /// The report of a research session. Its own tint because it is the deliverable rather
+    /// than a voice in the conversation: it should not read as one more participant.
+    static func reportTint(_ palette: AppPalette) -> AnyShapeStyle {
+        AnyShapeStyle(
+            palette.isBlack ? Color(white: 0.62) : Color(red: 0.30, green: 0.40, blue: 0.52))
+    }
+
     static func systemTint(_ palette: AppPalette) -> AnyShapeStyle {
         palette.isBlack ? AnyShapeStyle(Color(white: 0.55)) : AnyShapeStyle(.secondary)
     }
@@ -249,6 +256,7 @@ extension Turn {
         switch kind {
         case .topic, .steering: AnyShapeStyle(AgentTheme.moderatorTint(palette))
         case .introduction, .summary: AgentTheme.systemTint(palette)
+        case .report: AgentTheme.reportTint(palette)
         case .tool: AnyShapeStyle(AgentTheme.toolTint(palette))
         case .chat:
             if let seatIndex {
@@ -266,6 +274,7 @@ extension Turn {
         case .steering: "MODERATOR"
         case .introduction: "SETUP"
         case .summary: "CONDENSED"
+        case .report: "REPORT"
         case .tool: "TOOL"
         case .chat: speakerName.uppercased()
         }
@@ -277,6 +286,7 @@ extension Turn {
         case .steering: "person.wave.2.fill"
         case .introduction: "info.circle.fill"
         case .summary: "arrow.triangle.2.circlepath"
+        case .report: "doc.text.magnifyingglass"
         case .tool: "globe"
         case .chat: speakerID.map(AgentTheme.symbol(for:)) ?? "bubble.fill"
         }

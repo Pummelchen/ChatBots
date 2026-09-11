@@ -50,6 +50,7 @@ public enum TranscriptWriter {
         case .steering: "MODERATOR"
         case .introduction: "SETUP"
         case .summary: "CONDENSED EARLIER DISCUSSION"
+        case .report: "RESEARCH MODERATOR — FINAL REPORT"
         case .tool: "TOOL"
         case .chat: turn.speakerName.uppercased()
         }

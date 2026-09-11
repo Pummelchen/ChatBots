@@ -97,6 +97,30 @@
   <span id="context" class="note mono">ctx —</span>
 </footer>
 
+<!-- Shown only while a research session is running. -->
+<div id="research-bar" class="research-bar" hidden>
+  <span id="research-depth" class="pill"></span>
+  <span id="research-progress" class="note"></span>
+  <div class="spacer"></div>
+  <div class="seg" role="group" aria-label="Research budget">
+    <button id="depth-quick" title="5–10 minutes">Quick</button>
+    <button id="depth-standard" title="20–30 minutes">Standard</button>
+    <button id="depth-deep" title="45–60 minutes">Deep</button>
+  </div>
+</div>
+
+<!-- The deliverable. Its own panel rather than another message in the argument. -->
+<div id="report-panel" class="report-panel" hidden>
+  <div class="report-head">
+    <b>Research report</b>
+    <span id="report-meta" class="note"></span>
+    <div class="spacer"></div>
+    <button id="report-download" class="small">Download .md</button>
+    <button id="report-close" class="small">Close</button>
+  </div>
+  <div id="report-body" class="report-body"></div>
+</div>
+
 <div id="toast" class="toast" hidden></div>
 <div id="profile-badge" class="profile-badge" hidden></div>
 

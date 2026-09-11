@@ -559,3 +559,75 @@ body[data-device="phone"] .footer #message { flex: 1 1 auto; }
 /* Tablet: keep the two panes but give the controls room to breathe. */
 body[data-device="tablet"] .personas { display: inline; }
 body[data-device="tablet"] .toggle-text { display: inline; }
+
+
+/* ── Research session ─────────────────────────────────────────────────────────────── */
+
+/* The budget controls only mean anything before the run, so the bar appears with the
+   session and disappears with the report. */
+.research-bar {
+  display: flex;
+  align-items: center;
+  gap: calc(8px * var(--scale));
+  padding: calc(6px * var(--scale)) var(--pad);
+  background: var(--bg-sunken);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.research-bar .seg button { padding-inline: calc(8px * var(--scale)); }
+
+/* The report is the deliverable, so it takes the space rather than sitting in the log. */
+.report-panel {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(8px + var(--safe-top));
+  bottom: calc(8px + var(--safe-bottom));
+  width: min(760px, calc(var(--vw) - 16px));
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  z-index: 25;
+  overflow: hidden;
+}
+
+.report-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(9px * var(--scale)) var(--pad);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.report-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--pad);
+  font-size: var(--font-small);
+  line-height: 1.55;
+}
+
+.report-body h1 { font-size: calc(17px * var(--scale)); margin: 0 0 10px; }
+.report-body h2 {
+  font-size: calc(14px * var(--scale));
+  margin: 18px 0 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--line);
+}
+.report-body ul { margin: 0 0 8px; padding-left: 1.2em; }
+.report-body li { margin-bottom: 4px; }
+.report-body p { margin: 0 0 8px; }
+/* The claim labels are the point of the format, so they are emphasised. */
+.report-body strong { color: var(--seat-a); }
+
+@media (max-width: 780px) {
+  .report-panel { width: calc(var(--vw) - 12px); }
+  .report-head .spacer { display: none; }
+}

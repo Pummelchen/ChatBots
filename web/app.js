@@ -414,6 +414,7 @@
     drawSeats();
     drawAttachments();
     drawContext();
+    drawResearch();
     if (first && next.messages.length && state.follow) scrollToBottom();
   }
 
@@ -502,6 +503,74 @@
     }
   }
 
+  /** The research session, while there is one. */
+  function drawResearch() {
+    const s = state.snapshot;
+    const bar = $("research-bar");
+    const research = s.research;
+    if (!research) {
+      bar.hidden = true;
+      // A finished session's report stays available even after the bar goes.
+      if (!s.report) $("report-panel").hidden = true;
+      return;
+    }
+
+    bar.hidden = false;
+    $("research-depth").textContent = `${research.depth} · ${research.budgetSummary}`;
+    $("research-progress").textContent = research.statusLine;
+    // The budget is only settable before the run, so the controls disable with it.
+    const locked = !s.canAttach;
+    for (const [id, depth] of [["depth-quick", "quick"], ["depth-standard", "standard"],
+                               ["depth-deep", "deep"]]) {
+      const button = $(id);
+      button.disabled = locked;
+      button.classList.toggle("on", research.depth.toLowerCase() === depth);
+    }
+
+    if (s.report) showReport(s.report);
+  }
+
+  function showReport(report) {
+    const panel = $("report-panel");
+    panel.hidden = false;
+    // Worth stating plainly: a report whose claims are unlabelled cannot be relied on, and
+    // the reader has to be told rather than left to assume the labels are missing by mistake.
+    const warnings = [];
+    if (!report.isLabelled) warnings.push("no claim labels — treat everything as unverified");
+    if (report.missingSections.length) {
+      warnings.push(`not covered: ${report.missingSections.join(", ")}`);
+    }
+    $("report-meta").textContent =
+      `${report.labelledClaims} labelled claims${warnings.length ? " · " + warnings.join(" · ") : ""}`;
+    $("report-body").innerHTML = markdownToHTML(report.markdown);
+  }
+
+  /** Enough markdown for the report's own format: headings, list items, bold. */
+  function markdownToHTML(markdown) {
+    const escape = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const lines = escape(markdown).split("\n");
+    let out = "";
+    let inList = false;
+    const closeList = () => { if (inList) { out += "</ul>"; inList = false; } };
+
+    for (const raw of lines) {
+      const line = raw.trimEnd();
+      if (line.startsWith("## ")) { closeList(); out += `<h2>${line.slice(3)}</h2>`; continue; }
+      if (line.startsWith("# ")) { closeList(); out += `<h1>${line.slice(2)}</h1>`; continue; }
+      if (line.startsWith("- ") || line.startsWith("* ")) {
+        if (!inList) { out += "<ul>"; inList = true; }
+        out += `<li>${line.slice(2).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")}</li>`;
+        continue;
+      }
+      closeList();
+      if (line === "---") { out += "<hr>"; continue; }
+      if (line.trim() === "") continue;
+      out += `<p>${line.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")}</p>`;
+    }
+    closeList();
+    return out;
+  }
+
   function drawContext() {
     const s = state.snapshot;
     const pct = Math.round(s.contextFraction * 100);
@@ -567,6 +636,23 @@
     $("attach").onclick = () => $("files").click();
     $("files").onchange = (event) => addFiles([...event.target.files]);
 
+    $("depth-quick").onclick = () => setDepth("quick");
+    $("depth-standard").onclick = () => setDepth("standard");
+    $("depth-deep").onclick = () => setDepth("deep");
+    $("report-close").onclick = () => { $("report-panel").hidden = true; };
+    $("report-download").onclick = () => {
+      const report = state.snapshot && state.snapshot.report;
+      if (!report) return;
+      const blob = new Blob([report.markdown], { type: "text/markdown;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      const slug = (report.question || "report").replace(/[^a-zA-Z0-9 ]/g, "").trim()
+        .replace(/\s+/g, "-").slice(0, 60);
+      a.download = `ChatBots report ${slug}.md`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+
     $("view-auto").onclick = () => setViewMode("auto");
     $("view-phone").onclick = () => setViewMode("phone");
     $("view-desktop").onclick = () => setViewMode("desktop");
@@ -615,6 +701,10 @@
       clearTimeout(timer);
       timer = setTimeout(() => fn(...args), ms);
     };
+  }
+
+  async function setDepth(depth) {
+    await run(() => api.post("/api/research/budget", { value: depth }));
   }
 
   async function send() {
