@@ -170,6 +170,10 @@ public final class ConversationEngine {
     /// transcript text — together they let the next prompt be predicted rather than
     /// guessed. Set from `TurnStats.promptTokens`.
     private var measuredPromptTokens: Int?
+    /// The name the seat currently speaking goes by, so its reply is logged under the name
+    /// it was spoken under rather than the seat's internal id. Captured per turn, which is
+    /// what lets a rename change future turns without rewriting history.
+    private var currentSpeakerName: String?
     private var lastMeasuredDialogueTokens = 0
     /// Turns that have begun generating (unlike `turnsCompleted`, counts the current one).
     public private(set) var startedTurns = 0
@@ -419,6 +423,7 @@ public final class ConversationEngine {
         // Built from the engine's live configuration, not the spec captured at
         // construction, so a persona or thinking change made in the UI takes effect here.
         let liveSpec = await seat.engine.currentSpec
+        currentSpeakerName = liveSpec.displayName
         let prompt = PromptBuilder.prompt(
             for: liveSpec,
             others: seats.map(\.spec).filter { $0.id != liveSpec.id },
@@ -471,7 +476,7 @@ public final class ConversationEngine {
                     Turn(
                         sequence: nextSequence(),
                         speakerID: id,
-                        speakerName: id,
+                        speakerName: currentSpeakerName ?? id,
                         kind: .chat,
                         content: clean
                     )

@@ -20,7 +20,7 @@ public enum PromptBuilder {
     /// The shared opening brief. Shown in both panes and sent to both models.
     public static func introduction(specs: [AgentSpec], topic: String) -> String {
         let roster = specs
-            .map { "- \($0.id): \($0.displayName) — \($0.modelShortName)" }
+            .map { "- \($0.displayName) — \($0.modelShortName)" }
             .joined(separator: "\n")
 
         return """
@@ -55,14 +55,15 @@ public enum PromptBuilder {
     /// The system message for one seat. Identical for every turn so the prompt prefix
     /// stays stable (and cacheable); the seat's own identity is the only difference.
     public static func systemMessage(for spec: AgentSpec, others: [AgentSpec], topic: String) -> String {
+        // Named by their display name, so a seat the moderator renamed is referred to by
+        // that name by the models too.
         let counterpart = others
             .filter { $0.id != spec.id }
-            .map { "\($0.id) (\($0.modelShortName))" }
+            .map { "\($0.displayName) (\($0.modelShortName))" }
             .joined(separator: ", ")
 
         var text = """
-        You are \(spec.id) — \(spec.displayName), running \(spec.modelShortName) locally on the \
-        moderator's Mac.
+        You are \(spec.displayName), running \(spec.modelShortName) on the moderator's Mac.
 
         You are one participant in an open, continuing discussion about:
         \(topic)
@@ -111,6 +112,7 @@ public enum PromptBuilder {
         case .tool:
             return "[Tool result for \(turn.speakerName)]"
         case .chat:
+            // The tagged log uses the seat's display name, which the moderator can change.
             return "[\(turn.speakerName)]"
         }
     }
@@ -211,7 +213,7 @@ public enum PromptBuilder {
         let ask = """
         \(log)
 
-        [It is your turn — \(spec.id)]
+        [It is your turn — \(spec.displayName)]
         Post your next message to the group.
         """
 

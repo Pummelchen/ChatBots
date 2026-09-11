@@ -411,6 +411,24 @@ Three things are worth knowing, all of them observed rather than assumed:
 `min_p` and `repetition_penalty` are LM Studio extensions: sent, harmless where unknown,
 and only meaningful on a server that implements them.
 
+### Renaming the participants
+
+Double-click a seat's name to rename it — the same gesture macOS uses for file names and
+window titles, so it needs no explaining. Return or clicking away commits, and clearing the
+field restores the seat's default name. A single click does nothing, so a name cannot be
+changed by accident while reaching for the control beside it.
+
+The name is not just a label. It becomes what the *models* are told each participant is
+called, both in their instructions and in the tagged log they read, so "Mira" and "Otto"
+address each other by those names rather than as "Agent 1" and "Agent 2". The seat's
+internal id is untouched, so the transcript stays addressable and saved settings keep
+loading.
+
+Renaming is offered **before** a conversation starts and refused once it is running: history
+already carries the previous name, and a rename mid-thread would leave the shared log
+attributing turns to two different names for the same participant. Earlier turns keep the
+name they were spoken under rather than being retroactively re-attributed.
+
 ### Personas
 
 Each seat has its own style, picked from a library of **26 styles plus Neutral**, grouped

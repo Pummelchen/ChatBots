@@ -31,6 +31,9 @@ public actor OpenAIResponsesEngine: LLMEngine {
         onStateChange: @escaping @Sendable (EngineState) -> Void = { _ in }
     ) {
         self.spec = spec
+        self.currentDisplayName = spec.displayName
+        self.currentThinking = spec.thinking
+        self.currentPersona = spec.personaID
         self.onStateChange = onStateChange
     }
 
@@ -65,7 +68,29 @@ public actor OpenAIResponsesEngine: LLMEngine {
 
     public var lastStats: TurnStats? { lastStatsValue }
 
-    public var currentSpec: AgentSpec { spec }
+    /// Live display name, thinking level and style.
+    ///
+    /// These have to be held here rather than read from `spec`: a seat reaches the UI
+    /// through this engine, and the UI changes it while a conversation runs, so `spec` is
+    /// only the configuration it was built with.
+    private var currentDisplayName: String
+    private var currentThinking: ThinkingMode
+    private var currentPersona: String
+
+    public func setDisplayName(_ name: String) { currentDisplayName = name }
+    public func setThinking(_ mode: ThinkingMode) { currentThinking = mode }
+    public func setPersona(_ personaID: String) { currentPersona = personaID }
+
+    public var persona: Persona { PersonaLibrary.persona(id: currentPersona) }
+    public var thinking: ThinkingMode { currentThinking }
+
+    public var currentSpec: AgentSpec {
+        var live = spec
+        live.displayName = currentDisplayName
+        live.thinking = currentThinking
+        live.personaID = currentPersona
+        return live
+    }
 
     // MARK: - Reaching the server
 

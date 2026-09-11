@@ -24,6 +24,14 @@ struct PaneHeader: View {
     let spec: AgentSpec
     /// Seat position, for the colour and symbol.
     let seatIndex: Int
+    /// The seat's own kind ("Agent 1"), used when a cleared name is restored.
+    let seatKind: String
+    /// Whether the name is currently being edited, owned by the pane.
+    let seatRenaming: Bool
+    /// Whether renaming is allowed at all right now.
+    let canRenameSeats: Bool
+    let onRename: (String) -> Void
+    let onBeginRename: () -> Void
     /// Drop the sampler row and show a condensed readout instead.
     let isCompact: Bool
     /// Backend may only change before the conversation begins.
@@ -44,8 +52,14 @@ struct PaneHeader: View {
                     .font(.system(size: 15))
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(spec.displayName)
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    EditableSeatName(
+                        name: spec.displayName,
+                        seatKind: seatKind,
+                        isRenaming: seatRenaming,
+                        canRename: canRenameSeats,
+                        onBeginRename: onBeginRename,
+                        onCommit: onRename
+                    )
                     Text(spec.backendLabel)
                         .font(.system(size: 10.5, design: .monospaced))
                         .foregroundStyle(palette.textSecondary)
@@ -361,4 +375,65 @@ struct EndpointBar: View {
         }
         .help("This seat uses the OpenAI Responses API at \(spec.openAI.baseURL)")
     }
+}
+
+
+/// A seat's name, renamed by double-clicking it.
+///
+/// Double-click to edit and Return (or clicking away) to commit, which is the convention
+/// macOS uses for renaming — Finder's file names, sidebar items and window titles all
+/// behave this way, so it needs no explaining. A single click does nothing, so the name
+/// cannot be changed by accident while reaching for a control beside it.
+///
+/// The field shows the seat's kind as a placeholder, so clearing the name shows what will
+/// be restored rather than leaving an empty space.
+struct EditableSeatName: View {
+    let name: String
+    let seatKind: String
+    let isRenaming: Bool
+    let canRename: Bool
+    let onBeginRename: () -> Void
+    let onCommit: (String) -> Void
+
+    @State private var draft = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        Group {
+            if isRenaming {
+                TextField(seatKind, text: $draft)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .frame(minWidth: 60, maxWidth: 220)
+                    .focused($focused)
+                    .onSubmit { onCommit(draft) }
+                    // Clicking away commits, matching the double-click-to-edit convention.
+                    // Committing is idempotent on the pane side, so this firing around the
+                    // same time as onSubmit is harmless.
+                    .onChange(of: focused) { _, isFocused in
+                        if !isFocused { onCommit(draft) }
+                    }
+                    .task(id: isRenaming) {
+                        guard isRenaming else { return }
+                        draft = name
+                        focused = true
+                    }
+            } else {
+                Text(name)
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 2) {
+                        guard canRename else { return }
+                        onBeginRename()
+                    }
+                    .help(
+                        canRename
+                            ? "Double-click to rename"
+                            : "Names are fixed once the conversation has started"
+                    )
+            }
+        }
+    }
+
 }

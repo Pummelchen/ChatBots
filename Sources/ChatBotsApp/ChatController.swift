@@ -34,6 +34,8 @@ public final class AgentPaneState: ObservableObject, Identifiable {
     /// speaker waits for it — which is what makes the hand-off look immediate rather than
     /// leaving a pause while the previous seat catches up.
     @Published public var isAwaitingDisplayClear = false
+    /// True while the moderator is editing this seat's name.
+    @Published public var isRenaming = false
     @Published public var lastStats: TurnStats?
     @Published public var toolLog: [String] = []
     /// Bumped when the transcript should jump to the newest entry. A counter rather than
@@ -46,11 +48,14 @@ public final class AgentPaneState: ObservableObject, Identifiable {
     /// Position in the conversation, driving the seat's colour and symbol. Stable for the
     /// life of the pane, and independent of how many seats exist.
     public nonisolated let seatIndex: Int
+    /// "Agent 1" and so on: the seat's kind, used when a name is cleared.
+    public nonisolated let seatKind: String
 
     init(spec: AgentSpec, seatIndex: Int) {
         self.spec = spec
         self.id = spec.id
         self.seatIndex = seatIndex
+        self.seatKind = spec.id
     }
 
     func beginTurn() {
@@ -487,7 +492,7 @@ public final class ChatController: ObservableObject {
     public func setThinking(_ mode: ThinkingMode, for agentID: String) {
         guard var spec = engine.specs.first(where: { $0.id == agentID }) else { return }
         spec.thinking = mode
-        if let seat = engine.allSeats.first(where: { $0.spec.id == agentID }) as? MLXEngine {
+        if let seat = engine.seatEngine(for: agentID) {
             Task { await seat.setThinking(mode) }
         }
         if let pane = pane(agentID) {
@@ -530,11 +535,42 @@ public final class ChatController: ObservableObject {
         NSPasteboard.general.setString(text, forType: .string)
     }
 
+    /// Rename a seat.
+    ///
+    /// The name is what the moderator sees, what the transcript is tagged with, and what
+    /// the *models* are told each participant is called. The seat's internal id is
+    /// untouched, so the log stays addressable and settings keep loading.
+    ///
+    /// Rejected while a conversation is running: history already carries the previous name,
+    /// and a rename halfway through would leave the shared log attributing turns to
+    /// different names for the same participant.
+    @discardableResult
+    public func renameSeat(_ agentID: String, to name: String) -> Bool {
+        guard turns.isEmpty, !isRunning else { return false }
+        guard let index = panes.firstIndex(where: { $0.id == agentID }) else { return false }
+
+        let trimmed = String(
+            name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(40))
+        var spec = panes[index].spec
+        // An emptied field falls back to the seat's kind rather than leaving it nameless.
+        spec.displayName = trimmed.isEmpty ? panes[index].seatKind : trimmed
+        panes[index].spec = spec
+
+        if let seat = engine.seatEngine(for: agentID) {
+            Task { await seat.setDisplayName(spec.displayName) }
+        }
+        saveSettings()
+        return true
+    }
+
+    /// Whether seats may be renamed right now.
+    public var canRenameSeats: Bool { turns.isEmpty && !isRunning }
+
     /// Change one seat's style. Applies from its next turn.
     public func setPersona(_ personaID: String, for agentID: String) {
         guard var spec = engine.specs.first(where: { $0.id == agentID }) else { return }
         spec.personaID = personaID
-        if let seat = engine.allSeats.first(where: { $0.spec.id == agentID }) as? MLXEngine {
+        if let seat = engine.seatEngine(for: agentID) {
             Task { await seat.setPersona(personaID) }
         }
         if let pane = pane(agentID) {

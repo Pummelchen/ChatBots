@@ -39,6 +39,11 @@ struct ChatPane: View {
         PaneHeader(
             spec: pane.spec,
             seatIndex: pane.seatIndex,
+            seatKind: pane.seatKind,
+            seatRenaming: pane.isRenaming,
+            canRenameSeats: controller.canRenameSeats,
+            onRename: { name in commitRename(name) },
+            onBeginRename: { pane.isRenaming = true },
             isCompact: isCompact,
             canChangeBackend: controller.turns.isEmpty,
             statusText: pane.statusText,
@@ -176,6 +181,14 @@ struct ChatPane: View {
     }
 
     // MARK: Footer
+
+    /// Commit a rename, once. Return and losing focus can both fire, and the field can be
+    /// dismissed twice; the guard makes repeated calls harmless.
+    private func commitRename(_ name: String) {
+        guard pane.isRenaming else { return }
+        pane.isRenaming = false
+        controller.renameSeat(pane.id, to: name)
+    }
 
     private var contextLabel: String {
         let usage = controller.contextUsage

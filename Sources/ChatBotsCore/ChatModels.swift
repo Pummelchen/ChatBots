@@ -528,6 +528,16 @@ public protocol LLMEngine: Sendable {
     var contextWindow: Int { get async }
     /// Free the weights.
     func unload() async
+    /// Change how much this seat may think. Takes effect on its next turn.
+    ///
+    /// `async` because a seat's engine is an actor: the live configuration is actor state,
+    /// and these are the only way to change it from the UI.
+    func setThinking(_ mode: ThinkingMode) async
+    /// Change this seat's style. Takes effect on its next turn.
+    func setPersona(_ personaID: String) async
+    /// Rename this seat. Takes effect on its next turn, and on what the models are told
+    /// each participant is called.
+    func setDisplayName(_ name: String) async
     /// Ask this seat to condense a transcript into a compact digest.
     ///
     /// Used to reclaim context without losing what was said. Implementations must not use
@@ -548,6 +558,22 @@ public protocol LLMEngine: Sendable {
         onToolCall: @escaping @Sendable (String, String) async -> Void,
         onEvent: @escaping @Sendable (TurnEvent) async -> Void
     ) async throws -> String
+}
+
+extension LLMEngine {
+    /// Live reconfiguration is optional for an engine.
+    ///
+    /// Both shipped backends implement these, but an engine that cannot be reconfigured at
+    /// runtime — a test double, or a future read-only proxy — should not have to write
+    /// empty methods to satisfy the protocol. The defaults are deliberately silent rather
+    /// than fatal: the worst case is that a control does nothing, which is exactly what an
+    /// engine that ignores it already means.
+    public func setThinking(_ mode: ThinkingMode) async {}
+    public func setPersona(_ personaID: String) async {}
+    public func setDisplayName(_ name: String) async {}
+
+    /// Engines that cannot summarise simply decline.
+    public func compact(prompt: String, maxTokens: Int) async throws -> String { "" }
 }
 
 /// A capability handed to a model as a callable function.

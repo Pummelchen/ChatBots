@@ -44,6 +44,8 @@ public actor MLXEngine: LLMEngine {
     private var currentThinking: ThinkingMode
     /// Live persona id, same reasoning as `currentThinking`.
     private var currentPersonaID: String
+    /// Live display name, same reasoning as `currentPersonaID`.
+    private var currentDisplayName: String
 
     /// Throughput of this seat's most recent turn, for diagnostics and benchmarks.
     public private(set) var lastStats: TurnStats?
@@ -56,6 +58,7 @@ public actor MLXEngine: LLMEngine {
         self.spec = spec
         self.currentThinking = spec.thinking
         self.currentPersonaID = spec.personaID
+        self.currentDisplayName = spec.displayName
         self.toolRegistry = toolRegistry
         self.onStateChange = onStateChange
     }
@@ -71,6 +74,11 @@ public actor MLXEngine: LLMEngine {
     /// The level this seat will use on its next turn.
     public var thinking: ThinkingMode { currentThinking }
 
+    /// Rename this seat. Takes effect on its next turn.
+    public func setDisplayName(_ name: String) {
+        currentDisplayName = name
+    }
+
     /// The style this seat will use on its next turn.
     public func setPersona(_ personaID: String) {
         currentPersonaID = personaID
@@ -84,6 +92,7 @@ public actor MLXEngine: LLMEngine {
         var live = spec
         live.thinking = currentThinking
         live.personaID = currentPersonaID
+        live.displayName = currentDisplayName
         return live
     }
 
