@@ -10,7 +10,7 @@ import Foundation
 public enum SampleConversation {
 
     public static func turns(topic: String) -> [Turn] {
-        let start = Date().addingTimeInterval(-600)
+        let start = Date.now.addingTimeInterval(-600)
         func at(_ offset: Double) -> Date { start.addingTimeInterval(offset) }
 
         var sequence = 0

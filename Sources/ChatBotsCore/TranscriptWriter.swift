@@ -61,7 +61,7 @@ public enum TranscriptWriter {
         topic: String,
         turns: [Turn],
         participants: [AgentSpec],
-        exportedAt: Date = Date()
+        exportedAt: Date = Date.now
     ) -> String {
         var out = ""
         out += "ChatBots — conversation log\n"
@@ -96,7 +96,7 @@ public enum TranscriptWriter {
     }
 
     /// A suggested filename, with the topic where it fits and a timestamp for uniqueness.
-    public static func suggestedFilename(topic: String, at date: Date = Date()) -> String {
+    public static func suggestedFilename(topic: String, at date: Date = Date.now) -> String {
         var slug = topic
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .components(separatedBy: CharacterSet.alphanumerics.union(.whitespaces).inverted)

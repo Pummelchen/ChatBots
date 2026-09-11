@@ -212,21 +212,21 @@ let options = Options.parse(Array(CommandLine.arguments.dropFirst()))
 // checkpoint all work together on this machine, and it does so without needing to read or
 // interpret a conversation.
 if options.check {
-    let spec = AgentSpec.seat(index: 0, modelID: options.modelA ?? AgentSpec.defaultModelID)
+    let spec = AgentSpec.seat(index: 0, modelID: options.modelA)
     log("Checking seat A: \(spec.modelID)")
     let engine = MLXEngine(spec: spec)
     do {
         try await engine.load()
         let window = await engine.contextWindow
         log("  model loaded — context window \(window) tokens")
-        let started = Date()
+        let started = Date.now
         let reply = try await engine.generate(
             messages: [
                 .init(role: .system, content: "You are terse."),
                 .init(role: .user, content: "Reply with the single word: ready"),
             ],
             tools: [], onToolCall: { _, _ in }, onEvent: { _ in })
-        let seconds = Date().timeIntervalSince(started)
+        let seconds = Date.now.timeIntervalSince(started)
         let trimmed = reply.trimmingCharacters(in: .whitespacesAndNewlines)
         log(String(format: "  generated %d characters in %.1fs", trimmed.count, seconds))
         if trimmed.isEmpty {
@@ -252,7 +252,7 @@ if options.exportSample {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        return formatter.date(from: value) ?? Date()
+        return formatter.date(from: value) ?? Date.now
     }
     let turns = [
         Turn(
@@ -436,10 +436,10 @@ if options.memoryProbe {
         log(String(
             format: "  %-22@ active=%7.1f MiB  cache=%7.1f MiB  peak=%7.1f MiB  gpuLimit=%7.1f MiB  memLimit=%7.1f MiB",
             label as NSString,
-            Double(GPU.activeMemory) / mib,
-            Double(GPU.cacheMemory) / mib,
-            Double(GPU.peakMemory) / mib,
-            Double(GPU.memoryLimit) / mib,
+            Double(Memory.activeMemory) / mib,
+            Double(Memory.cacheMemory) / mib,
+            Double(Memory.peakMemory) / mib,
+            Double(Memory.memoryLimit) / mib,
             Double(Memory.memoryLimit) / mib))
     }
     log("GPU memory (one seat, then both, then a turnaround):")

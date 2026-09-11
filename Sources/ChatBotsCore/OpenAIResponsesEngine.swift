@@ -166,7 +166,6 @@ public actor OpenAIResponsesEngine: LLMEngine {
 
     // MARK: - Generation
 
-    @discardableResult
     /// Images the seat was given, refreshed by the orchestrator each turn.
     public func setAttachments(_ documents: [AttachedDocument]) async {
         images = documents.compactMap { document in
@@ -187,7 +186,7 @@ public actor OpenAIResponsesEngine: LLMEngine {
     ) async throws -> String {
         try await load()
         let agentID = spec.id
-        let started = Date()
+        let started = Date.now
 
         if !tools.isEmpty {
             FileHandle.standardError.write(
@@ -244,7 +243,7 @@ public actor OpenAIResponsesEngine: LLMEngine {
             throw OpenAIResponsesError.streamFailed(failed)
         }
 
-        let seconds = Date().timeIntervalSince(started)
+        let seconds = Date.now.timeIntervalSince(started)
         let final = answer.trimmingCharacters(in: .whitespacesAndNewlines)
         let stats = TurnStats(
             promptTokens: usage.inputTokens,

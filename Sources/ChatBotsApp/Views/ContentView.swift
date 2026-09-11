@@ -38,10 +38,10 @@ struct ContentView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.94)))
             }
         }
-        // Report the new size, then fade. The previous value is optional so the first
-        // appearance — which is just the saved setting being restored — shows nothing.
-        .onChange(of: zoom.percent) { previous, current in
-            guard previous != nil else { return }
+        // Report the new size, then fade. `onChange` only fires on a change, so the saved
+        // setting being restored at launch shows nothing — there is no need to test the
+        // previous value, which the compiler rightly pointed out was never nil.
+        .onChange(of: zoom.percent) { _, current in
             hudDismissal?.cancel()
             withAnimation(.easeOut(duration: 0.12)) { hud = current }
             hudDismissal = Task {

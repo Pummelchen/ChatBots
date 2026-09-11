@@ -311,7 +311,7 @@ public struct OpenAIResponsesClient: Sendable {
 
     public init(endpoint: OpenAIEndpoint) {
         self.endpoint = endpoint
-        var configuration = URLSessionConfiguration.ephemeral
+        let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 600
         configuration.timeoutIntervalForResource = 3_600
         configuration.httpAdditionalHeaders = ["User-Agent": "ChatBots/1.0 (macOS)"]

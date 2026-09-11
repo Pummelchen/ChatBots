@@ -1,4 +1,4 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 6.3
 // ChatBots — two local LLMs talking to each other on a Mac (MLX / Apple Silicon).
 //
 // Layout:
@@ -40,7 +40,11 @@ let package = Package(
                 .product(name: "HuggingFace", package: "swift-huggingface"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
             ],
-            path: "Sources/ChatBotsCore"
+            path: "Sources/ChatBotsCore",
+            // Swift 6 language mode, stated rather than inferred from the tools version. The
+            // engine is actor-isolated throughout, so this describes the code rather than
+            // aspiring to it — and it is what makes the compiler check that claim.
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
 
         // MARK: - GUI
@@ -52,7 +56,11 @@ let package = Package(
             // The icon master travels with the app (usable at runtime, e.g. an About
             // panel). The bundle's actual icon is the .icns, installed by
             // tools/make-app.sh as CFBundleIconFile.
-            resources: [.copy("Resources/AppIcon-1024.png")]
+            resources: [.copy("Resources/AppIcon-1024.png")],
+            // Swift 6 language mode, stated rather than inferred from the tools version. The
+            // engine is actor-isolated throughout, so this describes the code rather than
+            // aspiring to it — and it is what makes the compiler check that claim.
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
 
         // MARK: - Headless verification
@@ -60,7 +68,11 @@ let package = Package(
         .executableTarget(
             name: "ChatBotsCLI",
             dependencies: ["ChatBotsCore"],
-            path: "Sources/ChatBotsCLI"
+            path: "Sources/ChatBotsCLI",
+            // Swift 6 language mode, stated rather than inferred from the tools version. The
+            // engine is actor-isolated throughout, so this describes the code rather than
+            // aspiring to it — and it is what makes the compiler check that claim.
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
 
         // MARK: - Tests
@@ -68,7 +80,11 @@ let package = Package(
         .testTarget(
             name: "ChatBotsCoreTests",
             dependencies: ["ChatBotsCore"],
-            path: "Tests/ChatBotsCoreTests"
+            path: "Tests/ChatBotsCoreTests",
+            // Swift 6 language mode, stated rather than inferred from the tools version. The
+            // engine is actor-isolated throughout, so this describes the code rather than
+            // aspiring to it — and it is what makes the compiler check that claim.
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]
 )

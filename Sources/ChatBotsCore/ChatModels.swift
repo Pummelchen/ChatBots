@@ -56,7 +56,7 @@ public struct Turn: Identifiable, Sendable, Hashable {
         kind: Kind,
         content: String,
         toolDetail: String? = nil,
-        timestamp: Date = Date()
+        timestamp: Date = Date.now
     ) {
         self.id = id
         self.sequence = sequence

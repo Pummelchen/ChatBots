@@ -98,6 +98,14 @@ struct AppKitScrollView<Content: View>: NSViewRepresentable {
         }
     }
 
+    /// `@MainActor` because everything it touches — `NSScrollView`, `NSClipView`,
+    /// `NSHostingView` — is main-actor isolated. Without it these calls are made from a
+    /// nonisolated context, which the compiler warns about and which is a real hazard rather
+    /// `@MainActor` because everything it touches — `NSScrollView`, `NSClipView`,
+    /// `NSHostingView` — is main-actor isolated. Without it those calls are made from a
+    /// nonisolated context, which the compiler warns about and which is a real hazard rather
+    /// than a formality: AppKit view state belongs to the main thread.
+    @MainActor
     final class Coordinator {
         var hostingView: NSHostingView<AnyView>?
         var lastSignal = 0

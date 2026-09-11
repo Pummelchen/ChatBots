@@ -99,7 +99,7 @@ public struct ResearchReport: Sendable, Hashable, Codable {
     public init(
         question: String,
         sections: [Section],
-        producedAt: Date = Date(),
+        producedAt: Date = Date.now,
         stopReason: String,
         budgetSummary: String,
         rounds: Int,
@@ -271,7 +271,7 @@ public enum ResearchReporting {
         budgetSummary: String,
         rounds: Int,
         searches: Int,
-        producedAt: Date = Date()
+        producedAt: Date = Date.now
     ) -> ResearchReport {
         var sections: [ResearchReport.Section] = []
         var currentTitle = "Executive Summary"

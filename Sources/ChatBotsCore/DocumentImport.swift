@@ -160,8 +160,8 @@ public enum SystemProcess {
         let outputData = out.fileHandleForReading.readDataToEndOfFile()
         let errorData = err.fileHandleForReading.readDataToEndOfFile()
 
-        let deadline = Date().addingTimeInterval(timeout)
-        while process.isRunning, Date() < deadline {
+        let deadline = Date.now.addingTimeInterval(timeout)
+        while process.isRunning, Date.now < deadline {
             usleep(20_000)
         }
         if process.isRunning {

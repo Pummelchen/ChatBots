@@ -116,7 +116,7 @@ public struct AttachedDocument: Identifiable, Sendable, Equatable, Codable {
         pageCount: Int? = nil,
         wasTruncated: Bool = false,
         imageData: Data? = nil,
-        addedAt: Date = Date()
+        addedAt: Date = Date.now
     ) {
         self.id = id
         self.name = name

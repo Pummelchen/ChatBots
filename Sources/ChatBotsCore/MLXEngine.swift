@@ -395,7 +395,7 @@ public actor MLXEngine: LLMEngine {
         /// Watches for degenerate repetition; see `RepetitionDetector`.
         var repetition = RepetitionDetector()
         var stats = TurnStats()
-        let started = Date()
+        let started = Date.now
 
         /// Everything sent on the round currently in flight. Each round restates the
         /// whole list (rather than leaning on the session to accumulate) because the
@@ -426,14 +426,23 @@ public actor MLXEngine: LLMEngine {
         // anyway). Apple GPUs are shared, so two seats coexist; when they generate at
         // the same time they time-share rather than overlap. The orchestrator's turn
         // loop is sequential, so in practice one seat is always idle.
-        var isToolRound = false
+        // Which pass over the prompt this is. Images go on the first one only: after a tool
+        // round the log already contains the image turn, and re-sending it would duplicate it
+        // in the KV cache and confuse a template expecting a single image token run.
+        //
+        // This was previously a `isToolRound` flag that nothing ever set, so the guard never
+        // engaged and the ternary below it was dead code. A round counter says the same thing
+        // and cannot silently stop working.
+        var roundIndex = 0
         rounds: while true {
+            let isFirstRound = roundIndex == 0
+            roundIndex += 1
             reasoningTokens = 0
             repetition = RepetitionDetector()
             let entriesForRound = promptEntries
             // Captured before the closure: `container.perform` runs off the actor, so it can
             // see neither the engine's properties nor a mutable local.
-            let imagesForRound: [Data] = isToolRound ? [] : imageData
+            let imagesForRound: [Data] = isFirstRound ? imageData : []
             let stream = await container.perform {
                 context -> AsyncThrowingStream<Generation, Error> in
                 // Images ride on the user message itself. They are attached only while the
@@ -519,7 +528,7 @@ public actor MLXEngine: LLMEngine {
                         tokensPerSecond: info.generateTime > 0
                             ? Double(info.generationTokenCount) / info.generateTime
                             : 0,
-                        seconds: Date().timeIntervalSince(started)
+                        seconds: Date.now.timeIntervalSince(started)
                     )
                 }
             }
@@ -570,7 +579,7 @@ public actor MLXEngine: LLMEngine {
         }
         let final = Self.clean(scrubbed.text, spec: spec)
         if stats.generationTokens == 0 {
-            stats.seconds = Date().timeIntervalSince(started)
+            stats.seconds = Date.now.timeIntervalSince(started)
         }
         // A reasoning model can burn the entire budget inside `<think>` and emit no
         // answer at all. That is legitimate behaviour, not an error, but the user must be

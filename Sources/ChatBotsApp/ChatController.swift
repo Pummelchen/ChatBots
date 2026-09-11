@@ -385,7 +385,7 @@ public final class ChatController: ObservableObject {
     /// Sampled over a window rather than per token, because per-token arrival is bursty by
     /// nature and would make the reveal rate jitter with it.
     private func sampleGenerationRate(agentID: String, characters: Int) {
-        let now = Date()
+        let now = Date.now
         guard var sample = rateSamples[agentID] else {
             rateSamples[agentID] = (characters, now)
             return
@@ -507,7 +507,7 @@ public final class ChatController: ObservableObject {
     /// One shared log walked once, so each message appears exactly once — including the
     /// messages the two seats addressed to each other, which are the conversation rather
     /// than duplicates of it. Timestamps are the format the moderator asked for.
-    public func transcriptAsText(exportedAt: Date = Date()) -> String {
+    public func transcriptAsText(exportedAt: Date = Date.now) -> String {
         TranscriptWriter.text(
             topic: topic,
             turns: engine.displayTurns,

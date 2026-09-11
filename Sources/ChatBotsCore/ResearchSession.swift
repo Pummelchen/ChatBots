@@ -139,18 +139,18 @@ public struct ResearchSession: Sendable, Hashable, Codable {
     /// Set when the session has been ended deliberately.
     public private(set) var stop: ResearchStop = .running
 
-    public init(budget: ResearchBudget, startedAt: Date = Date()) {
+    public init(budget: ResearchBudget, startedAt: Date = Date.now) {
         self.budget = budget
         self.startedAt = startedAt
     }
 
-    public static func newSession(_ depth: ResearchBudget.Depth, at date: Date = Date()) -> ResearchSession {
+    public static func newSession(_ depth: ResearchBudget.Depth, at date: Date = Date.now) -> ResearchSession {
         ResearchSession(budget: .preset(depth), startedAt: date)
     }
 
     public func elapsed(at now: Date) -> TimeInterval { now.timeIntervalSince(startedAt) }
 
-    public func remaining(at now: Date = Date()) -> TimeInterval {
+    public func remaining(at now: Date = Date.now) -> TimeInterval {
         max(0, budget.maxDuration - elapsed(at: now))
     }
 
@@ -160,7 +160,7 @@ public struct ResearchSession: Sendable, Hashable, Codable {
     /// answered, a position changed. A run of contributions that add nothing is the signal
     /// that the discussion has stopped being productive, which is a better cue to stop than a
     /// clock: it means the analysts have run out of things to say rather than out of time.
-    public mutating func record(searchCount: Int = 0, addedSomething: Bool = false, at now: Date = Date()) {
+    public mutating func record(searchCount: Int = 0, addedSomething: Bool = false, at now: Date = Date.now) {
         guard stop == .running else { return }
         rounds += 1
         searches += searchCount
@@ -179,7 +179,7 @@ public struct ResearchSession: Sendable, Hashable, Codable {
     /// The duration is re-checked rather than latched because a session can sit idle between
     /// turns — a slow model, a paused engine — and the time budget is wall-clock, not
     /// thinking time.
-    public func isFinished(at now: Date = Date()) -> Bool {
+    public func isFinished(at now: Date = Date.now) -> Bool {
         stop.isFinished || evaluate(at: now).isFinished
     }
 
@@ -187,7 +187,7 @@ public struct ResearchSession: Sendable, Hashable, Codable {
     ///
     /// Ordered by how conclusive each reason is: an exhausted evidence base is a better story
     /// to tell the moderator than "the clock ran out", so it is checked first.
-    public func evaluate(at now: Date = Date()) -> ResearchStop {
+    public func evaluate(at now: Date = Date.now) -> ResearchStop {
         if stop != .running { return stop }
         // Convergence first: stopping because the work is done reads better than stopping
         // because a timer expired, and it is what the moderator actually wants to know.
@@ -211,7 +211,7 @@ public struct ResearchSession: Sendable, Hashable, Codable {
     }
 
     /// A line for the log or the interface.
-    public func statusLine(at now: Date = Date()) -> String {
+    public func statusLine(at now: Date = Date.now) -> String {
         let reason = evaluate(at: now)
         guard reason == .running else { return "Finished — \(reason.explanation)" }
         let minutes = Int(remaining(at: now) / 60)

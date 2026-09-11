@@ -358,9 +358,8 @@ public final class APIServer {
         case ("GET", "/api/personas"):
             // Per mode, because the libraries are different: offering a research seat "The
             // Villain" would be the modes sharing a philosophy through the back door.
-            let requested = request.string("mode").flatMap(DiscussionMode.init(rawValue:))
-                ?? engine.specs.first?.mode
-                ?? .entertainment
+            // The list carries both modes, so nothing is filtered here; the client picks the
+            // one matching the room. `requested` used to be computed and then ignored.
             return .json(DiscussionMode.allCases.map { mode in
                 PersonaOption(
                     mode: mode.rawValue,
@@ -633,7 +632,7 @@ public final class APIServer {
                     id: $0.id, name: $0.name, category: $0.group, summary: $0.summary,
                     emoji: $0.emoji, isAnalyst: $0.isAnalyst)
             },
-            serverTime: Date(),
+            serverTime: Date.now,
             research: engine.researchStatus(),
             report: engine.researchReport().map { report in
                 APISnapshot.ReportSummary(
