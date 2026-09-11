@@ -342,6 +342,14 @@ extension AgentSpec {
         "gemini", "llava", "qwen-vl", "qwen2-vl", "qwen2.5-vl", "qwen3-vl", "qwen3.5-vl",
         "pixtral", "internvl", "minicpm-v", "moondream", "paligemma", "idefics",
         "smolvlm", "gemma-3", "gemma3", "mistral-small-3", "glm-4v", "glm-4.5v",
+        // DeepSeek's flash tier sees images. Verified against the live API: asked to name
+        // the shape and colour in a test image it answered "Green triangle.", and its own
+        // reasoning read "The image shows a green triangle."
+        //
+        // Deliberately only the flash tier. The pro tier was asked the same question and
+        // replied "Cannot see image.", so listing the family would have been wrong in the
+        // other direction — it would offer images on a seat that cannot read them.
+        "deepseek-flash",
     ]
 
     /// What this seat's model can accept.
@@ -359,11 +367,26 @@ extension AgentSpec {
             return .supported
         }
         if let override = visionOverride { return override }
+
+        // The endpoint's model comes first, and the order matters.
+        //
+        // An API seat names the model it is asking the server for, and that name is the only
+        // evidence about what will answer. Asking about the local checkpoint instead was the
+        // original bug in a different guise: this build's default checkpoint is the same
+        // Qwen3.5 whose weights here include a vision tower, so `declaresVision` returned
+        // true for a seat pointed at a text-only server model, and images were offered on the
+        // strength of weights that seat would never load.
+        if !openAI.model.isEmpty {
+            let name = openAI.model.lowercased()
+            return Self.visionModelMarkers.contains { name.contains($0) } ? .supported : .unknown
+        }
+
+        // No endpoint model named, so the checkpoint is the only thing left to go on.
         if let declared = ModelStore.declaresVision(for: modelID) {
             return declared ? .supported : .unsupported
         }
-        let id = modelID.lowercased()
-        return Self.visionModelMarkers.contains { id.contains($0) } ? .supported : .unknown
+        let name = modelID.lowercased()
+        return Self.visionModelMarkers.contains { name.contains($0) } ? .supported : .unknown
     }
 }
 

@@ -325,7 +325,10 @@ struct VisionSupportTests {
         for id in ["gpt-4o-mini", "claude-sonnet-4", "gemini-2.5-pro", "llava-1.6", "qwen3-vl-8b"] {
             var spec = AgentSpec.seat(index: 0)
             spec.backend = .openAIResponses
-            spec.modelID = id
+            // Named where an API seat actually names its model. This test used to set the
+            // checkpoint id instead, which stopped meaning anything once the endpoint's model
+            // became what decides — the checkpoint id is not evidence about a server's model.
+            spec.openAI = OpenAIEndpoint(baseURL: "https://example.test/v1", model: id)
             #expect(spec.visionSupport == .supported, "\(id) should be recognised")
         }
     }
