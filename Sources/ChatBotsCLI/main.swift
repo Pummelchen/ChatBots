@@ -28,6 +28,11 @@ struct Options {
     var thinking: ThinkingMode?
     var personaA: String?
     var personaB: String?
+    var backendA: AgentSpec.Backend = .mlx
+    var backendB: AgentSpec.Backend = .mlx
+    var baseURL = "http://localhost:1234"
+    var apiModel = "mlx-community/Qwen3.5-4B-MLX-4bit"
+    var apiKey: String?
 
     static func parse(_ arguments: [String]) -> Options {
         var options = Options()
@@ -45,6 +50,13 @@ struct Options {
             case "--model-b": options.modelB = next() ?? options.modelB
             case "--key": options.tavilyKey = next()
             case "--max-tokens": options.maxTokens = Int(next() ?? "")
+            case "--backend-a":
+                options.backendA = AgentSpec.Backend(rawValue: next() ?? "") ?? .mlx
+            case "--backend-b":
+                options.backendB = AgentSpec.Backend(rawValue: next() ?? "") ?? .mlx
+            case "--base-url": options.baseURL = next() ?? options.baseURL
+            case "--api-model": options.apiModel = next() ?? options.apiModel
+            case "--api-key": options.apiKey = next()
             case "--persona-a": options.personaA = next()
             case "--persona-b": options.personaB = next()
             case "--list-personas":
@@ -92,6 +104,11 @@ struct Options {
               --key <key>          Tavily API key (env TAVILY_API_KEY, else built-in dev key)
               --max-tokens <n>     Cap answer tokens per turn
               --thinking <mode>    off | minimal | low | medium | high | unlimited
+              --backend-a <mlx|openAIResponses>   Engine for seat A (default: mlx)
+              --backend-b <mlx|openAIResponses>   Engine for seat B
+              --base-url <url>     Server for the API backend (default: http://localhost:1234)
+              --api-model <id>     Model id as the server names it
+              --api-key <key>      Bearer token, if the server wants one
               --persona-a <id>     Style for seat A (see --list-personas)
               --persona-b <id>     Style for seat B
               --list-personas      Print the persona library and exit
@@ -103,16 +120,24 @@ struct Options {
         parameters, so a headless run exercises exactly the same path as the GUI.
         """
 
-    private func configured(_ spec: AgentSpec, persona: String?) -> AgentSpec {
+    private func configured(
+        _ spec: AgentSpec, persona: String?, backend: AgentSpec.Backend
+    ) -> AgentSpec {
         var spec = spec
         if let maxTokens { spec.maxTokens = maxTokens }
         if let thinking { spec.thinking = thinking }
         if let persona { spec.personaID = persona }
+        spec.backend = backend
+        spec.openAI = OpenAIEndpoint(baseURL: baseURL, model: apiModel, apiKey: apiKey)
         return spec
     }
 
-    var specA: AgentSpec { configured(AgentSpec.seatA(modelID: modelA), persona: personaA) }
-    var specB: AgentSpec { configured(AgentSpec.seatB(modelID: modelB), persona: personaB) }
+    var specA: AgentSpec {
+        configured(AgentSpec.seatA(modelID: modelA), persona: personaA, backend: backendA)
+    }
+    var specB: AgentSpec {
+        configured(AgentSpec.seatB(modelID: modelB), persona: personaB, backend: backendB)
+    }
 }
 
 // MARK: - Output helpers
@@ -267,6 +292,10 @@ log("  seat B    : \(options.modelB)")
 log("  thinking  : \(specs[0].thinking.rawValue) — \(specs[0].thinking.detail)")
 for spec in specs {
     log("  \(spec.id) style: \(spec.persona.name) — \(spec.persona.summary)")
+    log(
+        "  \(spec.id) backend: \(spec.backend.rawValue)"
+            + (spec.backend == .openAIResponses
+                ? " → \(spec.openAI.baseURL) as \(spec.openAI.model)" : ""))
 }
 log("  tavily    : \(TavilyClient.isConfigured ? "configured" : "MISSING")")
 print("")
@@ -275,7 +304,13 @@ var configuration = ConversationEngine.Configuration()
 configuration.pace = .zero
 configuration.maxTurns = max(1, options.turns)
 
-let seats = zip(specs, engines).map { ConversationEngine.Seat(spec: $0, engine: $1) }
+let seats = zip(specs, engines).map { spec, mlx in
+    ConversationEngine.Seat(
+        spec: spec,
+        mlx: mlx,
+        openAI: OpenAIResponsesEngine(spec: spec)
+    )
+}
 let engine = ConversationEngine(seats: seats, configuration: configuration)
 
 // Render the log as it grows, printing each entry once.

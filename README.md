@@ -34,6 +34,7 @@ hallucinated.
 | **Moderator box** | Your message goes into the shared log — **both** models read it |
 | **Show thinking** | Streams each model's `<think>` block into its own pane (never into the log) |
 | **Models ▸ Load …** | Pre-loads weights, optionally per seat |
+| **Backend** | Per seat: MLX in-process, or the OpenAI Responses API |
 | **Persona** | Per seat: 26 styles plus Neutral, from the library |
 | **Layout** | `Split` (two panes) or `Thread` (one chat-style conversation) |
 | **Theme** | `Original` (default) follows the Mac's appearance; `Black` is flat pure-black |
@@ -187,6 +188,55 @@ result is the same re-entrant update that stops the window drawing; it was found
 removing the modifier from one view at a time until the freezes stopped.
 
 Instead, **Edit ▸ Copy Conversation (⇧⌘C)** copies the whole transcript as plain text.
+
+### Two backends, selectable per seat
+
+Each seat runs on either engine, chosen from the `MLX ▾` control next to the persona:
+
+| | **MLX** | **OpenAI Responses API** |
+| --- | --- | --- |
+| Where the model runs | in-process, on the GPU | a server you run, or OpenAI |
+| API | MLX Swift | `POST /v1/responses` |
+| Web tools | yes | **no** |
+| Reasoning control | token ceiling, enforced by us | `reasoning.effort` hint, server's choice |
+| Endpoint | — | `http://localhost:1234` by default |
+
+Both implement the same `LLMEngine` contract, so the orchestrator does not know or care
+which is in use — a conversation can run one seat on each, and seat B reads seat A's
+output either way. Backend may only be changed **before** the conversation starts, since
+switching changes who a participant is part-way through.
+
+On the API backend the app talks to LM Studio by default, which serves `/v1/responses`
+from 0.3.39 onward and is [Open Responses](https://lmstudio.ai/blog/openresponses)
+compliant. To set it up:
+
+```bash
+lms server start
+lms get "https://huggingface.co/mlx-community/Qwen3.5-4B-MLX-4bit" --mlx --yes
+lms load qwen3.5-4b-mlx --identifier qwen35 --gpu max -c 32768
+swift run chatbots-cli --backend-a openAIResponses --backend-b openAIResponses \
+    --api-model qwen35 --turns 4
+```
+
+Three things are worth knowing, all of them observed rather than assumed:
+
+* **Tools do not work on the API backend.** `web_search` and `fetch_page` are dispatched
+  in-process by the MLX engine. A seat that switches backend loses them, and both the
+  pane and stderr say so. Wiring tool calls through the Responses API's `tools` field
+  would be the fix; it is not done.
+* **The presence penalty is negated for this backend.** The Responses API uses OpenAI's
+  convention, where a positive value discourages repetition — the opposite of MLX, which
+  subtracts the value it is given. The seat stores MLX's sign, so the API client negates
+  it on the way out. That is one of exactly two places the sign is handled.
+* **Thinking is a hint here, not a ceiling.** MLX honours the app's token budget; the API
+  takes a `reasoning.effort` value and the server decides. Measured against LM Studio,
+  Qwen 3.5 spent 399 of a 400-token budget reasoning and produced no answer at all, and
+  `effort: "none"` did not stop it. That is the same failure mode the MLX backend had, from
+  the same model, so the empty-answer notice applies on both.
+
+`temperature`, `top_p` and the token cap are standard Responses parameters. `top_k`,
+`min_p` and `repetition_penalty` are LM Studio extensions: sent, harmless where unknown,
+and only meaningful on a server that implements them.
 
 ### Personas
 

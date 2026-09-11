@@ -91,6 +91,34 @@ public struct Conversation: Sendable {
 /// checkpoints *and* different samplers. `QwenSampling` is the shared preset used by the
 /// two default Qwen seats.
 public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
+
+    /// Which engine drives this seat.
+    ///
+    /// The two are equivalent from the orchestrator's point of view — both are `LLMEngine`
+    /// — but not from the app's: `mlx` runs the weights in-process on the GPU, while
+    /// `openAIResponses` talks HTTP to a server (LM Studio, or OpenAI itself). Tools are
+    /// dispatched in-process and so exist only on `mlx`.
+    public enum Backend: String, Sendable, Codable, CaseIterable, Identifiable {
+        case mlx
+        case openAIResponses
+
+        public var id: String { rawValue }
+
+        public var label: String {
+            switch self {
+            case .mlx: "MLX (in-process)"
+            case .openAIResponses: "OpenAI Responses API"
+            }
+        }
+
+        public var shortLabel: String {
+            switch self {
+            case .mlx: "MLX"
+            case .openAIResponses: "API"
+            }
+        }
+    }
+
     /// Stable id (also the seat label used in prompts, e.g. "Agent A").
     public var id: String
     public var displayName: String
@@ -98,6 +126,10 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
     public var modelID: String
     /// Short label shown in the UI badge.
     public var modelShortName: String
+    /// Which engine runs this seat.
+    public var backend: Backend
+    /// Endpoint used when `backend` is `.openAIResponses`.
+    public var openAI: OpenAIEndpoint
     public var temperature: Double
     public var topP: Double
     /// Keep only this many most-likely tokens. `0` disables the cut.
@@ -133,6 +165,8 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
         displayName: String,
         modelID: String = AgentSpec.defaultModelID,
         modelShortName: String = "Qwen3.5-4B-4bit",
+        backend: Backend = .mlx,
+        openAI: OpenAIEndpoint = OpenAIEndpoint(),
         temperature: Double = 0.75,
         topP: Double = 0.95,
         topK: Int = 0,
@@ -148,6 +182,8 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
         self.displayName = displayName
         self.modelID = modelID
         self.modelShortName = modelShortName
+        self.backend = backend
+        self.openAI = openAI
         self.temperature = temperature
         self.topP = topP
         self.topK = topK
@@ -252,6 +288,14 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
     /// this thinking mode allows for reasoning.
     public var generationCap: Int {
         maxTokens + (thinking.reasoningTokenBudget ?? 0)
+    }
+
+    /// What the badge under a seat's name should read.
+    public var backendLabel: String {
+        switch backend {
+        case .mlx: modelShortName
+        case .openAIResponses: openAI.shortModelName
+        }
     }
 
     /// The resolved style. Never fails: an unknown id yields `neutral`.

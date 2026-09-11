@@ -129,13 +129,17 @@ public final class ChatController: ObservableObject {
         // One engine per seat = one independent model instance per seat. Swapping in a
         // different checkpoint later is a change to `specs`, nothing else.
         let seats = zip(specs, panes).map { spec, pane in
-            ConversationEngine.Seat(
-                spec: spec,
-                engine: MLXEngine(spec: spec, toolRegistry: registry) { state in
-                    Task { @MainActor in
-                        pane.engineState = state
-                    }
+            // Both backends are constructed up front: an MLX seat keeps its weights loaded
+            // even while the OpenAI backend is selected, and vice versa.
+            let stateHandler: @Sendable (EngineState) -> Void = { state in
+                Task { @MainActor in
+                    pane.engineState = state
                 }
+            }
+            return ConversationEngine.Seat(
+                spec: spec,
+                mlx: MLXEngine(spec: spec, toolRegistry: registry, onStateChange: stateHandler),
+                openAI: OpenAIResponsesEngine(spec: spec, onStateChange: stateHandler)
             )
         }
 
@@ -378,6 +382,23 @@ public final class ChatController: ObservableObject {
         if let pane = pane(agentID) {
             pane.spec = spec
         }
+    }
+
+    /// Point one seat at a backend. Only offered before the conversation starts, because
+    /// switching mid-thread would change a participant's identity part-way through.
+    public func setBackend(_ backend: AgentSpec.Backend, for agentID: String) {
+        engine.setBackend(backend, for: agentID)
+        guard var spec = engine.specs.first(where: { $0.id == agentID }) else { return }
+        spec.backend = backend
+        pane(agentID)?.spec = spec
+    }
+
+    /// Point one seat at a different server or model id.
+    public func setEndpoint(_ endpoint: OpenAIEndpoint, for agentID: String) {
+        engine.setEndpoint(endpoint, for: agentID)
+        guard var spec = engine.specs.first(where: { $0.id == agentID }) else { return }
+        spec.openAI = endpoint
+        pane(agentID)?.spec = spec
     }
 
     public func warmUp(_ agentID: String) {

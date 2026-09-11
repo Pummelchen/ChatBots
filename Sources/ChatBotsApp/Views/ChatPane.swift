@@ -36,12 +36,14 @@ struct ChatPane: View {
         // text streams. See PaneHeader for why that matters.
         PaneHeader(
             spec: pane.spec,
+            canChangeBackend: controller.turns.isEmpty,
             statusText: pane.statusText,
             isGenerating: pane.isGenerating,
             tint: tint,
             palette: palette,
             onThinkingChange: { controller.setThinking($0, for: pane.id) },
-            onPersonaChange: { controller.setPersona($0, for: pane.id) }
+            onPersonaChange: { controller.setPersona($0, for: pane.id) },
+            onBackendChange: { controller.setBackend($0, for: pane.id) }
         )
     }
 

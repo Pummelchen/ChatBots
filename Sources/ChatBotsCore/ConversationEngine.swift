@@ -79,14 +79,33 @@ public final class ConversationEngine {
         public init() {}
     }
 
-    /// One seat: static spec plus its private engine instance.
+    /// One seat: its configuration plus one engine per backend.
+    ///
+    /// Both engines are held even though only one is used at a time, so a seat can switch
+    /// backend without losing the loaded MLX weights or re-resolving the endpoint.
     public struct Seat: Sendable {
-        public let spec: AgentSpec
-        public let engine: any LLMEngine
+        public var spec: AgentSpec
+        public let mlx: (any LLMEngine)?
+        public let openAI: (any LLMEngine)?
 
         public init(spec: AgentSpec, engine: any LLMEngine) {
             self.spec = spec
-            self.engine = engine
+            self.mlx = engine
+            self.openAI = nil
+        }
+
+        public init(spec: AgentSpec, mlx: any LLMEngine, openAI: any LLMEngine) {
+            self.spec = spec
+            self.mlx = mlx
+            self.openAI = openAI
+        }
+
+        /// The engine the spec currently selects.
+        public var engine: any LLMEngine {
+            switch spec.backend {
+            case .mlx: mlx ?? openAI!
+            case .openAIResponses: openAI ?? mlx!
+            }
         }
     }
 
@@ -135,7 +154,7 @@ public final class ConversationEngine {
     // MARK: Internals
 
     public let configuration: Configuration
-    private let seats: [Seat]
+    private var seats: [Seat]
 
     private var seatCursor = 0
     private var turnsCompleted = 0
@@ -159,6 +178,24 @@ public final class ConversationEngine {
     /// loop itself goes through `runTurn` so it can tag events with the speaker.
     public func seatEngine(for agentID: String) -> (any LLMEngine)? {
         seats.first { $0.spec.id == agentID }?.engine
+    }
+
+    /// The MLX engine for a seat, regardless of which backend is selected. The UI warms
+    /// weights through this.
+    public func mlxEngine(for agentID: String) -> (any LLMEngine)? {
+        seats.first { $0.spec.id == agentID }?.mlx
+    }
+
+    /// Point a seat at a backend. Takes effect on its next turn.
+    public func setBackend(_ backend: AgentSpec.Backend, for agentID: String) {
+        guard let index = seats.firstIndex(where: { $0.spec.id == agentID }) else { return }
+        seats[index].spec.backend = backend
+    }
+
+    /// Change a seat's endpoint. Takes effect on its next turn.
+    public func setEndpoint(_ endpoint: OpenAIEndpoint, for agentID: String) {
+        guard let index = seats.firstIndex(where: { $0.spec.id == agentID }) else { return }
+        seats[index].spec.openAI = endpoint
     }
 
     public var isLoopRunning: Bool { generationTask != nil }

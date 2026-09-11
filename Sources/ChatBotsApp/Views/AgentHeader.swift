@@ -22,12 +22,15 @@ import SwiftUI
 /// the status line, or whether the seat is generating.
 struct PaneHeader: View {
     let spec: AgentSpec
+    /// Backend may only change before the conversation begins.
+    let canChangeBackend: Bool
     let statusText: String
     let isGenerating: Bool
     let tint: Color
     let palette: AppPalette
     let onThinkingChange: (ThinkingMode) -> Void
     let onPersonaChange: (String) -> Void
+    let onBackendChange: (AgentSpec.Backend) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -39,7 +42,7 @@ struct PaneHeader: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(spec.displayName)
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    Text(spec.modelShortName)
+                    Text(spec.backendLabel)
                         .font(.system(size: 10.5, design: .monospaced))
                         .foregroundStyle(palette.textSecondary)
                         .lineLimit(1)
@@ -47,6 +50,12 @@ struct PaneHeader: View {
                 }
 
                 Spacer(minLength: 8)
+
+                BackendControl(
+                    spec: spec,
+                    isEnabled: canChangeBackend,
+                    onSelect: onBackendChange
+                )
 
                 PersonaControl(
                     persona: spec.persona,
@@ -264,5 +273,82 @@ struct PersonaSummary: View {
         }
         .help(specs.map { "\($0.id) — \($0.persona.name): \($0.persona.summary)" }
             .joined(separator: "\n"))
+    }
+}
+
+/// Per-seat backend picker.
+///
+/// Changing backend changes who a participant *is*, so it is offered only before the
+/// conversation starts — the control disables itself once there are turns, and the
+/// tooltip says why.
+struct BackendControl: View {
+    let spec: AgentSpec
+    let isEnabled: Bool
+    let onSelect: (AgentSpec.Backend) -> Void
+
+    var body: some View {
+        Menu {
+            Picker("Backend", selection: binding) {
+                ForEach(AgentSpec.Backend.allCases) { backend in
+                    Text(backend.label).tag(backend)
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: spec.backend == .mlx ? "cpu" : "network")
+                    .font(.system(size: 9))
+                Text(spec.backend.shortLabel)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+            }
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .disabled(!isEnabled)
+        .help(
+            !isEnabled
+                ? "Backend is fixed once the conversation has started"
+                : spec.backend == .mlx
+                    ? "Running Qwen in-process on the GPU with MLX"
+                    : "Talking to \(spec.openAI.baseURL) over the OpenAI Responses API. Web tools are MLX-only, so this seat has none."
+        )
+    }
+
+    private var binding: Binding<AgentSpec.Backend> {
+        Binding(get: { spec.backend }, set: { onSelect($0) })
+    }
+}
+
+/// Shows where an API-backed seat is pointed, and warns that its tools are gone.
+struct EndpointBar: View {
+    let spec: AgentSpec
+    let palette: AppPalette
+    let onEdit: () -> Void
+
+    @EnvironmentObject private var theme: ThemeStore
+    @State private var draft = ""
+    @State private var showingEditor = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "network")
+                .font(.system(size: 9))
+                .foregroundStyle(palette.textTertiary)
+
+            Text("\(spec.openAI.baseURL) · \(spec.openAI.model)")
+                .font(.system(size: 9.5, design: .monospaced))
+                .foregroundStyle(palette.textTertiary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            if spec.webSearchEnabled {
+                Label("web tools unavailable on this backend", systemImage: "exclamationmark.triangle")
+                    .font(.system(size: 9.5, design: .rounded))
+                    .foregroundStyle(AgentTheme.warning)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .help("This seat uses the OpenAI Responses API at \(spec.openAI.baseURL)")
     }
 }

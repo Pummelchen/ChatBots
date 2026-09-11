@@ -65,6 +65,13 @@ struct UnifiedConversation: View {
                     Text(pane.spec.displayName)
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
 
+                    BackendControl(
+                        spec: pane.spec,
+                        isEnabled: controller.turns.isEmpty
+                    ) { backend in
+                        controller.setBackend(backend, for: pane.id)
+                    }
+
                     PersonaControl(
                         persona: pane.spec.persona,
                         isEnabled: !pane.isGenerating
