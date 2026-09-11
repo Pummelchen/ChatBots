@@ -264,6 +264,7 @@ public final class APIServer {
     private let engine: ConversationEngine
     private var server: HTTPServer?
     private var feedTask: Task<Void, Never>?
+    private var tokenTask: Task<Void, Never>?
     private var streams: [HTTPServer.EventStream] = []
 
     /// Whether the web interface shows the models' thinking blocks. A view preference, but
@@ -299,6 +300,8 @@ public final class APIServer {
     public func stop() {
         feedTask?.cancel()
         feedTask = nil
+        tokenTask?.cancel()
+        tokenTask = nil
         for stream in streams { stream.close() }
         streams.removeAll()
         server?.stop()
@@ -692,7 +695,6 @@ public final class APIServer {
         feedTask = Task { [weak self] in
             guard let self else { return }
             var seen = Set<UUID>()
-            var ticks = 0
             for await turns in self.engine.transcriptUpdates {
                 if Task.isCancelled { return }
                 for turn in turns where !seen.contains(turn.id) {
@@ -701,11 +703,65 @@ public final class APIServer {
                         self.encode(MessageEnvelope(turn: turn)) ?? "{}", event: "turn")
                 }
                 self.broadcast(self.encode(self.snapshot()) ?? "{}", event: "snapshot")
-                ticks = 0
             }
-            // The stream ending means the engine was reset or replaced.
-            _ = ticks
         }
+        startTokenFeed()
+    }
+
+    /// Stream the model's output as it is written.
+    ///
+    /// The snapshot feed alone is not enough for a client that wants to show a reply being
+    /// written: it fires once per turn, so the text would appear in whole answers rather than
+    /// arriving as it is produced. This carries the engine's own per-token events instead.
+    ///
+    /// Deliberately a small payload — an id and a fragment — rather than a fresh snapshot per
+    /// token. A snapshot is a few kilobytes and a turn can produce thousands of tokens;
+    /// broadcasting one per token would drown the connection in its own status.
+    ///
+    /// The reasoning stream is carried too, so a client can show the thinking blocks the
+    /// desktop app shows.
+    private func startTokenFeed() {
+        tokenTask?.cancel()
+        tokenTask = Task { [weak self] in
+            guard let self else { return }
+            // The engine has one event stream and hands every event to whoever is reading it,
+            // so opening a second reader would steal events from the first. Reading the same
+            // stream that drives the transcript would therefore be wrong; the engine exposes
+            // this stream precisely so a second consumer can see what the first saw.
+            for await event in self.engine.events {
+                if Task.isCancelled { return }
+                switch event {
+                case .token(let agentID, let text):
+                    self.broadcast(
+                        self.encode(Delta(agentID: agentID, text: text, kind: "token")) ?? "{}",
+                        event: "delta")
+                case .reasoning(let agentID, let text):
+                    self.broadcast(
+                        self.encode(Delta(agentID: agentID, text: text, kind: "reasoning")) ?? "{}",
+                        event: "delta")
+                case .toolCall(let agentID, let name, let query):
+                    self.broadcast(
+                        self.encode(Delta(agentID: agentID, text: "\\(name)(\\(query))", kind: "tool"))
+                            ?? "{}",
+                        event: "delta")
+                case .turnStarted(let agentID, _):
+                    self.broadcast(
+                        self.encode(Delta(agentID: agentID, text: "", kind: "started")) ?? "{}",
+                        event: "delta")
+                default:
+                    // Everything else is reflected in the snapshot that follows the turn.
+                    break
+                }
+            }
+        }
+    }
+
+    /// One fragment of a model's output.
+    private struct Delta: Encodable {
+        var agentID: String
+        var text: String
+        /// token, reasoning, tool or started.
+        var kind: String
     }
 
     private struct MessageEnvelope: Encodable {

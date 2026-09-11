@@ -138,28 +138,25 @@ public final class ConversationEngine {
 
     // MARK: Streams
 
-    private var eventContinuation: AsyncStream<TurnEvent>.Continuation?
-    private var statusContinuation: AsyncStream<RunStatus>.Continuation?
-    private var transcriptContinuation: AsyncStream<[Turn]>.Continuation?
+    private var eventContinuation: AsyncStream<TurnEvent>.Continuation!
+    private var statusContinuation: AsyncStream<RunStatus>.Continuation!
+    private var transcriptContinuation: AsyncStream<[Turn]>.Continuation!
 
     /// Every token, tool call and note, in order.
-    public private(set) lazy var events: AsyncStream<TurnEvent> = {
-        AsyncStream(bufferingPolicy: .unbounded) { continuation in
-            self.eventContinuation = continuation
-        }
-    }()
+    /// Every token, tool call and note, in order.
+    ///
+    /// Built once, in `init`, and never rebuilt. It was a `lazy var` whose closure assigned
+    /// the continuation, which meant *reading the property a second time replaced the
+    /// continuation* — so a second consumer silently took the stream away from the first, and
+    /// the first received nothing more. Two subscribers are exactly what this is for: the
+    /// HTTP API forwards these events to its clients while the engine uses them itself.
+    public private(set) var events: AsyncStream<TurnEvent>
 
-    public private(set) lazy var statusUpdates: AsyncStream<RunStatus> = {
-        AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
-            self.statusContinuation = continuation
-        }
-    }()
+    /// The run status as it changes. Built once; see `events` for why.
+    public private(set) var statusUpdates: AsyncStream<RunStatus>
 
-    public private(set) lazy var transcriptUpdates: AsyncStream<[Turn]> = {
-        AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
-            self.transcriptContinuation = continuation
-        }
-    }()
+    /// The shared log whenever it changes. Built once; see `events` for why.
+    public private(set) var transcriptUpdates: AsyncStream<[Turn]>
 
     // MARK: Internals
 
@@ -186,6 +183,25 @@ public final class ConversationEngine {
         precondition(!seats.isEmpty, "a conversation needs at least one seat")
         self.seats = seats
         self.configuration = configuration
+
+        // Built here rather than lazily. A `lazy var` whose closure assigns the continuation
+        // hands the stream to whoever reads the property last, so a second subscriber takes
+        // it from the first — which is how the API's token feed silently starved the engine's
+        // own transcript feed. Built once in `init`, every reader gets the same stream, which
+        // is what makes it safe for the API and the engine to both listen.
+        let (eventStream, eventSink) = AsyncStream.makeStream(
+            of: TurnEvent.self, bufferingPolicy: .unbounded)
+        let (statusStream, statusSink) = AsyncStream.makeStream(
+            of: RunStatus.self, bufferingPolicy: .bufferingNewest(1))
+        let (transcriptStream, transcriptSink) = AsyncStream.makeStream(
+            of: [Turn].self, bufferingPolicy: .bufferingNewest(1))
+        self.events = eventStream
+        self.statusUpdates = statusStream
+        self.transcriptUpdates = transcriptStream
+        // Assigned after every stored property has a value, which is when `self` may be used.
+        self.eventContinuation = eventSink
+        self.statusContinuation = statusSink
+        self.transcriptContinuation = transcriptSink
     }
 
     public var specs: [AgentSpec] { seats.map(\.spec) }
