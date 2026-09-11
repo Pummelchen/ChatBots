@@ -458,12 +458,22 @@ actor MLXGate {
     }
 
     /// Run `body` with exclusive access to MLX.
+    ///
+    /// `rethrows` with an explicit release rather than `defer { Task { ... } }`: a
+    /// detached release task could let a waiter in before `body` has actually finished
+    /// with the GPU, which is the exact race this gate exists to prevent.
     static func exclusive<T: Sendable>(
         _ body: @Sendable () async throws -> T
-    ) async rethrows -> T {
+    ) async throws -> T {
         await shared.acquire()
-        defer { Task { await shared.release() } }
-        return try await body()
+        do {
+            let result = try await body()
+            await shared.release()
+            return result
+        } catch {
+            await shared.release()
+            throw error
+        }
     }
 }
 
