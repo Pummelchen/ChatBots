@@ -1,12 +1,13 @@
-// ChatBotsApp — reading the moderator's files
+// ChatBotsCore — reading the moderator's files
 //
-// The app target, because this is where the system's own converters are available: PDFKit
-// for PDFs and `textutil` for the document formats. Using the system's converters is
-// deliberate over hand-written parsers — `textutil` is part of macOS and has read Word,
-// RTF, ODT and HTML for years, and a hand-rolled `.docx` unzipper would be a fraction as
-// capable and a great deal more code to get wrong.
+// In the core rather than a front end, so the SwiftUI app, the HTTP server and the web page
+// all read a document the same way. There is one implementation of "what is in this PDF".
+//
+// It uses the system's own converters: PDFKit for PDFs and `textutil` for the document
+// formats. That is deliberate over hand-written parsers — `textutil` is part of macOS and
+// has read Word, RTF, ODT and HTML for years, and a hand-rolled `.docx` unzipper would be a
+// fraction as capable and a great deal more code to get wrong.
 
-import ChatBotsCore
 import Foundation
 import PDFKit
 
@@ -14,8 +15,8 @@ import PDFKit
 ///
 /// Markdown is included here: it is text, and converting it would strip the structure that
 /// makes it useful to a model, so it is passed through as written.
-struct PlainTextExtractor: DocumentExtracting {
-    func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument {
+public struct PlainTextExtractor: DocumentExtracting {
+    public func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument {
         let data: Data
         do {
             data = try Data(contentsOf: url)
@@ -38,7 +39,7 @@ struct PlainTextExtractor: DocumentExtracting {
     ///
     /// `kind` is passed in rather than assumed: this serves both plain text and Markdown,
     /// and returning `.plainText` for a `.md` file would misreport what the moderator added.
-    func fit(_ text: String, kind: DocumentKind, in limits: AttachmentLimits) -> AttachedDocument {
+    public func fit(_ text: String, kind: DocumentKind, in limits: AttachmentLimits) -> AttachedDocument {
         // Null bytes appear in files that are not really text; they confuse models and
         // serve no purpose here.
         let cleaned = text.replacingOccurrences(of: "\u{0}", with: "")
@@ -52,8 +53,8 @@ struct PlainTextExtractor: DocumentExtracting {
 }
 
 /// Reads a PDF's text layer.
-struct PDFTextExtractor: DocumentExtracting {
-    func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument {
+public struct PDFTextExtractor: DocumentExtracting {
+    public func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument {
         guard let document = PDFDocument(url: url) else {
             throw DocumentError.unreadable("the PDF could not be opened")
         }
@@ -83,8 +84,8 @@ struct PDFTextExtractor: DocumentExtracting {
 }
 
 /// Converts Word, RTF, ODT, HTML and WebArchive with the system's own converter.
-struct TextutilExtractor: DocumentExtracting {
-    func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument {
+public struct TextutilExtractor: DocumentExtracting {
+    public func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument {
         let result = try SystemProcess.run(
             "/usr/bin/textutil",
             ["-convert", "txt", "-stdout", "-encoding", "UTF-8", url.path]
@@ -102,8 +103,8 @@ struct TextutilExtractor: DocumentExtracting {
 }
 
 /// Reads an image's bytes, for seats that can see.
-struct ImageExtractor: DocumentExtracting {
-    func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument {
+public struct ImageExtractor: DocumentExtracting {
+    public func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument {
         let data: Data
         do {
             data = try Data(contentsOf: url)
@@ -124,19 +125,19 @@ private extension AttachedDocument {
 }
 
 /// Runs a system tool and collects its output.
-enum SystemProcess {
-    struct Result {
-        var status: Int32
-        var output: Data
-        var error: String
+public enum SystemProcess {
+    public struct Result {
+        public var status: Int32
+        public var output: Data
+        public var error: String
     }
 
     /// How long a conversion may take before it is killed. Generous, because a large Word
     /// document on a busy Mac is not a hang — but bounded, because a broken file should not
     /// freeze the interface.
-    static let timeout: TimeInterval = 30
+    public static let timeout: TimeInterval = 30
 
-    static func run(_ executable: String, _ arguments: [String]) throws -> Result {
+    public static func run(_ executable: String, _ arguments: [String]) throws -> Result {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
@@ -178,8 +179,8 @@ enum SystemProcess {
 }
 
 /// The extractors this app ships with.
-enum SystemDocumentExtractor {
-    static var ingestor: DocumentIngestor {
+public enum SystemDocumentExtractor {
+    public static var ingestor: DocumentIngestor {
         let text = PlainTextExtractor()
         let pdf = PDFTextExtractor()
         let documents = TextutilExtractor()
@@ -198,7 +199,7 @@ enum SystemDocumentExtractor {
     /// Add files, keeping the ones that worked and describing the ones that did not.
     ///
     /// One bad file should not discard the good ones, so this reports per file.
-    static func add(
+    public static func add(
         urls: [URL], limits: AttachmentLimits = .standard
     ) -> (documents: [AttachedDocument], failures: [String]) {
         var documents: [AttachedDocument] = []

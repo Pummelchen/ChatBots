@@ -1,4 +1,4 @@
-// ChatBotsAppTests — the extractors against real files
+// ChatBotsCoreTests — the extractors against real files
 //
 // The PDF and Office paths talk to PDFKit and `textutil`, so fakes prove nothing about
 // them. These build genuine files — a real PDF written through Core Graphics, a real .docx
@@ -11,7 +11,6 @@ import CoreText
 import Foundation
 import Testing
 
-@testable import ChatBots
 
 private let scratch = FileManager.default.temporaryDirectory
     .appending(path: "chatbots-extract-\(UUID().uuidString)")

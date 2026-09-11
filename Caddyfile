@@ -1,0 +1,51 @@
+# ChatBots — Caddy front end
+#
+# Caddy is the public face: it listens on 7788, serves the web interface, and forwards
+# /api/* to the Swift engine behind it. The engine itself never faces outwards.
+#
+#   browser ──▶ :7788 Caddy ──┬──▶ /            static files from ./web
+#                              └──▶ /api/*      127.0.0.1:7789  (the Swift engine)
+#
+# HTTP only, deliberately. This is a local chat app: the traffic does not leave the machine,
+# and the engine already binds to loopback. Automatic HTTPS would try to obtain a
+# certificate for a name that is not public and fail noisily for no benefit.
+#
+# Run it with:  caddy run --config Caddyfile
+# Or let tools/start.sh manage it.
+
+{
+	# No admin API: nothing needs to reconfigure a running instance, and leaving it on
+	# would open another port.
+	admin off
+	# Keep the log on stderr so the start script shows one stream.
+	log {
+		output stderr
+		level WARN
+	}
+}
+
+http://:7788 {
+	encode zstd gzip
+
+	# The engine. `flush_interval -1` disables response buffering, which server-sent events
+	# need: without it Caddy would hold the stream and the live transcript would never
+	# appear until the turn finished — the exact thing the feed exists to avoid.
+	handle /api/* {
+		reverse_proxy 127.0.0.1:7789 {
+			flush_interval -1
+			# Loopback only, so no need to pass a host header through.
+			header_up Host {upstream_hostport}
+		}
+	}
+
+	# The interface itself.
+	handle {
+		root * ./web
+		file_server
+		# A reload during development must not serve a stale page.
+		header Cache-Control "no-store"
+	}
+
+	# Anything not found is a mistake rather than a client route, so Caddy's default 404 is
+	# the honest answer.
+}

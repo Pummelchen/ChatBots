@@ -206,6 +206,35 @@ public protocol DocumentExtracting: Sendable {
     func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument
 }
 
+/// Holds the extractor a front end installed.
+///
+/// The core cannot read a PDF or a Word file itself — that needs PDFKit and `textutil`, which
+/// belong to the app target — so the front end installs an ingestor here at launch and the
+/// API uses it. Until one is installed, uploads are refused with a clear message rather than
+/// crashing.
+public enum DocumentIngestorProvider {
+    private static let lock = NSLock()
+    private nonisolated(unsafe) static var installed: DocumentIngestor?
+
+    public static func install(_ ingestor: DocumentIngestor) {
+        lock.lock()
+        defer { lock.unlock() }
+        installed = ingestor
+    }
+
+    public static var ingestor: DocumentIngestor {
+        get throws {
+            lock.lock()
+            defer { lock.unlock() }
+            guard let installed else {
+                throw DocumentError.unreadable(
+                    "this server was started without document support")
+            }
+            return installed
+        }
+    }
+}
+
 /// Chooses an extractor per kind, and holds the shared rules — size limits and the
 /// blank-result check — so no individual extractor has to remember them.
 /// `@unchecked Sendable` because its stored values are immutable — a dictionary of sendable

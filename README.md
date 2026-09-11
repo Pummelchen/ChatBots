@@ -732,6 +732,81 @@ cutting that tenth away and leaving a white sliver wherever the mask and the art
 not line up exactly. Verified by asking the system for the finished app's icon
 (`NSWorkspace.icon(forFile:)`), which returns the artwork with macOS's mask applied.
 
+## Architecture: one engine, two front ends
+
+The conversation lives in `ChatBotsCore`, and both interfaces are clients of it:
+
+```
+   SwiftUI app  ─┐
+                 ├──▶  ConversationEngine  (ChatBotsCore)  ──▶  MLX / OpenAI-compatible
+   web page     ─┘         ▲
+                           │  HTTP on loopback
+                    HTTP API + embedded web interface
+```
+
+The engine is served over HTTP by `APIServer`:
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/state` | the whole state, as one JSON snapshot |
+| `GET /api/events` | server-sent events: a snapshot on connect, then a snapshot per turn |
+| `GET /api/health`, `GET /api/personas` | liveness and the persona library |
+| `POST /api/start · pause · resume · stop · reset · compact` | the transport controls |
+| `POST /api/topic · message · attachments · attachments/remove · attachments/clear` | content |
+| `POST /api/seat · settings` | per-seat configuration and view preferences |
+
+Handlers run on the main actor. The engine is `@MainActor`, so every route sees a
+single-threaded conversation while the network side stays concurrent — no locks around the
+conversation, and no way for two requests to interleave inside a turn.
+
+`GET /api/state` returns the whole snapshot rather than patches: a small payload that is
+always consistent beats a set of deltas that can drift. The events feed exists so a client
+does not have to poll while a model is talking.
+
+### The web interface
+
+```
+bash tools/start.sh          # engine + Caddy, then open http://localhost:7788
+bash tools/start.sh --stop
+bash tools/start.sh --status
+```
+
+Caddy is the public face. The engine listens on **7789 on loopback only** and is never
+exposed; Caddy serves the static interface and proxies `/api/*` to it:
+
+```
+browser ──▶ :7788 Caddy ──┬──▶ /          web/  (static files)
+                           └──▶ /api/*    127.0.0.1:7789  (the engine)
+```
+
+`flush_interval -1` on the proxy is not optional: without it Caddy buffers the event stream
+and the live transcript would only appear once a turn had finished — the exact thing the
+feed exists to avoid.
+
+If Caddy is **not** installed the engine serves the interface itself on 7788, so the web
+interface works either way; it just does not get Caddy's compression. Nothing needs the
+SwiftUI app: the engine is a separate process and the page drives it directly.
+
+The interface itself lives in `web/` and is also embedded into the binary by
+`tools/embed-web.py`, so the server works from any directory rather than depending on being
+run next to the source. `web/` is the source of truth; the generated
+`Sources/ChatBotsCore/WebAssets.swift` must not be edited by hand, and `tools/start.sh`
+regenerates it when `web/` has changed.
+
+It adapts to the screen rather than assuming one: the two panes sit side by side, collapse to
+a single column below 780px, and everything is sized from one root scale that the media
+queries adjust. There is a Thread view for a single conversational column, matching the
+desktop app's two window modes. HTTP only, deliberately — the traffic never leaves the
+machine, and automatic HTTPS would try to obtain a certificate for a name that is not public.
+
+**Status: the web front end is complete; the SwiftUI app has not yet been moved onto the
+API.** The engine, the API and the page are done and verified. What remains is pointing the
+desktop app at `http://127.0.0.1:7789` instead of constructing its own `ConversationEngine`,
+which is also what will remove the duplicated display state (the app keeps its own copy of
+the live pane text; the engine now maintains that itself, which is what the web page reads).
+Until that is done, run one or the other: they are separate processes with separate
+conversations.
+
 ## Installing on another Mac
 
 For a Mac that has nothing set up for development, from a Terminal:

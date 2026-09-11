@@ -14,3 +14,6 @@ models/
 .install-check.log
 models/.huggingface-file-list.txt
 models/.hf-model.json
+
+# Runtime state from tools/start.sh (pid files and logs)
+.run/

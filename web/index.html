@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ChatBots</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body data-layout="split">
+
+<header class="bar">
+  <div class="topic-row">
+    <label class="lab" for="topic">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12v8H6l-3 3v-3H2z"/></svg>
+      Topic
+    </label>
+    <input id="topic" type="text" autocomplete="off" spellcheck="false"
+           placeholder="What should the models discuss?">
+    <div class="transport">
+      <button id="start" class="primary">Start</button>
+      <button id="pause" disabled>Pause</button>
+      <button id="stop" disabled>Stop</button>
+      <button id="save" disabled title="Download the conversation log">Save</button>
+      <button id="clear" disabled>Clear</button>
+    </div>
+  </div>
+
+  <div class="attach-row">
+    <button id="attach" class="small">Add files</button>
+    <input id="files" type="file" multiple hidden>
+    <span id="vision-note" class="note" hidden></span>
+    <div id="chips" class="chips"></div>
+  </div>
+
+  <div class="control-row">
+    <span id="status" class="pill">Idle</span>
+    <span id="counts" class="note"></span>
+    <summary class="personas" id="persona-summary"></summary>
+    <div class="spacer"></div>
+    <label class="toggle" title="Stream the models' thinking into the panes">
+      <input id="thinking" type="checkbox" checked> Show thinking
+    </label>
+    <div class="seg" role="group" aria-label="Layout">
+      <button id="layout-split" class="on" title="Side by side">Split</button>
+      <button id="layout-thread" title="One column, like a chat">Thread</button>
+    </div>
+  </div>
+</header>
+
+<main id="stage">
+  <section class="pane" data-pane="0">
+    <div class="pane-head">
+      <span class="dot" data-seat="0">A</span>
+      <div class="who">
+        <button class="name" data-rename="0" title="Double-click, or press, to rename">Agent 1</button>
+        <span class="meta" data-meta="0"></span>
+      </div>
+      <div class="spacer"></div>
+      <span class="state" data-state="0">idle</span>
+    </div>
+    <div class="params" data-params="0"></div>
+    <div class="transcript" data-transcript="0"></div>
+  </section>
+
+  <section class="pane" data-pane="1">
+    <div class="pane-head">
+      <span class="dot" data-seat="1">B</span>
+      <div class="who">
+        <button class="name" data-rename="1" title="Double-click, or press, to rename">Agent 2</button>
+        <span class="meta" data-meta="1"></span>
+      </div>
+      <div class="spacer"></div>
+      <span class="state" data-state="1">idle</span>
+    </div>
+    <div class="params" data-params="1"></div>
+    <div class="transcript" data-transcript="1"></div>
+  </section>
+
+  <div id="thread" class="thread" hidden></div>
+</main>
+
+<footer class="bar footer">
+  <textarea id="message" rows="1" placeholder="Message both participants as the moderator…"></textarea>
+  <button id="send" class="primary" disabled>Send to both</button>
+  <div class="spacer"></div>
+  <button id="condense" disabled title="Summarise the older turns now">Condense</button>
+  <span id="context" class="note mono">ctx —</span>
+</footer>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

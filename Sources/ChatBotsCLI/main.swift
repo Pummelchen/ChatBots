@@ -26,6 +26,8 @@ struct Options {
     var compactThreshold: Double?
     var exportSample = false
     var check = false
+    var serve = false
+    var port = 7788
     var contextWindow: Int?
     var keepRecent: Int?
     /// Cap on answer tokens per turn; `nil` keeps the seat's own budget.
@@ -85,6 +87,8 @@ struct Options {
             case "--session-probe": options.sessionProbe = true
             case "--export-sample": options.exportSample = true
             case "--check": options.check = true
+            case "--serve": options.serve = true
+            case "--port": options.port = Int(next() ?? "") ?? options.port
             case "--compact-threshold": options.compactThreshold = Double(next() ?? "")
             case "--context-window": options.contextWindow = Int(next() ?? "")
             case "--compact-keep": options.keepRecent = Int(next() ?? "")
@@ -400,6 +404,49 @@ if options.memoryProbe {
         report("after turn \(turn)")
     }
     exit(0)
+}
+
+// MARK: - Server
+//
+// The same engine the printed run uses, behind HTTP instead of stdout. Both front ends —
+// the web page and the SwiftUI app — talk to this, so there is one conversation engine and
+// one place where a conversation actually lives.
+if options.serve {
+    let configuration = ConversationEngine.Configuration()
+    let seats = zip(specs, engines).map { spec, mlx in
+        ConversationEngine.Seat(spec: spec, mlx: mlx, openAI: OpenAIResponsesEngine(spec: spec))
+    }
+    let engine = ConversationEngine(seats: seats, configuration: configuration)
+    if !options.topic.isEmpty { _ = engine.setTopic(options.topic) }
+    for (index, spec) in specs.enumerated() where engine.attachments.isEmpty {
+        _ = index
+        _ = spec
+    }
+
+    // Documents are read by the app's extractors, which live in the app target; the CLI
+    // links the same code, so the server can accept uploads too.
+    DocumentIngestorProvider.install(SystemDocumentExtractor.ingestor)
+
+    let server = APIServer(engine: engine, port: UInt16(options.port))
+    do {
+        try server.start()
+    } catch {
+        FileHandle.standardError.write(
+            Data("could not start the server on port \(options.port): \(error.localizedDescription)\n".utf8))
+        exit(1)
+    }
+
+    log("ChatBots server listening on http://127.0.0.1:\(options.port)")
+    log("  state   : GET  /api/state")
+    log("  events  : GET  /api/events  (server-sent events)")
+    log("  control : POST /api/start | /api/pause | /api/resume | /api/stop | /api/reset")
+    log("  models  : \(specs.map(\.modelShortName).joined(separator: ", "))")
+    log("Press Control-C to stop.")
+
+    // Keep the process alive; the HTTP listener runs on its own queue.
+    while true {
+        try? await Task.sleep(for: .seconds(3600))
+    }
 }
 
 // MARK: - Conversation

@@ -188,6 +188,130 @@ public final class ConversationEngine {
 
     public var specs: [AgentSpec] { seats.map(\.spec) }
 
+    /// The topic, read and written by a front end. Set through `setTopic` rather than a
+    /// plain setter so a running conversation can refuse it the way it refuses attachments.
+    public var topic: String { conversation.topic }
+
+    @discardableResult
+    public func setTopic(_ value: String) -> Bool {
+        guard startedTurns == 0, generationTask == nil else { return false }
+        conversation.topic = value
+        publishTranscript()
+        return true
+    }
+
+    /// Start, or start over. What a front end's single Start button means.
+    public func startOrRestart() {
+        if isRunning || isPaused {
+            stop()
+        }
+        if startedTurns > 0 {
+            reset()
+        }
+        start()
+    }
+
+    /// Whether the last thing that happened was a failure, for a front end to display.
+    public var lastError: String? {
+        if case .failed(let message) = status { return message }
+        return nil
+    }
+
+    /// Source material may only be added before the conversation starts, since it is
+    /// context for the discussion rather than a message in it.
+    public var canAttachFiles: Bool { startedTurns == 0 && generationTask == nil }
+
+    /// Images are offered only when every seat can see them: a discussion where one
+    /// participant cannot see the picture is worse than being told images are unavailable.
+    public var allSeatsSupportVision: Bool {
+        specs.allSatisfy { $0.visionSupport.allowsImages }
+    }
+
+    /// What each seat is doing right now, for the live panes.
+    public struct LiveSeat: Sendable {
+        public var id: String
+        public var isGenerating: Bool
+        public var text: String
+        public var reasoning: String
+        public var activity: String?
+        public var toolLog: [String]
+        public var stats: TurnStats?
+    }
+
+    /// The live view is held while the answer is still being revealed, so a front end shows
+    /// the whole reply rather than cutting it off when generation reports finished.
+    public var liveSeats: [LiveSeat] {
+        seats.map { seat in
+            let live = liveState[seat.spec.id] ?? LiveState()
+            return LiveSeat(
+                id: seat.spec.id,
+                isGenerating: live.isGenerating,
+                text: live.text,
+                reasoning: live.reasoning,
+                activity: live.activity,
+                toolLog: live.toolLog,
+                stats: live.stats
+            )
+        }
+    }
+
+    /// Per-seat progress, rebuilt from the engine's own events.
+    ///
+    /// It lives here rather than in each front end so that "what is this seat doing right
+    /// now" has one answer. The SwiftUI app and the web page read the same value, which is
+    /// what let the GUI's own copy of this be removed.
+    private struct LiveState {
+        var isGenerating = false
+        var text = ""
+        var reasoning = ""
+        var activity: String?
+        var toolLog: [String] = []
+        var stats: TurnStats?
+    }
+
+    private var liveState: [String: LiveState] = [:]
+
+    /// Fold one engine event into the live state.
+    private func record(_ event: TurnEvent) {
+        switch event {
+        case .turnStarted(let agentID, _):
+            liveState[agentID] = LiveState(isGenerating: true)
+        case .token(let agentID, let text):
+            liveState[agentID, default: LiveState()].text += text
+        case .reasoning(let agentID, let text):
+            liveState[agentID, default: LiveState()].reasoning += text
+        case .toolCall(let agentID, let name, let query):
+            liveState[agentID, default: LiveState()].activity = "\(name)(\(UTF8Text.prefix(query, 60)))"
+        case .toolResult(let agentID, _, let summary, _):
+            liveState[agentID, default: LiveState()].toolLog.append(summary)
+            liveState[agentID]?.activity = nil
+        case .toolFailure(let agentID, _, let message):
+            liveState[agentID, default: LiveState()].toolLog.append("failed: \(message)")
+            liveState[agentID]?.activity = nil
+        case .turnFinished(let agentID, _, let stats):
+            liveState[agentID]?.isGenerating = false
+            liveState[agentID]?.stats = stats
+            liveState[agentID]?.activity = nil
+        case .turnFailed(let agentID, let message):
+            liveState[agentID]?.isGenerating = false
+            liveState[agentID]?.activity = "failed: \(message)"
+        }
+    }
+
+    /// Replace one seat's configuration and tell its engine, so a change applies from that
+    /// seat's next turn rather than only being recorded.
+    public func updateSeat(_ spec: AgentSpec) {
+        guard let index = seats.firstIndex(where: { $0.spec.id == spec.id }) else { return }
+        seats[index].spec = spec
+        if let engine = seatEngine(for: spec.id) {
+            Task {
+                await engine.setDisplayName(spec.displayName)
+                await engine.setPersona(spec.personaID)
+                await engine.setThinking(spec.thinking)
+            }
+        }
+    }
+
     /// Every seat, in speaking order.
     public var allSeats: [Seat] { seats }
 
@@ -272,6 +396,11 @@ public final class ConversationEngine {
     }
 
     /// Pause between turns. A turn already generating is allowed to finish.
+    /// True while a conversation is under way, paused included — a paused conversation is
+    /// still one that has started.
+    public var isRunning: Bool { status.isActive }
+    public var isPaused: Bool { status.isPaused }
+
     public func pause() {
         guard generationTask != nil else { return }
         guard !status.isPaused else { return }
@@ -431,7 +560,7 @@ public final class ConversationEngine {
         )
 
         startedTurns += 1
-        publish(.turnStarted(agentID: seat.spec.id, prompt: prompt))
+        publishEvent(.turnStarted(agentID: seat.spec.id, prompt: prompt))
 
         let tools: [any ToolProvider] = seat.spec.webSearchEnabled ? WebToolbox.tools : []
         let engine = seat.engine
@@ -442,10 +571,11 @@ public final class ConversationEngine {
                 messages: prompt,
                 tools: tools,
                 onToolCall: { [weak self] name, argument in
-                    await self?.publish(
+                    await self?.publishEvent(
                         .toolCall(agentID: agentID, name: name, query: argument))
                 },
                 onEvent: { [weak self] event in
+                    await self?.publishEvent(event)
                     await self?.handle(event, from: agentID)
                 }
             )
@@ -455,7 +585,7 @@ public final class ConversationEngine {
         } catch {
             if Task.isCancelled { return }
             note("\(agentID) error: \(error.localizedDescription)")
-            publish(.turnFailed(agentID: agentID, message: error.localizedDescription))
+            publishEvent(.turnFailed(agentID: agentID, message: error.localizedDescription))
         }
     }
 
@@ -483,7 +613,7 @@ public final class ConversationEngine {
                 )
                 publishTranscript()
             }
-            publish(event)
+            publishEvent(event)
 
         case .toolResult(let id, let name, let summary, let detail):
             conversation.turns.append(
@@ -497,14 +627,14 @@ public final class ConversationEngine {
                 )
             )
             publishTranscript()
-            publish(event)
+            publishEvent(event)
 
         case .toolFailure(let id, let name, let message):
             note("\(id) tool \(name) failed: \(message)")
-            publish(event)
+            publishEvent(event)
 
         default:
-            publish(event)
+            publishEvent(event)
         }
     }
 
@@ -677,7 +807,10 @@ public final class ConversationEngine {
         transcriptContinuation?.yield(displayTurns)
     }
 
-    private func publish(_ event: TurnEvent) {
+    private func publishEvent(_ event: TurnEvent) {
+        // Fold the event into the live state before handing it on, so a front end that only
+        // reads snapshots sees replies being written without having to consume the stream.
+        record(event)
         eventContinuation?.yield(event)
     }
 
