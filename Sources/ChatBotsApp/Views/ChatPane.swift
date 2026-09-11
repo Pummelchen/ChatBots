@@ -88,42 +88,30 @@ struct ChatPane: View {
     // MARK: Transcript
 
     private var transcript: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 8) {
-                    ForEach(turns) { turn in
-                        TurnRow(
-                            turn: turn,
-                            isOwn: turn.speakerID == pane.spec.id,
-                            isPending: pendingSteeringIDs.contains(turn.id)
-                        )
-                        .id(turn.id)
-                    }
-
-                    if pane.isGenerating {
-                        liveRow.id(Self.liveAnchor)
-                    }
-
-                    if turns.isEmpty {
-                        emptyState
-                    }
+        // AppKit does the scrolling; see AppKitScrollView for why ScrollViewReader's
+        // `scrollTo` could not be used here.
+        AppKitScrollView(
+            scrollToBottomSignal: pane.scrollSignal
+        ) {
+            LazyVStack(alignment: .leading, spacing: 8) {
+                ForEach(turns) { turn in
+                    TurnRow(
+                        turn: turn,
+                        isOwn: turn.speakerID == pane.spec.id,
+                        isPending: pendingSteeringIDs.contains(turn.id)
+                    )
                 }
-                .padding(12)
+
+                if pane.isGenerating {
+                    liveRow
+                }
+
+                if turns.isEmpty {
+                    emptyState
+                }
             }
-            // Only follow real growth. Animating a scroll per token fights the layout
-            // and is a common cause of stutter while a model streams.
-            .onChange(of: turns.count) { _, _ in scrollToBottom(proxy) }
-            .onChange(of: pane.liveText.count) { _, count in
-                guard count > 0 else { return }
-                scrollToBottom(proxy)
-            }
+            .padding(12)
         }
-    }
-
-    private static let liveAnchor = "live-turn-anchor"
-
-    private func scrollToBottom(_ proxy: ScrollViewProxy) {
-        proxy.scrollTo(Self.liveAnchor, anchor: .bottom)
     }
 
     @ViewBuilder
@@ -133,7 +121,7 @@ struct ChatPane: View {
                 ReasoningBlock(text: pane.liveReasoning, tint: tint)
             }
 
-            if pane.liveText.isEmpty {
+            if pane.liveText.isEmpty, pane.liveBlocks.isEmpty {
                 WaitingRow(name: pane.spec.displayName, tint: tint, activity: pane.activity)
             } else {
                 HStack(alignment: .top, spacing: 10) {
@@ -143,7 +131,7 @@ struct ChatPane: View {
                         .frame(width: 18)
                         .padding(.top, 2)
 
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 6) {
                             Text(pane.spec.id.uppercased())
                                 .font(.system(size: 10, weight: .heavy, design: .rounded))
@@ -153,11 +141,22 @@ struct ChatPane: View {
                                 .foregroundStyle(palette.textSecondary)
                             Spacer(minLength: 0)
                         }
-                        Text(pane.liveText)
-                            .font(.system(size: 12.5))
-                            .textSelection(.enabled)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        // Finished paragraphs are separate, already-laid-out views; only
+                        // the growing tail below is rebuilt as tokens arrive.
+                        ForEach(Array(pane.liveBlocks.enumerated()), id: \.offset) { _, block in
+                            Text(block)
+                                .font(.system(size: 12.5))
+                                .textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        if !pane.liveText.isEmpty {
+                            Text(pane.liveText)
+                                .font(.system(size: 12.5))
+                                .textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                 }
                 .padding(10)

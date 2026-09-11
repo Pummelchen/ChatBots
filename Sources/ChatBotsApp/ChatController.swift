@@ -15,14 +15,23 @@ public final class AgentPaneState: ObservableObject, Identifiable {
     public let spec: AgentSpec
     @Published public var engineState: EngineState = .idle
     @Published public var isGenerating = false
-    /// Visible answer text accumulated during the current turn.
+    /// The still-growing final paragraph of the answer. Re-laying out a single
+    /// *growing* `Text` on every update is what puts SwiftUI on a layout treadmill —
+    /// at streaming rates the main thread never leaves the run-loop observer that
+    /// flushes view updates. Only this tail changes per frame.
     @Published public var liveText = ""
+    /// Paragraphs of the current answer that are already complete. They are appended
+    /// once and never change again, so SwiftUI keeps them and their layout.
+    @Published public var liveBlocks: [String] = []
     /// `<think>` text accumulated during the current turn (shown collapsed).
     @Published public var liveReasoning = ""
     /// Short line under the header: "searching…", token rate, last stats.
     @Published public var activity: String = ""
     @Published public var lastStats: TurnStats?
     @Published public var toolLog: [String] = []
+    /// Bumped when the transcript should jump to the newest entry. A counter rather than
+    /// a flag, so a redraw with an unchanged value never re-scrolls.
+    @Published public var scrollSignal = 0
 
     public nonisolated var id: String { spec.id }
 
@@ -33,16 +42,34 @@ public final class AgentPaneState: ObservableObject, Identifiable {
     func beginTurn() {
         isGenerating = true
         liveText = ""
+        liveBlocks = []
         liveReasoning = ""
         toolLog = []
         activity = "thinking…"
+        scrollSignal += 1
     }
 
     func endTurn() {
         isGenerating = false
         liveText = ""
+        liveBlocks = []
         liveReasoning = ""
         activity = ""
+        scrollSignal += 1
+    }
+
+    /// Move every complete paragraph of the streaming answer out of the tail.
+    ///
+    /// A block is "complete" once a blank line follows it, so it can be frozen. Text
+    /// after the last blank line is still being written and stays in `liveText`.
+    func moveCompletedBlocksToBuffer() {
+        guard liveText.contains("\n\n") else { return }
+        let parts = liveText.components(separatedBy: "\n\n")
+        guard parts.count > 1 else { return }
+        let complete = parts.dropLast().filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        guard !complete.isEmpty else { return }
+        liveBlocks.append(contentsOf: complete)
+        liveText = parts.last ?? ""
     }
 
     var statusText: String {
@@ -225,7 +252,12 @@ public final class ChatController: ObservableObject {
         for (agentID, delta) in buffered {
             guard let pane = pane(agentID) else { continue }
             if !delta.reasoning.isEmpty { pane.liveReasoning += delta.reasoning }
-            if !delta.text.isEmpty { pane.liveText += delta.text }
+            if !delta.text.isEmpty {
+                pane.liveText += delta.text
+                // Keeps the per-frame layout cost proportional to one paragraph rather
+                // than to the whole answer.
+                pane.moveCompletedBlocksToBuffer()
+            }
             if let activity = delta.activity { pane.activity = activity }
         }
     }
@@ -233,7 +265,7 @@ public final class ChatController: ObservableObject {
     private func startFlushLoop() {
         flushTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(40))
+                try? await Task.sleep(for: .milliseconds(100))
                 guard let self else { return }
                 self.flush()
             }

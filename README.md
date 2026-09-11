@@ -91,6 +91,35 @@ at another device, but no such seat ships here.
 `--benchmark` is kept because it is also the cheapest way to prove a new checkpoint loads
 and generates at all before wiring it into a conversation.
 
+### Why the transcript is an `NSScrollView`
+
+`ScrollViewReader.scrollTo` is unusable in this view hierarchy. Every configuration of it
+was tried and each one eventually froze the window:
+
+| What was tried | Result |
+| --- | --- |
+| `scrollTo` per token, animated | window stops drawing within ~60 s |
+| `scrollTo` per token, unanimated | same |
+| `scrollTo` throttled to 250 ms | same |
+| `scrollTo` once per completed turn | same |
+| follow-the-tail timer at 500 ms, AppKit scroll | same |
+
+Sampling the frozen process every time showed the main thread pinned in
+`NSRunLoop.flushObservers` → `GraphHost.flushTransactions`: scrolling changes the scroll
+content's size, which republishes the view graph, which scrolls again. It is a transaction
+loop, not slowness — the app is busy, not blocked, which is why it looks alive but draws
+nothing.
+
+The transcript now lives in a plain `NSScrollView` (`AppKitScrollView`), scrolled through
+AppKit's one-way `contentView.scroll(to:)` from a deferred main-queue turn, and **only when
+a turn completes or begins** — never on a timer. That configuration ran an 11-turn,
+8-minute conversation with the window responsive throughout. The bonus is proper macOS
+overlay scrollbars and rubber-banding.
+
+The honest trade-off: while a long answer streams, the newest lines can fall below the
+fold until the turn ends, at which point the view jumps to the bottom. Scrolling smoothly
+while text streams is the thing SwiftUI would not let us have here.
+
 ### Standard macOS window behaviour
 
 The window is a completely ordinary macOS window: close / minimize / zoom traffic lights
@@ -278,5 +307,7 @@ models — that is fine here, because each seat tokenizes its own prompt.
   consequences of the pinned 3.31.4 API; see the comment in `MLXEngine.generate`.
 * Measured on an M3: ~30 tokens/s per seat, ~20 s for a 500-token opening statement.
 * Only one seat may touch MLX at a time — see "One MLX caller at a time".
+* The transcript auto-scrolls once per turn, not continuously while streaming — see
+  "Why the transcript is an `NSScrollView`".
 * Both seats are GPU-only — see the benchmark table above for why CPU offload is not an
   option for this checkpoint.
