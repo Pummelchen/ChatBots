@@ -616,6 +616,32 @@ swift run chatbots-cli --model-a mlx-community/Qwen3.5-4B-MLX-4bit \
 Any checkpoint `mlx-swift-lm` can load will work. Vocabularies may differ between
 models — that is fine here, because each seat tokenizes its own prompt.
 
+## Text encoding
+
+Everything is UTF-8: prompts, the shared log, the transcript export, the pane text and the
+CLI. Swift strings are Unicode-correct by default, so the models are not the risk here —
+the app's own text handling was, in two specific places, and both are now covered by tests.
+
+**Shortening text.** Truncating *bytes* splits multi-byte characters, and
+`String(data:encoding:.utf8)` then fails or yields the replacement character. Two error
+paths did exactly that (`data.prefix(300)` on an HTTP error body, `data.prefix(400)` on a
+Tavily response), so a server error containing an accented character could print as
+`…caf` followed by a replacement glyph. All shortening now goes through `UTF8Text`: a byte
+cut drops the partial character instead of corrupting it, and a character cut counts
+grapheme clusters, so an emoji ZWJ sequence or a combining accent is never split.
+
+**Stream chunks.** A stream that splits text between bytes rather than between characters
+would deliver a replacement character mid-word. MLX guards this itself — *"if the new
+segment ends with REPLACEMENT CHARACTER this means that the token didn't produce a
+complete unicode character"* — while the HTTP path did not. It now buffers a partial
+trailing sequence until the next chunk completes it.
+
+Verified with `café naïve Grüße ẞ 日本語 中文 Ελληνικά العربية עברית ñandú — em dash,
+"curly quotes", 👩‍👩‍👧‍👦 🥚 🇯🇵` through the full path (prompt, conversation, transcript,
+export) with no replacement characters anywhere. There is also a test that feeds a stream
+one byte at a time, the worst case a server can produce, and one that ends a stream
+mid-character.
+
 ## Known issue: intermittent GPU crash
 
 There is an **unresolved, intermittent crash** in MLX's Metal layer. It appears roughly
