@@ -1,5 +1,5 @@
 {
-  "originHash" : "bbe2f5c33a50ecc385804cb23ae2166ddc70bde5a88297ac84d969bc2d46938d",
+  "originHash" : "01954e4c8e21fbfd1b2ea159f6d1338b7e2ace90c583463a16ca335b201d924f",
   "pins" : [
     {
       "identity" : "eventsource",
@@ -107,6 +107,15 @@
       "state" : {
         "revision" : "c21fdcde390313a6d98d8e33a346f2c3486c3ab0",
         "version" : "1.3.4"
+      }
+    },
+    {
+      "identity" : "webtransport",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Pummelchen/WebTransport.git",
+      "state" : {
+        "revision" : "b1c562507ffba592c42db02da87bcb368c9187a2",
+        "version" : "1.3.5"
       }
     },
     {

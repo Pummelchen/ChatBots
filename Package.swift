@@ -11,7 +11,9 @@ import PackageDescription
 let package = Package(
     name: "ChatBots",
     platforms: [
-        .macOS(.v14)
+        // macOS 26 because WebTransport requires it. See the wiki for what that costs:
+        // anyone on Sonoma or Sequoia can no longer run the app.
+        .macOS(.v26)
     ],
     products: [
         .library(name: "ChatBotsCore", targets: ["ChatBotsCore"]),
@@ -24,6 +26,9 @@ let package = Package(
         // provide the concrete hub client and tokenizer the macros in MLXHuggingFace wrap.
         .package(url: "https://github.com/huggingface/swift-huggingface", from: "0.9.0"),
         .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0"),
+        // The channel between the desktop app and the engine. Internal only: the website is
+        // served by Caddy, which does not speak WebTransport.
+        .package(url: "https://github.com/Pummelchen/WebTransport.git", from: "1.3.5"),
     ],
     targets: [
         // MARK: - Core
@@ -39,6 +44,7 @@ let package = Package(
                 .product(name: "MLXHuggingFace", package: "mlx-swift-lm"),
                 .product(name: "HuggingFace", package: "swift-huggingface"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
+                .product(name: "WebTransport", package: "WebTransport"),
             ],
             path: "Sources/ChatBotsCore",
             // Swift 6 language mode, stated rather than inferred from the tools version. The
