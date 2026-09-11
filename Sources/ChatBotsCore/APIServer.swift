@@ -331,6 +331,16 @@ public final class APIServer {
         startFeed()
     }
 
+    /// Wait until the HTTP listener is accepting connections.
+    ///
+    /// False means the port could not be taken. Worth checking wherever a server is started:
+    /// the failure is asynchronous, so `start()` returning is not evidence that anything is
+    /// listening.
+    public func waitUntilReady(timeout: Duration = .seconds(2)) async -> Bool {
+        guard let server else { return false }
+        return await server.waitUntilReady(timeout: timeout)
+    }
+
     public func stop() {
         feedTask?.cancel()
         feedTask = nil

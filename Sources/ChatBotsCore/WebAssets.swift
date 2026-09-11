@@ -66,6 +66,7 @@ public enum WebAssets {
       <button id="stop" disabled>Stop</button>
       <button id="save" disabled title="Download the conversation log">Save</button>
       <button id="kept" title="Reopen a conversation the engine kept">Kept</button>
+      <button id="lineup" title="Choose who is in the room, or let the app choose">Line-up</button>
       <button id="clear" disabled>Clear</button>
     </div>
   </div>
@@ -170,6 +171,19 @@ public enum WebAssets {
     <button id="kept-close" class="small">Close</button>
   </div>
   <div id="kept-body" class="report-body"></div>
+</div>
+
+<!-- Who is in the room, and what they are put in front of. One panel, because a panel is the
+     wrong room for the wrong question and the pairing is the thing worth choosing. -->
+<div id="lineup-panel" class="report-panel" hidden>
+  <div class="report-head">
+    <b>Line-up</b>
+    <span id="lineup-meta" class="note"></span>
+    <div class="spacer"></div>
+    <button id="lineup-surprise" class="small">Surprise me</button>
+    <button id="lineup-close" class="small">Close</button>
+  </div>
+  <div id="lineup-body" class="report-body"></div>
 </div>
 
 <div id="toast" class="toast" hidden></div>
@@ -871,6 +885,34 @@ body[data-device="tablet"] .toggle-text { display: inline; }
 }
 .kept-actions { display: flex; gap: 6px; flex: 0 0 auto; }
 .kept-empty { color: var(--text-secondary); text-align: center; padding: calc(28px * var(--scale)) 0; }
+
+.lineup-section {
+  font-size: var(--font-small);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin: calc(14px * var(--scale)) 0 calc(4px * var(--scale));
+}
+.lineup-section:first-child { margin-top: 0; }
+.lineup-row {
+  display: flex;
+  align-items: flex-start;
+  gap: calc(10px * var(--scale));
+  padding: calc(7px * var(--scale)) 0;
+  border-bottom: 1px solid var(--line);
+}
+.lineup-row:last-child { border-bottom: 0; }
+.lineup-text { flex: 1 1 auto; min-width: 0; }
+.lineup-name { font-weight: 600; }
+.lineup-note { color: var(--text-secondary); font-size: var(--font-small); margin-top: 2px; }
+.lineup-who {
+  color: var(--text-faint);
+  font-size: var(--font-tiny);
+  font-family: ui-monospace, Menlo, monospace;
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
 
 
 /* ── More than two seats ──────────────────────────────────────────────────────────── */
@@ -1879,6 +1921,101 @@ body[data-view="phone"] {
     }
   }
 
+  // ── Line-up and scenarios ────────────────────────────────────────────────────────
+
+  function currentMode() {
+    return state.snapshot && state.snapshot.mode === "research" ? "research" : "entertainment";
+  }
+
+  function lineupRow(entry) {
+    const row = document.createElement("div");
+    row.className = "lineup-row";
+
+    const text = document.createElement("div");
+    text.className = "lineup-text";
+    const name = document.createElement("div");
+    name.className = "lineup-name";
+    name.textContent = entry.title;
+    const note = document.createElement("div");
+    note.className = "lineup-note";
+    note.textContent = entry.note;
+    text.append(name, note);
+    if (entry.who) {
+      const who = document.createElement("div");
+      who.className = "lineup-who";
+      who.textContent = entry.who;
+      text.append(who);
+    }
+
+    const apply = document.createElement("button");
+    apply.className = "small";
+    apply.textContent = "Apply";
+    apply.disabled = Boolean(state.snapshot && state.snapshot.isRunning);
+    if (apply.disabled) apply.title = "Stop the conversation first";
+    apply.onclick = () => run(() => api.post(entry.path, entry.body));
+
+    row.append(text, apply);
+    return row;
+  }
+
+  async function refreshLineup() {
+    const body = $("lineup-body");
+    body.textContent = "";
+    const mode = currentMode();
+    $("lineup-meta").textContent = mode === "research" ? "research" : "show";
+
+    // The libraries come from the engine rather than being compiled in here, so a line-up
+    // added on the other side appears in this panel without the page being rebuilt.
+    let rosters = [];
+    let scenarios = [];
+    try {
+      [rosters, scenarios] = await Promise.all([
+        api.get(`/api/rosters?mode=${mode}`),
+        api.get(`/api/scenarios?mode=${mode}`),
+      ]);
+    } catch (error) {
+      toast(error.message);
+      return;
+    }
+
+    const heading = (label) => {
+      const el = document.createElement("div");
+      el.className = "lineup-section";
+      el.textContent = label;
+      return el;
+    };
+
+    body.append(heading("Line-ups"));
+    const random = lineupRow({
+      title: "Surprise me — a random room",
+      note: "Drawn from every participant in this mode. The seed is reported in the log, so the draw can be repeated.",
+      who: "",
+      path: "/api/roster",
+      body: { id: "random" },
+    });
+    body.append(random);
+    for (const roster of rosters) {
+      body.append(lineupRow({
+        title: roster.name,
+        note: roster.summary,
+        who: roster.personaIDs.join(" · "),
+        path: "/api/roster",
+        body: { id: roster.id },
+      }));
+    }
+
+    body.append(heading("Scenarios"));
+    for (const scenario of scenarios) {
+      body.append(lineupRow({
+        title: scenario.topic,
+        note: scenario.note,
+        who: scenario.depth ? `budget: ${scenario.depth}` : "",
+        path: "/api/scenario",
+        body: { id: scenario.id },
+      }));
+    }
+  }
+
   function wire() {
     $("start").onclick = () => run(() => api.post("/api/start"));
     $("pause").onclick = () => run(() =>
@@ -1921,6 +2058,27 @@ body[data-view="phone"] {
       refreshKept();
     };
     $("kept-close").onclick = () => { $("kept-panel").hidden = true; };
+    $("lineup").onclick = () => {
+      $("lineup-panel").hidden = false;
+      refreshLineup();
+    };
+    $("lineup-close").onclick = () => { $("lineup-panel").hidden = true; };
+    $("lineup-surprise").onclick = async () => {
+      // A scenario rather than a line-up: it sets the question as well, which is the point of
+      // asking to be surprised.
+      const mode = currentMode();
+      let pool = [];
+      try {
+        pool = await api.get(`/api/scenarios?mode=${mode}`);
+      } catch (error) {
+        toast(error.message);
+        return;
+      }
+      if (!pool.length) return;
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      await run(() => api.post("/api/scenario", { id: pick.id }));
+      $("lineup-panel").hidden = true;
+    };
     $("kept-refresh").onclick = refreshKept;
     $("kept-new").onclick = async () => {
       // The engine has already kept what is on screen, so this clears the view rather than
@@ -1989,6 +2147,8 @@ body[data-view="phone"] {
 
   async function setMode(mode) {
     await run(() => api.post("/api/mode", { value: mode }));
+    // The line-ups and scenarios are per mode, so anything already drawn is now wrong.
+    if (!$("lineup-panel").hidden) refreshLineup();
   }
 
   async function setDepth(depth) {

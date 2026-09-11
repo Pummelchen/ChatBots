@@ -644,6 +644,14 @@ if !options.attachments.isEmpty {
             Data("could not start the server on port \(options.port): \(error.localizedDescription)\n".utf8))
         exit(1)
     }
+    // `start()` returning only means the listener was created. A port already in use is reported
+    // asynchronously, so without this the server would announce itself as listening and then
+    // serve nothing — the same false green the transport check used to have.
+    guard await server.waitUntilReady() else {
+        FileHandle.standardError.write(
+            Data("could not listen on port \(options.port): the port is already in use\n".utf8))
+        exit(1)
+    }
 
     log("ChatBots server listening on http://127.0.0.1:\(options.port)")
     log("  state   : GET  /api/state")

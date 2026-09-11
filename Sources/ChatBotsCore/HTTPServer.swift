@@ -309,7 +309,17 @@ public final class HTTPServer: @unchecked Sendable {
     /// Streams that are still open, so they can be closed when the server stops.
     private var streams: [EventStream] = []
 
+    /// Whether the listener is actually accepting connections.
+    ///
+    /// Driven by the listener's own state rather than set when `start()` returns. `NWListener`
+    /// reports a port it cannot take asynchronously, so the previous version marked itself
+    /// running before it had bound anything: a second process on the same port looked like a
+    /// server that was up, and the only sign otherwise was a line on stderr. Callers that need
+    /// to know should `waitUntilReady()`.
     public private(set) var isRunning = false
+
+    /// Why the listener stopped, when it did.
+    public private(set) var lastError: String?
 
     public init(port: UInt16, handler: @escaping Handler, streamer: Streamer? = nil) {
         self.port = port
@@ -330,15 +340,38 @@ public final class HTTPServer: @unchecked Sendable {
         listener.newConnectionHandler = { [weak self] connection in
             self?.accept(connection)
         }
-        listener.stateUpdateHandler = { state in
-            if case .failed(let error) = state {
+        listener.stateUpdateHandler = { [weak self] state in
+            switch state {
+            case .ready:
+                self?.isRunning = true
+            case .failed(let error):
+                self?.isRunning = false
+                self?.lastError = "\(error)"
                 FileHandle.standardError.write(
                     Data("[ChatBots] http listener failed: \(error)\n".utf8))
+            case .cancelled:
+                self?.isRunning = false
+            default:
+                break
             }
         }
         listener.start(queue: queue)
         self.listener = listener
-        isRunning = true
+    }
+
+    /// Wait for the listener to bind, or for the attempt to fail.
+    ///
+    /// Returns false when the port could not be taken. Exists because "start() returned" and
+    /// "the server is answering" are different facts, and code that treats them as one reports
+    /// success on a port somebody else holds.
+    public func waitUntilReady(timeout: Duration = .seconds(2)) async -> Bool {
+        let deadline = ContinuousClock.now.advanced(by: timeout)
+        while ContinuousClock.now < deadline {
+            if isRunning { return true }
+            if lastError != nil { return false }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        return isRunning
     }
 
     public func stop() {

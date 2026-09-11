@@ -12,6 +12,8 @@ struct ControlBar: View {
     @State private var showNotes = false
     @State private var showEndpoints = false
     @State private var showSaved = false
+    @State private var showLineup = false
+    @State private var showReport = false
 
     private var status: RunStatus { controller.status }
 
@@ -28,10 +30,26 @@ struct ControlBar: View {
                     .disabled(controller.isRunning)
                     .onSubmit { if controller.canStart { controller.startOrRestart() } }
 
+                Picker("Mode", selection: modeBinding) {
+                    ForEach(DiscussionMode.allCases) { mode in
+                        Label(mode.label, systemImage: mode == .research ? "magnifyingglass" : "theatermasks")
+                            .tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                .disabled(controller.isRunning)
+                .help("A show, or an investigation with a budget and a report")
+
                 transport
             }
 
             AttachmentBar(controller: controller)
+
+            if let research = controller.research {
+                researchBar(research)
+            }
 
             HStack(spacing: 10) {
                 statusPill
@@ -174,6 +192,32 @@ struct ControlBar: View {
             }
 
             Button {
+                showLineup = true
+            } label: {
+                Label("Line-up", systemImage: "person.3.sequence")
+            }
+            .buttonStyle(.bordered)
+            .help("Choose who is in the room, or let the app choose")
+            .sheet(isPresented: $showLineup) {
+                LineupSheet(controller: controller) { showLineup = false }
+                    .environmentObject(zoom)
+            }
+
+            if controller.report != nil {
+                Button {
+                    showReport = true
+                } label: {
+                    Label("Report", systemImage: "doc.text.magnifyingglass")
+                }
+                .buttonStyle(.borderedProminent)
+                .help("The report the investigation produced")
+                .sheet(isPresented: $showReport) {
+                    ReportSheet(controller: controller) { showReport = false }
+                        .environmentObject(zoom)
+                }
+            }
+
+            Button {
                 controller.reset()
             } label: {
                 Label("Clear", systemImage: "trash")
@@ -218,6 +262,48 @@ struct ControlBar: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
         .background(palette.raised, in: Capsule())
+    }
+
+    /// The mode picker writes through to the engine, which owns the answer.
+    private var modeBinding: Binding<DiscussionMode> {
+        Binding(get: { controller.mode }, set: { controller.setMode($0) })
+    }
+
+    /// Where a research session has got to, and how hard it is looking.
+    ///
+    /// Shown only while there is a research session, which is the one case where the numbers
+    /// mean anything: a budget with no session behind it is a control that does nothing.
+    private func researchBar(_ research: APISnapshot.ResearchStatus) -> some View {
+        HStack(spacing: 8) {
+            Text(research.depth)
+                .scaledFont(size: 10, weight: .bold)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 2)
+                .background(palette.raised, in: Capsule())
+            Text(research.statusLine)
+                .scaledFont(size: 11, design: .rounded)
+                .foregroundStyle(palette.textSecondary)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            if !research.isFinished {
+                Picker("Depth", selection: depthBinding) {
+                    ForEach(ResearchBudget.Depth.allCases) { depth in
+                        Text(depth.label).tag(depth)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                .disabled(controller.isRunning)
+                .help("How hard the analysts look before concluding")
+            }
+        }
+    }
+
+    private var depthBinding: Binding<ResearchBudget.Depth> {
+        Binding(
+            get: { ResearchBudget.Depth(rawValue: controller.research?.depth.lowercased() ?? "") ?? .standard },
+            set: { controller.setResearchDepth($0) })
     }
 
     private var cloudOnlyBinding: Binding<Bool> {

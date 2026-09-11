@@ -142,6 +142,16 @@ public final class ChatController: ObservableObject {
     /// Held here rather than fetched by the view so the list survives the sheet being closed and
     /// reopened, and so there is one place that knows when it is out of date.
     @Published public private(set) var savedConversations: [SavedConversationSummary] = []
+    /// Which mode the room is in. The engine's to decide, like everything else about the
+    /// conversation, so the app shows what it is told rather than what it last asked for.
+    @Published public private(set) var mode: DiscussionMode = .entertainment
+    /// How far a research session has got, or nil outside research.
+    @Published public private(set) var research: APISnapshot.ResearchStatus?
+    /// The finished report, with its markdown, when there is one.
+    @Published public private(set) var report: APISnapshot.ReportSummary?
+    /// The line-ups and scenarios the engine ships, for the picker.
+    @Published public private(set) var rosters: [Roster] = []
+    @Published public private(set) var scenarios: [Scenario] = []
 
     public let panes: [AgentPaneState]
 
@@ -356,6 +366,11 @@ public final class ChatController: ObservableObject {
             error: snapshot.error)
         notices = snapshot.notices
         if let error = snapshot.error { errorBanner = error }
+        // Mode, progress and the report all come from the engine rather than being tracked
+        // here, so switching mode in the browser moves the app too.
+        mode = DiscussionMode(rawValue: snapshot.mode) ?? mode
+        research = snapshot.research
+        report = snapshot.report
 
         // Seat settings are the engine's, so a change made in another front end appears here.
         for (index, seat) in snapshot.seats.enumerated() where index < panes.count {
@@ -1082,4 +1097,81 @@ public final class ChatController: ObservableObject {
     /// Whether a kept conversation can be opened right now. Loading replaces the transcript, so
     /// it is refused while a turn is generating rather than silently discarding that turn.
     public var canLoadSavedConversation: Bool { !isRunning }
+
+    // MARK: - Mode, line-ups and scenarios
+
+    /// Switch the room between a show and an investigation.
+    ///
+    /// The engine refuses once a conversation has started, and the refusal is shown rather than
+    /// pre-empted: a disabled control would hide which rule was being applied.
+    public func setMode(_ value: DiscussionMode) {
+        errorBanner = nil
+        run { client in
+            let reply = try await client.send(.setMode(value))
+            if let reason = reply.refusal { await MainActor.run { self.errorBanner = reason } }
+        }
+    }
+
+    /// Set how hard a research session looks before concluding.
+    public func setResearchDepth(_ depth: ResearchBudget.Depth) {
+        errorBanner = nil
+        run { client in
+            let reply = try await client.send(.setResearchBudget(depth))
+            if let reason = reply.refusal { await MainActor.run { self.errorBanner = reason } }
+        }
+    }
+
+    /// Fetch the line-ups and scenarios for the mode the engine is in.
+    public func refreshLineup() {
+        let mode = self.mode
+        run { [weak self] client in
+            let rosters = try await client.send(.listRosters(mode)).rosters ?? []
+            let scenarios = try await client.send(.listScenarios(mode)).scenarios ?? []
+            await MainActor.run {
+                self?.rosters = rosters
+                self?.scenarios = scenarios
+            }
+        }
+    }
+
+    /// Apply a line-up, or a draw. The engine reports the seed in the log either way.
+    public func applyRoster(id: String) {
+        errorBanner = nil
+        run { client in
+            let reply = try await client.send(
+                .applyRoster(id: id, seed: RosterLibrary.freshSeed()))
+            if let reason = reply.refusal { await MainActor.run { self.errorBanner = reason } }
+        }
+    }
+
+    /// Put a whole scenario — question, panel and budget — in place at once.
+    public func applyScenario(id: String) {
+        errorBanner = nil
+        run { client in
+            let reply = try await client.send(.applyScenario(id: id))
+            if let reason = reply.refusal { await MainActor.run { self.errorBanner = reason } }
+        }
+    }
+
+    /// Whether who is in the room, and what they are asked, can still be changed.
+    public var canChangeLineup: Bool { !isRunning }
+
+    /// Save the report the engine produced, as markdown.
+    @discardableResult
+    public func saveReport() -> URL? {
+        guard let report, !report.markdown.isEmpty else { return nil }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.plainText]
+        panel.nameFieldStringValue =
+            TranscriptWriter.suggestedFilename(topic: report.question, at: report.producedAt)
+                .replacingOccurrences(of: ".txt", with: ".md")
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
+        do {
+            try report.markdown.write(to: url, atomically: true, encoding: .utf8)
+            return url
+        } catch {
+            errorBanner = error.localizedDescription
+            return nil
+        }
+    }
 }

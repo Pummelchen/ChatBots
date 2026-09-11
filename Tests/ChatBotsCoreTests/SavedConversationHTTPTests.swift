@@ -39,10 +39,21 @@ private actor KeptStub: LLMEngine {
     }
 }
 
+/// Ports handed out one at a time.
+///
+/// The first version derived a port from `UUID().uuidString.hashValue % 90`, which is not
+/// distinct between two tests running in parallel — and swift-testing runs them in parallel — so
+/// two servers occasionally picked the same port and one of them silently served nothing.
+/// Nondeterminism in a test fixture is indistinguishable from a bug in the code under test.
+@MainActor private var nextTestPort = 7_900
+
 /// A server on a port of its own, with its own store, so tests cannot see each other.
+///
+/// Retries on the next port if this one is taken: another process on the machine may hold it, and
+/// a test that fails because something else is listening is a test that lies.
 @MainActor
 private func liveServer(topic: String = "A question worth keeping")
-    throws -> (APIServer, ConversationEngine, URLSession, String)
+    async throws -> (APIServer, ConversationEngine, URLSession, String)
 {
     let specs = AgentSpec.makeSeats(count: 2)
     let stubs = specs.map { KeptStub(spec: $0) }
@@ -55,12 +66,24 @@ private func liveServer(topic: String = "A question worth keeping")
     let store = ConversationStore(
         directory: FileManager.default.temporaryDirectory
             .appending(path: "kept-\(UUID().uuidString)"))
-    // A port per test run, so a second test does not collide with the first.
-    let port = 7_800 + UInt16(abs(UUID().uuidString.hashValue) % 90)
-    let server = APIServer(engine: engine, store: store, port: port)
-    try server.start()
     let session = URLSession(configuration: .ephemeral)
-    return (server, engine, session, "http://127.0.0.1:\(port)")
+    for _ in 0..<8 {
+        let port = nextTestPort
+        nextTestPort += 1
+        let server = APIServer(engine: engine, store: store, port: UInt16(port))
+        try server.start()
+        // `start()` returning is not evidence that anything is listening; a taken port is
+        // reported asynchronously. Asking is the only way to know.
+        if await server.waitUntilReady() {
+            return (server, engine, session, "http://127.0.0.1:\(port)")
+        }
+        server.stop()
+    }
+    throw HTTPTestError.noPort
+}
+
+private enum HTTPTestError: Error {
+    case noPort
 }
 
 private func get(_ session: URLSession, _ url: String) async throws -> (Int, Data) {
@@ -87,7 +110,7 @@ struct SavedConversationHTTPTests {
 
     @Test("A conversation links a running engine to the store it is written into")
     func aConversationIsKept() async throws {
-        let (server, engine, session, base) = try liveServer()
+        let (server, engine, session, base) = try await liveServer()
         defer { server.stop() }
 
         engine.start()
@@ -105,7 +128,7 @@ struct SavedConversationHTTPTests {
 
     @Test("A kept conversation comes back with its transcript and its topic")
     func aConversationIsReopened() async throws {
-        let (server, engine, session, base) = try liveServer()
+        let (server, engine, session, base) = try await liveServer()
         defer { server.stop() }
 
         engine.start()
@@ -134,7 +157,7 @@ struct SavedConversationHTTPTests {
 
     @Test("Deleting removes it from disk, and says so by returning the shorter list")
     func aConversationIsDeleted() async throws {
-        let (server, engine, session, base) = try liveServer()
+        let (server, engine, session, base) = try await liveServer()
         defer { server.stop() }
 
         engine.start()
@@ -157,7 +180,7 @@ struct SavedConversationHTTPTests {
 
     @Test("Opening something that is not there is refused, not answered with a blank conversation")
     func openingAnUnknownIdIsRefused() async throws {
-        let (server, _, session, base) = try liveServer()
+        let (server, _, session, base) = try await liveServer()
         defer { server.stop() }
 
         let (status, data) = try await post(
@@ -170,7 +193,7 @@ struct SavedConversationHTTPTests {
 
     @Test("A malformed id is refused rather than deleting something at random")
     func aMalformedIdIsRefused() async throws {
-        let (server, _, session, base) = try liveServer()
+        let (server, _, session, base) = try await liveServer()
         defer { server.stop() }
 
         let (status, data) = try await post(
