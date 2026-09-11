@@ -32,8 +32,6 @@ struct PaneHeader: View {
     let canRenameSeats: Bool
     let onRename: (String) -> Void
     let onBeginRename: () -> Void
-    /// Drop the sampler row and show a condensed readout instead.
-    let isCompact: Bool
     /// Backend may only change before the conversation begins.
     let canChangeBackend: Bool
     let statusText: String
@@ -90,41 +88,6 @@ struct PaneHeader: View {
                 statusChip
             }
 
-            if isCompact {
-                CompactAgentSettings(spec: spec, palette: palette)
-            }
-
-            if !isCompact {
-                // The sampler readout in a single line. At large text sizes it cannot fit
-                // across the pane, so it scrolls rather than wrapping: a `Label` wraps its
-                // text before it truncates, which broke labels like "temp 1.00" across two
-                // lines. Scrolling keeps every value reachable.
-                ScrollView(.horizontal) {
-                    HStack(spacing: 9) {
-                        Label(String(format: "temp %.2f", spec.temperature), systemImage: "thermometer.medium")
-                        Label("top-p \(String(format: "%.2f", spec.topP))", systemImage: "chart.bar")
-                        Label("top-k \(spec.topK)", systemImage: "list.number")
-                        Label("min-p \(String(format: "%.1f", spec.minP))", systemImage: "line.diagonal")
-                        if let presence = spec.presencePenalty {
-                            Label("pres \(String(format: "%.1f", abs(presence)))", systemImage: "arrow.uturn.backward")
-                                .help("Presence penalty \(String(format: "%.1f", abs(presence))) (stored as \(String(format: "%.2f", presence)) for MLX, which subtracts it)")
-                        }
-                        if let repetition = spec.repetitionPenalty, repetition != 1.0 {
-                            Label("rep \(String(format: "%.2f", repetition))", systemImage: "repeat")
-                        }
-                        Label("max \(Format.tokens(spec.maxTokens)) tok", systemImage: "text.alignleft")
-                        if spec.webSearchEnabled {
-                            Label("web", systemImage: "globe")
-                        }
-                    }
-                    // One line each, always.
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-                }
-                .scrollIndicators(.hidden)
-                .scaledFont(size: 9.5, design: .rounded)
-                .foregroundStyle(palette.textTertiary)
-            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
@@ -204,42 +167,6 @@ struct PaneThinkingControl: View {
 ///
 /// A condensed version of the pane header's parameter row. The full precision is still
 /// available: it is printed per seat at startup, and the tooltip here carries all of it.
-struct CompactAgentSettings: View {
-    let spec: AgentSpec
-    let palette: AppPalette
-
-    var body: some View {
-        HStack(spacing: 7) {
-            Label(String(format: "%.2f", spec.temperature), systemImage: "thermometer.medium")
-            Label("p \(String(format: "%.2f", spec.topP))", systemImage: "chart.bar")
-            Label("k \(spec.topK)", systemImage: "list.number")
-            Label("min \(String(format: "%.1f", spec.minP))", systemImage: "line.diagonal")
-            if let presence = spec.presencePenalty {
-                Label("pres \(String(format: "%.1f", abs(presence)))", systemImage: "arrow.uturn.backward")
-            }
-            Label("\(Format.tokens(spec.maxTokens))", systemImage: "text.alignleft")
-            if spec.webSearchEnabled {
-                Image(systemName: "globe")
-            }
-            Spacer(minLength: 0)
-        }
-        .scaledFont(size: 9.5, design: .rounded)
-        .foregroundStyle(palette.textTertiary)
-        .help(description)
-    }
-
-    private var description: String {
-        let presence = spec.presencePenalty.map { String(format: "%.1f", abs($0)) } ?? "off"
-        let repetition = spec.repetitionPenalty.map { String(format: "%.2f", $0) } ?? "off"
-        return """
-            \(spec.modelID)
-            temp \(String(format: "%.2f", spec.temperature)) · top-p \(String(format: "%.2f", spec.topP)) · \
-            top-k \(spec.topK) · min-p \(String(format: "%.1f", spec.minP)) · presence \(presence) · \
-            repetition \(repetition) · max \(spec.maxTokens) tok · thinking \(spec.thinking.label)
-            """
-    }
-}
-
 /// Per-seat persona picker.
 ///
 /// Same isolation as `PaneThinkingControl`: plain values plus a callback, never an

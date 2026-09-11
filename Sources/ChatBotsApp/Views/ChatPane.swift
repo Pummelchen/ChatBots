@@ -14,9 +14,6 @@ struct ChatPane: View {
     let turns: [Turn]
     let pendingSteeringIDs: Set<UUID>
     let showReasoning: Bool
-    /// True when the pane is narrower than a comfortable column, so the header drops its
-    /// sampler row instead of being clipped.
-    var isCompact: Bool = false
 
     private var tint: Color { AgentTheme.tint(forSeat: pane.seatIndex, palette: palette) }
 
@@ -45,7 +42,6 @@ struct ChatPane: View {
             canRenameSeats: controller.canRenameSeats,
             onRename: { name in commitRename(name) },
             onBeginRename: { pane.isRenaming = true },
-            isCompact: isCompact,
             canChangeBackend: controller.turns.isEmpty,
             statusText: pane.statusText,
             isGenerating: pane.isGenerating,

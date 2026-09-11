@@ -100,7 +100,7 @@ struct UnifiedConversation: View {
                         palette: palette
                     )
 
-                    CompactAgentSettings(spec: pane.spec, palette: palette)
+                    Spacer(minLength: 0)
                 }
             }
         }
