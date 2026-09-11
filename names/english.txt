@@ -1,0 +1,50 @@
+# English names, one per line.
+# First half female, second half male. Comment lines and blanks are ignored,
+# and the section is chosen by the marker rather than by counting.
+#
+# Used to name the participants at startup: Agent 1 takes a female name and
+# Agent 2 a male one, picked at random from whichever languages are enabled.
+
+[female]
+Alice
+Clara
+Diana
+Eleanor
+Fiona
+Grace
+Hannah
+Iris
+Julia
+Katherine
+Laura
+Maya
+Nora
+Olivia
+Phoebe
+Rachel
+Rose
+Sophie
+Tessa
+Vivian
+
+[male]
+Adam
+Benjamin
+Charles
+Daniel
+Edward
+Felix
+George
+Henry
+Isaac
+James
+Leo
+Marcus
+Nathan
+Oliver
+Peter
+Robert
+Samuel
+Thomas
+Victor
+William

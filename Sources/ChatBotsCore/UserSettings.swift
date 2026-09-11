@@ -73,7 +73,9 @@ public struct UserSettings: Codable, Sendable, Equatable {
     /// Defaults for a first run, or after a stored payload could not be used.
     public static func defaults(
         topic: String,
-        seats: [AgentSpec] = AgentSpec.SeatRoster.specs()
+        // Named, because this is the first-launch path: a fresh install should open with two
+        // participants who have names rather than with "Agent 1" and "Agent 2".
+        seats: [AgentSpec] = AgentSpec.SeatRoster.namedSpecs()
     ) -> UserSettings {
         UserSettings(topic: topic, seats: seats)
     }
@@ -91,7 +93,9 @@ public struct UserSettings: Codable, Sendable, Equatable {
             // the ones the user configured first.
             copy.seats = Array(copy.seats.prefix(supportedSeatCount))
         } else if copy.seats.isEmpty {
-            copy.seats = AgentSpec.SeatRoster.specs()
+            // A roster with nothing in it gets the default one, named: this is the
+            // first-launch path.
+            copy.seats = AgentSpec.SeatRoster.namedSpecs()
         } else if copy.seats.count < supportedSeatCount {
             // Fewer than supported: add a default spec for each missing *position*, so a
             // third and fourth seat keep their own ids and styles rather than inheriting

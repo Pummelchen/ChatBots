@@ -1,0 +1,45 @@
+# Brazilian Portuguese names, one per line. Section markers select female or male.
+
+[female]
+Adriana
+Ana Clara
+Beatriz
+Bruna
+Camila
+Cláudia
+Elaine
+Fernanda
+Gabriela
+Helena
+Isabela
+Juliana
+Larissa
+Letícia
+Luana
+Mariana
+Patrícia
+Renata
+Tatiana
+Vitória
+
+[male]
+Alexandre
+André
+Bruno
+Caio
+Carlos Eduardo
+Daniel
+Eduardo
+Felipe
+Gabriel
+Gustavo
+Henrique
+João Pedro
+Lucas
+Marcelo
+Mateus
+Rafael
+Ricardo
+Rodrigo
+Thiago
+Vinícius

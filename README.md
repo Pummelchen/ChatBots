@@ -19,6 +19,11 @@ key, nothing leaves your Mac.
   report you can act on, with every claim labelled as fact, sourced, inference, assumption,
   opinion or scenario, and the disagreements and gaps named rather than hidden.
 
+**The participants have names.** Agent 1 is given a female name and Agent 2 a male one, drawn
+at random from English, French, German, Spanish (Latino), Brazilian Portuguese and Italian
+lists — so a conversation reads as two people talking rather than as two seat numbers. The
+choice is saved with your settings and stays for that conversation.
+
 **Two front ends, one engine.** A macOS app with the models side by side, and a web interface
 at `http://localhost:7788` for any browser, including your phone. They are clients of the same
 conversation engine, so anything you can do in one you can do in the other.

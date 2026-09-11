@@ -171,8 +171,18 @@ if [ ! -d "$ROOT/models" ] || [ -z "$(ls -A "$ROOT/models" 2>/dev/null)" ]; then
   printf "      bash tools/install.sh downloads them.\n"
 fi
 
-# The web interface is embedded in the binary, so a change to web/ has to be regenerated
-# before the build or the server would serve the previous version.
+# The name lists are generated from names/, and the web interface from web/. Both are
+# embedded in the binary, so a change to either has to be regenerated before the build or the
+# app would use the previous version.
+if ! python3 "$SCRIPT_DIR/embed-names.py" --check >/dev/null 2>&1; then
+  step "Regenerating the embedded name lists"
+  python3 "$SCRIPT_DIR/embed-names.py" >/dev/null || {
+    fail "Could not regenerate Sources/ChatBotsCore/NameLists.swift"
+    exit 1
+  }
+  ok "name lists regenerated"
+fi
+
 if ! python3 "$SCRIPT_DIR/embed-web.py" --check >/dev/null 2>&1; then
   step "Regenerating the embedded web interface"
   python3 "$SCRIPT_DIR/embed-web.py" >/dev/null || {

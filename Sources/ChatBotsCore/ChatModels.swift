@@ -327,6 +327,22 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
         }
 
         /// The seats to build.
+        /// The roster with the first two seats named, which is what the app starts with.
+        ///
+        /// Naming happens here so that every entry point gets it — the app, the command line,
+        /// the server — rather than each having to remember. A roster loaded from saved
+        /// settings is used as it stands: the name was chosen when those seats were built, and
+        /// re-rolling it on every launch would change the participants under a conversation
+        /// someone is in the middle of.
+        public static func namedSpecs(
+            environment: [String: String] = ProcessInfo.processInfo.environment
+        ) -> [AgentSpec] {
+            var seats = specs(environment: environment)
+            var generator = SystemRandomNumberGenerator()
+            AgentSpec.assignNames(to: &seats, using: &generator)
+            return seats
+        }
+
         public static func specs(
             environment: [String: String] = ProcessInfo.processInfo.environment
         ) -> [AgentSpec] {
@@ -410,6 +426,42 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
                 personaID: personaIDs?[safe: index]
             )
         }
+    }
+
+    /// Give the first two seats a person's name instead of "Agent 1" and "Agent 2".
+    ///
+    /// One female and one male, drawn at random from any of the six languages. The point is
+    /// that a conversation between two people reads differently from one between two seat
+    /// numbers — the models refer to each other by name, and so does the transcript.
+    ///
+    /// Only the first two: a third and fourth seat keep their numbers, because the brief is
+    /// about the pair and because inventing a gender balance for four seats would be
+    /// arbitrary.
+    ///
+    /// The choice is saved with the settings, so it survives a restart. A name only changes
+    /// when the seats are rebuilt, which is what "on startup" means — not while a conversation
+    /// is under way.
+    public static func assignNames(
+        to seats: inout [AgentSpec],
+        using generator: inout some RandomNumberGenerator
+    ) {
+        guard seats.count >= 1 else { return }
+        seats[0].displayName = NameLists.random(.female, using: &generator)
+        if seats.count >= 2 {
+            seats[1].displayName = NameLists.random(.male, using: &generator)
+        }
+    }
+
+    /// The seats to build, with the first two named.
+    public static func namedSeats(
+        count: Int = 2,
+        modelIDs: [String]? = nil,
+        personaIDs: [String]? = nil,
+        using generator: inout some RandomNumberGenerator
+    ) -> [AgentSpec] {
+        var seats = makeSeats(count: count, modelIDs: modelIDs, personaIDs: personaIDs)
+        assignNames(to: &seats, using: &generator)
+        return seats
     }
 
     /// Seat 1 — opens the conversation.

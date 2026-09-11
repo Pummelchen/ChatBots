@@ -245,8 +245,9 @@ if options.check {
 // Printing the export format, with no model involved: handy for checking what a saved
 // conversation looks like, and for support.
 if options.exportSample {
-    let specA = AgentSpec.seat(index: 0)
-    let specB = AgentSpec.seat(index: 1)
+    // Named, so the sample shows what a real log looks like.
+    let specA = AgentSpec.SeatRoster.namedSpecs()[0]
+    let specB = AgentSpec.SeatRoster.namedSpecs()[1]
     let stamp: (String) -> Date = { value in
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -285,7 +286,12 @@ var specs: [AgentSpec] = {
     if count > 2 {
         built.append(contentsOf: AgentSpec.makeSeats(count: count).dropFirst(2))
     }
-    return Array(built.prefix(count))
+    built = Array(built.prefix(count))
+    // Named like the app: one female and one male, at random. The CLI built its own first two
+    // seats, so it has to ask for this rather than inheriting it.
+    var generator = SystemRandomNumberGenerator()
+    AgentSpec.assignNames(to: &built, using: &generator)
+    return built
 }()
 // The mode decides which library a persona comes from, so it is applied to every seat
 // before anything reads one. A seat holding an identifier from the other library resolves
