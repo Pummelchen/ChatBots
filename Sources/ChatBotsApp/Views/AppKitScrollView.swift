@@ -7,6 +7,14 @@
 // `GraphHost.flushTransactions`). The loop is `scrollTo` → content resize → republish →
 // `scrollTo`.
 //
+// A second, related hazard lives in the same area: `.textSelection(.enabled)` on any view
+// inside a pane. The pane republishes roughly 20 times a second while a model streams, so
+// the selection overlay is rebuilt on every pass, and each rebuild re-runs its text scan
+// and triggers another layout cycle. That also ends with the main thread pinned in
+// `GraphHost.flushTransactions` and a window that no longer draws — verified by removing
+// the modifier from one view at a time until the freezes stopped. There is therefore no
+// selectable text in the panes; Edit ▸ Copy Conversation copies the whole transcript.
+//
 // So the transcript is hosted in a plain `NSScrollView`, scrolled through AppKit's
 // direct, one-way primitive (`contentView.scroll(to:)`, no animation) from a deferred
 // main-queue turn. Scrolling is strictly event-driven — once per completed turn. A timer

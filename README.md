@@ -159,12 +159,51 @@ Two details worth knowing:
   model can in principle spend all of it inside `<think>` and emit no answer; if that
   happens the pane now says so explicitly instead of just staying empty.
 
+**Measured caveat on this combination.** With thinking *off*, this sampler drives
+Qwen 3.5-4B into a degenerate attractor on open-ended prompts: output settled into one
+8-gram repeated dozens of times with a distinct-word ratio of 0.10, and ran to the token
+cap. Legitimate answers from the same model measured a repeated-8-gram rate of 0.00–0.14
+against 0.79–0.91 for the loop, and `RepetitionDetector` now ends a turn once the rate
+passes 0.30 — so this is caught rather than allowed to burn 32k tokens, but the *output*
+is still poor at that setting. The middle and high thinking levels (which are the default)
+produced no such loop in testing. If you want stable output with thinking off, consider a
+lower temperature and a smaller presence-penalty magnitude.
+
 The effective sampler is printed to stderr once per seat at startup, so a run can be
 audited:
 
 ```
 [ChatBots] Agent A sampler: temp=1.00 topP=0.95 topK=20 minP=0.00 presence=-1.50 repetition=1.00 maxOut=32768
 ```
+
+### Copying text out
+
+The panes contain **no selectable text**, deliberately. `.textSelection(.enabled)` inside
+a pane is rebuilt every time the pane republishes (~20 Hz while a model streams), and each
+rebuild re-runs the selection overlay's text scan, which triggers another layout pass. The
+result is the same re-entrant update that stops the window drawing; it was found by
+removing the modifier from one view at a time until the freezes stopped.
+
+Instead, **Edit ▸ Copy Conversation (⇧⌘C)** copies the whole transcript as plain text.
+
+### Thinking controls
+
+Each pane header has its own thinking control (`think: Medium`), so the two seats can run
+different reasoning budgets side by side. Levels: **Off**, **Minimal** (128 reasoning
+tokens), **Low** (512), **Medium** (2,048, the default), **High** (8,192) and
+**Unlimited** (no ceiling). A change applies from that seat's next turn.
+
+**These levels are budgets, not requests.** Qwen 3.5's chat template exposes exactly one
+thinking knob — a boolean `enable_thinking` — and the pinned MLX release has no
+budget-transition API, so there is no `reasoning_effort: "low"` for the model to honour.
+What is genuinely controllable is how many tokens of reasoning are permitted before the
+block is closed and an answer required, which is what each level enforces: reasoning text
+is counted, and once the level's ceiling is reached the block is closed with the `</think>`
+delimiter the model already knows. A model that finishes thinking early is unaffected, and
+when a ceiling does bite the pane says so rather than hiding the truncation. Levels also
+map to the nearest native template flag (`enable_thinking: false` for Off, plus a
+`reasoning_effort` hint for checkpoints that understand one), so the same control stays
+meaningful if a seat is pointed at another model family.
 
 ### Themes
 

@@ -5,6 +5,12 @@ import SwiftUI
 
 /// One logged turn, rendered the same way in both panes.
 ///
+/// Text selection is deliberately *not* enabled here or anywhere else in a pane: these
+/// views are rebuilt every time the pane republishes (~20 Hz while a model streams), and
+/// a rebuilt selection overlay drives SwiftUI into a re-entrant update that stops the
+/// window drawing. See `AppKitScrollView` for the full account, and Edit ▸ Copy
+/// Conversation for the supported way to get the text out.
+///
 /// Both panes draw the *shared* log: the moderator's messages and each model's
 /// messages appear identically on both sides. Only the active seat adds a live,
 /// in-progress row underneath.
@@ -59,7 +65,6 @@ struct TurnRow: View {
 
                 Text(turn.content)
                     .font(.system(size: 12.5, design: .default))
-                    .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -67,8 +72,7 @@ struct TurnRow: View {
                     Text(detail)
                         .font(.system(size: 10.5, design: .monospaced))
                         .foregroundStyle(palette.textSecondary)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
+                            .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -116,7 +120,6 @@ struct ReasoningBlock: View {
                 Text(text)
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(palette.textSecondary)
-                    .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)

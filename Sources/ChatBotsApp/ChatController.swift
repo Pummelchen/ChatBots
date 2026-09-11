@@ -5,6 +5,7 @@
 // plain @Published values the views can bind to. Keeping that translation here means
 // the views stay declarative and the engine stays testable without SwiftUI.
 
+import AppKit
 import ChatBotsCore
 import Foundation
 import SwiftUI
@@ -12,7 +13,7 @@ import SwiftUI
 /// Live state of one seat's pane.
 @MainActor
 public final class AgentPaneState: ObservableObject, Identifiable {
-    public let spec: AgentSpec
+    @Published public var spec: AgentSpec
     @Published public var engineState: EngineState = .idle
     @Published public var isGenerating = false
     /// The still-growing final paragraph of the answer. Re-laying out a single
@@ -33,10 +34,13 @@ public final class AgentPaneState: ObservableObject, Identifiable {
     /// a flag, so a redraw with an unchanged value never re-scrolls.
     @Published public var scrollSignal = 0
 
-    public nonisolated var id: String { spec.id }
+    /// Stable identity. `spec.id` is captured once because the spec is now mutable
+    /// (the thinking level changes from the pane) and this must stay nonisolated.
+    public nonisolated let id: String
 
     init(spec: AgentSpec) {
         self.spec = spec
+        self.id = spec.id
     }
 
     func beginTurn() {
@@ -312,6 +316,50 @@ public final class ChatController: ObservableObject {
         guard !text.isEmpty else { return }
         engine.steer(text)
         moderatorDraft = ""
+    }
+
+    /// Change one seat's thinking level. Applies from its next turn.
+    public func setThinking(_ mode: ThinkingMode, for agentID: String) {
+        guard var spec = engine.specs.first(where: { $0.id == agentID }) else { return }
+        spec.thinking = mode
+        if let seat = engine.allSeats.first(where: { $0.spec.id == agentID }) as? MLXEngine {
+            Task { await seat.setThinking(mode) }
+        }
+        if let pane = pane(agentID) {
+            pane.spec = spec
+        }
+    }
+
+    /// The whole conversation as plain text, for Edit ▸ Copy Conversation.
+    ///
+    /// On-screen selection is not available in the panes (see `AppKitScrollView`), so
+    /// this is the supported way to lift the transcript out of the app.
+    public func transcriptAsText() -> String {
+        var lines: [String] = ["# \(topic)", ""]
+        for turn in engine.displayTurns {
+            switch turn.kind {
+            case .topic, .steering:
+                lines.append("**\(turn.speakerName):** \(turn.content)")
+            case .introduction:
+                continue
+            case .tool:
+                lines.append("> tool → \(turn.content)")
+            case .chat:
+                lines.append("**\(turn.speakerName):** \(turn.content)")
+            }
+            lines.append("")
+        }
+        if let stats = panes.compactMap(\.lastStats).first {
+            lines.append("— \(Format.rate(stats))")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    public func copyConversation() {
+        let text = transcriptAsText()
+        guard !text.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     public func warmUp(_ agentID: String) {

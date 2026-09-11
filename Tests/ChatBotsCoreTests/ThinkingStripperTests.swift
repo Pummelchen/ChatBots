@@ -90,11 +90,4 @@ struct ThinkingStripperTests {
         #expect(reasoning == "still thinking and thinking")
         #expect(stripper.isInsideReasoning == false)  // finalized
     }
-
-    @Test("Reasoning mode maps to the expected chat-template flag")
-    func templateFlags() {
-        #expect(ReasoningMode.off.templateContext?["enable_thinking"] as? Bool == false)
-        #expect(ReasoningMode.stream.templateContext?["enable_thinking"] as? Bool == true)
-        #expect(ReasoningMode.discard.templateContext?["enable_thinking"] as? Bool == true)
-    }
 }

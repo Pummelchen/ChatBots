@@ -22,8 +22,10 @@ struct Options {
     var benchmark = false
     var solo = false
     var memoryProbe = false
-    /// Cap on visible answer tokens per turn; `nil` keeps every seat's own budget.
+    /// Cap on answer tokens per turn; `nil` keeps the seat's own budget.
     var maxTokens: Int?
+    /// Thinking level for both seats; `nil` keeps the preset (medium).
+    var thinking: ThinkingMode?
 
     static func parse(_ arguments: [String]) -> Options {
         var options = Options()
@@ -41,6 +43,13 @@ struct Options {
             case "--model-b": options.modelB = next() ?? options.modelB
             case "--key": options.tavilyKey = next()
             case "--max-tokens": options.maxTokens = Int(next() ?? "")
+            case "--thinking":
+                let raw = next() ?? ""
+                guard let mode = ThinkingMode(rawValue: raw.lowercased()) else {
+                    FileHandle.standardError.write(Data("unknown thinking mode: \(raw)\n".utf8))
+                    exit(2)
+                }
+                options.thinking = mode
             case "--benchmark": options.benchmark = true
             case "--memory-probe": options.memoryProbe = true
             case "--solo": options.solo = true
@@ -70,6 +79,7 @@ struct Options {
               --model-b <id>       MLX checkpoint for seat B
               --key <key>          Tavily API key (env TAVILY_API_KEY, else built-in dev key)
               --max-tokens <n>     Cap answer tokens per turn
+              --thinking <mode>    off | minimal | low | medium | high | unlimited
               --benchmark          Measure seat throughput instead of chatting
               --solo               With --benchmark: measure seat A only, then exit
               --memory-probe       Report MLX GPU memory across loading and turns
@@ -78,18 +88,15 @@ struct Options {
         parameters, so a headless run exercises exactly the same path as the GUI.
         """
 
-    private func capped(_ spec: AgentSpec) -> AgentSpec {
-        guard let maxTokens else { return spec }
+    private func configured(_ spec: AgentSpec) -> AgentSpec {
         var spec = spec
-        spec.maxTokens = maxTokens
-        // A cap is only a cap if the thinking block is not given its own headroom,
-        // otherwise the seat may still emit budget + 2048 tokens per turn.
-        spec.thinkingBudget = 0
+        if let maxTokens { spec.maxTokens = maxTokens }
+        if let thinking { spec.thinking = thinking }
         return spec
     }
 
-    var specA: AgentSpec { capped(AgentSpec.seatA(modelID: modelA)) }
-    var specB: AgentSpec { capped(AgentSpec.seatB(modelID: modelB)) }
+    var specA: AgentSpec { configured(AgentSpec.seatA(modelID: modelA)) }
+    var specB: AgentSpec { configured(AgentSpec.seatB(modelID: modelB)) }
 }
 
 // MARK: - Output helpers
@@ -241,6 +248,7 @@ log("  topic     : \(options.topic)")
 log("  turns     : \(options.turns)")
 log("  seat A    : \(options.modelA)")
 log("  seat B    : \(options.modelB)")
+log("  thinking  : \(specs[0].thinking.rawValue) — \(specs[0].thinking.detail)")
 log("  tavily    : \(TavilyClient.isConfigured ? "configured" : "MISSING")")
 print("")
 

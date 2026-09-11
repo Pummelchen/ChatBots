@@ -39,6 +39,9 @@ public actor MLXEngine: LLMEngine {
     private var loadingTask: Task<ModelContainer, Error>?
     private var loadedContextWindow = 32_768
     private var didLogConfiguration = false
+    /// Live thinking level. Starts from the seat's spec and is changed between turns by
+    /// the pane control; `spec` itself stays immutable because it is a protocol property.
+    private var currentThinking: ThinkingMode
 
     /// Throughput of this seat's most recent turn, for diagnostics and benchmarks.
     public private(set) var lastStats: TurnStats?
@@ -49,11 +52,21 @@ public actor MLXEngine: LLMEngine {
         onStateChange: @escaping @Sendable (EngineState) -> Void = { _ in }
     ) {
         self.spec = spec
+        self.currentThinking = spec.thinking
         self.toolRegistry = toolRegistry
         self.onStateChange = onStateChange
     }
 
     public var isLoaded: Bool { container != nil }
+
+    /// Change how much this seat may think. Read at the start of each turn, so it takes
+    /// effect on the next turn and never mid-generation.
+    public func setThinking(_ mode: ThinkingMode) {
+        currentThinking = mode
+    }
+
+    /// The level this seat will use on its next turn.
+    public var thinking: ThinkingMode { currentThinking }
 
     public var contextWindow: Int { loadedContextWindow }
 
@@ -177,6 +190,10 @@ public actor MLXEngine: LLMEngine {
 
         let spec = self.spec
         let agentID = spec.id
+        let thinking = currentThinking
+        let reasoningCeiling = thinking.reasoningTokenBudget
+        /// Answer budget plus whatever this thinking level allows for reasoning.
+        let generationCap = spec.maxTokens + (reasoningCeiling ?? 0)
         // Copy the callbacks into locals: the tool-dispatch closure outlives this
         // scope, so it cannot capture the non-escaping parameters directly.
         let reportToolCall = onToolCall
@@ -188,11 +205,10 @@ public actor MLXEngine: LLMEngine {
         let toolSpecs = tools.isEmpty ? nil : tools.map { Self.toolSpec(for: $0) }
         let toolRegistry = self.toolRegistry
 
-        // `maxTokens` is what the model may emit, thinking included; `thinkingBudget` is
-        // extra headroom on top and is 0 for the Qwen preset, making maxTokens the whole
-        // budget. Sampling mirrors the seat's spec exactly.
+        // The cap is the answer budget plus whatever the thinking mode allows for
+        // reasoning. Sampling mirrors the seat's spec exactly.
         var mutableParameters = GenerateParameters(
-            maxTokens: spec.thinkingBudget + spec.maxTokens,
+            maxTokens: generationCap,
             temperature: Float(spec.temperature),
             topP: Float(spec.topP),
             topK: spec.topK,
@@ -206,7 +222,7 @@ public actor MLXEngine: LLMEngine {
         mutableParameters.repetitionPenalty = spec.repetitionPenalty.map(Float.init)
         mutableParameters.repetitionContextSize = 256
         let parameters = mutableParameters
-        let additionalContext = spec.reasoning.templateContext
+        let additionalContext = thinking.templateContext
 
         /// A conversation entry we can send across isolation. Tool metadata is kept
         /// alongside because `Chat.Message` itself is not `Sendable`.
@@ -219,11 +235,21 @@ public actor MLXEngine: LLMEngine {
 
         var promptEntries = promptText.map { Entry(role: $0.role, content: $0.content) }
 
-        let emitReasoning = spec.reasoning == .stream
+        // Reasoning is streamed to the pane and never enters the log, so it is always
+        // reported; `.off` simply produces none.
+        let emitReasoning = thinking.thinks
         var answer = ""
         /// Set when this turn produced reasoning text, so an empty answer can be
         /// explained as "ran out of budget while thinking" rather than silence.
         var stripperSpentItsBudget = false
+        /// Reasoning tokens seen this turn, for the mode's ceiling.
+        var reasoningTokens = 0
+        /// Set when the ceiling cut the thought short, so the UI can say so.
+        var reasoningWasTruncated = false
+        /// Set when generation was cut short because the model began repeating itself.
+        var loopDetected = false
+        /// Watches for degenerate repetition; see `RepetitionDetector`.
+        var repetition = RepetitionDetector()
         var stats = TurnStats()
         let started = Date()
 
@@ -257,6 +283,8 @@ public actor MLXEngine: LLMEngine {
         // the same time they time-share rather than overlap. The orchestrator's turn
         // loop is sequential, so in practice one seat is always idle.
         rounds: while true {
+            reasoningTokens = 0
+            repetition = RepetitionDetector()
             let entriesForRound = promptEntries
             let stream = await container.perform {
                 context -> AsyncThrowingStream<Generation, Error> in
@@ -281,7 +309,7 @@ public actor MLXEngine: LLMEngine {
                 return session.streamDetails(to: messagesForRound)
             }
 
-            var stripper = ThinkingStripper(startsPrimed: spec.reasoning != .off)
+            var stripper = ThinkingStripper(startsPrimed: thinking.thinks)
             var toolCalls: [ToolCall] = []
 
             for try await generation in stream {
@@ -289,9 +317,31 @@ public actor MLXEngine: LLMEngine {
                 switch generation {
                 case .chunk(let text):
                     let segment = stripper.process(text)
-                    if !segment.reasoning.isEmpty { stripperSpentItsBudget = true }
+                    if !segment.reasoning.isEmpty {
+                        stripperSpentItsBudget = true
+                        reasoningTokens += segment.reasoning.count / 4
+                    }
                     answer += segment.answer
                     await report(segment)
+
+                    // Enforce the mode's ceiling. The budget is counted in roughly
+                    // 4-characters-per-token units rather than exact token ids, which is
+                    // accurate enough for "think less" and needs no extra bookkeeping
+                    // from the generation loop.
+                    if let ceiling = reasoningCeiling, ceiling > 0, reasoningTokens >= ceiling,
+                        stripper.isInsideReasoning
+                    {
+                        reasoningWasTruncated = true
+                        answer += Self.forcedThinkingExit
+                        break
+                    }
+
+                    // A loop is a stop condition regardless of the token budget, which is
+                    // what keeps a bad sampler setting from producing 32k tokens of noise.
+                    if repetition.ingest(segment.answer) {
+                        loopDetected = true
+                        break rounds
+                    }
 
                 case .toolCall(let call):
                     toolCalls.append(call)
@@ -359,12 +409,32 @@ public actor MLXEngine: LLMEngine {
                 .toolFailure(
                     agentID: agentID,
                     name: "generation",
-                    message: "spent the whole \(spec.thinkingBudget + spec.maxTokens)-token budget thinking and produced no answer — raise the limit or turn thinking off"
+                    message: "spent the whole \(generationCap)-token budget thinking and produced no answer — raise the thinking level's headroom or turn thinking off"
                 )
             )
         }
 
         lastStats = stats
+        if loopDetected {
+            await onEvent(
+                .toolFailure(
+                    agentID: agentID,
+                    name: "generation",
+                    message: "the model fell into a repetition loop and the turn was ended — its sampler settings are too loose for this prompt"
+                )
+            )
+        }
+
+        if reasoningWasTruncated {
+            await onEvent(
+                .toolFailure(
+                    agentID: agentID,
+                    name: "thinking",
+                    message: "thinking stopped at the \(thinking.label.lowercased()) ceiling (\(reasoningCeiling ?? 0) tokens) and the model answered from there"
+                )
+            )
+        }
+
         await onEvent(.turnFinished(agentID: agentID, text: final, stats: stats))
         logConfigurationOnce(container: container, spec: spec)
         return final
@@ -379,15 +449,23 @@ public actor MLXEngine: LLMEngine {
             spec.temperature, spec.topP, spec.topK, spec.minP,
             spec.presencePenalty.map { String(format: "%.2f", $0) } ?? "off",
             spec.repetitionPenalty.map { String(format: "%.2f", $0) } ?? "off",
-            spec.thinkingBudget + spec.maxTokens)
+            spec.generationCap)
         FileHandle.standardError.write(
             Data(
-                "[ChatBots] \(spec.id) \(spec.modelID) ready — context \(context) tok, reasoning \(spec.reasoning.rawValue)\n[ChatBots] \(spec.id) sampler: \(sampler)\n"
+                "[ChatBots] \(spec.id) \(spec.modelID) ready — context \(context) tok, thinking \(currentThinking.rawValue)\n[ChatBots] \(spec.id) sampler: \(sampler)\n"
                     .utf8)
         )
     }
 
     // MARK: - Helpers
+
+    /// Text that closes a reasoning block the model would have kept writing.
+    ///
+    /// Qwen is trained on `<think>…</think>`, and this pinned MLX release offers no
+    /// budget-transition API, so ending the block with the delimiter it already knows is
+    /// the least surprising way to force an answer. It is a real truncation and the UI
+    /// says so.
+    static let forcedThinkingExit = "\n</think>\n"
 
     /// Drop a stray delimiter or an echoed speaker tag the model may have emitted.
     private static func clean(_ text: String, spec: AgentSpec) -> String {

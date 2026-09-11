@@ -8,21 +8,100 @@
 
 import Foundation
 
-/// How a seat treats a reasoning model's thinking block.
-public enum ReasoningMode: String, Sendable, Codable, CaseIterable {
-    /// Let the model think; the `<think>` text is routed to the UI as `.reasoning`
-    /// and never written to the shared log.
-    case stream
-    /// Ask the template to disable thinking entirely (`enable_thinking: false`).
+/// How much a reasoning model is allowed to think before it must answer.
+///
+/// **Why levels are budgeted rather than requested.** Qwen 3.5's chat template exposes
+/// exactly one thinking knob — a boolean `enable_thinking` — and the MLX release this app
+/// pins has no budget-transition API, so there is no `reasoning_effort: "low"` to ask
+/// for. What *is* controllable is how many tokens of reasoning we permit before closing
+/// the block and requiring an answer, so the levels below are real but approximate:
+/// a level is a ceiling, and a model that finishes thinking early is unaffected.
+///
+/// Levels also translate to the nearest native template flag when a checkpoint supports
+/// one (`.off` requests `enable_thinking: false`; a checkpoint honouring
+/// `reasoning_effort` would receive it), so the same control stays meaningful if a seat is
+/// pointed at another model family.
+public enum ThinkingMode: String, Sendable, Codable, CaseIterable, Identifiable {
+    /// Do not think at all. The template is asked for `enable_thinking: false`.
     case off
-    /// Keep thinking on but discard it — neither shown nor logged.
-    case discard
+    /// A token's worth of deliberation — enough to pick a direction.
+    case minimal
+    case low
+    case medium
+    case high
+    /// No budget at all: the model thinks until it decides it is done.
+    case unlimited
 
-    /// The chat-template flag for this mode, or `nil` to leave the template default.
-    public var templateContext: [String: any Sendable]? {
+    public var id: String { rawValue }
+
+    public var label: String {
         switch self {
-        case .off: ["enable_thinking": false]
-        case .stream, .discard: ["enable_thinking": true]
+        case .off: "Off"
+        case .minimal: "Minimal"
+        case .low: "Low"
+        case .medium: "Medium"
+        case .high: "High"
+        case .unlimited: "Unlimited"
+        }
+    }
+
+    public var symbol: String {
+        switch self {
+        case .off: "brain"
+        case .minimal: "brain.head.profile"
+        case .low: "brain.head.profile"
+        case .medium: "brain.head.profile"
+        case .high: "brain.head.profile"
+        case .unlimited: "infinity"
+        }
+    }
+
+    /// Ceiling on reasoning tokens, or `nil` when the model decides for itself.
+    ///
+    /// Calibrated against this app's own measurements: a short factual prompt spends
+    /// roughly 250 reasoning tokens, so `minimal`/`low` genuinely bite while `high`
+    /// leaves normal answers untouched.
+    public var reasoningTokenBudget: Int? {
+        switch self {
+        case .off: 0
+        case .minimal: 128
+        case .low: 512
+        case .medium: 2_048
+        case .high: 8_192
+        case .unlimited: nil
+        }
+    }
+
+    public var thinks: Bool { self != .off }
+
+    /// How this mode is expressed to the chat template.
+    ///
+    /// `enable_thinking` is the Qwen flag. `reasoning_effort` is included for checkpoints
+    /// that understand it; a template that does not reference it ignores the extra key.
+    public var templateContext: [String: any Sendable] {
+        var context: [String: any Sendable] = ["enable_thinking": thinks]
+        switch self {
+        case .off:
+            context["reasoning_effort"] = "none"
+        case .minimal, .low:
+            context["reasoning_effort"] = "low"
+        case .medium:
+            context["reasoning_effort"] = "medium"
+        case .high, .unlimited:
+            context["reasoning_effort"] = "high"
+        }
+        return context
+    }
+
+    /// One-line description for the control's help text.
+    public var detail: String {
+        switch self {
+        case .off: "No thinking block; answer straight away"
+        case .minimal: "Up to 128 reasoning tokens"
+        case .low: "Up to 512 reasoning tokens"
+        case .medium: "Up to 2,048 reasoning tokens"
+        case .high: "Up to 8,192 reasoning tokens"
+        case .unlimited: "No budget — think until finished"
         }
     }
 }
@@ -146,5 +225,68 @@ public struct ThinkingStripper: Sendable {
             }
         }
         return 0
+    }
+}
+
+/// Detects a model that has fallen into a repetition loop.
+///
+/// Free-form sampling at a high temperature with a strong presence penalty can drive a
+/// small model into a degenerate attractor: the text stops advancing and one phrase
+/// repeats, sometimes with a few words varied between passes. Measured on this app with
+/// the shipped sampler and thinking disabled, output settled into an 8-gram repeated
+/// dozens of times at a distinct-word ratio of 0.10 and would have run to the full
+/// 32,768-token cap.
+///
+/// Rather than paper over that by quietly changing the sampling settings, the loop is
+/// detected and the turn ends. Detection has to tolerate the varied-filler form, so it
+/// measures **near-repetition rate** over a rolling window: the fraction of recent
+/// n-grams that have already been seen in that window. Ordinary prose sits far below the
+/// threshold; a degenerate attractor saturates it.
+public struct RepetitionDetector: Sendable {
+    /// Words per compared phrase.
+    private let gram: Int
+    /// Recent words kept in the rolling window. Long enough that a slow drift still
+    /// re-uses phrases, short enough that genuine long-form writing does not trip it.
+    private let windowSize: Int
+    /// Fraction of repeated n-grams that counts as degenerate.
+    ///
+    /// Calibrated on this app's own output: legitimate answers measured 0.00–0.14,
+    /// while degenerate attractors measured 0.79–0.91. 0.30 sits in that gap with room
+    /// on both sides.
+    private let threshold: Double
+    /// Don't judge until this many words have been generated.
+    private let minimumWords: Int
+
+    private var words: [String] = []
+
+    public init(gram: Int = 8, windowSize: Int = 300, threshold: Double = 0.30, minimumWords: Int = 120) {
+        self.gram = gram
+        self.windowSize = windowSize
+        self.threshold = threshold
+        self.minimumWords = minimumWords
+    }
+
+    /// Feed generated text. Returns `true` once the output looks degenerate.
+    public mutating func ingest(_ text: String) -> Bool {
+        words.append(contentsOf: Self.normalise(text))
+        if words.count > windowSize {
+            words.removeFirst(words.count - windowSize)
+        }
+        guard words.count >= minimumWords, words.count >= gram * 3 else { return false }
+
+        var seen = Set<[String]>()
+        var repeats = 0
+        var total = 0
+        for start in 0...(words.count - gram) {
+            let phrase = Array(words[start..<(start + gram)])
+            total += 1
+            if !seen.insert(phrase).inserted { repeats += 1 }
+        }
+        guard total > 0 else { return false }
+        return Double(repeats) / Double(total) >= threshold
+    }
+
+    private static func normalise(_ text: String) -> [String] {
+        text.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
     }
 }

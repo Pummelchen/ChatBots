@@ -112,19 +112,13 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
     /// Repetition penalty, a multiplier. `1.0` is neutral; above `1` penalises, below
     /// `1` rewards.
     public var repetitionPenalty: Double?
-    /// Maximum tokens to generate. When `thinkingBudget` is `0` this is the whole
-    /// output budget, thinking included.
+    /// Maximum tokens for the *answer*, reasoning excluded. The hard generation cap is
+    /// this plus whatever `thinking` budgets for reasoning.
     public var maxTokens: Int
-    /// Extra headroom granted for a reasoning block, on top of `maxTokens`.
-    ///
-    /// `0` means "`maxTokens` is the entire output budget", which is how the Qwen preset
-    /// below is configured. Raising it only makes sense for a seat whose budgeting is
-    /// tracked separately from its answer length.
-    public var thinkingBudget: Int
     /// Whether this seat may call the web-search tools.
     public var webSearchEnabled: Bool
-    /// How this seat handles a reasoning model's thinking block.
-    public var reasoning: ReasoningMode
+    /// How much this seat may think before answering. Changeable at runtime from the pane.
+    public var thinking: ThinkingMode
     /// Extra per-seat persona note. Deliberately short: the design goal is to watch
     /// two models run the conversation, not to script them.
     public var persona: String
@@ -141,9 +135,8 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
         presencePenalty: Double? = nil,
         repetitionPenalty: Double? = nil,
         maxTokens: Int = 1024,
-        thinkingBudget: Int = 0,
         webSearchEnabled: Bool = true,
-        reasoning: ReasoningMode = .stream,
+        thinking: ThinkingMode = .medium,
         persona: String = ""
     ) {
         self.id = id
@@ -157,9 +150,8 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
         self.presencePenalty = presencePenalty
         self.repetitionPenalty = repetitionPenalty
         self.maxTokens = maxTokens
-        self.thinkingBudget = thinkingBudget
         self.webSearchEnabled = webSearchEnabled
-        self.reasoning = reasoning
+        self.thinking = thinking
         self.persona = persona
     }
 
@@ -182,8 +174,7 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
     /// | Presence penalty | 1.5 (UI convention) → `-1.5` for MLX |
     /// | Repetition penalty | 1.0 (neutral) |
     /// | Max output tokens | 32,768 |
-    public enum QwenSampling {
-        public static let thinking = true
+    public enum QwenSampling: Sendable {
         public static let temperature = 1.0
         public static let topP = 0.95
         public static let topK = 20
@@ -196,6 +187,9 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
         /// MLX multiplies by this, and `1.0` is neutral, so this is deliberately a no-op.
         public static let repetitionPenalty = 1.0
         public static let maxOutputTokens = 32_768
+        /// Thinking defaults to the level the moderator asked for; change it per seat in
+        /// the pane header.
+        public static let thinking = ThinkingMode.medium
     }
 
     private static func qwen(
@@ -215,9 +209,7 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
             presencePenalty: QwenSampling.presencePenalty,
             repetitionPenalty: QwenSampling.repetitionPenalty,
             maxTokens: QwenSampling.maxOutputTokens,
-            // `maxTokens` above is the whole output budget, thinking included.
-            thinkingBudget: 0,
-            reasoning: QwenSampling.thinking ? .stream : .off
+            thinking: QwenSampling.thinking
         )
     }
 
@@ -234,6 +226,12 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
 
     /// A separate instance of the same weights still deserves a distinct sampling
     /// seed-stream, otherwise the two seats converge on identical phrasing.
+    /// Total tokens the model may emit for one turn: the answer budget plus whatever
+    /// this thinking mode allows for reasoning.
+    public var generationCap: Int {
+        maxTokens + (thinking.reasoningTokenBudget ?? 0)
+    }
+
     public var samplingSeed: UInt64 {
         var hasher = Hasher()
         hasher.combine(id)

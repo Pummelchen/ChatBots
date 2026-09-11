@@ -40,6 +40,7 @@ struct AgentPanes: View {
             ForEach(controller.panes) { pane in
                 ChatPane(
                     pane: pane,
+                    controller: controller,
                     turns: controller.turns,
                     pendingSteeringIDs: pending,
                     showReasoning: controller.showReasoning,
@@ -60,7 +61,6 @@ struct ErrorBanner: View {
                 .foregroundStyle(.red)
             Text(message)
                 .font(.system(size: 12))
-                .textSelection(.enabled)
             Spacer(minLength: 0)
             Button {
                 dismiss()

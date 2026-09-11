@@ -38,6 +38,14 @@ struct ChatBotsApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {}
 
+            // The panes contain no selectable text (see AppKitScrollView), so copying the
+            // transcript is an explicit command rather than ⌘A then ⌘C.
+            CommandGroup(after: .pasteboard) {
+                Button("Copy Conversation") { controller.copyConversation() }
+                    .keyboardShortcut("c", modifiers: [.command, .shift])
+                    .disabled(controller.turns.isEmpty)
+            }
+
             CommandGroup(after: .saveItem) {
                 Button("Clear Conversation") { controller.reset() }
                     .keyboardShortcut("k", modifiers: .command)

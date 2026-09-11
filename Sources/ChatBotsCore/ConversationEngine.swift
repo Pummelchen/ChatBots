@@ -152,6 +152,9 @@ public final class ConversationEngine {
 
     public var specs: [AgentSpec] { seats.map(\.spec) }
 
+    /// Every seat, in speaking order.
+    public var allSeats: [Seat] { seats }
+
     /// The engine behind a seat. Used by the UI for warm-up and diagnostics; the turn
     /// loop itself goes through `runTurn` so it can tag events with the speaker.
     public func seatEngine(for agentID: String) -> (any LLMEngine)? {
