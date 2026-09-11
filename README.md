@@ -34,6 +34,7 @@ hallucinated.
 | **Moderator box** | Your message goes into the shared log — **both** models read it |
 | **Show thinking** | Streams each model's `<think>` block into its own pane (never into the log) |
 | **Models ▸ Load …** | Pre-loads weights, optionally per seat |
+| **Theme** | `Original` (default) follows the Mac's appearance; `Black` is flat pure-black |
 
 Moderator messages typed *while a model is generating* are queued, shown as `queued`,
 and appended exactly once at the next turn boundary — so both models see it on their
@@ -90,6 +91,21 @@ at another device, but no such seat ships here.
 
 `--benchmark` is kept because it is also the cheapest way to prove a new checkpoint loads
 and generates at all before wiring it into a conversation.
+
+### Themes
+
+`Original` is the default and uses the system's dynamic colours, so it follows the Mac's
+light/dark setting and the panes keep native materials. `Black` is the opt-in theme the
+moderator asked for: flat `#000000` everywhere, no materials, and its own literal palette
+rather than semantic colours — a material over black reads as muddy grey, and a semantic
+colour like `.tertiary` would flip to dark ink on a black pane when the Mac is in light
+mode. The two agent tints are also lifted in `Black`, because the system `.teal` and
+`.indigo` are too dim at small sizes against pure black.
+
+The choice is stored with `@AppStorage("themeMode")`, so it survives relaunch. The window's
+AppKit appearance and background are set alongside the SwiftUI palette, because a SwiftUI
+background alone leaves the titlebar and the gutter around the split view in the system
+appearance.
 
 ### Three decisions worth knowing about
 

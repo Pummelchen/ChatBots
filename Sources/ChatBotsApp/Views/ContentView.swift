@@ -4,6 +4,7 @@ import ChatBotsCore
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(\.themePalette) private var palette
     @ObservedObject var controller: ChatController
 
     var body: some View {

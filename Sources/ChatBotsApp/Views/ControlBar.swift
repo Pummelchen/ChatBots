@@ -4,6 +4,8 @@ import ChatBotsCore
 import SwiftUI
 
 struct ControlBar: View {
+    @Environment(\.themePalette) private var palette
+    @EnvironmentObject private var theme: ThemeStore
     @ObservedObject var controller: ChatController
     @State private var showNotes = false
 
@@ -14,7 +16,7 @@ struct ControlBar: View {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Label("Topic", systemImage: "text.bubble")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.textSecondary)
 
                 TextField("What should the models discuss?", text: $controller.topic)
                     .textFieldStyle(.roundedBorder)
@@ -28,6 +30,17 @@ struct ControlBar: View {
             HStack(spacing: 10) {
                 statusPill
                 Spacer(minLength: 0)
+
+                Picker("Theme", selection: $theme.mode) {
+                    ForEach(ThemeMode.allCases) { mode in
+                        Label(mode.label, systemImage: mode.symbol).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                .help("Original follows the Mac's appearance; Black is pure black")
+
                 Toggle(isOn: $controller.showReasoning) {
                     Label("Show thinking", systemImage: "brain")
                         .font(.system(size: 11))
@@ -41,7 +54,7 @@ struct ControlBar: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(.bar)
+        .background(palette.surface)
     }
 
     // MARK: Transport
@@ -118,21 +131,21 @@ struct ControlBar: View {
             }
             Text("· \(controller.turns.filter { $0.kind == .chat }.count) messages")
                 .font(.system(size: 10.5, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(palette.textSecondary)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
-        .background(Color.primary.opacity(0.05), in: Capsule())
+        .background(palette.raised, in: Capsule())
     }
 
     private var dotColour: Color {
         switch status {
-        case .running: .green
-        case .preparing: .yellow
-        case .paused: .orange
-        case .limitReached: .blue
-        case .failed: .red
-        case .idle, .stopped: .secondary
+        case .running: AgentTheme.ok
+        case .preparing: AgentTheme.warning
+        case .paused: AgentTheme.warning
+        case .limitReached: AgentTheme.tint(for: "Agent B", palette: palette)
+        case .failed: AgentTheme.failure
+        case .idle, .stopped: AgentTheme.dotIdle(palette)
         }
     }
 
@@ -159,6 +172,7 @@ struct ControlBar: View {
 
 /// Moderator strip — one input, delivered to both models.
 struct ModeratorBar: View {
+    @Environment(\.themePalette) private var palette
     @ObservedObject var controller: ChatController
 
     var body: some View {
@@ -166,10 +180,10 @@ struct ModeratorBar: View {
             VStack(alignment: .leading, spacing: 3) {
                 Label("Moderator", systemImage: "person.wave.2.fill")
                     .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(AgentTheme.moderatorTint)
+                    .foregroundStyle(AgentTheme.moderatorTint(palette))
                 Text("Goes into the shared log — both models read it.")
                     .font(.system(size: 9.5))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(palette.textTertiary)
             }
             .frame(width: 170, alignment: .leading)
 
@@ -189,11 +203,11 @@ struct ModeratorBar: View {
                 Label("Send to both", systemImage: "paperplane.fill")
             }
             .buttonStyle(.borderedProminent)
-            .tint(AgentTheme.moderatorTint)
+            .tint(AgentTheme.moderatorTint(palette))
             .disabled(controller.moderatorDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(.bar)
+        .background(palette.surface)
     }
 }

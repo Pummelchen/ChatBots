@@ -7,13 +7,14 @@ import ChatBotsCore
 import SwiftUI
 
 struct ChatPane: View {
+    @Environment(\.themePalette) private var palette
     @ObservedObject var pane: AgentPaneState
     let turns: [Turn]
     let pendingSteeringIDs: Set<UUID>
     let showReasoning: Bool
     let contextEstimate: Int
 
-    private var tint: Color { AgentTheme.tint(for: pane.spec.id) }
+    private var tint: Color { AgentTheme.tint(for: pane.spec.id, palette: palette) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,7 +25,7 @@ struct ChatPane: View {
             footer
         }
         .frame(minWidth: 380, maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .textBackgroundColor))
+        .background(palette.background)
     }
 
     // MARK: Header
@@ -41,7 +42,7 @@ struct ChatPane: View {
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                     Text(pane.spec.modelShortName)
                         .font(.system(size: 10.5, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(palette.textSecondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -61,27 +62,27 @@ struct ChatPane: View {
                 Spacer(minLength: 0)
             }
             .font(.system(size: 9.5, design: .rounded))
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(palette.textTertiary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
-        .background(tint.opacity(0.07))
+        .background(tint.opacity(0.10))
     }
 
     private var statusChip: some View {
         HStack(spacing: 5) {
             Circle()
-                .fill(pane.isGenerating ? Color.green : Color.secondary.opacity(0.45))
+                .fill(pane.isGenerating ? AgentTheme.ok : AgentTheme.dotIdle(palette))
                 .frame(width: 7, height: 7)
             Text(pane.statusText)
                 .font(.system(size: 10, weight: .medium, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(palette.textSecondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
-        .background(Color.primary.opacity(0.05), in: Capsule())
+        .background(palette.raised, in: Capsule())
     }
 
     // MARK: Transcript
@@ -146,7 +147,7 @@ struct ChatPane: View {
                                 .foregroundStyle(tint)
                             Text("streaming")
                                 .font(.system(size: 9, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(palette.textSecondary)
                             Spacer(minLength: 0)
                         }
                         Text(pane.liveText)
@@ -157,7 +158,7 @@ struct ChatPane: View {
                     }
                 }
                 .padding(10)
-                .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+                .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
                         .strokeBorder(tint.opacity(0.5), lineWidth: 1.2)
@@ -174,7 +175,7 @@ struct ChatPane: View {
                                 .font(.system(size: 10, design: .monospaced))
                                 .lineLimit(2)
                         }
-                        .foregroundStyle(AgentTheme.toolTint)
+                        .foregroundStyle(AgentTheme.toolTint(palette))
                     }
                 }
                 .padding(.horizontal, 10)
@@ -186,13 +187,13 @@ struct ChatPane: View {
         VStack(spacing: 8) {
             Image(systemName: "bubble.left.and.bubble.right")
                 .font(.system(size: 26))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(palette.textTertiary)
             Text("Nothing yet")
                 .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(palette.textSecondary)
             Text("Set a topic and press Start. Both models will appear here.")
                 .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(palette.textTertiary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -212,9 +213,9 @@ struct ChatPane: View {
             Label("≈\(Format.tokens(contextEstimate)) prompt tok shared", systemImage: "text.book.closed")
         }
         .font(.system(size: 9.5, design: .rounded))
-        .foregroundStyle(.tertiary)
+        .foregroundStyle(palette.textTertiary)
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
-        .background(Color.primary.opacity(0.03))
+        .background(palette.surface)
     }
 }
