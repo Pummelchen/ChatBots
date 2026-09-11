@@ -21,8 +21,14 @@ public final class EngineService {
     /// is held here because both front ends share one conversation.
     public var showReasoning = true
 
-    public init(engine: ConversationEngine) {
+    /// Where conversations are kept between runs.
+    public let store: ConversationStore
+
+    public init(engine: ConversationEngine, store: ConversationStore) {
         self.engine = engine
+        self.store = store
+        // The engine writes on every change, so the app does not have to remember to.
+        engine.conversationStore = store
     }
 
     /// How many seats and what state, for a health check.
@@ -139,7 +145,42 @@ public final class EngineService {
                 return .refused("no report has been produced yet")
             }
             return .report(report.markdown())
+
+        // ── Saved conversations ──────────────────────────────────────────────────────
+        case .listSavedConversations:
+            return .savedConversations(store.list().map(Self.summary))
+
+        case .loadSavedConversation(let id):
+            guard let uuid = UUID(uuidString: id), let record = store.conversation(id: uuid)
+            else {
+                return .refused("no saved conversation with that id")
+            }
+            guard engine.load(record) else {
+                return .refused("a conversation is running; stop it before opening another")
+            }
+            return .state(snapshot())
+
+        case .deleteSavedConversation(let id):
+            guard let uuid = UUID(uuidString: id) else {
+                return .refused("that is not a valid id")
+            }
+            _ = store.delete(id: uuid)
+            return .savedConversations(store.list().map(Self.summary))
+
+        case .newConversation:
+            engine.startNewConversation()
+            return .state(snapshot())
         }
+    }
+
+    private static func summary(_ record: StoredConversation) -> SavedConversationSummary {
+        SavedConversationSummary(
+            id: record.id.uuidString,
+            topic: record.topic,
+            summary: record.summary,
+            replies: record.turns.filter { $0.kind == "chat" }.count,
+            updatedAt: record.updatedAt,
+            startedAt: record.startedAt)
     }
 
     /// Stage an upload and read it.

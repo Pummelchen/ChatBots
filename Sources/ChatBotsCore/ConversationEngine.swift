@@ -164,6 +164,15 @@ public final class ConversationEngine {
     private var eventContinuation: AsyncStream<TurnEvent>.Continuation!
     private var statusContinuation: AsyncStream<RunStatus>.Continuation!
     private var transcriptContinuation: AsyncStream<[Turn]>.Continuation!
+    /// Where the conversation is kept between runs. Set by whoever creates the engine, so the
+    /// engine itself does not decide where files live.
+    public var conversationStore: ConversationStore?
+    /// Identifies this conversation across saves, so growing it updates one record rather than
+    /// adding another every turn.
+    public private(set) var conversationID = UUID()
+    /// When it began, for the record.
+    private var conversationStartedAt = Date.now
+
     /// Everyone watching the log. See `observeTranscript`.
     private var transcriptObservers: [UUID: ([Turn]) -> Void] = [:]
     /// Everyone watching the output. See `observeEvents`.
@@ -1084,6 +1093,50 @@ public final class ConversationEngine {
         transcriptContinuation?.yield(displayTurns)
         let turns = displayTurns
         for observer in transcriptObservers.values { observer(turns) }
+        saveConversation()
+    }
+
+    /// Keep the conversation on disk.
+    ///
+    /// Called whenever the log changes, which is once per turn — often enough that nothing
+    /// meaningful is lost if the app is closed, and rare enough that it is not writing during
+    /// generation. The whole conversation is written each time rather than appended to,
+    /// because a record that can be rewritten is a record that cannot be left half-appended.
+    private func saveConversation() {
+        guard let store = conversationStore, !conversation.turns.isEmpty else { return }
+        let record = StoredConversation(
+            id: conversationID,
+            conversation: conversation,
+            seats: specs,
+            startedAt: conversationStartedAt,
+            endReason: status.isActive ? nil : status.label)
+        _ = store.save(record)
+    }
+
+    /// Replace this conversation with a saved one.
+    ///
+    /// The seats are *not* taken from the record: who is in the room is a current choice, and
+    /// a conversation read from a file should not change it. What comes back is the topic and
+    /// the transcript — the conversation itself.
+    @discardableResult
+    public func load(_ record: StoredConversation) -> Bool {
+        guard !isRunning else { return false }
+        reset()
+        conversation = record.conversation()
+        // A loaded conversation keeps the identity it was saved under, so continuing it
+        // updates that record rather than starting a second one.
+        conversationID = record.id
+        conversationStartedAt = record.startedAt
+        publishTranscript()
+        setStatus(.idle)
+        return true
+    }
+
+    /// Start a new conversation, with a new identity on disk.
+    public func startNewConversation() {
+        reset()
+        conversationID = UUID()
+        conversationStartedAt = .now
     }
 
     /// Watch the shared log.

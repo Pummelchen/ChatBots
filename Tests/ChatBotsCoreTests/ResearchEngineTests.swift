@@ -194,7 +194,12 @@ struct ResearchEngineTests {
         engine.start(topic: "A question")
         await engine.waitUntilFinished()
 
-        let server = APIServer(engine: engine, port: 7799)
+        let server = APIServer(
+            engine: engine,
+            store: ConversationStore(
+                directory: FileManager.default.temporaryDirectory
+                    .appending(path: "research-\(UUID().uuidString)")),
+            port: 7799)
         let snapshot = server.engineService.snapshot()
         #expect(snapshot.research != nil)
         #expect(snapshot.report != nil)

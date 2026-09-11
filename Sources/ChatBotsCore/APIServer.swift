@@ -295,10 +295,12 @@ public final class APIServer {
     private var tokenObserver: UUID?
     private var streams: [HTTPServer.EventStream] = []
 
-    public init(engine: ConversationEngine, port: UInt16 = 7788) {
+    public init(
+        engine: ConversationEngine, store: ConversationStore, port: UInt16 = 7788
+    ) {
         self.engine = engine
         self.port = port
-        self.service = EngineService(engine: engine)
+        self.service = EngineService(engine: engine, store: store)
     }
 
     /// The shared dispatch, so a caller can treat both transports alike.
@@ -428,6 +430,16 @@ public final class APIServer {
         case ("POST", "/api/reset"): return .reset
         case ("POST", "/api/compact"): return .compact
         case ("POST", "/api/attachments/clear"): return .clearAttachments
+        case ("GET", "/api/conversations"): return .listSavedConversations
+        case ("POST", "/api/conversations/new"): return .newConversation
+
+        case ("POST", "/api/conversations/load"):
+            guard let id = request.json(APICommand.self)?.value else { return nil }
+            return .loadSavedConversation(id: id)
+
+        case ("POST", "/api/conversations/delete"):
+            guard let id = request.json(APICommand.self)?.value else { return nil }
+            return .deleteSavedConversation(id: id)
 
         case ("POST", "/api/topic"):
             guard let body = request.json(APICommand.self), let topic = body.topic,
@@ -490,6 +502,8 @@ public final class APIServer {
         case .report(let markdown):
             return HTTPResponse(
                 contentType: "text/markdown; charset=utf-8", body: Data(markdown.utf8))
+        case .savedConversations(let list):
+            return .json(list)
         case .refused(let reason):
             // A refusal is an answer, so it is 409 rather than 500 — the client shows the
             // reason and carries on.

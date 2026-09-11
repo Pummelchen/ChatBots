@@ -632,7 +632,11 @@ if !options.attachments.isEmpty {
     // links the same code, so the server can accept uploads too.
     DocumentIngestorProvider.install(SystemDocumentExtractor.ingestor)
 
-    let server = APIServer(engine: engine, port: UInt16(options.port))
+    let runDirectory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        .appending(path: ".run")
+    let server = APIServer(
+        engine: engine, store: ConversationStore(directory: runDirectory),
+        port: UInt16(options.port))
     do {
         try server.start()
     } catch {

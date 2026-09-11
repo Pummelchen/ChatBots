@@ -42,13 +42,18 @@ private func makeService(personas: [String] = []) -> (EngineService, Conversatio
     configuration.pace = .zero
     let seats = zip(specs, stubs).map { ConversationEngine.Seat(spec: $0, engine: $1) }
     let engine = ConversationEngine(seats: seats, configuration: configuration)
+    // A store per engine, in a directory of its own, so tests cannot see each other's
+    // conversations.
+    let store = ConversationStore(
+        directory: FileManager.default.temporaryDirectory
+            .appending(path: "service-\(UUID().uuidString)"))
     // A topic, because a conversation cannot start without one — and these tests are about
     // what a locked conversation does, so they have to reach a running state first. The
     // first version of this fixture left it blank, so `start` was refused, the conversation
     // never ran, and the "refused because it is locked" assertions passed for the wrong
     // reason: the localisation check happened to match the "please enter a topic" message.
     engine.setTopic("A test topic")
-    return (EngineService(engine: engine), engine)
+    return (EngineService(engine: engine, store: store), engine)
 }
 
 @MainActor

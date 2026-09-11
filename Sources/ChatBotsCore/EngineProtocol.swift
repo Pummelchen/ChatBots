@@ -56,6 +56,13 @@ public enum EngineRequest: Sendable, Hashable, Codable {
     case fetchState
     /// The finished research report, as markdown.
     case fetchReport
+    /// Conversations kept from earlier runs.
+    case listSavedConversations
+    /// Reopen a saved conversation.
+    case loadSavedConversation(id: String)
+    case deleteSavedConversation(id: String)
+    /// Begin a new conversation, with a new record on disk.
+    case newConversation
 
     /// A partial seat change, so the sender says what it means to alter rather than sending a
     /// whole seat back and relying on the receiver to notice what differs.
@@ -97,6 +104,8 @@ public enum EngineReply: Sendable, Codable {
     case state(APISnapshot)
     /// A report, for `fetchReport`.
     case report(String)
+    /// The saved conversations, as a list of summaries.
+    case savedConversations([SavedConversationSummary])
     /// The command was understood and refused. Distinct from a transport failure: "the topic
     /// cannot be changed once the conversation has started" is an answer, not an error.
     case refused(String)
@@ -104,6 +113,31 @@ public enum EngineReply: Sendable, Codable {
     public var snapshot: APISnapshot? {
         if case .state(let snapshot) = self { return snapshot }
         return nil
+    }
+}
+
+/// One kept conversation, as much as a list needs.
+///
+/// A summary rather than the whole record: a list of two hundred conversations should not
+/// carry two hundred transcripts to draw a menu.
+public struct SavedConversationSummary: Sendable, Codable, Identifiable, Hashable {
+    public var id: String
+    public var topic: String
+    public var summary: String
+    public var replies: Int
+    public var updatedAt: Date
+    public var startedAt: Date
+
+    public init(
+        id: String, topic: String, summary: String, replies: Int, updatedAt: Date,
+        startedAt: Date
+    ) {
+        self.id = id
+        self.topic = topic
+        self.summary = summary
+        self.replies = replies
+        self.updatedAt = updatedAt
+        self.startedAt = startedAt
     }
 }
 
