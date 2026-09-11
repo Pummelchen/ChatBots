@@ -48,6 +48,7 @@ public enum TranscriptWriter {
         switch turn.kind {
         case .topic: "MODERATOR — TOPIC"
         case .steering: "MODERATOR"
+        case .direction: "RESEARCH MODERATOR — ASSIGNMENT"
         case .introduction: "SETUP"
         case .summary: "CONDENSED EARLIER DISCUSSION"
         case .report: "RESEARCH MODERATOR — FINAL REPORT"

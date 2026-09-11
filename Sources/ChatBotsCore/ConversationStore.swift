@@ -21,7 +21,13 @@ public struct StoredConversation: Codable, Sendable, Identifiable {
     ///
     /// Present from the first version rather than added later, because a format without one
     /// cannot be identified when it needs to be migrated.
-    public static let currentFormatVersion = 1
+    ///
+    /// Version 2 added `Turn.Kind.direction`. An older build would read such a turn's kind as
+    /// an unknown string and fall back to `.chat`, showing the research moderator's assignment
+    /// as though it were a contribution to the argument — a wrong reading of the transcript
+    /// rather than a crash, which is exactly the kind of difference the version is here to
+    /// catch.
+    public static let currentFormatVersion = 2
 
     public var formatVersion: Int
     public var id: UUID

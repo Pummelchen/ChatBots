@@ -28,7 +28,8 @@ struct UnifiedConversation: View {
         var rows: [ThreadRow] = controller.turns.compactMap { turn in
             switch turn.kind {
             case .introduction, .tool: nil
-            case .topic, .steering, .chat, .summary, .report: ThreadRow(turn: turn)
+            case .topic, .steering, .direction, .chat, .summary, .report:
+                ThreadRow(turn: turn)
             }
         }
         // An actively generating seat gets a row, with whatever it has produced so far.
@@ -232,7 +233,7 @@ struct ThreadMessage: View {
     }
 
     private var isModerator: Bool {
-        turn?.kind == .topic || turn?.kind == .steering
+        turn?.kind == .topic || turn?.kind == .steering || turn?.kind == .direction
     }
 
     /// Seats alternate sides so the eye can follow who is speaking without reading names.

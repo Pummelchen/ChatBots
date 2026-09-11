@@ -24,6 +24,13 @@ public struct Turn: Identifiable, Sendable, Hashable {
         case chat
         /// A mid-conversation instruction typed by the human moderator.
         case steering
+        /// Work assigned by the research moderator — the app's director, not the human.
+        ///
+        /// Its own kind because it must not read as the human speaking: the moderator typing
+        /// "check the capital cost" and the director assigning that check are different acts
+        /// by different authors, and a front end that showed them identically would be
+        /// misreporting who asked.
+        case direction
         /// A tool round-trip summary (always attached to the agent that ran it).
         case tool
         /// A model-written digest that replaced older turns to reclaim context. Authored by

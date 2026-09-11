@@ -254,7 +254,7 @@ extension Turn {
     ///   is preferred because it is exact; otherwise the id is parsed.
     func tint(_ palette: AppPalette, seatIndex: Int? = nil) -> AnyShapeStyle {
         switch kind {
-        case .topic, .steering: AnyShapeStyle(AgentTheme.moderatorTint(palette))
+        case .topic, .steering, .direction: AnyShapeStyle(AgentTheme.moderatorTint(palette))
         case .introduction, .summary: AgentTheme.systemTint(palette)
         case .report: AgentTheme.reportTint(palette)
         case .tool: AnyShapeStyle(AgentTheme.toolTint(palette))
@@ -272,6 +272,7 @@ extension Turn {
         switch kind {
         case .topic: "TOPIC"
         case .steering: "MODERATOR"
+        case .direction: "ASSIGNMENT"
         case .introduction: "SETUP"
         case .summary: "CONDENSED"
         case .report: "REPORT"
@@ -284,6 +285,7 @@ extension Turn {
         switch kind {
         case .topic: "questionmark.bubble.fill"
         case .steering: "person.wave.2.fill"
+        case .direction: "arrow.right.circle.fill"
         case .introduction: "info.circle.fill"
         case .summary: "arrow.triangle.2.circlepath"
         case .report: "doc.text.magnifyingglass"

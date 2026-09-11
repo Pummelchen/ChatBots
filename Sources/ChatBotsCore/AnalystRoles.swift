@@ -101,6 +101,12 @@ public struct AnalystRole: Identifiable, Sendable, Hashable, Codable {
 
 public enum AnalystLibrary {
 
+    /// The moderator's identifier.
+    ///
+    /// Public because more than one place has to recognise the role by it, and two copies of a
+    /// string literal is how they end up disagreeing.
+    public static let moderatorID = "research-moderator"
+
     // MARK: - Evidence & method
 
     private static let principal = AnalystRole(

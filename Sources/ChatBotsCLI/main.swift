@@ -754,6 +754,7 @@ let transcriptTask = Task {
             case .topic: label = "MODERATOR · TOPIC"
             case .introduction: label = "SETUP"
             case .steering: label = "MODERATOR"
+            case .direction: label = "RESEARCH MODERATOR — ASSIGNMENT"
             case .tool: label = "TOOL"
             case .summary: label = "CONDENSED EARLIER DISCUSSION"
             case .report: label = "RESEARCH MODERATOR — FINAL REPORT"

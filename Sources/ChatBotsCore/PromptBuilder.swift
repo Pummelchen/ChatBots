@@ -103,6 +103,11 @@ public enum PromptBuilder {
             return "[Moderator — topic]"
         case .steering:
             return "[Moderator]"
+        case .direction:
+            // The research moderator, not the human. Named the same way the final report is,
+            // so the two things the moderator authors read as one voice — the app's — and the
+            // human's own interjections stay visibly theirs.
+            return "[Research Moderator]"
         case .introduction:
             return "[System]"
         case .summary:
@@ -341,7 +346,8 @@ public enum PromptBuilder {
         var log = conversation.dialogueTurns
             .filter {
                 $0.kind == .topic || $0.kind == .introduction || $0.kind == .chat
-                    || $0.kind == .steering || $0.kind == .summary || $0.kind == .report
+                    || $0.kind == .steering || $0.kind == .direction || $0.kind == .summary
+                    || $0.kind == .report
             }
             .map { body(for: $0) }
             .joined(separator: "\n\n")

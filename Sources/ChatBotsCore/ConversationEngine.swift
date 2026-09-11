@@ -564,6 +564,47 @@ public final class ConversationEngine {
 
     // MARK: - Turn loop
 
+    /// Who speaks next.
+    ///
+    /// Entertainment rotates, and rotation is the right answer there: a show where the app
+    /// decides who is worth hearing is a show being edited. Research does not rotate. The
+    /// moderator has a job — deciding what the investigation still owes and who is equipped to
+    /// supply it — and a rotation means a question needing the Statistician hears from whoever
+    /// is next instead, which is how a session spends its budget and still does not answer.
+    ///
+    /// The direction is logged as its own kind of turn, so it reaches the seat in the prompt
+    /// *and* is visible in the transcript. A decision that steers the conversation but is
+    /// invisible in the record would make the investigation impossible to review afterwards.
+    private func nextSeat() -> Seat {
+        let rotation = seats[seatCursor % seats.count]
+        guard conversation.research != nil else { return rotation }
+
+        let direction = ResearchReading.read(seats: specs, turns: conversation.turns).direction()
+        guard
+            let seatID = direction.seatID,
+            let directed = seats.first(where: { $0.spec.id == seatID })
+        else {
+            // Nothing outstanding. Saying so is the honest answer, and it is worth a line:
+            // otherwise "the moderator had nothing to direct" and "the moderator is not
+            // implemented" look identical from the outside.
+            note("Research Moderator: \(direction.reason).")
+            return rotation
+        }
+
+        note("Research Moderator → \(directed.spec.displayName): \(direction.reason).")
+        conversation.turns.append(
+            Turn(
+                sequence: nextSequence(),
+                speakerID: nil,
+                speakerName: "Research Moderator",
+                kind: .direction,
+                content: direction.instruction
+            )
+        )
+        publishTranscript()
+        return directed
+    }
+
     /// Write the report that ends a research session.
     ///
     /// The **moderator** writes it, because that is what the role is for: it has read every
@@ -575,10 +616,10 @@ public final class ConversationEngine {
         guard let session = conversation.research else { return }
 
         let moderator =
-            seats.first { $0.spec.personaID == "research-moderator" }
+            seats.first { $0.spec.personaID == AnalystLibrary.moderatorID }
             ?? seats.first
         guard let moderator else { return }
-        if moderator.spec.personaID != "research-moderator" {
+        if moderator.spec.personaID != AnalystLibrary.moderatorID {
             note("No Research Moderator among the seats, so \(moderator.spec.displayName) is writing the report.")
         }
 
@@ -669,7 +710,7 @@ public final class ConversationEngine {
                 break
             }
 
-            let seat = seats[seatCursor % seats.count]
+            let seat = nextSeat()
             setStatus(.running(turn: turnsCompleted + 1))
             await runTurn(seat: seat)
             if Task.isCancelled { break }

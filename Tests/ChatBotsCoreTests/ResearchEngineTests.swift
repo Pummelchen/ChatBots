@@ -177,7 +177,7 @@ struct ResearchEngineTests {
         engine.start(topic: "A question")
         await engine.waitUntilFinished()
 
-        let moderator = await stubs.first { $0.spec.personaID == "research-moderator" }
+        let moderator = await stubs.first { $0.spec.personaID == AnalystLibrary.moderatorID }
         let prompts = await moderator?.prompts ?? []
         #expect(prompts.contains { $0.contains("your job now is to write the report") })
         #expect(prompts.contains { $0.contains("not adding to it") })

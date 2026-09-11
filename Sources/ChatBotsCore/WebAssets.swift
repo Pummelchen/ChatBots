@@ -602,7 +602,7 @@ body[data-layout="thread"] #thread { display: flex; }
 
 @keyframes fade { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; } }
 
-.msg[data-kind="topic"], .msg[data-kind="steering"] { border-left-color: var(--mod); }
+.msg[data-kind="topic"], .msg[data-kind="steering"], .msg[data-kind="direction"] { border-left-color: var(--mod); }
 .msg[data-kind="summary"] { border-left-color: var(--text-faint); font-style: italic; }
 .msg[data-kind="tool"] { border-left-color: var(--line); background: transparent; }
 .msg[data-seat="0"] { border-left-color: var(--seat-a); }
@@ -619,7 +619,7 @@ body[data-layout="thread"] #thread { display: flex; }
 .msg-who { font-size: var(--font-small); font-weight: 700; letter-spacing: 0.02em; }
 .msg[data-seat="0"] .msg-who { color: var(--seat-a); }
 .msg[data-seat="1"] .msg-who { color: var(--seat-b); }
-.msg[data-kind="topic"] .msg-who, .msg[data-kind="steering"] .msg-who { color: var(--mod); }
+.msg[data-kind="topic"] .msg-who, .msg[data-kind="steering"] .msg-who, .msg[data-kind="direction"] .msg-who { color: var(--mod); }
 .msg-time { font-size: var(--font-tiny); color: var(--text-faint); font-family: ui-monospace, Menlo, monospace; }
 .msg-body { white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg-body p { margin: 0 0 0.6em; }
@@ -1211,6 +1211,7 @@ body[data-view="phone"] {
     switch (message.kind) {
       case "topic": return "MODERATOR · TOPIC";
       case "steering": return "MODERATOR";
+      case "direction": return "RESEARCH MODERATOR · ASSIGNMENT";
       case "summary": return "CONDENSED EARLIER DISCUSSION";
       case "tool": return "TOOL";
       default: return String(message.speaker || "?").toUpperCase();
@@ -1317,7 +1318,7 @@ body[data-view="phone"] {
     for (const message of state.snapshot.messages) {
       const seat = seatIndexOf(message);
       const shared = message.kind === "steering" || message.kind === "topic" ||
-                     message.kind === "summary";
+                     message.kind === "summary" || message.kind === "direction";
 
       // The single-column view holds everything once.
       if (inThread) {

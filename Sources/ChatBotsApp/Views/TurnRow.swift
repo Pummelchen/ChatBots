@@ -27,7 +27,7 @@ struct TurnRow: View {
     /// borders. The setup row is deliberately neutral, hence the fallback.
     private var wash: Color {
         switch turn.kind {
-        case .topic, .steering: AgentTheme.moderatorTint(palette)
+        case .topic, .steering, .direction: AgentTheme.moderatorTint(palette)
         case .introduction, .summary, .report: palette.isBlack ? Color(white: 0.16) : Color.secondary
         case .tool: AgentTheme.toolTint(palette)
         case .chat:
