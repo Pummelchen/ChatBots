@@ -82,6 +82,8 @@ public enum WebAssets {
     <span id="status" class="pill">Idle</span>
     <span id="counts" class="note"></span>
     <span class="personas" id="persona-summary"></span>
+    <span class="note" id="audience" hidden></span>
+    <button id="votes-clear" class="small" hidden title="Forget every vote">Clear votes</button>
     <div class="spacer"></div>
     <label class="toggle" title="Stream the models' thinking into the panes">
       <input id="thinking" type="checkbox" checked> <span class="toggle-text">Show thinking</span>
@@ -653,6 +655,28 @@ body[data-layout="thread"] #thread { display: flex; }
 .msg-body p { margin: 0 0 0.6em; }
 .msg-body p:last-child { margin-bottom: 0; }
 .msg-body code { font-family: ui-monospace, Menlo, monospace; font-size: 0.92em; background: var(--bg-sunken); padding: 0 4px; border-radius: 4px; }
+
+.vote-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 5px;
+  opacity: 0.45;
+  transition: opacity 120ms ease;
+}
+.msg:hover .vote-row, .vote-row:focus-within { opacity: 1; }
+.vote {
+  padding: 1px 7px;
+  font-size: var(--font-tiny);
+  line-height: 1.5;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.vote:hover { color: var(--text); border-color: var(--text-faint); }
+/* The cast verdict stays visible without hover, so a scorecard can be read off the transcript. */
+.vote[data-on="1"] { color: var(--text); border-color: var(--seat-a); background: var(--bg-sunken); }
 
 .msg.live { opacity: 0.96; }
 .msg .thinking {
@@ -1269,6 +1293,25 @@ body[data-view="phone"] {
   const rendered = new Map();
   const threadCopy = new Map();
 
+  /**
+   * Mark the verdicts on the messages already drawn.
+   *
+   * A vote changes only the two buttons inside one message, and a turn is drawn once — so
+   * rebuilding the transcript to show it would throw away the scroll position and any output
+   * still arriving. The buttons are updated where they are instead.
+   */
+  function drawVotes() {
+    for (const el of document.querySelectorAll(".msg[data-id]")) {
+      const cast = voteFor(el.dataset.id);
+      for (const button of el.querySelectorAll(".vote")) {
+        const isStrong = button.getAttribute("aria-label") === "Moved it forward";
+        const on = cast && ((isStrong && cast === "strong") || (!isStrong && cast === "weak"));
+        if (on) button.dataset.on = "1";
+        else delete button.dataset.on;
+      }
+    }
+  }
+
   function seatIndexOf(message) {
     if (!state.snapshot) return -1;
     return state.snapshot.seats.findIndex(
@@ -1327,7 +1370,57 @@ body[data-view="phone"] {
     body.innerHTML = bodyHTML(message.text || "");
 
     el.append(head, body);
+    // Only a contribution can be scored. A vote on the topic or on the moderator's own
+    // assignment would be a judgement of something nobody argued.
+    if (message.kind === "chat") el.append(voteRow(message));
     return el;
+  }
+
+  /** The audience's verdict on one contribution. */
+  function voteRow(message) {
+    const row = document.createElement("div");
+    row.className = "vote-row";
+    const cast = voteFor(message.id);
+    for (const [verdict, title] of [
+      ["strong", "Moved it forward"],
+      ["weak", "Did not hold up"],
+    ]) {
+      const button = document.createElement("button");
+      button.className = "vote";
+      button.textContent = verdict === "strong" ? "▲" : "▼";
+      button.title = title;
+      button.setAttribute("aria-label", title);
+      if (cast === verdict) button.dataset.on = "1";
+      button.onclick = () => {
+        // Clicking the verdict already cast withdraws it, so a mis-click does not have to be
+        // reversed by casting its opposite — which would leave a wrong judgement in the record.
+        const next = cast === verdict ? null : verdict;
+        run(() => api.post("/api/vote", { id: message.id, verdict: next }));
+      };
+      row.append(button);
+    }
+    return row;
+  }
+
+  function voteFor(turnID) {
+    if (!state.snapshot || !state.snapshot.votes) return null;
+    const found = state.snapshot.votes.find((v) => v.turnID === turnID);
+    return found ? found.verdict : null;
+  }
+
+  /** The scorecard, in the status row. */
+  function drawAudience() {
+    const el = $("audience");
+    const entries = (state.snapshot && state.snapshot.audience) || [];
+    if (!entries.length) {
+      el.textContent = "";
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    el.textContent = "Audience: " + entries
+      .map((entry) => `${entry.name} ${entry.score > 0 ? "+" : ""}${entry.score}`)
+      .join(" · ");
   }
 
   /**
@@ -1541,6 +1634,7 @@ body[data-view="phone"] {
     }
     if (first) $("topic").value = next.topic || "";
     drawMessages();
+    drawVotes();
     drawLive();
     drawControls();
     drawSeats();
@@ -1561,6 +1655,8 @@ body[data-view="phone"] {
     $("stop").disabled = !running;
     $("clear").disabled = s.messages.length === 0 && !running;
     $("save").disabled = s.messages.length === 0;
+    drawAudience();
+    $("votes-clear").hidden = !s.votes || s.votes.length === 0;
     $("condense").disabled = s.messages.length === 0;
     $("send").disabled = !running;
     $("topic").disabled = s.messages.length > 0;
@@ -2043,6 +2139,7 @@ body[data-view="phone"] {
       }
     });
 
+    $("votes-clear").onclick = () => run(() => api.post("/api/votes/clear"));
     $("save").onclick = save;
     $("attach").onclick = () => $("files").click();
     $("files").onchange = (event) => addFiles([...event.target.files]);

@@ -17,6 +17,7 @@ import SwiftUI
 struct TurnRow: View {
     @EnvironmentObject private var zoom: ZoomStore
     @Environment(\.themePalette) private var palette
+    @ObservedObject var controller: ChatController
     let turn: Turn
     /// The speaker's seat position, when known; the id is parsed as a fallback.
     let seatIndex: Int?
@@ -72,6 +73,8 @@ struct TurnRow: View {
                     .scaledFont(size: 12.5, design: .default)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
+
+                VoteButtons(controller: controller, turn: turn)
 
                 if let detail = turn.toolDetail, !detail.isEmpty {
                     Text(detail)

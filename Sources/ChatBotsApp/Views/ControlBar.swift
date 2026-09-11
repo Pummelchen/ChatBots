@@ -53,6 +53,7 @@ struct ControlBar: View {
 
             HStack(spacing: 10) {
                 statusPill
+                audiencePill
 
                 // Before the conversation starts, show what the two seats are configured
                 // as. Afterwards the per-pane controls carry it and this would be noise.
@@ -262,6 +263,11 @@ struct ControlBar: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
         .background(palette.raised, in: Capsule())
+    }
+
+    /// The audience's scorecard, once anyone has voted.
+    private var audiencePill: some View {
+        AudienceScorecardView(controller: controller)
     }
 
     /// The mode picker writes through to the engine, which owns the answer.

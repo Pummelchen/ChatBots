@@ -113,6 +113,7 @@ struct UnifiedConversation: View {
                 ForEach(rows) { row in
                     if let turn = row.turn {
                         ThreadMessage(
+                                controller: controller,
                                 turn: turn,
                                 isPending: controller.pendingSteeringIDs.contains(turn.id),
                                 isOwn: false,
@@ -124,6 +125,7 @@ struct UnifiedConversation: View {
                         )
                     } else if let pane = row.live {
                         ThreadMessage(
+                            controller: controller,
                             turn: nil,
                             isPending: false,
                             isOwn: false,
@@ -216,6 +218,7 @@ struct ThreadRow: Identifiable {
 /// the model did.
 struct ThreadMessage: View {
     @Environment(\.themePalette) private var palette
+    @ObservedObject var controller: ChatController
     let turn: Turn?
     let isPending: Bool
     let isOwn: Bool
@@ -266,6 +269,7 @@ struct ThreadMessage: View {
                     .frame(maxWidth: 620, alignment: .leading)
             }
             bubble
+            if let turn { VoteButtons(controller: controller, turn: turn) }
         }
         .frame(maxWidth: .infinity, alignment: frameAlignment)
     }

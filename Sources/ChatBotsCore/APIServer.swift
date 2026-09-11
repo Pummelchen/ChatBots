@@ -94,6 +94,10 @@ public struct APISnapshot: Codable, Sendable {
     /// The research session, when there is one. Nil in entertainment, where there is no
     /// budget and no end condition on purpose.
     public var research: ResearchStatus?
+    /// The audience's votes, one per contribution.
+    public var votes: [Vote]
+    /// The scorecard, best first.
+    public var audience: [AudienceEntry]
     /// The finished report, when the session produced one.
     public var report: ReportSummary?
 
@@ -131,6 +135,22 @@ public struct APISnapshot: Codable, Sendable {
         public var statusLine: String
         public var isFinished: Bool
         public var stopReason: String?
+    }
+
+    /// One contribution's verdict, for a front end marking up the transcript.
+    public struct Vote: Codable, Sendable, Hashable {
+        public var turnID: String
+        public var seatID: String
+        public var verdict: String
+    }
+
+    /// How one seat stands with the audience.
+    public struct AudienceEntry: Codable, Sendable, Hashable {
+        public var seatID: String
+        public var name: String
+        public var strong: Int
+        public var weak: Int
+        public var score: Int
     }
 
     public struct ReportSummary: Codable, Sendable {
@@ -283,6 +303,8 @@ public struct APICommand: Codable, Sendable {
     public var id: String?
     /// A seed for a random line-up, when the caller wants a particular draw rather than any.
     public var seed: UInt64?
+    /// The audience's verdict: "strong" or "weak". Absent withdraws the vote.
+    public var verdict: String?
 }
 
 /// Serves the engine over HTTP.
@@ -504,6 +526,17 @@ public final class APIServer {
         case ("POST", "/api/scenario"):
             guard let id = request.json(APICommand.self)?.id else { return nil }
             return .applyScenario(id: id)
+
+        case ("POST", "/api/vote"):
+            guard let body = request.json(APICommand.self), let turnID = body.id else { return nil }
+            // No verdict withdraws the vote, so a mis-click does not have to be reversed by
+            // clicking the opposite button — which would leave a wrong judgement in the record.
+            return .castVote(
+                turnID: turnID,
+                verdict: body.verdict.flatMap(AudienceVote.Verdict.init(rawValue:)))
+
+        case ("POST", "/api/votes/clear"):
+            return .clearVotes
 
         case ("POST", "/api/research/budget"):
             guard let raw = request.json(APICommand.self)?.value,

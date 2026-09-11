@@ -159,6 +159,20 @@ public final class EngineService {
         case .applyScenario(let id):
             return applyScenario(id: id)
 
+        // ── The audience ─────────────────────────────────────────────────────────────
+        case .castVote(let turnID, let verdict):
+            guard let uuid = UUID(uuidString: turnID) else {
+                return .refused("that is not a valid message id")
+            }
+            guard engine.castVote(turnID: uuid, verdict: verdict) else {
+                return .refused("there is no contribution with that id to score")
+            }
+            return .state(snapshot())
+
+        case .clearVotes:
+            engine.clearVotes()
+            return .state(snapshot())
+
         // ── Saved conversations ──────────────────────────────────────────────────────
         case .listSavedConversations:
             return .savedConversations(store.list().map(Self.summary))
@@ -379,6 +393,17 @@ public final class EngineService {
             },
             serverTime: .now,
             research: engine.researchStatus(),
+            votes: engine.conversation.votes.map { vote in
+                APISnapshot.Vote(
+                    turnID: vote.turnID.uuidString, seatID: vote.seatID,
+                    verdict: vote.verdict.rawValue)
+            },
+            audience: engine.audience.scores.map { entry in
+                APISnapshot.AudienceEntry(
+                    seatID: entry.seatID,
+                    name: engine.specs.first { $0.id == entry.seatID }?.displayName ?? entry.seatID,
+                    strong: entry.strong, weak: entry.weak, score: entry.score)
+            },
             report: engine.researchReport().map { report in
                 APISnapshot.ReportSummary(
                     question: report.question,

@@ -97,6 +97,13 @@ public struct Conversation: Sendable {
     /// The report a finished research session produced, kept so the interface can show it and
     /// the export can include it.
     public var report: ResearchReport?
+    /// The audience's verdict on individual contributions.
+    ///
+    /// Beside the conversation rather than in it, and deliberately: a vote is never sent to a
+    /// model and never enters a prompt. Putting the audience's opinion of one seat into a
+    /// shared log would let it shape another seat's next turn, which is the one thing the
+    /// shared log exists to prevent.
+    public var votes: [AudienceVote] = []
 
     public init(
         topic: String,
@@ -104,7 +111,8 @@ public struct Conversation: Sendable {
         attachments: [AttachedDocument] = [],
         conflict: ConflictState = ConflictState(),
         research: ResearchSession? = nil,
-        report: ResearchReport? = nil
+        report: ResearchReport? = nil,
+        votes: [AudienceVote] = []
     ) {
         self.topic = topic
         self.turns = turns
@@ -112,6 +120,13 @@ public struct Conversation: Sendable {
         self.conflict = conflict
         self.research = research
         self.report = report
+        self.votes = votes
+    }
+
+    /// The audience's votes, as a scorecard.
+    public var audience: AudienceScorecard {
+        get { AudienceScorecard(votes: votes) }
+        set { votes = newValue.votes }
     }
 
     /// Turns that an LLM should actually read: history and opening brief, but not

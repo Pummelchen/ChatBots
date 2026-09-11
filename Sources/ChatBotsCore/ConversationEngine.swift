@@ -512,9 +512,24 @@ public final class ConversationEngine {
     }
 
 
+    /// Forget the conversation, keeping the configuration.
+    ///
+    /// The rule is what a conversation *accumulated* goes and what the moderator *chose* stays:
+    /// the topic, the seats and the attachments are settings, and the transcript, the social
+    /// state, the investigation's budget, its report and the audience's votes all belong to the
+    /// conversation being cleared.
+    ///
+    /// Getting this wrong was not cosmetic. `research` surviving a reset meant a finished
+    /// investigation kept its latched stop reason, so **Clear then Start did nothing at all**:
+    /// the new run found a session that was already finished and wrote a second report without
+    /// a single turn. A stale report also stayed on screen over an empty transcript.
     public func reset() {
         stop()
         conversation.turns = []
+        conversation.conflict = ConflictState()
+        conversation.research = nil
+        conversation.report = nil
+        conversation.votes = []
         queuedSteering = []
         notices = []
         noticeContinuation?.yield([])
@@ -1189,6 +1204,40 @@ public final class ConversationEngine {
         setStatus(.idle)
         return true
     }
+
+    // MARK: - The audience
+
+    /// Cast, change or withdraw the audience's verdict on one contribution.
+    ///
+    /// Returns false for a turn that is not a contribution: voting on the topic, on a tool
+    /// result or on the moderator's own assignment would put a score against something nobody
+    /// argued, and the scorecard is meant to be a judgement of the argument.
+    @discardableResult
+    public func castVote(turnID: UUID, verdict: AudienceVote.Verdict?) -> Bool {
+        guard let turn = conversation.turns.first(where: { $0.id == turnID }),
+            turn.kind == .chat, let seatID = turn.speakerID
+        else { return false }
+        if let verdict {
+            conversation.audience.cast(verdict, for: turnID, seatID: seatID)
+        } else {
+            conversation.audience.withdraw(turnID: turnID)
+        }
+        // Written immediately rather than at the next turn: a vote is the audience's work, and
+        // losing it because the window was closed before the next contribution would be the
+        // same class of loss as losing the transcript.
+        saveConversation()
+        publishTranscript()
+        return true
+    }
+
+    public func clearVotes() {
+        conversation.audience.clear()
+        saveConversation()
+        publishTranscript()
+    }
+
+    /// The audience's scorecard.
+    public var audience: AudienceScorecard { conversation.audience }
 
     /// Start a new conversation, with a new identity on disk.
     public func startNewConversation() {

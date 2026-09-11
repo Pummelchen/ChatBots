@@ -27,7 +27,11 @@ public struct StoredConversation: Codable, Sendable, Identifiable {
     /// as though it were a contribution to the argument — a wrong reading of the transcript
     /// rather than a crash, which is exactly the kind of difference the version is here to
     /// catch.
-    public static let currentFormatVersion = 2
+    ///
+    /// Version 3 added the report, the research session and the audience's votes. An older
+    /// build would reopen a finished investigation without its report — losing the deliverable
+    /// and keeping the argument, which is the worst half to be left with.
+    public static let currentFormatVersion = 3
 
     public var formatVersion: Int
     public var id: UUID
@@ -39,6 +43,17 @@ public struct StoredConversation: Codable, Sendable, Identifiable {
     public var turns: [StoredTurn]
     /// Why the conversation ended, when it did.
     public var endReason: String?
+    /// The deliverable of a research session.
+    ///
+    /// Optional so a record written before this existed still decodes: a missing key for an
+    /// optional property is nil rather than an error, and a decode failure here would make the
+    /// whole file unreadable and cost every conversation in it.
+    public var report: ResearchReport?
+    /// A research session's budget and progress, so a reopened investigation carries on with
+    /// the same accounting rather than starting its clock again.
+    public var research: ResearchSession?
+    /// The audience's verdict on individual contributions.
+    public var votes: [AudienceVote]?
 
     public struct StoredSeat: Codable, Sendable, Hashable {
         public var id: String
@@ -207,6 +222,9 @@ extension StoredConversation {
         self.startedAt = startedAt
         self.updatedAt = .now
         self.endReason = endReason
+        self.report = conversation.report
+        self.research = conversation.research
+        self.votes = conversation.votes.isEmpty ? nil : conversation.votes
         self.seats = seats.map { spec in
             StoredSeat(
                 id: spec.id, name: spec.displayName, personaID: spec.personaID,
@@ -241,6 +259,8 @@ extension StoredConversation {
     }
 
     public func conversation() -> Conversation {
-        Conversation(topic: topic, turns: turns_)
+        Conversation(
+            topic: topic, turns: turns_, research: research, report: report,
+            votes: votes ?? [])
     }
 }

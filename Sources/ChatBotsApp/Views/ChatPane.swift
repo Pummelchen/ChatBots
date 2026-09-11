@@ -68,6 +68,7 @@ struct ChatPane: View {
             LazyVStack(alignment: .leading, spacing: 8) {
                 ForEach(turns) { turn in
                     TurnRow(
+                        controller: controller,
                         turn: turn,
                         seatIndex: controller.seatIndex(forSpeaker: turn.speakerID),
                         isOwn: controller.seatIndex(forSpeaker: turn.speakerID) == pane.seatIndex,

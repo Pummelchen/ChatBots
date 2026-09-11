@@ -152,6 +152,10 @@ public final class ChatController: ObservableObject {
     /// The line-ups and scenarios the engine ships, for the picker.
     @Published public private(set) var rosters: [Roster] = []
     @Published public private(set) var scenarios: [Scenario] = []
+    /// The audience's verdicts, by contribution id, and the scorecard. Both come from the
+    /// engine so the app and the browser cannot show different scores.
+    @Published public private(set) var votes: [String: String] = [:]
+    @Published public private(set) var audience: [APISnapshot.AudienceEntry] = []
 
     public let panes: [AgentPaneState]
 
@@ -371,6 +375,9 @@ public final class ChatController: ObservableObject {
         mode = DiscussionMode(rawValue: snapshot.mode) ?? mode
         research = snapshot.research
         report = snapshot.report
+        votes = Dictionary(
+            snapshot.votes.map { ($0.turnID, $0.verdict) }, uniquingKeysWith: { first, _ in first })
+        audience = snapshot.audience
 
         // Seat settings are the engine's, so a change made in another front end appears here.
         for (index, seat) in snapshot.seats.enumerated() where index < panes.count {
@@ -1155,6 +1162,35 @@ public final class ChatController: ObservableObject {
 
     /// Whether who is in the room, and what they are asked, can still be changed.
     public var canChangeLineup: Bool { !isRunning }
+
+    // MARK: - The audience
+
+    /// Score one contribution, or withdraw the score by passing the same verdict again.
+    ///
+    /// Voting twice with the same verdict clears it rather than re-casting, so a mis-click is
+    /// undone by clicking the same button — reversing it by casting the opposite would leave a
+    /// judgement in the record that nobody made.
+    public func castVote(turnID: String, verdict: AudienceVote.Verdict) {
+        errorBanner = nil
+        let next: AudienceVote.Verdict? = votes[turnID] == verdict.rawValue ? nil : verdict
+        run { client in
+            let reply = try await client.send(.castVote(turnID: turnID, verdict: next))
+            if let reason = reply.refusal { await MainActor.run { self.errorBanner = reason } }
+        }
+    }
+
+    /// What the audience decided about one contribution, if anything.
+    public func vote(for turnID: UUID) -> AudienceVote.Verdict? {
+        votes[turnID.uuidString].flatMap(AudienceVote.Verdict.init(rawValue:))
+    }
+
+    public func clearVotes() {
+        errorBanner = nil
+        run { client in
+            let reply = try await client.send(.clearVotes)
+            if let reason = reply.refusal { await MainActor.run { self.errorBanner = reason } }
+        }
+    }
 
     /// Save the report the engine produced, as markdown.
     @discardableResult
