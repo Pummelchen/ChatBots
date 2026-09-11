@@ -902,6 +902,79 @@ conversation, and no way for two requests to interleave inside a turn.
 always consistent beats a set of deltas that can drift. The events feed exists so a client
 does not have to poll while a model is talking.
 
+### The web interface on phones and tablets
+
+The interface is mobile first, because that is where the layout is hardest. A phone gets one
+column — a WhatsApp-shaped single conversation — and the two-pane view is a privilege of a
+wide screen rather than the default.
+
+```
+bash tools/start.sh                 # then open http://localhost:7788 on the phone
+```
+
+**It adapts on its own, and can be overridden.** The header carries an **Auto / Phone /
+Desktop** switch: Auto follows the detected device, and choosing one of the others is
+remembered so a reload does not undo it. `?view=phone|desktop|auto` forces a mode for a
+single load, which is what makes a capture reproducible.
+
+Three things drive the responsive behaviour, in this order:
+
+1. **`data-device` on `<body>`** — phone, tablet or desktop, derived from the live viewport.
+   An attribute rather than a media query alone, because a media query cannot express "the
+   user asked for the desktop layout on a phone".
+2. **`--vh` and `--vw` from `window.visualViewport`** — on iOS `100vh` is the height
+   *without* the browser chrome, so a full-height phone layout built on `vh` sits under the
+   address bar. `--vh` is the height actually visible.
+3. **Safe-area insets**, so a notch or home indicator does not land on the text.
+
+An unknown device is not a problem. The layout branches on **width**, and the profile list
+exists so that every width in use can be *verified* rather than assumed: a device not in the
+list still gets the right shape from the breakpoints, and the resolver reports it as unknown
+rather than guessing.
+
+#### Known screen profiles
+
+| Range | Count | Notes |
+| --- | --- | --- |
+| iPhone 12 → 16 Pro, plus SE | 15 | from 2020; the 375-point mini is the narrowest modern iPhone |
+| Samsung Galaxy, A-series → S24 Ultra, Z Flip, Note 20 | 14 | entry level to flagship, last five years; **360-point A-series is the narrowest thing in use** |
+| iPad, 2018 → 2025 | 10 | including the 744-point mini and both Pro sizes |
+| Top Android tablets | 6 | Galaxy Tab S6 Lite → S9 Ultra, Pixel Tablet |
+
+Viewports are **CSS points, not marketing resolutions** — an iPhone 12 is sold as 1170×2532
+and reports 390×844 at 3×. Confusing the two is the usual reason a mobile layout is tested at
+the wrong width, and it is asserted in the tests.
+
+#### Verifying it, offscreen
+
+```
+python3 tools/capture-devices.py                 # all 45 profiles
+python3 tools/capture-devices.py --common        # one per distinct shape
+python3 tools/capture-devices.py --id galaxy-a13 # a single device
+python3 tools/capture-devices.py --include-landscape
+```
+
+Captures go to `captures/` with an `index.html` that tiles them for comparison. Nothing
+appears on the desktop: Chrome runs headless and writes straight to a file.
+
+**The harness fails on horizontal overflow**, and that is the point of it. A capture that
+merely looks right is weak evidence, so after each screenshot the harness asks the page what
+it measured — `scrollWidth` against the viewport, and the selectors of any element wider than
+the screen — and exits non-zero if anything overflowed. All 45 profiles currently report none.
+
+It uses the DevTools protocol (`tools/cdp.py`, a small hand-written WebSocket client) rather
+than Chrome's command-line screenshot flags, and the reason is worth recording: `--window-size`
+is in *physical* pixels and `--force-device-scale-factor` multiplies the CSS viewport as well
+as the output, so the two cannot be set independently. Asking for a 390-point iPhone at 3×
+produced a **1170-point layout** — the page believed it was on a desktop — and the resulting
+screenshot clipped the right-hand third. It looked plausible, and only the layout report
+revealed it. `Emulation.setDeviceMetricsOverride` sets a CSS width, a CSS height and a device
+scale factor independently, which is what a real phone reports.
+
+Two layout bugs were found this way and fixed: the header overflowed a 360-point screen
+because a flex row will not shrink below its content, and the footer clipped its message box
+because a long placeholder plus two buttons does not fit 360 points.
+
 ### The web interface
 
 ```

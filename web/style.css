@@ -1,9 +1,22 @@
 /* ChatBots — the web interface
  *
- * Two requirements shape this: it must be usable from a phone to a large desktop display,
- * and it must not look like a web page pretending to be an app. So it fills the viewport,
- * scrolls only inside the transcripts, and sizes everything from one root scale that the
- * media queries adjust — the same idea as the text-size setting in the SwiftUI app.
+ * Mobile first, because that is where the layout is hardest. The phone case has to fit a
+ * conversation, a topic field and a message box into about 360 by 780 points without the
+ * keyboard eating the transcript, and everything a desktop needs is a relaxation of that
+ * rather than the other way round.
+ *
+ * Three things drive the responsive behaviour, in this order:
+ *
+ *   1. `data-device` on <body> — phone, tablet or desktop — set from the live viewport.
+ *      A user override replaces the detected value, which is why it is an attribute rather
+ *      than a media query alone: CSS media queries cannot be overridden from a setting.
+ *   2. `--vw` and `--vh` custom properties, written from `window.visualViewport`. On iOS
+ *      `100vh` is the height *without* the browser chrome, so a full-height phone layout
+ *      built on `vh` is covered by the address bar. `--vh` is the real visible height.
+ *   3. Safe-area insets, so a notch or a home indicator does not sit on top of the text.
+ *
+ * The two-pane view is a *privilege* of a wide screen, not the default: below the tablet
+ * breakpoint the interface is one column, which is the WhatsApp shape.
  */
 
 :root {
@@ -20,10 +33,20 @@
   --mod: #ffc44d;
   --danger: #ff6b6b;
   --radius: 10px;
+  /* Minimum comfortable touch target. Apple asks for 44pt, Google for 48dp; 44 CSS px
+     satisfies both in practice and is what the buttons below are built to. */
+  --tap: 44px;
   --pad: calc(12px * var(--scale));
   --font: calc(13.5px * var(--scale));
   --font-small: calc(11px * var(--scale));
   --font-tiny: calc(10px * var(--scale));
+  /* Fallbacks for the first paint, before app.js has measured anything. */
+  --vw: 100vw;
+  --vh: 100vh;
+  --safe-top: 0px;
+  --safe-bottom: 0px;
+  --safe-left: 0px;
+  --safe-right: 0px;
 }
 
 @media (prefers-color-scheme: light) {
@@ -38,13 +61,13 @@
   }
 }
 
-/* Roomier text on a phone, more of it on a tablet, and a comfortable measure on a desktop.
-   The transcripts are the point, so they get the space rather than the furniture. */
+/* Text scales with the screen rather than the device name: a 360-point Android entry model
+   and a 360-point flagship have the same room and should not look different. */
 @media (min-width: 700px)  { :root { --scale: 1; } }
 @media (min-width: 1100px) { :root { --scale: 1.05; } }
 @media (min-width: 1700px) { :root { --scale: 1.15; } }
-@media (max-width: 560px)  { :root { --scale: 0.95; } }
-@media (max-height: 560px) { :root { --scale: 0.9; } }
+@media (max-width: 390px)  { :root { --scale: 0.95; } }
+@media (max-width: 340px)  { :root { --scale: 0.9; } }
 
 * { box-sizing: border-box; }
 
@@ -54,13 +77,25 @@ html, body {
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
-  font: var(--font)/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font: var(--font)/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+        system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  /* Stops iOS from inflating text in landscape, which breaks a carefully fitted layout. */
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   display: flex;
   flex-direction: column;
+  /* The real visible height, not 100vh. */
+  height: var(--vh);
+  /* Nothing on the page is wider than the screen; if something is, the transcript scrolls
+     inside its own container rather than the whole interface sliding sideways. This is a
+     guard, not the fix — the rows below wrap so it should never trigger. */
+  overflow-x: hidden;
+  max-width: var(--vw);
+  /* A phone is used with a thumb: taps should not select text or show a blue flash. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* ── Controls ─────────────────────────────────────────────────────────────────────── */
@@ -69,7 +104,7 @@ body {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: calc(8px * var(--scale));
+  gap: calc(7px * var(--scale));
   padding: var(--pad);
   background: var(--bg-raised);
   border-bottom: 1px solid var(--line);
@@ -80,15 +115,25 @@ body {
   border-top: 1px solid var(--line);
   flex-direction: row;
   align-items: center;
-  gap: calc(8px * var(--scale));
+  gap: calc(7px * var(--scale));
+  /* Clear the home indicator so the message box is not under it. */
+  padding-bottom: calc(var(--pad) + var(--safe-bottom));
 }
 
 .topic-row, .attach-row, .control-row {
   display: flex;
   align-items: center;
-  gap: calc(8px * var(--scale));
+  gap: calc(7px * var(--scale));
   flex-wrap: wrap;
+  /* A flex row refuses to shrink below its content unless told to. Without this a long
+     label or a row of buttons pushes the whole page wider than the phone. */
+  min-width: 0;
+  max-width: 100%;
 }
+
+/* The label text is dropped on a phone to buy width for the topic itself; the icon carries
+   the meaning and the placeholder says the rest. */
+body[data-device="phone"] .lab-text { display: none; }
 
 .lab {
   display: inline-flex;
@@ -100,24 +145,29 @@ body {
   white-space: nowrap;
 }
 
-.lab svg { width: 14px; height: 14px; fill: currentColor; }
+.lab svg { width: 15px; height: 15px; fill: currentColor; flex: 0 0 auto; }
 
 input[type="text"], textarea {
   font: inherit;
+  /* 16px minimum: any smaller and iOS Safari zooms the page on focus, which is
+     disorienting and leaves the layout scrolled. */
+  font-size: max(16px, var(--font));
   color: var(--text);
   background: var(--bg-sunken);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: calc(6px * var(--scale)) calc(9px * var(--scale));
+  border-radius: 9px;
+  padding: calc(8px * var(--scale)) calc(10px * var(--scale));
   min-width: 0;
 }
 
-#topic { flex: 1 1 220px; }
+#topic { flex: 1 1 140px; min-width: 0; }
 
 textarea {
   flex: 1 1 auto;
+  min-width: 0;
   resize: none;
   max-height: calc(96px * var(--scale));
+  line-height: 1.35;
 }
 
 input:focus-visible, textarea:focus-visible, button:focus-visible {
@@ -125,7 +175,7 @@ input:focus-visible, textarea:focus-visible, button:focus-visible {
   outline-offset: 1px;
 }
 
-input:disabled, textarea:disabled { opacity: 0.65; }
+input:disabled, textarea:disabled { opacity: 0.6; }
 
 button {
   font: inherit;
@@ -133,14 +183,17 @@ button {
   color: var(--text);
   background: var(--bg-sunken);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: calc(6px * var(--scale)) calc(10px * var(--scale));
+  border-radius: 9px;
+  padding: calc(7px * var(--scale)) calc(11px * var(--scale));
   cursor: pointer;
   white-space: nowrap;
+  /* Comfortable on a touchscreen without looking oversized with a mouse. */
+  min-height: calc(var(--tap) * 0.78);
 }
 
 button:hover:not(:disabled) { background: var(--line); }
-button:disabled { opacity: 0.45; cursor: default; }
+button:active:not(:disabled) { transform: scale(0.97); }
+button:disabled { opacity: 0.42; cursor: default; }
 
 button.primary {
   background: var(--seat-a);
@@ -151,14 +204,17 @@ button.primary {
 
 button.small { font-size: var(--font-tiny); }
 
-.transport { display: flex; gap: calc(6px * var(--scale)); flex: 0 0 auto; }
+/* A finger needs a bigger target than a cursor. */
+body[data-device="phone"] button { min-height: var(--tap); padding-inline: calc(13px * var(--scale)); }
+
+.transport { display: flex; gap: calc(6px * var(--scale)); flex: 0 0 auto; flex-wrap: wrap; }
 
 .spacer { flex: 1 1 auto; }
 
 .pill {
   font-size: var(--font-small);
   font-weight: 600;
-  padding: calc(4px * var(--scale)) calc(9px * var(--scale));
+  padding: calc(5px * var(--scale)) calc(10px * var(--scale));
   border-radius: 999px;
   background: var(--bg-sunken);
   border: 1px solid var(--line);
@@ -172,10 +228,18 @@ button.small { font-size: var(--font-tiny); }
 .note { color: var(--text-faint); font-size: var(--font-tiny); }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
-.toggle { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-small); color: var(--text-dim); white-space: nowrap; }
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-small);
+  color: var(--text-dim);
+  white-space: nowrap;
+  min-height: var(--tap);
+}
 
-.seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.seg button { border: none; border-radius: 0; background: transparent; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.seg button { border: none; border-radius: 0; background: transparent; padding-inline: calc(9px * var(--scale)); }
 .seg button.on { background: var(--seat-a); color: #06121f; font-weight: 600; }
 
 .personas { color: var(--text-faint); font-size: var(--font-tiny); }
@@ -189,14 +253,15 @@ button.small { font-size: var(--font-tiny); }
   background: var(--bg-sunken);
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: calc(3px * var(--scale)) calc(4px * var(--scale)) calc(3px * var(--scale)) calc(10px * var(--scale));
+  padding: calc(4px * var(--scale)) calc(5px * var(--scale)) calc(4px * var(--scale)) calc(11px * var(--scale));
   font-size: var(--font-tiny);
   max-width: 100%;
+  min-height: calc(var(--tap) * 0.7);
 }
 
-.chip b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 34ch; }
+.chip b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 30ch; }
 .chip span { color: var(--text-faint); white-space: nowrap; }
-.chip button { border: none; background: transparent; padding: 0 4px; font-size: var(--font-small); line-height: 1; }
+.chip button { border: none; background: transparent; padding: 0 6px; font-size: var(--font); line-height: 1; min-height: 0; }
 
 /* ── Panes ────────────────────────────────────────────────────────────────────────── */
 
@@ -204,19 +269,25 @@ button.small { font-size: var(--font-tiny); }
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 1px;
   background: var(--line);
 }
 
+/* Two columns only when the device is a tablet or a desktop. */
+body[data-device="tablet"] #stage { grid-template-columns: 1fr 1fr; }
+body[data-device="desktop"] #stage { grid-template-columns: 1fr 1fr; }
+
+/* The single-column shape: one conversation, both participants in it. */
 body[data-layout="thread"] #stage { grid-template-columns: 1fr; }
 body[data-layout="thread"] .pane { display: none; }
-body[data-layout="thread"] #thread { display: block; }
+body[data-layout="thread"] #thread { display: flex; }
 
-/* One column when two cannot fit: side-by-side on a phone would give each pane about
-   fifteen characters, which is not a conversation. */
-@media (max-width: 780px) {
-  #stage { grid-template-columns: 1fr; }
+/* A narrow *tablet* still gets one column, because two 400-point panes are not useful. */
+@media (max-width: 720px) {
+  body[data-device="tablet"] #stage { grid-template-columns: 1fr; }
+  body[data-device="tablet"] .pane { display: none; }
+  body[data-device="tablet"] #thread { display: flex; }
 }
 
 .pane {
@@ -239,8 +310,8 @@ body[data-layout="thread"] #thread { display: block; }
 
 .dot {
   flex: 0 0 auto;
-  width: calc(24px * var(--scale));
-  height: calc(24px * var(--scale));
+  width: calc(26px * var(--scale));
+  height: calc(26px * var(--scale));
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -250,33 +321,41 @@ body[data-layout="thread"] #thread { display: block; }
   background: var(--seat-a);
 }
 
-.pane:nth-child(2) .dot { background: var(--seat-b); }
+.pane:nth-of-type(2) .dot { background: var(--seat-b); }
 
-.who { min-width: 0; }
+.who { min-width: 0; flex: 1 1 auto; }
 
 .name {
   display: block;
   background: none;
   border: none;
   padding: 0;
-  font-size: calc(14px * var(--scale));
+  font-size: calc(15px * var(--scale));
   font-weight: 600;
   color: var(--text);
   text-align: left;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-height: 0;
 }
 
 .name[contenteditable="true"] {
   background: var(--bg-sunken);
   border: 1px solid var(--seat-a);
   border-radius: 6px;
-  padding: 1px 5px;
+  padding: 1px 6px;
   outline: none;
 }
 
-.meta { display: block; font-size: var(--font-tiny); color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta {
+  display: block;
+  font-size: var(--font-tiny);
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .state { font-size: var(--font-tiny); color: var(--text-faint); white-space: nowrap; }
 .state.live { color: var(--seat-a); }
@@ -291,30 +370,38 @@ body[data-layout="thread"] #thread { display: block; }
   overflow-x: auto;
   white-space: nowrap;
   scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 .params::-webkit-scrollbar { display: none; }
 
+/* The transcript scrolls, the page does not: a phone should not scroll the whole
+   interface when a long reply arrives. */
 .transcript, .thread {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   padding: var(--pad);
   display: flex;
   flex-direction: column;
   gap: calc(10px * var(--scale));
-  scroll-behavior: smooth;
 }
+
+.thread { display: none; }
 
 /* ── Messages ─────────────────────────────────────────────────────────────────────── */
 
 .msg {
   border-left: 3px solid var(--line);
-  padding: calc(7px * var(--scale)) calc(10px * var(--scale));
-  border-radius: 0 8px 8px 0;
+  padding: calc(8px * var(--scale)) calc(11px * var(--scale));
+  border-radius: 0 9px 9px 0;
   background: var(--bg-raised);
   animation: fade 0.18s ease-out;
+  /* Long URLs and code should wrap rather than widen the transcript. */
+  overflow-wrap: anywhere;
 }
 
 @keyframes fade { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; } }
@@ -330,6 +417,7 @@ body[data-layout="thread"] #thread { display: block; }
   align-items: baseline;
   gap: 8px;
   margin-bottom: 3px;
+  flex-wrap: wrap;
 }
 
 .msg-who { font-size: var(--font-small); font-weight: 700; letter-spacing: 0.02em; }
@@ -345,8 +433,8 @@ body[data-layout="thread"] #thread { display: block; }
 .msg.live { opacity: 0.96; }
 .msg .thinking {
   margin-top: 6px;
-  padding: 6px 8px;
-  border-radius: 6px;
+  padding: 6px 9px;
+  border-radius: 7px;
   background: var(--bg-sunken);
   color: var(--text-dim);
   font-size: var(--font-small);
@@ -373,28 +461,101 @@ body[data-layout="thread"] #thread { display: block; }
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(78px * var(--scale));
   transform: translateX(-50%);
   background: var(--bg-raised);
   border: 1px solid var(--line);
   border-left: 3px solid var(--danger);
-  border-radius: 8px;
-  padding: 9px 14px;
+  border-radius: 9px;
+  padding: 10px 14px;
   font-size: var(--font-small);
   box-shadow: 0 8px 28px rgba(0,0,0,0.4);
-  max-width: min(560px, 90vw);
+  max-width: min(560px, calc(var(--vw) - 24px));
   z-index: 20;
+  /* Above the message box, and above the home indicator. */
+  bottom: calc(84px * var(--scale) + var(--safe-bottom));
 }
 
 .toast.good { border-left-color: var(--seat-a); }
 
-/* ── The thread view: both participants in one column, like a chat ─────────────────── */
-
-.thread .msg { max-width: min(760px, 100%); }
+/* The thread shape: both participants in one column, like a messaging app. */
+.thread .msg { max-width: min(680px, 100%); }
 .thread .msg[data-seat="1"] { align-self: flex-end; }
+
+/* A debug label, shown only when ?profile is in the URL. */
+.profile-badge {
+  position: fixed;
+  top: calc(4px + var(--safe-top));
+  right: 6px;
+  font-size: 9px;
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--text-faint);
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 2px 5px;
+  z-index: 30;
+  pointer-events: none;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .msg { animation: none; }
   .transcript, .thread { scroll-behavior: auto; }
   .caret::after { animation: none; }
+  button:active:not(:disabled) { transform: none; }
 }
+
+/* ── Phone-specific refinements ───────────────────────────────────────────────────── */
+
+/* On a phone the controls are a means to an end: the conversation is the point. So the
+   attachment row only appears once there is something attached, and the transcript gets the
+   height instead. The class is set by the client, because `:empty` cannot match a row that
+   always contains hidden inputs. */
+body[data-device="phone"] .attach-row { display: none; }
+body[data-device="phone"] .attach-row.has-chips { display: flex; }
+body[data-device="phone"] .personas { display: none; }
+
+/* On a phone the model parameters are trivia; they are still reachable by overriding to
+   the desktop layout, which is where someone would look for them. */
+body[data-device="phone"] .params { display: none; }
+body[data-device="phone"] .pane .params { display: none; }
+
+body[data-device="phone"] .control-row {
+  gap: 6px;
+  /* The status, the mode switch and the thinking toggle all fit, but only if this row is
+     allowed to wrap. */
+  flex-wrap: wrap;
+}
+
+/* The transport buttons are the primary control on a phone, so they get their own line
+   rather than competing with the topic field for one. */
+body[data-device="phone"] .topic-row { row-gap: 6px; }
+body[data-device="phone"] .transport { flex: 1 1 100%; justify-content: flex-start; }
+
+/* The context meter is useful but not worth a row on a phone; it moves next to the status. */
+body[data-device="phone"] .footer .mono { display: none; }
+
+/* Landscape phone: the header alone can eat the screen, so it is compacted. */
+@media (orientation: landscape) and (max-height: 480px) {
+  body[data-device="phone"] .attach-row { display: none; }
+  body[data-device="phone"] .params { display: none; }
+  body[data-device="phone"] .control-row { padding-block: 2px; }
+  body[data-device="phone"] .footer .note { display: none; }
+}
+
+/* The footer is the most constrained row on a phone: a text box, a send button and, on a
+   desktop, a condense button and the context meter. Only the first two are essential on a
+   handset, so the others step aside and the message box gets the width. */
+body[data-device="phone"] .footer { gap: 6px; }
+body[data-device="phone"] .footer #condense { display: none; }
+body[data-device="phone"] .footer #send { flex: 0 0 auto; }
+body[data-device="phone"] .footer #message { flex: 1 1 auto; }
+
+/* A notched phone in landscape puts the notch over one edge; inset the whole frame. */
+@media (orientation: landscape) {
+  body[data-device="phone"] .bar,
+  body[data-device="phone"] .footer { padding-left: calc(var(--pad) + var(--safe-left)); padding-right: calc(var(--pad) + var(--safe-right)); }
+}
+
+/* Tablet: keep the two panes but give the controls room to breathe. */
+body[data-device="tablet"] .personas { display: inline; }
+body[data-device="tablet"] .toggle-text { display: inline; }

@@ -1,0 +1,291 @@
+#!/usr/bin/env python3
+"""A minimal Chrome DevTools Protocol client, for accurate device emulation.
+
+Why this exists rather than Chrome's command-line screenshot flags:
+
+`--window-size` is in *physical* pixels and `--force-device-scale-factor` multiplies the CSS
+viewport as well as the output, so the two cannot be set independently. Asking for a 390-point
+iPhone at 3× through the command line produced a 1170-point layout — the page thought it was
+on a desktop, and the screenshot clipped it. That failure is worth recording, because the
+output looked plausible and only the layout report revealed it.
+
+The DevTools protocol can set the two independently:
+`Emulation.setDeviceMetricsOverride` takes a CSS width, a CSS height and a device scale
+factor, which is exactly what a real phone reports.
+
+Only what is needed is implemented: an HTTP upgrade, text frames, and four CDP calls. Chrome
+requires client frames to be masked and closes the connection if they are not, so that much
+is done properly.
+"""
+
+from __future__ import annotations
+
+import base64
+import json
+import os
+import socket
+import struct
+import time
+import urllib.request
+
+
+class DevToolsError(RuntimeError):
+    pass
+
+
+class _WebSocket:
+    """A client WebSocket, text frames only, no fragmentation."""
+
+    def __init__(self, url: str, timeout: float = 20) -> None:
+        # ws://127.0.0.1:9222/devtools/page/ABC
+        if not url.startswith("ws://"):
+            raise DevToolsError(f"unsupported websocket url: {url}")
+        rest = url[len("ws://"):]
+        hostport, _, path = rest.partition("/")
+        host, _, port = hostport.partition(":")
+        self.sock = socket.create_connection((host, int(port or 80)), timeout=timeout)
+        self.sock.settimeout(timeout)
+        self._buffer = b""
+
+        key = base64.b64encode(os.urandom(16)).decode()
+        handshake = (
+            f"GET /{path} HTTP/1.1\r\n"
+            f"Host: {hostport}\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            f"Sec-WebSocket-Key: {key}\r\n"
+            "Sec-WebSocket-Version: 13\r\n\r\n"
+        )
+        self.sock.sendall(handshake.encode())
+
+        header = b""
+        while b"\r\n\r\n" not in header:
+            chunk = self.sock.recv(4096)
+            if not chunk:
+                raise DevToolsError("connection closed during handshake")
+            header += chunk
+        if b"101" not in header.split(b"\r\n")[0]:
+            raise DevToolsError(f"upgrade refused: {header.splitlines()[0]!r}")
+        # Anything after the handshake belongs to the frame stream.
+        self._buffer = header.split(b"\r\n\r\n", 1)[1]
+
+    # ── Framing ──────────────────────────────────────────────────────────────────────
+
+    def send(self, text: str) -> None:
+        payload = text.encode()
+        header = bytearray([0x81])          # FIN + text opcode
+        length = len(payload)
+        if length < 126:
+            header.append(0x80 | length)
+        elif length < (1 << 16):
+            header.append(0x80 | 126)
+            header += struct.pack(">H", length)
+        else:
+            header.append(0x80 | 127)
+            header += struct.pack(">Q", length)
+        # A client frame must be masked; Chrome closes the socket otherwise.
+        mask = os.urandom(4)
+        header += mask
+        masked = bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
+        self.sock.sendall(bytes(header) + masked)
+
+    def _read_exactly(self, count: int) -> bytes:
+        while len(self._buffer) < count:
+            chunk = self.sock.recv(65536)
+            if not chunk:
+                raise DevToolsError("connection closed")
+            self._buffer += chunk
+        result, self._buffer = self._buffer[:count], self._buffer[count:]
+        return result
+
+    def receive(self) -> str:
+        """One text message, skipping control frames and joining fragments."""
+        pieces: list[bytes] = []
+        while True:
+            first, second = self._read_exactly(2)
+            fin = first & 0x80
+            opcode = first & 0x0F
+            length = second & 0x7F
+            if length == 126:
+                length = struct.unpack(">H", self._read_exactly(2))[0]
+            elif length == 127:
+                length = struct.unpack(">Q", self._read_exactly(8))[0]
+            payload = self._read_exactly(length)
+
+            if opcode == 0x8:                       # close
+                raise DevToolsError("server closed the websocket")
+            if opcode == 0x9:                       # ping
+                self.sock.sendall(b"\x8a\x80" + os.urandom(4))
+                continue
+            if opcode == 0xA:                       # pong
+                continue
+            pieces.append(payload)
+            if fin:
+                return b"".join(pieces).decode()
+
+    def close(self) -> None:
+        try:
+            self.sock.close()
+        except OSError:
+            pass
+
+
+class Chrome:
+    """A headless Chrome instance driven over the DevTools protocol."""
+
+    def __init__(self, binary: str, port: int = 9222, profile: str = "/tmp/chatbots-cdp") -> None:
+        self.binary = binary
+        self.port = port
+        self.profile = profile
+        self.process = None
+        self.socket: _WebSocket | None = None
+        self._next_id = 1
+
+    def __enter__(self) -> "Chrome":
+        self.start()
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self.stop()
+
+    def start(self, url: str = "about:blank") -> None:
+        import shutil
+        import subprocess
+
+        shutil.rmtree(self.profile, ignore_errors=True)
+        self.process = subprocess.Popen(
+            [
+                self.binary,
+                "--headless=new",
+                "--disable-gpu",
+                "--hide-scrollbars",
+                "--no-first-run",
+                "--no-default-browser-check",
+                "--disable-extensions",
+                "--disable-background-networking",
+                f"--user-data-dir={self.profile}",
+                f"--remote-debugging-port={self.port}",
+                url,
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+        # Wait for the debugging endpoint, then find the page target.
+        target = None
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{self.port}/json", timeout=2) as r:
+                    pages = json.load(r)
+                target = next((p for p in pages if p.get("type") == "page"), None)
+                if target:
+                    break
+            except Exception:
+                time.sleep(0.3)
+        if not target:
+            self.stop()
+            raise DevToolsError("Chrome's debugging endpoint never came up")
+
+        self.socket = _WebSocket(target["webSocketDebuggerUrl"])
+
+    def stop(self) -> None:
+        if self.socket:
+            self.socket.close()
+            self.socket = None
+        if self.process:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=5)
+            except Exception:
+                self.process.kill()
+            self.process = None
+
+    def call(self, method: str, params: dict | None = None) -> dict:
+        """Send a command and wait for its reply, ignoring events."""
+        if not self.socket:
+            raise DevToolsError("not connected")
+        message_id = self._next_id
+        self._next_id += 1
+        self.socket.send(json.dumps({"id": message_id, "method": method, "params": params or {}}))
+        while True:
+            message = json.loads(self.socket.receive())
+            if message.get("id") != message_id:
+                continue                       # an event, not our reply
+            if "error" in message:
+                raise DevToolsError(f"{method}: {message['error']}")
+            return message.get("result", {})
+
+    def emulate(
+        self, width: int, height: int, pixel_ratio: float, mobile: bool = True
+    ) -> None:
+        """Set the CSS viewport and the device pixel ratio, independently."""
+        self.call(
+            "Emulation.setDeviceMetricsOverride",
+            {
+                "width": width,
+                "height": height,
+                "deviceScaleFactor": pixel_ratio,
+                "mobile": mobile,
+                # A phone reports a touch screen; the interface does not depend on it, but a
+                # layout that did would otherwise be tested in the wrong mode.
+                "screenOrientation": {"type": "portraitPrimary", "angle": 0},
+            },
+        )
+        self.call("Emulation.setTouchEmulationEnabled", {"enabled": mobile, "maxTouchPoints": 5})
+
+    def navigate(self, url: str, settle: float = 2.5) -> None:
+        self.call("Page.enable")
+        self.call("Page.navigate", {"url": url})
+        # No load event is awaited: the page is live and always has a connection open, so
+        # waiting for "network idle" would never return. A fixed settle is honest here and is
+        # why the captures are reproducible.
+        time.sleep(settle)
+
+    def evaluate(self, expression: str) -> object:
+        result = self.call(
+            "Runtime.evaluate",
+            {"expression": expression, "returnByValue": True, "awaitPromise": True},
+        )
+        return result.get("result", {}).get("value")
+
+    def screenshot(self, path: str) -> None:
+        result = self.call(
+            "Page.captureScreenshot",
+            # Beyond the viewport, so a long transcript is captured in full rather than cut
+            # off at the fold.
+            {"format": "png", "captureBeyondViewport": True},
+        )
+        with open(path, "wb") as handle:
+            handle.write(base64.b64decode(result["data"]))
+
+    def metrics(self) -> dict:
+        """What the page actually measured about itself."""
+        return self.evaluate(
+            """(() => {
+                const root = document.documentElement;
+                const vw = Math.round(window.visualViewport?.width ?? window.innerWidth);
+                const vh = Math.round(window.visualViewport?.height ?? window.innerHeight);
+                const overflowing = [];
+                for (const el of document.querySelectorAll('body *')) {
+                    const r = el.getBoundingClientRect();
+                    if (r.right > vw + 1 || r.width > vw + 1) {
+                        const id = el.id ? '#' + el.id : '';
+                        const cls = (typeof el.className === 'string' && el.className)
+                            ? '.' + el.className.trim().split(/\\s+/).slice(0,2).join('.') : '';
+                        overflowing.push(el.tagName.toLowerCase() + id + cls + '(' + Math.round(r.width) + ')');
+                    }
+                }
+                overflowing.sort((a,b) => (parseInt(b.match(/\\((\\d+)\\)$/)?.[1]||0)) - (parseInt(a.match(/\\((\\d+)\\)$/)?.[1]||0)));
+                return {
+                    viewport: vw,
+                    height: vh,
+                    dpr: window.devicePixelRatio,
+                    scrollWidth: root.scrollWidth,
+                    device: document.body.dataset.device,
+                    layout: document.body.dataset.layout,
+                    overflowing: overflowing.slice(0, 8),
+                    messages: document.querySelectorAll('.msg').length,
+                };
+            })()"""
+        )

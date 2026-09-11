@@ -38,17 +38,25 @@ public enum WebAssets {
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- viewport-fit=cover so a notched phone can be detected and inset properly; the CSS only
+     applies the safe-area insets on a phone profile, where they matter. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101014" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f4f7" media="(prefers-color-scheme: light)">
+<meta name="mobile-web-app-capable" content="yes">
 <title>ChatBots</title>
 <link rel="stylesheet" href="/style.css">
 </head>
-<body data-layout="split">
+<!-- The attributes the client fills in. `data-device` is derived from the live viewport and
+     drives every responsive rule; `data-layout` is the user's mode choice. Both are set by
+     app.js before first paint where possible, and CSS has sane defaults if it is not. -->
+<body data-device="phone" data-layout="thread" data-profile="unknown">
 
 <header class="bar">
   <div class="topic-row">
     <label class="lab" for="topic">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12v8H6l-3 3v-3H2z"/></svg>
-      Topic
+      <span class="lab-text">Topic</span>
     </label>
     <input id="topic" type="text" autocomplete="off" spellcheck="false"
            placeholder="What should the models discuss?">
@@ -71,14 +79,16 @@ public enum WebAssets {
   <div class="control-row">
     <span id="status" class="pill">Idle</span>
     <span id="counts" class="note"></span>
-    <summary class="personas" id="persona-summary"></summary>
+    <span class="personas" id="persona-summary"></span>
     <div class="spacer"></div>
     <label class="toggle" title="Stream the models' thinking into the panes">
-      <input id="thinking" type="checkbox" checked> Show thinking
+      <input id="thinking" type="checkbox" checked> <span class="toggle-text">Show thinking</span>
     </label>
-    <div class="seg" role="group" aria-label="Layout">
-      <button id="layout-split" class="on" title="Side by side">Split</button>
-      <button id="layout-thread" title="One column, like a chat">Thread</button>
+    <!-- Auto follows the detected device; the other two override it and are remembered. -->
+    <div class="seg" role="group" aria-label="View mode">
+      <button id="view-auto" class="on" title="Follow this device automatically">Auto</button>
+      <button id="view-phone" title="Force the single-column phone layout">Phone</button>
+      <button id="view-desktop" title="Force the two-pane desktop layout">Desktop</button>
     </div>
   </div>
 </header>
@@ -88,7 +98,7 @@ public enum WebAssets {
     <div class="pane-head">
       <span class="dot" data-seat="0">A</span>
       <div class="who">
-        <button class="name" data-rename="0" title="Double-click, or press, to rename">Agent 1</button>
+        <button class="name" data-rename="0" title="Press to rename">Agent 1</button>
         <span class="meta" data-meta="0"></span>
       </div>
       <div class="spacer"></div>
@@ -102,7 +112,7 @@ public enum WebAssets {
     <div class="pane-head">
       <span class="dot" data-seat="1">B</span>
       <div class="who">
-        <button class="name" data-rename="1" title="Double-click, or press, to rename">Agent 2</button>
+        <button class="name" data-rename="1" title="Press to rename">Agent 2</button>
         <span class="meta" data-meta="1"></span>
       </div>
       <div class="spacer"></div>
@@ -116,14 +126,15 @@ public enum WebAssets {
 </main>
 
 <footer class="bar footer">
-  <textarea id="message" rows="1" placeholder="Message both participants as the moderator…"></textarea>
-  <button id="send" class="primary" disabled>Send to both</button>
+  <textarea id="message" rows="1" placeholder="Message…"></textarea>
+  <button id="send" class="primary" disabled>Send</button>
   <div class="spacer"></div>
   <button id="condense" disabled title="Summarise the older turns now">Condense</button>
   <span id="context" class="note mono">ctx —</span>
 </footer>
 
 <div id="toast" class="toast" hidden></div>
+<div id="profile-badge" class="profile-badge" hidden></div>
 
 <script src="/app.js"></script>
 </body>
@@ -134,10 +145,23 @@ public enum WebAssets {
     static let styleCSS = """
 /* ChatBots — the web interface
  *
- * Two requirements shape this: it must be usable from a phone to a large desktop display,
- * and it must not look like a web page pretending to be an app. So it fills the viewport,
- * scrolls only inside the transcripts, and sizes everything from one root scale that the
- * media queries adjust — the same idea as the text-size setting in the SwiftUI app.
+ * Mobile first, because that is where the layout is hardest. The phone case has to fit a
+ * conversation, a topic field and a message box into about 360 by 780 points without the
+ * keyboard eating the transcript, and everything a desktop needs is a relaxation of that
+ * rather than the other way round.
+ *
+ * Three things drive the responsive behaviour, in this order:
+ *
+ *   1. `data-device` on <body> — phone, tablet or desktop — set from the live viewport.
+ *      A user override replaces the detected value, which is why it is an attribute rather
+ *      than a media query alone: CSS media queries cannot be overridden from a setting.
+ *   2. `--vw` and `--vh` custom properties, written from `window.visualViewport`. On iOS
+ *      `100vh` is the height *without* the browser chrome, so a full-height phone layout
+ *      built on `vh` is covered by the address bar. `--vh` is the real visible height.
+ *   3. Safe-area insets, so a notch or a home indicator does not sit on top of the text.
+ *
+ * The two-pane view is a *privilege* of a wide screen, not the default: below the tablet
+ * breakpoint the interface is one column, which is the WhatsApp shape.
  */
 
 :root {
@@ -154,10 +178,20 @@ public enum WebAssets {
   --mod: #ffc44d;
   --danger: #ff6b6b;
   --radius: 10px;
+  /* Minimum comfortable touch target. Apple asks for 44pt, Google for 48dp; 44 CSS px
+     satisfies both in practice and is what the buttons below are built to. */
+  --tap: 44px;
   --pad: calc(12px * var(--scale));
   --font: calc(13.5px * var(--scale));
   --font-small: calc(11px * var(--scale));
   --font-tiny: calc(10px * var(--scale));
+  /* Fallbacks for the first paint, before app.js has measured anything. */
+  --vw: 100vw;
+  --vh: 100vh;
+  --safe-top: 0px;
+  --safe-bottom: 0px;
+  --safe-left: 0px;
+  --safe-right: 0px;
 }
 
 @media (prefers-color-scheme: light) {
@@ -172,13 +206,13 @@ public enum WebAssets {
   }
 }
 
-/* Roomier text on a phone, more of it on a tablet, and a comfortable measure on a desktop.
-   The transcripts are the point, so they get the space rather than the furniture. */
+/* Text scales with the screen rather than the device name: a 360-point Android entry model
+   and a 360-point flagship have the same room and should not look different. */
 @media (min-width: 700px)  { :root { --scale: 1; } }
 @media (min-width: 1100px) { :root { --scale: 1.05; } }
 @media (min-width: 1700px) { :root { --scale: 1.15; } }
-@media (max-width: 560px)  { :root { --scale: 0.95; } }
-@media (max-height: 560px) { :root { --scale: 0.9; } }
+@media (max-width: 390px)  { :root { --scale: 0.95; } }
+@media (max-width: 340px)  { :root { --scale: 0.9; } }
 
 * { box-sizing: border-box; }
 
@@ -188,13 +222,25 @@ html, body {
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
-  font: var(--font)/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font: var(--font)/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+        system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  /* Stops iOS from inflating text in landscape, which breaks a carefully fitted layout. */
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   display: flex;
   flex-direction: column;
+  /* The real visible height, not 100vh. */
+  height: var(--vh);
+  /* Nothing on the page is wider than the screen; if something is, the transcript scrolls
+     inside its own container rather than the whole interface sliding sideways. This is a
+     guard, not the fix — the rows below wrap so it should never trigger. */
+  overflow-x: hidden;
+  max-width: var(--vw);
+  /* A phone is used with a thumb: taps should not select text or show a blue flash. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* ── Controls ─────────────────────────────────────────────────────────────────────── */
@@ -203,7 +249,7 @@ body {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: calc(8px * var(--scale));
+  gap: calc(7px * var(--scale));
   padding: var(--pad);
   background: var(--bg-raised);
   border-bottom: 1px solid var(--line);
@@ -214,15 +260,25 @@ body {
   border-top: 1px solid var(--line);
   flex-direction: row;
   align-items: center;
-  gap: calc(8px * var(--scale));
+  gap: calc(7px * var(--scale));
+  /* Clear the home indicator so the message box is not under it. */
+  padding-bottom: calc(var(--pad) + var(--safe-bottom));
 }
 
 .topic-row, .attach-row, .control-row {
   display: flex;
   align-items: center;
-  gap: calc(8px * var(--scale));
+  gap: calc(7px * var(--scale));
   flex-wrap: wrap;
+  /* A flex row refuses to shrink below its content unless told to. Without this a long
+     label or a row of buttons pushes the whole page wider than the phone. */
+  min-width: 0;
+  max-width: 100%;
 }
+
+/* The label text is dropped on a phone to buy width for the topic itself; the icon carries
+   the meaning and the placeholder says the rest. */
+body[data-device="phone"] .lab-text { display: none; }
 
 .lab {
   display: inline-flex;
@@ -234,24 +290,29 @@ body {
   white-space: nowrap;
 }
 
-.lab svg { width: 14px; height: 14px; fill: currentColor; }
+.lab svg { width: 15px; height: 15px; fill: currentColor; flex: 0 0 auto; }
 
 input[type="text"], textarea {
   font: inherit;
+  /* 16px minimum: any smaller and iOS Safari zooms the page on focus, which is
+     disorienting and leaves the layout scrolled. */
+  font-size: max(16px, var(--font));
   color: var(--text);
   background: var(--bg-sunken);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: calc(6px * var(--scale)) calc(9px * var(--scale));
+  border-radius: 9px;
+  padding: calc(8px * var(--scale)) calc(10px * var(--scale));
   min-width: 0;
 }
 
-#topic { flex: 1 1 220px; }
+#topic { flex: 1 1 140px; min-width: 0; }
 
 textarea {
   flex: 1 1 auto;
+  min-width: 0;
   resize: none;
   max-height: calc(96px * var(--scale));
+  line-height: 1.35;
 }
 
 input:focus-visible, textarea:focus-visible, button:focus-visible {
@@ -259,7 +320,7 @@ input:focus-visible, textarea:focus-visible, button:focus-visible {
   outline-offset: 1px;
 }
 
-input:disabled, textarea:disabled { opacity: 0.65; }
+input:disabled, textarea:disabled { opacity: 0.6; }
 
 button {
   font: inherit;
@@ -267,14 +328,17 @@ button {
   color: var(--text);
   background: var(--bg-sunken);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: calc(6px * var(--scale)) calc(10px * var(--scale));
+  border-radius: 9px;
+  padding: calc(7px * var(--scale)) calc(11px * var(--scale));
   cursor: pointer;
   white-space: nowrap;
+  /* Comfortable on a touchscreen without looking oversized with a mouse. */
+  min-height: calc(var(--tap) * 0.78);
 }
 
 button:hover:not(:disabled) { background: var(--line); }
-button:disabled { opacity: 0.45; cursor: default; }
+button:active:not(:disabled) { transform: scale(0.97); }
+button:disabled { opacity: 0.42; cursor: default; }
 
 button.primary {
   background: var(--seat-a);
@@ -285,14 +349,17 @@ button.primary {
 
 button.small { font-size: var(--font-tiny); }
 
-.transport { display: flex; gap: calc(6px * var(--scale)); flex: 0 0 auto; }
+/* A finger needs a bigger target than a cursor. */
+body[data-device="phone"] button { min-height: var(--tap); padding-inline: calc(13px * var(--scale)); }
+
+.transport { display: flex; gap: calc(6px * var(--scale)); flex: 0 0 auto; flex-wrap: wrap; }
 
 .spacer { flex: 1 1 auto; }
 
 .pill {
   font-size: var(--font-small);
   font-weight: 600;
-  padding: calc(4px * var(--scale)) calc(9px * var(--scale));
+  padding: calc(5px * var(--scale)) calc(10px * var(--scale));
   border-radius: 999px;
   background: var(--bg-sunken);
   border: 1px solid var(--line);
@@ -306,10 +373,18 @@ button.small { font-size: var(--font-tiny); }
 .note { color: var(--text-faint); font-size: var(--font-tiny); }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
-.toggle { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-small); color: var(--text-dim); white-space: nowrap; }
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-small);
+  color: var(--text-dim);
+  white-space: nowrap;
+  min-height: var(--tap);
+}
 
-.seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.seg button { border: none; border-radius: 0; background: transparent; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.seg button { border: none; border-radius: 0; background: transparent; padding-inline: calc(9px * var(--scale)); }
 .seg button.on { background: var(--seat-a); color: #06121f; font-weight: 600; }
 
 .personas { color: var(--text-faint); font-size: var(--font-tiny); }
@@ -323,14 +398,15 @@ button.small { font-size: var(--font-tiny); }
   background: var(--bg-sunken);
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: calc(3px * var(--scale)) calc(4px * var(--scale)) calc(3px * var(--scale)) calc(10px * var(--scale));
+  padding: calc(4px * var(--scale)) calc(5px * var(--scale)) calc(4px * var(--scale)) calc(11px * var(--scale));
   font-size: var(--font-tiny);
   max-width: 100%;
+  min-height: calc(var(--tap) * 0.7);
 }
 
-.chip b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 34ch; }
+.chip b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 30ch; }
 .chip span { color: var(--text-faint); white-space: nowrap; }
-.chip button { border: none; background: transparent; padding: 0 4px; font-size: var(--font-small); line-height: 1; }
+.chip button { border: none; background: transparent; padding: 0 6px; font-size: var(--font); line-height: 1; min-height: 0; }
 
 /* ── Panes ────────────────────────────────────────────────────────────────────────── */
 
@@ -338,19 +414,25 @@ button.small { font-size: var(--font-tiny); }
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 1px;
   background: var(--line);
 }
 
+/* Two columns only when the device is a tablet or a desktop. */
+body[data-device="tablet"] #stage { grid-template-columns: 1fr 1fr; }
+body[data-device="desktop"] #stage { grid-template-columns: 1fr 1fr; }
+
+/* The single-column shape: one conversation, both participants in it. */
 body[data-layout="thread"] #stage { grid-template-columns: 1fr; }
 body[data-layout="thread"] .pane { display: none; }
-body[data-layout="thread"] #thread { display: block; }
+body[data-layout="thread"] #thread { display: flex; }
 
-/* One column when two cannot fit: side-by-side on a phone would give each pane about
-   fifteen characters, which is not a conversation. */
-@media (max-width: 780px) {
-  #stage { grid-template-columns: 1fr; }
+/* A narrow *tablet* still gets one column, because two 400-point panes are not useful. */
+@media (max-width: 720px) {
+  body[data-device="tablet"] #stage { grid-template-columns: 1fr; }
+  body[data-device="tablet"] .pane { display: none; }
+  body[data-device="tablet"] #thread { display: flex; }
 }
 
 .pane {
@@ -373,8 +455,8 @@ body[data-layout="thread"] #thread { display: block; }
 
 .dot {
   flex: 0 0 auto;
-  width: calc(24px * var(--scale));
-  height: calc(24px * var(--scale));
+  width: calc(26px * var(--scale));
+  height: calc(26px * var(--scale));
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -384,33 +466,41 @@ body[data-layout="thread"] #thread { display: block; }
   background: var(--seat-a);
 }
 
-.pane:nth-child(2) .dot { background: var(--seat-b); }
+.pane:nth-of-type(2) .dot { background: var(--seat-b); }
 
-.who { min-width: 0; }
+.who { min-width: 0; flex: 1 1 auto; }
 
 .name {
   display: block;
   background: none;
   border: none;
   padding: 0;
-  font-size: calc(14px * var(--scale));
+  font-size: calc(15px * var(--scale));
   font-weight: 600;
   color: var(--text);
   text-align: left;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-height: 0;
 }
 
 .name[contenteditable="true"] {
   background: var(--bg-sunken);
   border: 1px solid var(--seat-a);
   border-radius: 6px;
-  padding: 1px 5px;
+  padding: 1px 6px;
   outline: none;
 }
 
-.meta { display: block; font-size: var(--font-tiny); color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta {
+  display: block;
+  font-size: var(--font-tiny);
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .state { font-size: var(--font-tiny); color: var(--text-faint); white-space: nowrap; }
 .state.live { color: var(--seat-a); }
@@ -425,30 +515,38 @@ body[data-layout="thread"] #thread { display: block; }
   overflow-x: auto;
   white-space: nowrap;
   scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 .params::-webkit-scrollbar { display: none; }
 
+/* The transcript scrolls, the page does not: a phone should not scroll the whole
+   interface when a long reply arrives. */
 .transcript, .thread {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   padding: var(--pad);
   display: flex;
   flex-direction: column;
   gap: calc(10px * var(--scale));
-  scroll-behavior: smooth;
 }
+
+.thread { display: none; }
 
 /* ── Messages ─────────────────────────────────────────────────────────────────────── */
 
 .msg {
   border-left: 3px solid var(--line);
-  padding: calc(7px * var(--scale)) calc(10px * var(--scale));
-  border-radius: 0 8px 8px 0;
+  padding: calc(8px * var(--scale)) calc(11px * var(--scale));
+  border-radius: 0 9px 9px 0;
   background: var(--bg-raised);
   animation: fade 0.18s ease-out;
+  /* Long URLs and code should wrap rather than widen the transcript. */
+  overflow-wrap: anywhere;
 }
 
 @keyframes fade { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; } }
@@ -464,6 +562,7 @@ body[data-layout="thread"] #thread { display: block; }
   align-items: baseline;
   gap: 8px;
   margin-bottom: 3px;
+  flex-wrap: wrap;
 }
 
 .msg-who { font-size: var(--font-small); font-weight: 700; letter-spacing: 0.02em; }
@@ -479,8 +578,8 @@ body[data-layout="thread"] #thread { display: block; }
 .msg.live { opacity: 0.96; }
 .msg .thinking {
   margin-top: 6px;
-  padding: 6px 8px;
-  border-radius: 6px;
+  padding: 6px 9px;
+  border-radius: 7px;
   background: var(--bg-sunken);
   color: var(--text-dim);
   font-size: var(--font-small);
@@ -507,31 +606,104 @@ body[data-layout="thread"] #thread { display: block; }
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(78px * var(--scale));
   transform: translateX(-50%);
   background: var(--bg-raised);
   border: 1px solid var(--line);
   border-left: 3px solid var(--danger);
-  border-radius: 8px;
-  padding: 9px 14px;
+  border-radius: 9px;
+  padding: 10px 14px;
   font-size: var(--font-small);
   box-shadow: 0 8px 28px rgba(0,0,0,0.4);
-  max-width: min(560px, 90vw);
+  max-width: min(560px, calc(var(--vw) - 24px));
   z-index: 20;
+  /* Above the message box, and above the home indicator. */
+  bottom: calc(84px * var(--scale) + var(--safe-bottom));
 }
 
 .toast.good { border-left-color: var(--seat-a); }
 
-/* ── The thread view: both participants in one column, like a chat ─────────────────── */
-
-.thread .msg { max-width: min(760px, 100%); }
+/* The thread shape: both participants in one column, like a messaging app. */
+.thread .msg { max-width: min(680px, 100%); }
 .thread .msg[data-seat="1"] { align-self: flex-end; }
+
+/* A debug label, shown only when ?profile is in the URL. */
+.profile-badge {
+  position: fixed;
+  top: calc(4px + var(--safe-top));
+  right: 6px;
+  font-size: 9px;
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--text-faint);
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 2px 5px;
+  z-index: 30;
+  pointer-events: none;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .msg { animation: none; }
   .transcript, .thread { scroll-behavior: auto; }
   .caret::after { animation: none; }
+  button:active:not(:disabled) { transform: none; }
 }
+
+/* ── Phone-specific refinements ───────────────────────────────────────────────────── */
+
+/* On a phone the controls are a means to an end: the conversation is the point. So the
+   attachment row only appears once there is something attached, and the transcript gets the
+   height instead. The class is set by the client, because `:empty` cannot match a row that
+   always contains hidden inputs. */
+body[data-device="phone"] .attach-row { display: none; }
+body[data-device="phone"] .attach-row.has-chips { display: flex; }
+body[data-device="phone"] .personas { display: none; }
+
+/* On a phone the model parameters are trivia; they are still reachable by overriding to
+   the desktop layout, which is where someone would look for them. */
+body[data-device="phone"] .params { display: none; }
+body[data-device="phone"] .pane .params { display: none; }
+
+body[data-device="phone"] .control-row {
+  gap: 6px;
+  /* The status, the mode switch and the thinking toggle all fit, but only if this row is
+     allowed to wrap. */
+  flex-wrap: wrap;
+}
+
+/* The transport buttons are the primary control on a phone, so they get their own line
+   rather than competing with the topic field for one. */
+body[data-device="phone"] .topic-row { row-gap: 6px; }
+body[data-device="phone"] .transport { flex: 1 1 100%; justify-content: flex-start; }
+
+/* The context meter is useful but not worth a row on a phone; it moves next to the status. */
+body[data-device="phone"] .footer .mono { display: none; }
+
+/* Landscape phone: the header alone can eat the screen, so it is compacted. */
+@media (orientation: landscape) and (max-height: 480px) {
+  body[data-device="phone"] .attach-row { display: none; }
+  body[data-device="phone"] .params { display: none; }
+  body[data-device="phone"] .control-row { padding-block: 2px; }
+  body[data-device="phone"] .footer .note { display: none; }
+}
+
+/* The footer is the most constrained row on a phone: a text box, a send button and, on a
+   desktop, a condense button and the context meter. Only the first two are essential on a
+   handset, so the others step aside and the message box gets the width. */
+body[data-device="phone"] .footer { gap: 6px; }
+body[data-device="phone"] .footer #condense { display: none; }
+body[data-device="phone"] .footer #send { flex: 0 0 auto; }
+body[data-device="phone"] .footer #message { flex: 1 1 auto; }
+
+/* A notched phone in landscape puts the notch over one edge; inset the whole frame. */
+@media (orientation: landscape) {
+  body[data-device="phone"] .bar,
+  body[data-device="phone"] .footer { padding-left: calc(var(--pad) + var(--safe-left)); padding-right: calc(var(--pad) + var(--safe-right)); }
+}
+
+/* Tablet: keep the two panes but give the controls room to breathe. */
+body[data-device="tablet"] .personas { display: inline; }
+body[data-device="tablet"] .toggle-text { display: inline; }
 
 """
 
@@ -540,13 +712,16 @@ body[data-layout="thread"] #thread { display: block; }
 //
 // A thin client over the HTTP API. It holds no conversation state of its own beyond what it
 // has been told: the server owns the conversation, so a reload, a second tab, or the SwiftUI
-// app all see the same thing. Where this does keep a copy — the message list — it exists
-// only to avoid re-drawing the whole transcript sixty times a second.
+// app all see the same thing. Where this does keep a copy — the rendered messages — it exists
+// only to avoid rebuilding the transcript on every update.
 //
-// Two habits matter for the live transcript: a reply that is still being written is nested
-// under the element that holds it, so text can be appended without rebuilding the list; and
-// a scroll is only forced when the reader is already at the bottom, so reading back through
-// the history does not get yanked away.
+// The responsive part is deliberately *profile driven* rather than purely CSS media queries.
+// A media query cannot express "the user asked for the desktop layout on a phone", and it
+// cannot tell a 360-point Android entry model from a 360-point flagship — nor does it need
+// to, which is the point: the layout branches on width, and the device profiles exist to
+// verify that every width in use is covered. `data-device` carries the branch, `--vh` and
+// `--vw` carry the measured viewport, and the safe-area insets come from CSS constants that
+// only mean anything on a device with a notch.
 
 (() => {
   "use strict";
@@ -570,18 +745,163 @@ body[data-layout="thread"] #thread { display: block; }
     },
   };
 
-  // Rendered messages, keyed by id, so a turn is only ever drawn once.
+  // ── Screen profile ─────────────────────────────────────────────────────────────────
+
+  const VIEW_MODE_KEY = "chatbots.viewMode";
+
+  /// Breakpoints, in CSS pixels. The tablet boundary is the one that matters: below it two
+  /// panes are too narrow to read, which is why a phone gets one column.
+  const PHONE_MAX = 719;
+  const TABLET_MAX = 1023;
+
+  const state = {
+    /** The conversation, as last reported by the server. */
+    snapshot: null,
+    /**
+     * Whether the transcript should follow new messages. Turned off when the reader scrolls
+     * up, so reading back is not yanked away by an arriving reply.
+     */
+    follow: true,
+  };
+
+  /** How the device was detected, for the badge and for the resize report. */
+  const screenInfo = { width: 0, height: 0, detected: "phone", matched: null };
+
+  function detectDevice(width) {
+    if (width <= PHONE_MAX) return "phone";
+    if (width <= TABLET_MAX) return "tablet";
+    return "desktop";
+  }
+
+  /**
+   * The mode the user asked for: "auto", "phone" or "desktop".
+   *
+   * "Desktop" is offered rather than "tablet" because the two wide layouts are the same;
+   * what a user on a phone wants when they override is the two-pane view, and what a user on
+   * a desktop wants when they narrow their window is the single column.
+   */
+  function storedViewMode() {
+    try {
+      const value = localStorage.getItem(VIEW_MODE_KEY);
+      return value === "phone" || value === "desktop" ? value : "auto";
+    } catch {
+      return "auto";
+    }
+  }
+
+  let viewMode = storedViewMode();
+
+  /**
+   * `?view=phone|desktop|auto` forces a mode for this load only.
+   *
+   * It exists for the capture harness: a screenshot has to be reproducible, and it should
+   * not depend on what happens to be in localStorage on the machine taking it. It is also
+   * handy for sharing a link to a particular view.
+   */
+  function urlViewMode() {
+    const value = new URLSearchParams(location.search).get("view");
+    return value === "phone" || value === "desktop" || value === "auto" ? value : null;
+  }
+
+  /** Measure the real visible viewport and publish it to CSS. */
+  function measureViewport() {
+    // `visualViewport` is the honest number on mobile: it excludes the browser chrome that
+    // `100vh` includes, which is why a layout built on `vh` is covered by the address bar on
+    // iOS. The fallbacks keep older browsers working.
+    const vv = window.visualViewport;
+    const width = Math.round(vv ? vv.width : window.innerWidth);
+    const height = Math.round(vv ? vv.height : window.innerHeight);
+    const root = document.documentElement;
+
+    root.style.setProperty("--vw", width + "px");
+    root.style.setProperty("--vh", height + "px");
+
+    screenInfo.width = width;
+    screenInfo.height = height;
+
+    // A phone in landscape is wider than PHONE_MAX and would otherwise be treated as a
+    // tablet, which puts two columns on a 390-point-tall screen. Touch plus a short edge is
+    // the signal that this is a handset.
+    const shortEdge = Math.min(width, height);
+    const longEdge = Math.max(width, height);
+    const looksHandheld = shortEdge <= 500 && longEdge <= 1000;
+    screenInfo.detected = looksHandheld ? "phone" : detectDevice(width);
+
+    applyDevice();
+  }
+
+  /** Apply the detected device, the user's override, and the badge. */
+  function applyDevice() {
+    const body = document.body;
+    let device = screenInfo.detected;
+    let layout;
+
+    if (viewMode === "phone") {
+      device = "phone";
+      layout = "thread";
+    } else if (viewMode === "desktop") {
+      // A phone forced to desktop gets the two-pane view; that is what the user asked for.
+      device = "desktop";
+      layout = "split";
+    } else {
+      layout = device === "phone" ? "thread" : "split";
+      // A tablet in portrait is wide but not wide enough for two panes plus comfortable
+      // reading, so it gets the single column at the narrow end of the tablet range.
+      if (device === "tablet" && screenInfo.width <= 720) layout = "thread";
+    }
+
+    body.dataset.device = device;
+    body.dataset.layout = layout;
+
+    for (const [id, mode] of [["view-auto", "auto"], ["view-phone", "phone"], ["view-desktop", "desktop"]]) {
+      $(id)?.classList.toggle("on", viewMode === mode);
+    }
+
+    $("profile-badge").textContent =
+      screenInfo.matched
+        ? `${screenInfo.matched.name} · ${screenInfo.matched.width}×${screenInfo.matched.height}`
+        : `${screenInfo.width}×${screenInfo.height} · unknown device`;
+  }
+
+  function setViewMode(mode) {
+    viewMode = mode;
+    // A deliberate choice clears any forced view in the URL, so the next reload does not
+    // undo it.
+    if (urlViewMode()) history.replaceState(null, "", location.pathname);
+    try {
+      localStorage.setItem(VIEW_MODE_KEY, mode);
+    } catch { /* a private window with storage disabled: the choice just will not persist */ }
+    applyDevice();
+    // The two shapes render different DOM, so one of them has to be rebuilt.
+    rebuildTranscripts();
+    drawMessages();
+    drawLive();
+    if (state.follow) scrollToBottom();
+  }
+
+  /** Ask the known-device list what this screen probably is, for the badge and for support. */
+  async function identifyDevice() {
+    try {
+      const match = await api.get(
+        `/api/device?w=${screenInfo.width}&h=${screenInfo.height}` +
+        `&mobile=${screenInfo.detected !== "desktop"}`);
+      screenInfo.matched = match && match.matched ? match : null;
+    } catch {
+      screenInfo.matched = null;
+    }
+    applyDevice();
+  }
+
+  // ── Rendering ─────────────────────────────────────────────────────────────────────
+
+  /** Rendered messages, keyed by id, so a turn is drawn once per container. */
   const rendered = new Map();
-  let state = null;
-  let layout = localStorage.getItem("chatbots.layout") || "split";
-  let follow = true;
+  const threadCopy = new Map();
 
-  // ── Rendering ───────────────────────────────────────────────────────────────────
-
-  /** The seat index a message belongs to, so it is coloured and filtered correctly. */
   function seatIndexOf(message) {
-    if (!state) return -1;
-    return state.seats.findIndex((s) => s.id === message.speakerID || s.name === message.speaker);
+    if (!state.snapshot) return -1;
+    return state.snapshot.seats.findIndex(
+      (s) => s.id === message.speakerID || s.name === message.speaker);
   }
 
   function formatTime(iso) {
@@ -594,12 +914,22 @@ body[data-layout="thread"] #thread { display: block; }
 
   /** Escape first, then apply the little formatting worth having. */
   function bodyHTML(text) {
-    const safe = text
+    const safe = String(text)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     return safe
       .split(/\\n{2,}/)
       .map((para) => `<p>${para.replace(/`([^`]+)`/g, "<code>$1</code>")}</p>`)
       .join("");
+  }
+
+  function labelFor(message) {
+    switch (message.kind) {
+      case "topic": return "MODERATOR · TOPIC";
+      case "steering": return "MODERATOR";
+      case "summary": return "CONDENSED EARLIER DISCUSSION";
+      case "tool": return "TOOL";
+      default: return String(message.speaker || "?").toUpperCase();
+    }
   }
 
   function messageElement(message) {
@@ -610,56 +940,29 @@ body[data-layout="thread"] #thread { display: block; }
     el.dataset.kind = message.kind;
     if (seat >= 0) el.dataset.seat = String(seat);
 
-    const who = document.createElement("div");
-    who.className = "msg-head";
-    const name = document.createElement("span");
-    name.className = "msg-who";
-    name.textContent = labelFor(message, seat);
+    const head = document.createElement("div");
+    head.className = "msg-head";
+    const who = document.createElement("span");
+    who.className = "msg-who";
+    who.textContent = labelFor(message);
     const time = document.createElement("span");
     time.className = "msg-time";
     time.textContent = formatTime(message.timestamp);
-    who.append(name, time);
+    head.append(who, time);
 
     const body = document.createElement("div");
     body.className = "msg-body";
     body.innerHTML = bodyHTML(message.text || "");
 
-    el.append(who, body);
+    el.append(head, body);
     return el;
   }
 
-  function labelFor(message, seat) {
-    switch (message.kind) {
-      case "topic": return "MODERATOR · TOPIC";
-      case "steering": return "MODERATOR";
-      case "summary": return "CONDENSED EARLIER DISCUSSION";
-      case "tool": return "TOOL";
-      default: return (message.speaker || (seat >= 0 ? state.seats[seat].name : "?")).toUpperCase();
-    }
-  }
-
-  /** Append messages that have not been drawn yet, in order. */
-  function drawMessages() {
-    if (!state) return;
-    for (const message of state.messages) {
-      if (rendered.has(message.id)) continue;
-      const el = messageElement(message);
-      rendered.set(message.id, el);
-      // Everything goes into the thread; each pane gets what belongs to it.
-      $("thread").append(el.cloneNode(true));
-      for (const [index, pane] of panes().entries()) {
-        const seat = seatIndexOf(message);
-        if (seat === index) pane.transcript.append(el);
-        else if (message.kind === "topic" || message.kind === "summary") {
-          pane.transcript.append(el.cloneNode(true));
-        }
-      }
-      // The moderator's own words belong in both panes: they are addressed to both.
-      if (message.kind === "steering") {
-        for (const pane of panes()) pane.transcript.append(el.cloneNode(true));
-      }
-    }
-    trimEmptyNotes();
+  function containers() {
+    return [
+      ...document.querySelectorAll(".transcript"),
+      $("thread"),
+    ].filter(Boolean);
   }
 
   function panes() {
@@ -669,161 +972,212 @@ body[data-layout="thread"] #thread { display: block; }
     }));
   }
 
-  function trimEmptyNotes() {
-    for (const pane of panes()) {
-      const note = pane.transcript.querySelector(".empty");
-      const hasMessages = pane.transcript.querySelector(".msg");
-      if (hasMessages && note) note.remove();
-      if (!hasMessages && !note) {
-        const empty = document.createElement("div");
-        empty.className = "empty";
-        empty.textContent = "Nothing yet.";
-        pane.transcript.append(empty);
-      }
-    }
-    const thread = $("thread");
-    const has = thread.querySelector(".msg");
-    const note = thread.querySelector(".empty");
-    if (has && note) note.remove();
-    if (!has && !note) {
-      const empty = document.createElement("div");
-      empty.className = "empty";
-      empty.textContent = "Nothing yet.";
-      thread.append(empty);
-    }
+  /** Throw away the rendered copies, for when the shape of the DOM changes. */
+  function rebuildTranscripts() {
+    rendered.clear();
+    threadCopy.clear();
+    for (const container of containers()) container.textContent = "";
   }
 
-  /** Draw the live reply being written, appending rather than rebuilding. */
-  function drawLive() {
-    if (!state) return;
-    for (const [index, pane] of panes().entries()) {
-      const seat = state.seats[index];
-      if (!seat) continue;
-      const live = state.live.find((l) => l.seatID === seat.id);
-      const existing = pane.transcript.querySelector(".msg.live");
+  function drawMessages() {
+    if (!state.snapshot) return;
+    const inThread = document.body.dataset.layout === "thread";
 
-      if (!live || (!live.isGenerating && !live.text && !live.reasoning)) {
-        if (existing) existing.remove();
+    for (const message of state.snapshot.messages) {
+      const seat = seatIndexOf(message);
+      const shared = message.kind === "steering" || message.kind === "topic" ||
+                     message.kind === "summary";
+
+      // The single-column view holds everything once.
+      if (inThread) {
+        if (threadCopy.has(message.id)) continue;
+        const el = messageElement(message);
+        threadCopy.set(message.id, el);
+        $("thread").append(el);
         continue;
       }
 
-      let el = existing;
-      if (!el) {
-        el = document.createElement("div");
-        el.className = "msg live";
-        el.dataset.seat = String(index);
-        el.dataset.kind = "chat";
-        el.innerHTML =
-          `<div class="msg-head"><span class="msg-who">${seat.name.toUpperCase()}</span>` +
-          `<span class="msg-time">writing…</span></div>` +
-          `<div class="msg-body caret"></div>`;
+      // The two-pane view splits by speaker, with moderator turns in both.
+      for (const [index, pane] of panes().entries()) {
+        const belongs = seat === index || shared || (message.kind === "tool" && seat === index);
+        if (!belongs) continue;
+        const key = `${message.id}:${index}`;
+        if (rendered.has(key)) continue;
+        const el = messageElement(message);
+        rendered.set(key, el);
         pane.transcript.append(el);
       }
-      const body = el.querySelector(".msg-body");
-      // Only touch the DOM when the text has actually grown.
-      if (body.dataset.length !== String(live.text.length)) {
-        body.innerHTML = bodyHTML(live.text || "");
-        body.dataset.length = String(live.text.length);
-      }
-      body.classList.toggle("caret", live.isGenerating);
-      el.querySelector(".msg-time").textContent = live.isGenerating ? "writing…" : formatTime(new Date().toISOString());
+    }
+    trimEmptyNotes();
+  }
 
-      // Thinking is shown only when asked for, and only while there is any.
-      let thinking = el.querySelector(".thinking");
-      const wantThinking = $("thinking").checked && live.reasoning;
-      if (wantThinking) {
-        if (!thinking) {
-          thinking = document.createElement("div");
-          thinking.className = "thinking";
-          el.append(thinking);
-        }
-        if (thinking.dataset.length !== String(live.reasoning.length)) {
-          thinking.textContent = live.reasoning;
-          thinking.dataset.length = String(live.reasoning.length);
-          thinking.scrollTop = thinking.scrollHeight;
-        }
-      } else if (thinking) {
-        thinking.remove();
+  function trimEmptyNotes() {
+    for (const container of containers()) {
+      const has = container.querySelector(".msg");
+      const note = container.querySelector(".empty");
+      if (has && note) note.remove();
+      if (!has && !note) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = document.body.dataset.layout === "thread"
+          ? "Nothing yet. Set a topic and press Start."
+          : "Nothing yet.";
+        container.append(empty);
       }
     }
-    if (follow) scrollToBottom();
+  }
+
+  /** Draw the reply currently being written, appending rather than rebuilding. */
+  function drawLive() {
+    if (!state.snapshot) return;
+    const inThread = document.body.dataset.layout === "thread";
+    const liveFor = (seatID) => state.snapshot.live.find((l) => l.seatID === seatID);
+
+    if (inThread) {
+      for (const seat of state.snapshot.seats) {
+        const live = liveFor(seat.id);
+        const existing = document.querySelector(`.msg.live[data-seat-id="${cssEscape(seat.id)}"]`);
+        const active = live && (live.isGenerating || live.text || live.reasoning);
+        if (!active) { existing?.remove(); continue; }
+        const el = existing ?? createLiveElement(seat.id, seat.name, -1);
+        $("thread").append(el);
+        updateLiveElement(el, live);
+      }
+      if (state.follow) scrollToBottom();
+      return;
+    }
+
+    for (const [index, pane] of panes().entries()) {
+      const seat = state.snapshot.seats[index];
+      if (!seat) continue;
+      const live = liveFor(seat.id);
+      const existing = pane.transcript.querySelector(".msg.live");
+      const active = live && (live.isGenerating || live.text || live.reasoning);
+      if (!active) { existing?.remove(); continue; }
+      const el = existing ?? createLiveElement(seat.id, seat.name, index);
+      pane.transcript.append(el);
+      updateLiveElement(el, live);
+    }
+    if (state.follow) scrollToBottom();
+  }
+
+  function cssEscape(value) {
+    return String(value).replace(/["\\\\]/g, "\\\\$&");
+  }
+
+  function createLiveElement(seatID, name, seatIndex) {
+    const el = document.createElement("div");
+    el.className = "msg live";
+    el.dataset.seatId = seatID;
+    if (seatIndex >= 0) el.dataset.seat = String(seatIndex);
+    el.dataset.kind = "chat";
+    el.innerHTML =
+      `<div class="msg-head"><span class="msg-who">${name.toUpperCase()}</span>` +
+      `<span class="msg-time">writing…</span></div>` +
+      `<div class="msg-body caret"></div>`;
+    return el;
+  }
+
+  function updateLiveElement(el, live) {
+    const body = el.querySelector(".msg-body");
+    // Only touch the DOM when the text actually grew.
+    if (body.dataset.length !== String(live.text.length)) {
+      body.innerHTML = bodyHTML(live.text || "");
+      body.dataset.length = String(live.text.length);
+    }
+    body.classList.toggle("caret", live.isGenerating);
+    el.querySelector(".msg-time").textContent = live.isGenerating ? "writing…" : "just now";
+
+    // Thinking is shown only when asked for. On a phone it starts collapsed, because it is
+    // long and the answer is what the reader came for.
+    let thinking = el.querySelector(".thinking");
+    const wantThinking = $("thinking").checked && live.reasoning;
+    if (wantThinking) {
+      if (!thinking) {
+        thinking = document.createElement("div");
+        thinking.className = "thinking";
+        el.append(thinking);
+      }
+      if (thinking.dataset.length !== String(live.reasoning.length)) {
+        thinking.textContent = live.reasoning;
+        thinking.dataset.length = String(live.reasoning.length);
+        thinking.scrollTop = thinking.scrollHeight;
+      }
+    } else if (thinking) {
+      thinking.remove();
+    }
   }
 
   function scrollToBottom() {
-    for (const container of [...panes().map((p) => p.transcript), $("thread")]) {
-      container.scrollTop = container.scrollHeight;
-    }
+    for (const container of containers()) container.scrollTop = container.scrollHeight;
   }
 
-  // ── State → interface ───────────────────────────────────────────────────────────
+  // ── State → interface ─────────────────────────────────────────────────────────────
 
   function apply(next) {
-    const first = state === null;
-    state = next;
-
-    if (first) {
-      $("topic").value = next.topic || "";
-    }
+    const first = state.snapshot === null;
+    state.snapshot = next;
+    if (first) $("topic").value = next.topic || "";
     drawMessages();
     drawLive();
     drawControls();
     drawSeats();
     drawAttachments();
     drawContext();
-    if (first && next.messages.length) scrollToBottom();
+    if (first && next.messages.length && state.follow) scrollToBottom();
   }
 
   function drawControls() {
-    const running = state.isRunning || state.status === "Paused";
-    $("start").textContent = state.messages.length ? "Restart" : "Start";
+    const s = state.snapshot;
+    const running = s.isRunning || s.status === "Paused";
+    $("start").textContent = s.messages.length ? "Restart" : "Start";
     $("start").disabled = false;
-    $("pause").disabled = !state.isRunning;
-    $("pause").textContent = state.status === "Paused" ? "Resume" : "Pause";
+    $("pause").disabled = !s.isRunning;
+    $("pause").textContent = s.status === "Paused" ? "Resume" : "Pause";
     $("stop").disabled = !running;
-    $("clear").disabled = state.messages.length === 0 && !running;
-    $("save").disabled = state.messages.length === 0;
-    $("condense").disabled = state.messages.length === 0;
-    $("send").disabled = !state.isRunning && !state.isPaused;
-    $("topic").disabled = state.messages.length > 0;
-    $("attach").disabled = !state.canAttach;
-    $("files").disabled = !state.canAttach;
+    $("clear").disabled = s.messages.length === 0 && !running;
+    $("save").disabled = s.messages.length === 0;
+    $("condense").disabled = s.messages.length === 0;
+    $("send").disabled = !running;
+    $("topic").disabled = s.messages.length > 0;
+    $("attach").disabled = !s.canAttach;
+    $("files").disabled = !s.canAttach;
 
     const pill = $("status");
-    pill.textContent = state.status;
+    pill.textContent = s.status;
     pill.className = "pill" +
-      (state.isRunning ? " running" : state.status === "Paused" ? " paused" :
-       state.status.startsWith("Failed") ? " failed" : "");
-
-    $("counts").textContent = `${state.turnsCompleted} turn${state.turnsCompleted === 1 ? "" : "s"}`;
-
-    if (state.error) toast(state.error);
+      (s.isRunning ? " running" : s.status === "Paused" ? " paused" :
+       String(s.status).startsWith("Failed") ? " failed" : "");
+    $("counts").textContent = `${s.turnsCompleted} turn${s.turnsCompleted === 1 ? "" : "s"}`;
+    if (s.error) toast(s.error);
   }
 
   function drawSeats() {
+    const s = state.snapshot;
     for (const [index, pane] of panes().entries()) {
-      const seat = state.seats[index];
+      const seat = s.seats[index];
       if (!seat) continue;
       const nameEl = pane.root.querySelector(".name");
       if (nameEl.contentEditable !== "true") nameEl.textContent = seat.name;
       pane.root.querySelector(".meta").textContent =
         `${seat.modelShortName} · ${seat.backend === "mlx" ? "MLX" : "API"} · ${seat.personaName}`;
-      const live = state.live.find((l) => l.seatID === seat.id);
-      const stateEl = pane.root.querySelector(".state");
+      const live = s.live.find((l) => l.seatID === seat.id);
       const busy = live && live.isGenerating;
+      const stateEl = pane.root.querySelector(".state");
       stateEl.className = "state" + (busy ? " live" : "");
-      stateEl.textContent = busy ? (live.activity || "thinking…") : (seat.thinking === "off" ? "ready" : `ready · ${seat.thinking}`);
+      stateEl.textContent = busy ? (live.activity || "thinking…") : "ready";
       pane.root.querySelector(".params").textContent =
         `temp ${seat.temperature.toFixed(2)} · top-p ${seat.topP.toFixed(2)} · top-k ${seat.topK} · ` +
         `min-p ${seat.minP.toFixed(1)} · pres ${Math.abs(seat.presencePenalty ?? 0).toFixed(1)} · ` +
-        `max ${Math.round(seat.maxTokens / 1024)}k tok${seat.webSearch ? " · web" : ""} · ${seat.vision ? "vision" : "no vision"}`;
+        `max ${Math.round(seat.maxTokens / 1024)}k${seat.webSearch ? " · web" : ""}`;
     }
-    $("persona-summary").textContent = state.seats.map((s) => `${s.name}: ${s.personaName}`).join("   ↔   ");
+    $("persona-summary").textContent = s.seats.map((x) => `${x.name}: ${x.personaName}`).join("  ↔  ");
 
     const note = $("vision-note");
-    if (state.imagesAllowed) {
+    if (s.imagesAllowed) {
       note.hidden = true;
     } else {
-      const blind = state.seats.filter((s) => !s.vision).map((s) => s.name);
+      const blind = s.seats.filter((x) => !x.vision).map((x) => x.name);
       note.hidden = false;
       note.textContent = `Images hidden — cannot see: ${blind.join(", ")}`;
     }
@@ -832,21 +1186,26 @@ body[data-layout="thread"] #thread { display: block; }
   function drawAttachments() {
     const chips = $("chips");
     chips.textContent = "";
-    for (const doc of state.attachments) {
+    const row = document.querySelector(".attach-row");
+    // On a phone an empty attachment row is collapsed, so the chip list has to keep it open
+    // once there is something in it.
+    row?.classList.toggle("has-chips", state.snapshot.attachments.length > 0);
+
+    for (const doc of state.snapshot.attachments) {
       const chip = document.createElement("span");
       chip.className = "chip";
       const name = document.createElement("b");
       name.textContent = doc.name;
       const detail = document.createElement("span");
-      detail.textContent = `${doc.summary}${doc.wasTruncated ? " · shortened" : ""} · ${doc.tokens} tok`;
+      detail.textContent = `${doc.summary}${doc.wasTruncated ? " · shortened" : ""}`;
       const remove = document.createElement("button");
       remove.textContent = "✕";
       remove.title = `Remove ${doc.name}`;
-      remove.disabled = !state.canAttach;
+      remove.setAttribute("aria-label", `Remove ${doc.name}`);
+      remove.disabled = !state.snapshot.canAttach;
       remove.onclick = async () => {
-        try {
-          apply(await api.post("/api/attachments/remove", { value: doc.id }));
-        } catch (error) { toast(error.message); }
+        try { apply(await api.post("/api/attachments/remove", { value: doc.id })); }
+        catch (error) { toast(error.message); }
       };
       chip.append(name, detail, remove);
       chips.append(chip);
@@ -854,10 +1213,10 @@ body[data-layout="thread"] #thread { display: block; }
   }
 
   function drawContext() {
-    const pct = Math.round(state.contextFraction * 100);
+    const s = state.snapshot;
+    const pct = Math.round(s.contextFraction * 100);
     $("context").textContent =
-      `ctx ${compact(state.contextTokens)}/${compact(state.contextWindow)} · ${pct}% ` +
-      `(condense at ${Math.round(state.compactThreshold * 100)}%)`;
+      `ctx ${compact(s.contextTokens)}/${compact(s.contextWindow)} · ${pct}%`;
   }
 
   function compact(n) {
@@ -876,7 +1235,7 @@ body[data-layout="thread"] #thread { display: block; }
     toastTimer = setTimeout(() => { el.hidden = true; }, 6000);
   }
 
-  // ── Commands ────────────────────────────────────────────────────────────────────
+  // ── Commands ──────────────────────────────────────────────────────────────────────
 
   async function run(fn) {
     try {
@@ -890,14 +1249,14 @@ body[data-layout="thread"] #thread { display: block; }
   function wire() {
     $("start").onclick = () => run(() => api.post("/api/start"));
     $("pause").onclick = () => run(() =>
-      api.post(state && state.status === "Paused" ? "/api/resume" : "/api/pause"));
+      api.post(state.snapshot && state.snapshot.status === "Paused" ? "/api/resume" : "/api/pause"));
     $("stop").onclick = () => run(() => api.post("/api/stop"));
     $("clear").onclick = () => run(() => api.post("/api/reset"));
     $("condense").onclick = () => run(() => api.post("/api/compact"));
 
     $("topic").addEventListener("change", () => {
       const value = $("topic").value.trim();
-      if (!value || (state && value === state.topic)) return;
+      if (!value || (state.snapshot && value === state.snapshot.topic)) return;
       run(() => api.post("/api/topic", { topic: value }));
     });
 
@@ -906,24 +1265,22 @@ body[data-layout="thread"] #thread { display: block; }
 
     $("send").onclick = send;
     $("message").addEventListener("keydown", (event) => {
-      // Return sends; Shift-Return is a newline, as in every other message box.
-      if (event.key === "Enter" && !event.shiftKey) {
+      // Return sends on a desktop; on a phone the return key is how you start a new line, so
+      // it must insert one.
+      if (event.key === "Enter" && !event.shiftKey && document.body.dataset.device === "desktop") {
         event.preventDefault();
         send();
       }
     });
 
     $("save").onclick = save;
-
     $("attach").onclick = () => $("files").click();
     $("files").onchange = (event) => addFiles([...event.target.files]);
 
-    $("layout-split").onclick = () => setLayout("split");
-    $("layout-thread").onclick = () => setLayout("thread");
-    setLayout(layout);
+    $("view-auto").onclick = () => setViewMode("auto");
+    $("view-phone").onclick = () => setViewMode("phone");
+    $("view-desktop").onclick = () => setViewMode("desktop");
 
-    // Renaming: a double-click, or a press of Return on the focused button, so it is
-    // reachable without a mouse.
     for (const button of document.querySelectorAll(".name")) {
       button.addEventListener("dblclick", () => startRename(button));
       button.addEventListener("keydown", (event) => {
@@ -931,12 +1288,11 @@ body[data-layout="thread"] #thread { display: block; }
       });
     }
 
-    // Only auto-scroll while the reader is already at the bottom.
-    for (const container of [...panes().map((p) => p.transcript), $("thread")]) {
+    for (const container of containers()) {
       container.addEventListener("scroll", () => {
         const distance = container.scrollHeight - container.scrollTop - container.clientHeight;
-        follow = distance < 40;
-      });
+        state.follow = distance < 40;
+      }, { passive: true });
     }
 
     window.addEventListener("keydown", (event) => {
@@ -945,6 +1301,30 @@ body[data-layout="thread"] #thread { display: block; }
         if (event.key === "Enter") { event.preventDefault(); $("start").click(); }
       }
     });
+
+    // The viewport changes when a phone's address bar hides, when the keyboard opens, and on
+    // rotation. All three change the usable height, so all three are re-measured.
+    const remeasure = debounce(() => {
+      measureViewport();
+      identifyDevice();
+    }, 120);
+    window.addEventListener("resize", remeasure, { passive: true });
+    window.addEventListener("orientationchange", remeasure, { passive: true });
+    window.visualViewport?.addEventListener("resize", remeasure, { passive: true });
+
+    // Keep the message box visible when the keyboard opens on a phone, which otherwise
+    // pushes the footer under it.
+    $("message").addEventListener("focus", () => {
+      setTimeout(() => { if (state.follow) scrollToBottom(); }, 250);
+    });
+  }
+
+  function debounce(fn, ms) {
+    let timer = null;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn(...args), ms);
+    };
   }
 
   async function send() {
@@ -962,9 +1342,12 @@ body[data-layout="thread"] #thread { display: block; }
   }
 
   function startRename(button) {
-    if (state && !state.canAttach) { toast("Names are fixed once the conversation has started."); return; }
+    if (state.snapshot && !state.snapshot.canAttach) {
+      toast("Names are fixed once the conversation has started.");
+      return;
+    }
     const index = Number(button.dataset.rename);
-    const seat = state.seats[index];
+    const seat = state.snapshot.seats[index];
     button.contentEditable = "true";
     button.focus();
     const range = document.createRange();
@@ -993,41 +1376,23 @@ body[data-layout="thread"] #thread { display: block; }
     button.addEventListener("keydown", onKey);
   }
 
-  function setLayout(next) {
-    layout = next;
-    document.body.dataset.layout = next;
-    localStorage.setItem("chatbots.layout", next);
-    $("layout-split").classList.toggle("on", next === "split");
-    $("layout-thread").classList.toggle("on", next === "thread");
-    if (next === "thread") {
-      // The thread is rebuilt from the state so it is always in order.
-      $("thread").textContent = "";
-      rendered.clear();
-      for (const pane of panes()) pane.transcript.textContent = "";
-      drawMessages();
-      drawLive();
-      scrollToBottom();
-    }
-  }
-
   async function addFiles(files) {
     if (!files.length) return;
     for (const file of files) {
       try {
         const buffer = await file.arrayBuffer();
-        // Base64 rather than multipart: one code path on both sides, and the files are
-        // documents rather than media.
+        // Base64 rather than multipart: one code path on both sides, and these are documents
+        // rather than media.
         let binary = "";
         const bytes = new Uint8Array(buffer);
         const chunk = 0x8000;
         for (let i = 0; i < bytes.length; i += chunk) {
           binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
         }
-        const next = await api.post("/api/attachments", {
+        apply(await api.post("/api/attachments", {
           filename: file.name,
           content: btoa(binary),
-        });
-        apply(next);
+        }));
         toast(`Added ${file.name}`, true);
       } catch (error) {
         toast(`${file.name}: ${error.message}`);
@@ -1037,7 +1402,8 @@ body[data-layout="thread"] #thread { display: block; }
   }
 
   function save() {
-    if (!state) return;
+    if (!state.snapshot) return;
+    const s = state.snapshot;
     const pad = (n) => String(n).padStart(2, "0");
     const stamp = (iso) => {
       const d = new Date(iso);
@@ -1046,18 +1412,17 @@ body[data-layout="thread"] #thread { display: block; }
     };
     const now = new Date();
     let out = "ChatBots — conversation log\\n";
-    out += `Topic: ${state.topic || "(none)"}\\n`;
-    for (const seat of state.seats) out += `Participant: ${seat.name} (${seat.modelShortName})\\n`;
+    out += `Topic: ${s.topic || "(none)"}\\n`;
+    for (const seat of s.seats) out += `Participant: ${seat.name} (${seat.modelShortName})\\n`;
     out += `Exported: ${stamp(now)}\\n\\n${"-".repeat(72)}\\n`;
-    for (const message of state.messages) {
+    for (const message of s.messages) {
       if (message.kind === "introduction") continue;
-      const who = labelFor(message, seatIndexOf(message));
-      out += `\\n[${stamp(message.timestamp)}] ${who}\\n`;
+      out += `\\n[${stamp(message.timestamp)}] ${labelFor(message)}\\n`;
       out += message.text.split("\\n").map((line) => "    " + line).join("\\n") + "\\n";
     }
     const blob = new Blob([out], { type: "text/plain;charset=utf-8" });
     const a = document.createElement("a");
-    const slug = (state.topic || "conversation").replace(/[^a-zA-Z0-9 ]/g, "").trim()
+    const slug = (s.topic || "conversation").replace(/[^a-zA-Z0-9 ]/g, "").trim()
       .replace(/\\s+/g, "-").slice(0, 60);
     a.href = URL.createObjectURL(blob);
     a.download = `ChatBots ${slug} ${stamp(now).replace(/:/g, "-")}.txt`;
@@ -1065,28 +1430,80 @@ body[data-layout="thread"] #thread { display: block; }
     URL.revokeObjectURL(a.href);
   }
 
-  // ── Events ──────────────────────────────────────────────────────────────────────
+  // ── Events ────────────────────────────────────────────────────────────────────────
 
-  function listen() {
-    const source = new EventSource("/api/events");
-    source.addEventListener("snapshot", (event) => {
-      $("status").title = "";
-      apply(JSON.parse(event.data));
+  /**
+   * Whether this load is a still capture.
+   *
+   * `?capture=1` skips the event stream. A headless screenshot never receives an update, so
+   * the stream buys nothing, and an open connection is exactly what stops Chrome's virtual
+   * time budget from expiring — it waits for the network to go quiet, and a server-sent feed
+   * never does. The state fetched on load is everything a capture needs.
+   */
+  const isCapture = new URLSearchParams(location.search).has("capture");
+  const isDiagnostic = new URLSearchParams(location.search).has("diag");
+
+  /**
+   * Report what this page measured about its own layout.
+   *
+   * Opt-in via `?diag=1`, and it exists because "is this laid out right on a 360-point
+   * screen" is otherwise answered by reading a screenshot. It names the elements that are
+   * wider than the viewport, which is the actual cause of a sideways-scrolling page; the
+   * number alone would only say that something is wrong.
+   */
+  async function reportLayout() {
+    if (!isDiagnostic) return;
+    const root = document.documentElement;
+    const viewport = Math.round(window.visualViewport?.width ?? window.innerWidth);
+    const overflowing = [];
+    for (const el of document.querySelectorAll("body *")) {
+      const rect = el.getBoundingClientRect();
+      if (rect.width > viewport + 1 || rect.right > viewport + 1) {
+        const id = el.id ? `#${el.id}` : "";
+        const cls = el.className && typeof el.className === "string"
+          ? "." + el.className.trim().split(/\\s+/).slice(0, 2).join(".")
+          : "";
+        overflowing.push(`${el.tagName.toLowerCase()}${id}${cls}(${Math.round(rect.width)})`);
+      }
+    }
+    // Worst first, and only the first few: a hundred entries help nobody.
+    overflowing.sort((a, b) => {
+      const num = (s) => Number(s.match(/\\((\\d+)\\)$/)?.[1] ?? 0);
+      return num(b) - num(a);
     });
-    source.addEventListener("turn", () => {
-      // A new turn is in the state that follows; the event exists so a front end can react
-      // immediately rather than waiting for the next snapshot.
-    });
-    source.onerror = () => {
-      // EventSource reconnects on its own. Saying so would be noise; saying it once is not.
-      toast("Lost the connection to the server — reconnecting…");
-    };
+    try {
+      await api.post("/api/client-report", {
+        width: viewport,
+        height: Math.round(window.visualViewport?.height ?? window.innerHeight),
+        pixelRatio: window.devicePixelRatio,
+        device: document.body.dataset.device,
+        layout: document.body.dataset.layout,
+        scrollWidth: root.scrollWidth,
+        profile: screenInfo.matched ? screenInfo.matched.name : null,
+        overflowing: overflowing.slice(0, 6),
+      });
+    } catch { /* a diagnostic that fails must not break the page */ }
   }
 
-  // ── Start ───────────────────────────────────────────────────────────────────────
+  function listen() {
+    if (isCapture) return;
+    const source = new EventSource("/api/events");
+    source.addEventListener("snapshot", (event) => apply(JSON.parse(event.data)));
+    source.addEventListener("turn", () => { /* the following snapshot carries it */ });
+    source.onerror = () => toast("Lost the connection to the server — reconnecting…");
+  }
 
+  // ── Start ─────────────────────────────────────────────────────────────────────────
+  // Measured before anything is drawn, so the first paint is already in the right shape.
+
+  // A forced view is applied before the first measure so the first paint is already right.
+  const forced = urlViewMode();
+  if (forced) viewMode = forced;
+
+  measureViewport();
   wire();
   api.get("/api/state").then(apply).catch((error) => toast(error.message));
+  identifyDevice().then(reportLayout);
   listen();
 })();
 

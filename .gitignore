@@ -17,3 +17,6 @@ models/.hf-model.json
 
 # Runtime state from tools/start.sh (pid files and logs)
 .run/
+
+# Device captures from tools/capture-devices.py (regenerate rather than commit)
+captures/

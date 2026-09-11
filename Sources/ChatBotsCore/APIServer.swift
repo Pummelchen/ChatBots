@@ -102,6 +102,91 @@ public struct APIPersona: Codable, Sendable {
     public var summary: String
 }
 
+/// What the client measured about its own layout.
+public struct ClientReport: Codable, Sendable {
+    public var width: Int
+    public var height: Int
+    public var pixelRatio: Double
+    public var device: String
+    public var layout: String
+    public var scrollWidth: Int
+    public var profile: String?
+    /// Selectors of elements wider than the viewport, worst first.
+    public var overflowing: [String]
+
+    public init(
+        width: Int, height: Int, pixelRatio: Double, device: String, layout: String,
+        scrollWidth: Int, profile: String?, overflowing: [String]
+    ) {
+        self.width = width
+        self.height = height
+        self.pixelRatio = pixelRatio
+        self.device = device
+        self.layout = layout
+        self.scrollWidth = scrollWidth
+        self.profile = profile
+        self.overflowing = overflowing
+    }
+}
+
+/// The profile list, flattened for the wire.
+public struct DeviceList: Codable, Sendable {
+    public struct Entry: Codable, Sendable {
+        public var id: String
+        public var name: String
+        public var `class`: String
+        public var width: Int
+        public var height: Int
+        public var pixelRatio: Double
+        public var year: Int
+        public var common: Bool
+
+        enum CodingKeys: String, CodingKey {
+            case id, name, width, height, pixelRatio, year, common
+            case `class` = "class"
+        }
+    }
+
+    public var profiles: [Entry]
+    public var captureSet: [String]
+
+    init(profiles: [ListedProfile], captureSet: [String]) {
+        self.profiles = profiles.map(\.entry)
+        self.captureSet = captureSet
+    }
+}
+
+public struct ListedProfile: Codable, Sendable {
+    public var entry: DeviceList.Entry
+    public var index: Int
+
+    init(profile: DeviceProfile, common: Bool, index: Int) {
+        self.entry = DeviceList.Entry(
+            id: profile.id, name: profile.name, class: profile.kind.rawValue,
+            width: profile.width, height: profile.height,
+            pixelRatio: profile.pixelRatio, year: profile.year, common: common)
+        self.index = index
+    }
+}
+
+/// The answer to "what screen am I on".
+public struct DeviceMatch: Codable, Sendable {
+    public var matched: Bool
+    public var profile: DeviceProfile?
+    public var width: Int
+    public var height: Int
+    /// The class the layout would use here, which is useful even when the device is unknown.
+    public var deviceClass: String
+
+    init(matched: Bool, profile: DeviceProfile?, width: Int, height: Int) {
+        self.matched = matched
+        self.profile = profile
+        self.width = width
+        self.height = height
+        self.deviceClass = profile?.kind.rawValue ?? (width <= 719 ? "phone" : width <= 1023 ? "tablet" : "desktop")
+    }
+}
+
 /// A command from a front end. Decoded from a small JSON body.
 public struct APICommand: Codable, Sendable {
     public var topic: String?
@@ -196,6 +281,31 @@ public final class APIServer {
         case ("GET", "/api/state"):
             return .json(snapshot())
 
+        case ("GET", "/api/devices"):
+            // The whole profile list, so the capture harness and the interface share one
+            // source of truth for what a device is.
+            return .json(
+                DeviceList(
+                    profiles: DeviceProfiles.all.enumerated().map { index, profile in
+                        ListedProfile(profile: profile, common: profile.isCommon, index: index)
+                    },
+                    captureSet: DeviceProfiles.captureSet.map(\.id)))
+
+        case ("GET", "/api/device"):
+            // Identify the screen, so the interface can name it and so support can ask what
+            // a report came from. An unknown device is a valid answer, not an error: the
+            // layout branches on width, and the profiles exist to check the widths in use.
+            let width = request.int("w") ?? 0
+            let height = request.int("h") ?? 0
+            let isMobile = request.string("mobile") != "false"
+            guard width > 0 else {
+                return .error("w is required", status: 400)
+            }
+            if let match = DeviceProfiles.nearest(width: width, height: height, isMobile: isMobile) {
+                return .json(DeviceMatch(matched: true, profile: match, width: width, height: height))
+            }
+            return .json(DeviceMatch(matched: false, profile: nil, width: width, height: height))
+
         case ("GET", "/api/personas"):
             return .json(PersonaLibrary.all.map {
                 APIPersona(id: $0.id, name: $0.name, category: $0.category.rawValue, summary: $0.summary)
@@ -257,6 +367,25 @@ public final class APIServer {
 
         case ("POST", "/api/seat"):
             return applySeatCommand(request)
+
+        case ("POST", "/api/client-report"):
+            // The client telling us what it measured. Written to stderr so a capture run
+            // leaves a record of the real viewport and any element overflowing it — the
+            // question "is this laid out correctly on a 360-point screen" is otherwise
+            // answered by squinting at a screenshot.
+            if let report = request.json(ClientReport.self) {
+                var line = "[client] \(report.width)x\(report.height) @\(report.pixelRatio)x"
+                line += " device=\(report.device) layout=\(report.layout)"
+                line += " scrollWidth=\(report.scrollWidth)"
+                if let profile = report.profile { line += " profile=\(profile)" }
+                if report.overflowing.isEmpty {
+                    line += " overflow=none"
+                } else {
+                    line += " overflow=\(report.overflowing.joined(separator: ","))"
+                }
+                FileHandle.standardError.write(Data((line + "\n").utf8))
+            }
+            return .json(["ok": "true"])
 
         case ("POST", "/api/attachments"):
             return addAttachment(request)

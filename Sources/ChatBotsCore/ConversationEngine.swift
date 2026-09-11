@@ -644,6 +644,22 @@ public final class ConversationEngine {
 
     // MARK: - Transcript plumbing
 
+    /// Insert turns directly, without running a model.
+    ///
+    /// For laying out the interface against a realistic conversation — screen captures, and
+    /// checking a long reply renders — without waiting for a model to produce one. It is
+    /// deliberately not reachable from any route: the API has no endpoint that fabricates a
+    /// conversation, so nothing a user can press will put words in a participant's mouth.
+    public func seed(_ turns: [Turn]) {
+        guard generationTask == nil else { return }
+        for turn in turns {
+            var copy = turn
+            copy.sequence = nextSequence()
+            conversation.turns.append(copy)
+        }
+        publishTranscript()
+    }
+
     /// Set the source material seats should read. Rejected once a conversation is running,
     /// since the material is context for the discussion rather than a message in it.
     @discardableResult

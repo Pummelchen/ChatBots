@@ -30,6 +30,7 @@ struct Options {
     var mode = DiscussionMode.entertainment
     var listCharacters = false
     var attachments: [String] = []
+    var seed = false
     var listRoles = false
     var port = 7788
     var contextWindow: Int?
@@ -93,6 +94,7 @@ struct Options {
             case "--check": options.check = true
             case "--serve": options.serve = true
             case "--attach": options.attachments.append(next() ?? "")
+            case "--seed": options.seed = true
             case "--list-characters": options.listCharacters = true
             case "--list-roles": options.listRoles = true
             case "--mode":
@@ -488,10 +490,8 @@ if !options.attachments.isEmpty {
     }
 }
     if !options.topic.isEmpty { _ = engine.setTopic(options.topic) }
-    for (index, spec) in specs.enumerated() where engine.attachments.isEmpty {
-        _ = index
-        _ = spec
-    }
+    // A sample conversation, for laying out the interface without waiting for a model.
+    if options.seed { engine.seed(SampleConversation.turns(topic: engine.topic)) }
 
     // Documents are read by the app's extractors, which live in the app target; the CLI
     // links the same code, so the server can accept uploads too.
