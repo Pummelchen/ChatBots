@@ -732,6 +732,64 @@ cutting that tenth away and leaving a white sliver wherever the mask and the art
 not line up exactly. Verified by asking the system for the finished app's icon
 (`NSWorkspace.icon(forFile:)`), which returns the artwork with macOS's mask applied.
 
+## Cloud models: what works, and what was measured
+
+The API backend speaks the **OpenAI Responses API** (`POST /v1/responses`), not the older
+chat-completions shape. Verified working against:
+
+| Provider | Base URL | Models | Notes |
+| --- | --- | --- | --- |
+| DeepSeek | `https://api.deepseek.com/v1` | `deepseek-v4-pro`, `deepseek-flash` | Responses API, streaming, reasoning, **all** sampler extensions accepted |
+| LM Studio (local) | `http://localhost:1234/v1` | whatever is loaded | Responses API from 0.3.39 |
+
+### What testing against DeepSeek found
+
+Three things that a local server would never have exposed, all of which produced an **empty
+reply** rather than an error — the worst kind of failure, because it looks like the model
+had nothing to say:
+
+**1. Reasoning shares the output ceiling.** A Responses-API server counts reasoning tokens
+against `max_output_tokens`, so a cap meant as an *answer* budget was being spent before any
+answer was written:
+
+```
+max_output_tokens=100  → 100 reasoning tokens, 0 text
+max_output_tokens=300  → 300 reasoning tokens, 0 text
+max_output_tokens=1000 → 750 reasoning, answer produced
+```
+
+`AgentSpec.serverOutputCap` now applies a floor: 4,096 with thinking on, 1,024 with it off.
+This is a ceiling rather than a target, so a model that needs less stops earlier and pays
+nothing for the headroom. A seat wanting genuinely terse replies should use `thinking: off`.
+
+**2. "Thinking off" did not switch thinking off.** The `reasoning.effort` hint was nested
+inside the branch that also decided whether to *return* the reasoning text, so turning
+thinking off omitted the instruction entirely and the server fell back to its own default —
+which on a reasoning model means it reasoned anyway. Three identical runs, two of them
+empty. The two concerns are now independent: the effort is always sent, and only the request
+for the reasoning text is conditional. Five consecutive runs clean after the fix.
+
+**3. DeepSeek varies its reasoning per request**, so no floor is a guarantee:
+`deepseek-flash` spent 1,511 tokens reasoning on one request and more than 2,048 on the
+next, where `deepseek-v4-pro` completed at 1,024. The floor is headroom, not a prediction,
+and the empty-reply notice names the token count so the cause is visible when it happens.
+
+Also confirmed: DeepSeek accepts the `top_k`, `min_p` and `repetition_penalty` extensions
+that OpenAI proper rejects, so it takes the `extended` compatibility path. Latency measured
+at ~46 tok/s for `deepseek-v4-pro` and ~139 tok/s for `deepseek-flash`.
+
+Configure it per seat with the **API** button, or on the command line:
+
+```
+chatbots-cli --turns 2 \
+  --backend-a openAIResponses --backend-b openAIResponses \
+  --base-url https://api.deepseek.com/v1 \
+  --api-model deepseek-v4-pro --api-key sk-...
+```
+
+Note that the web tool calls (`web_search`, `fetch_page`) are in-process and therefore
+**only exist on the MLX backend**; an API-backed seat is told so and has none.
+
 ## Architecture: one engine, two front ends
 
 The conversation lives in `ChatBotsCore`, and both interfaces are clients of it:

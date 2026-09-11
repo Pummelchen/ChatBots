@@ -294,6 +294,13 @@ public struct OpenAIResponsesClient: Sendable {
         if let key = endpoint.apiKey, !key.isEmpty {
             urlRequest.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         }
+        if ProcessInfo.processInfo.environment["CHATBOTS_TRACE_API"] != nil {
+            let preview = String(
+                data: (try? JSONSerialization.data(
+                    withJSONObject: body(for: request), options: [.sortedKeys])) ?? Data(),
+                encoding: .utf8) ?? "?"
+            FileHandle.standardError.write(Data("[trace] POST \(url.absoluteString)\n[trace] \(preview)\n".utf8))
+        }
         urlRequest.httpBody = try JSONSerialization.data(
             withJSONObject: body(for: request), options: [])
 
@@ -400,11 +407,17 @@ public struct OpenAIResponsesClient: Sendable {
         if let maxOutputTokens = request.maxOutputTokens {
             body["max_output_tokens"] = maxOutputTokens
         }
+        // The effort is sent whenever it is known, *independently* of whether the reasoning
+        // text is wanted back. These are two different things, and conflating them was a
+        // real bug: with thinking off the effort was omitted entirely, so the server fell
+        // back to its own default — which on a reasoning model means it reasoned anyway,
+        // spent the whole output ceiling doing so, and returned nothing. Measured against
+        // DeepSeek: identical requests, three runs, two of them empty.
+        if let effort = request.reasoningEffort {
+            body["reasoning"] = ["effort": effort]
+        }
         if request.includeReasoning {
             body["include"] = ["reasoning.encrypted_content"]
-            if let effort = request.reasoningEffort {
-                body["reasoning"] = ["effort": effort]
-            }
         }
         return body
     }

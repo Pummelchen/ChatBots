@@ -194,7 +194,7 @@ public actor OpenAIResponsesEngine: LLMEngine {
             minP: spec.minP,
             presencePenalty: spec.presencePenalty,
             repetitionPenalty: spec.repetitionPenalty,
-            maxOutputTokens: spec.generationCap,
+            maxOutputTokens: spec.serverOutputCap,
             includeReasoning: spec.thinking.thinks,
             reasoningEffort: spec.thinking.reasoningEffort
         )
@@ -252,6 +252,39 @@ public actor OpenAIResponsesEngine: LLMEngine {
 
         await onEvent(.turnFinished(agentID: agentID, text: final, stats: stats))
         return final
+    }
+}
+
+extension AgentSpec {
+    /// The output ceiling to ask a server for.
+    ///
+    /// Distinct from `generationCap`, which is an *answer* budget: for MLX that is the whole
+    /// story, but a Responses-API server counts reasoning tokens against the same ceiling.
+    /// Measured against DeepSeek, a reasoning model asked for 100 or 300 output tokens spent
+    /// every one of them thinking and returned no text at all — the request is not "answer
+    /// in 100 tokens", it is "stop after 100 tokens of any kind". So a floor is applied
+    /// whenever the ceiling is small enough that reasoning would consume it.
+    ///
+    /// The floor is not a promise that the answer will be short; it only stops the answer
+    /// being impossible. A seat genuinely wanting terse replies should use `thinking: off`.
+    public var serverOutputCap: Int {
+        // Even with thinking off this server-side ceiling counts every output token, so a
+        // very small cap truncates the answer mid-sentence — measured: 60 tokens produced
+        // "One advantage: ovoid eggs roll in " and nothing more. `effort: none` is honoured
+        // (the response reported zero reasoning tokens), so thinking off really does mean
+        // off; it just does not mean the answer can be arbitrarily short.
+        guard thinking != ThinkingMode.off else { return max(maxTokens, 1_024) }
+        // Measured against DeepSeek: with a ceiling of 100 or 300 every token went to
+        // reasoning and the reply was empty. `deepseek-v4-pro` then completed at 1,024,
+        // while `deepseek-flash` spent 1,511 on one request and more than 2,048 on the next
+        // — the amount varies per request, so no floor is a guarantee.
+        //
+        // 4,096 is headroom rather than a prediction: this is a *ceiling*, not a target, so
+        // a model that needs less stops earlier and pays nothing for the extra. What it
+        // costs is the worst case, and the alternative — a reply that cannot be produced at
+        // all — is worse. A seat that wants genuinely terse answers should set
+        // `thinking: off`, where this floor does not apply.
+        return max(maxTokens, 4_096)
     }
 }
 
