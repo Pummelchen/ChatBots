@@ -30,10 +30,21 @@ choice is saved with your settings and stays for that conversation.
 at `http://localhost:7788` for any browser, including your phone. They are clients of the same
 conversation engine, so anything you can do in one you can do in the other.
 
-**Nothing is lost.** Every conversation is written to disk as it runs, so closing the window —
-or quitting — does not lose it. **Kept** in either front end reopens one, or deletes the ones
-you are done with. **Save** exports any conversation, or a finished report, as a text or
-Markdown file you can send to someone.
+**Nothing is lost, and it can be shared.** Every conversation is written to disk as it runs, so
+closing the window — or quitting — does not lose it. **Kept** in either front end reopens one,
+deletes the ones you are done with, or gives you a read-only link that replays it in a browser.
+**Save** exports any conversation, or a finished report, as a text or Markdown file.
+
+**Say who you are, and who is talking.** The human moderator has a name and, if you want one, a
+way of arguing — drawn from the same library the participants use. It shapes how your
+interjections are read, and it tags your messages in the log and the export. Under each
+contribution, two buttons let you mark whether it moved the argument forward; the scorecard
+sits in the status bar, and votes are never sent to a model.
+
+**You do not have to invent a session.** Nine hand-written line-ups and sixteen ready-made
+questions, each paired with the panel that suits it — *"Does the trial design support the
+claim?"* is the wrong question for a room of comedians. **Line-up** applies either one in a
+single step, or draws a random room from a seed you can read in the log and repeat.
 
 ## Quick start
 
@@ -69,7 +80,9 @@ Full guides are in the **[wiki](https://github.com/Pummelchen/ChatBots/wiki)**:
 | [Using the website](https://github.com/Pummelchen/ChatBots/wiki/Using-the-website) | the browser and phone interface, and the three start scripts |
 | [Personas](https://github.com/Pummelchen/ChatBots/wiki/Personas) | who can take part, and how to choose |
 | [Running a research session](https://github.com/Pummelchen/ChatBots/wiki/Running-a-research-session) | budgets, the moderator assigning the work, and reading the report |
-| [Keeping and sharing](https://github.com/Pummelchen/ChatBots/wiki/Keeping-and-sharing) | reopening a past conversation, where the files are, exporting one |
+| [Keeping and sharing](https://github.com/Pummelchen/ChatBots/wiki/Keeping-and-sharing) | reopening a past conversation, share links and replay, where the files are, exporting one |
+| [Line-ups and scenarios](https://github.com/Pummelchen/ChatBots/wiki/Lineups-and-scenarios) | choosing who is in the room, and what they are put in front of |
+| [Taking part](https://github.com/Pummelchen/ChatBots/wiki/Taking-part) | your own name and persona, cutting in, and scoring the argument |
 | [Using cloud models](https://github.com/Pummelchen/ChatBots/wiki/Using-cloud-models) | DeepSeek, LM Studio, or any OpenAI-compatible server |
 | [Documents and images](https://github.com/Pummelchen/ChatBots/wiki/Documents-and-images) | giving the models something to read or look at |
 | [Troubleshooting](https://github.com/Pummelchen/ChatBots/wiki/Troubleshooting) | when it will not start, crashes, or is slow |
