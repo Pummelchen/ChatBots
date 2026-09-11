@@ -432,6 +432,14 @@ public enum TurnEvent: Sendable {
 /// Throughput information for one turn.
 public struct TurnStats: Sendable, Hashable, Codable {
     public var promptTokens: Int
+    /// Seconds spent prefilling the prompt, before the first token appeared.
+    public var prefillSeconds: Double
+    /// Prompt tokens processed per second during prefill — the number that decides how
+    /// long a long conversation takes to get going.
+    public var prefillTokensPerSecond: Double {
+        prefillSeconds > 0 ? Double(promptTokens) / prefillSeconds : 0
+    }
+
     public var generationTokens: Int
     public var cachedPromptTokens: Int
     public var stopReason: String
@@ -440,6 +448,7 @@ public struct TurnStats: Sendable, Hashable, Codable {
 
     public init(
         promptTokens: Int = 0,
+        prefillSeconds: Double = 0,
         generationTokens: Int = 0,
         cachedPromptTokens: Int = 0,
         stopReason: String = "",
@@ -447,6 +456,7 @@ public struct TurnStats: Sendable, Hashable, Codable {
         seconds: Double = 0
     ) {
         self.promptTokens = promptTokens
+        self.prefillSeconds = prefillSeconds
         self.generationTokens = generationTokens
         self.cachedPromptTokens = cachedPromptTokens
         self.stopReason = stopReason

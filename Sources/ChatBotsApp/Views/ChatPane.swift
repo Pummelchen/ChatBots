@@ -181,7 +181,10 @@ struct ChatPane: View {
     private var footer: some View {
         HStack(spacing: 10) {
             if let stats = pane.lastStats, stats.generationTokens > 0 {
-                Label(Format.rate(stats), systemImage: "speedometer")
+                Label(Format.rates(stats), systemImage: "speedometer")
+                    .help(
+                        "prefill \(stats.promptTokens) tok in \(String(format: "%.1f", stats.prefillSeconds))s"
+                            + " · generated \(stats.generationTokens) tok in \(String(format: "%.1f", stats.seconds))s")
             } else {
                 Label("no turn yet", systemImage: "speedometer")
             }

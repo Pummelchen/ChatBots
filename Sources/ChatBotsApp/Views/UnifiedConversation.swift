@@ -163,7 +163,7 @@ struct UnifiedConversation: View {
         HStack(spacing: 10) {
             ForEach(controller.panes) { pane in
                 if let stats = pane.lastStats, stats.generationTokens > 0 {
-                    Label("\(pane.spec.id): \(Format.rate(stats))", systemImage: "speedometer")
+                    Label("\(pane.spec.id): \(Format.rates(stats))", systemImage: "speedometer")
                 }
             }
             Spacer(minLength: 0)

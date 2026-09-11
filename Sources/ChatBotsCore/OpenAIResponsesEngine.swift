@@ -177,6 +177,7 @@ public actor OpenAIResponsesEngine: LLMEngine {
         let final = answer.trimmingCharacters(in: .whitespacesAndNewlines)
         let stats = TurnStats(
             promptTokens: usage.inputTokens,
+            prefillSeconds: 0,
             generationTokens: usage.outputTokens,
             cachedPromptTokens: usage.cachedTokens,
             stopReason: final.isEmpty ? "empty" : "stop",

@@ -368,6 +368,7 @@ public actor MLXEngine: LLMEngine {
                 case .info(let info):
                     stats = TurnStats(
                         promptTokens: info.promptTokenCount,
+                        prefillSeconds: info.promptTime,
                         generationTokens: info.generationTokenCount,
                         cachedPromptTokens: 0,
                         stopReason: Self.describe(info.stopReason),

@@ -350,7 +350,13 @@ let activityTask = Task {
                 "  [\(agentID)] \(stats.generationTokens) tok in "
                     + "\(String(format: "%.1f", stats.seconds))s "
                     + "(\(String(format: "%.1f", stats.tokensPerSecond)) tok/s, "
-                    + "stop=\(stats.stopReason))")
+                    + "stop=\(stats.stopReason))"
+                    + (stats.prefillSeconds > 0
+                        ? String(
+                            format: " | prefill %d tok in %.2fs (%.0f tok/s)",
+                            stats.promptTokens, stats.prefillSeconds,
+                            stats.prefillTokensPerSecond)
+                        : ""))
         case .turnFailed(let agentID, let message):
             log("  [\(agentID)] ✗ \(message)")
         case .token, .reasoning, .turnStarted:

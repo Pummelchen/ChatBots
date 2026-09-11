@@ -290,6 +290,19 @@ enum Format {
         String(format: "%.1f tok/s · %d tok · %.1fs", stats.tokensPerSecond, stats.generationTokens, stats.seconds)
     }
 
+    /// Generation and prefill side by side.
+    ///
+    /// Prefill is worth showing: it is an order of magnitude faster than generation per
+    /// token on this hardware (measured ~310 tok/s against ~28), so on a long shared log
+    /// the wait before the first token is a large part of the turn.
+    static func rates(_ stats: TurnStats) -> String {
+        var text = String(format: "gen %.1f tok/s", stats.tokensPerSecond)
+        if stats.prefillSeconds > 0 {
+            text += String(format: " · prefill %.0f tok/s", stats.prefillTokensPerSecond)
+        }
+        return text
+    }
+
     /// First sentence-ish summary, for collapsed rows.
     static func summarise(_ text: String, limit: Int = 90) -> String {
         let flat = text.replacingOccurrences(of: "\n", with: " ")
