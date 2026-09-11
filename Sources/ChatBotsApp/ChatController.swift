@@ -7,6 +7,7 @@
 
 import AppKit
 import ChatBotsCore
+import Combine
 import Foundation
 import SwiftUI
 
@@ -112,11 +113,17 @@ public final class ChatController: ObservableObject {
 
     // MARK: Inputs
 
-    @Published public var topic: String = ChatController.defaultTopic
-    @Published public var moderatorDraft: String = ""
+    @Published public var topic: String {
+        didSet { saveSettings() }
+    }
+    @Published public var moderatorDraft: String {
+        didSet { saveSettings() }
+    }
     /// Streams the models' thinking blocks into the panes (a view concern; whether the
-    /// model thinks at all is per-seat, see `AgentSpec.reasoning`).
-    @Published public var showReasoning: Bool = true
+    /// model thinks at all is per-seat, see `AgentSpec.thinking`).
+    @Published public var showReasoning: Bool {
+        didSet { saveSettings() }
+    }
 
     // MARK: Outputs
 
@@ -136,10 +143,19 @@ public final class ChatController: ObservableObject {
     public let engine: ConversationEngine
     private var pumpTasks: [Task<Void, Never>] = []
 
+    /// Called whenever anything the user set changes, so it can be written to disk.
+    var onSettingsChanged: (() -> Void)?
+
     public init(
         specs: [AgentSpec] = AgentSpec.SeatRoster.specs(),
-        configuration: ConversationEngine.Configuration = .init()
+        configuration: ConversationEngine.Configuration = .init(),
+        initialTopic: String = ChatController.defaultTopic,
+        initialModeratorDraft: String = "",
+        initialShowReasoning: Bool = true
     ) {
+        self.topic = initialTopic
+        self.moderatorDraft = initialModeratorDraft
+        self.showReasoning = initialShowReasoning
         let registry = WebToolbox.makeRegistry()
         let panes = specs.enumerated().map { AgentPaneState(spec: $0.element, seatIndex: $0.offset) }
 
@@ -164,6 +180,42 @@ public final class ChatController: ObservableObject {
         self.engine = ConversationEngine(seats: seats, configuration: configuration)
         startPumps()
         startFlushLoop()
+        observeSeatSettings()
+    }
+
+    /// Save the user's settings.
+    ///
+    /// Called from `didSet` on each bound property and from every seat change, so there is
+    /// no "unsaved" state to lose. The store coalesces bursts.
+    func saveSettings() {
+        // Skip while the panes are still being built, when observation may fire early.
+        guard isFullyInitialised else { return }
+        onSettingsChanged?()
+    }
+
+    private var isFullyInitialised = false
+
+    /// Seat settings live inside `AgentPaneState.spec`, which is mutated by the persona,
+    /// thinking and backend controls rather than by a binding, so they are watched
+    /// explicitly.
+    private func observeSeatSettings() {
+        for pane in panes {
+            pane.$spec
+                .dropFirst()
+                .sink { [weak self] _ in self?.saveSettings() }
+                .store(in: &settingsObservers)
+        }
+        isFullyInitialised = true
+    }
+
+    private var settingsObservers: [AnyCancellable] = []
+
+    /// Current settings, for the store to write.
+    var currentSeats: [AgentSpec] { panes.map(\.spec) }
+
+    /// Flush any pending write, for termination.
+    public func saveSettingsNow() {
+        onSettingsChanged?()
     }
 
     deinit {
@@ -440,6 +492,7 @@ public final class ChatController: ObservableObject {
         }
         if let pane = pane(agentID) {
             pane.spec = spec
+            saveSettings()
         }
     }
 
@@ -486,6 +539,7 @@ public final class ChatController: ObservableObject {
         }
         if let pane = pane(agentID) {
             pane.spec = spec
+            saveSettings()
         }
     }
 

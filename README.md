@@ -189,6 +189,40 @@ removing the modifier from one view at a time until the freezes stopped.
 
 Instead, **Edit ▸ Copy Conversation (⇧⌘C)** copies the whole transcript as plain text.
 
+### Settings are saved as you change them
+
+Everything you set is written when you change it, so a relaunch — or a crash, or a force
+quit — comes back to the same configuration:
+
+| Setting | Stored |
+| --- | --- |
+| Topic, moderator draft | as you type |
+| Per-seat persona, thinking level, backend, model, sampler | when picked |
+| Show thinking | when toggled |
+| Theme, window layout | when picked |
+| API endpoints | when edited (keys in the Keychain) |
+
+There is a short (250 ms) coalescing window, which is about write volume while typing rather
+than about durability — `UserDefaults.set` is durable from the moment it is called, and
+there is no `synchronize()` to call. Verified the direct way: toggle a setting, `kill -9`
+the process 1.5 s later, and the stored value is already there.
+
+Two details that matter more than they look:
+
+* **Adding a field never resets your settings.** The payload is decoded field by field with
+  defaults for anything absent, rather than by a synthesised decoder — which would make
+  every non-optional field *required* and turn a new setting into a wiped configuration for
+  everyone who upgrades. That was a real bug in the first version of this, caught by a test
+  that decodes a payload from before the field existed.
+* **A stored roster is reconciled with what the build supports** — trimmed, padded, or
+  replaced by defaults — so an upgrade cannot produce a seat count the layout and palettes
+  cannot draw. Padding fills each missing *position*, so a new third seat gets its own id
+  and style rather than inheriting the first seat's.
+
+Unreadable settings are reported in the banner and replaced with defaults, rather than
+failing to start or reverting silently. They live at
+`~/Library/Preferences/local.chatbots.twollms.plist`.
+
 ### Smooth output and an immediate hand-off
 
 Model output does not arrive at a constant rate — tokens come in clumps, sometimes several

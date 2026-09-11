@@ -10,13 +10,51 @@ import SwiftUI
 
 @main
 struct ChatBotsApp: App {
-    @StateObject private var controller = ChatController()
+    @StateObject private var controller: ChatController
     @StateObject private var endpoints = APIEndpointStore()
+    @StateObject private var settings: UserSettingsStore
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     init() {
         // Before any engine loads: point model storage at the project's `models/` folder
         // and make sure it exists. See ModelStore for how the path is resolved.
         ModelStore.prepare()
+
+        // Restore what the user set last time — topic, per-seat persona/thinking/backend,
+        // and the thinking-block toggle — and write it back on every change.
+        let store = UserSettingsStore()
+        let restored = ChatController(
+            specs: store.settings.seats,
+            initialTopic: store.settings.topic,
+            initialModeratorDraft: store.settings.moderatorDraft,
+            initialShowReasoning: store.settings.showReasoning
+        )
+        // Every change writes: the topic as it is typed, and each seat's persona, thinking
+        // level and backend as they are picked.
+        let snapshot: @MainActor () -> UserSettings = { [weak restored] in
+            UserSettings(
+                topic: restored?.topic ?? "",
+                moderatorDraft: restored?.moderatorDraft ?? "",
+                showReasoning: restored?.showReasoning ?? true,
+                seats: restored?.currentSeats ?? AgentSpec.SeatRoster.specs()
+            )
+        }
+        restored.onSettingsChanged = { [weak store] in
+            guard let store else { return }
+            store.save(snapshot())
+        }
+        // If something was stored but unreadable, say so once rather than letting the user
+        // wonder why their setup reverted.
+        if let warning = store.takeLoadWarning() {
+            restored.errorBanner = warning
+        }
+        _settings = StateObject(wrappedValue: store)
+        _controller = StateObject(wrappedValue: restored)
+
+        AppDelegate.flush = { [weak store] in
+            guard let store else { return }
+            store.saveNow(snapshot())
+        }
     }
     @StateObject private var theme = ThemeStore()
 
@@ -32,6 +70,7 @@ struct ChatBotsApp: App {
                 .themePalette(theme.palette)
                 .environmentObject(theme)
                 .environmentObject(endpoints)
+                .environmentObject(settings)
                 // Restore each seat's saved endpoint before any turn can run.
                 .task { controller.applyAPIEndpoints(endpoints) }
                 // The black theme is dark-only regardless of the Mac's setting; the
@@ -112,6 +151,23 @@ struct ChatBotsApp: App {
 }
 
 /// Opens a small standard About-panel-style help window.
+/// Writes the settings one last time on the way out.
+///
+/// The store already writes as changes happen, so this only closes the gap of the short
+/// coalescing window — but "it forgot my last edit" is exactly the kind of thing that makes
+/// an app feel unreliable, so it is worth the few lines.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Set once the controller exists; called on termination. Main-actor isolated because
+    /// it closes over the controller, and `applicationWillTerminate` arrives on the main
+    /// thread.
+    @MainActor static var flush: (() -> Void)?
+
+    func applicationWillTerminate(_ notification: Notification) {
+        MainActor.assumeIsolated { Self.flush?() }
+    }
+}
+
+
 enum HelpWindow {
     @MainActor
     static func show() {
