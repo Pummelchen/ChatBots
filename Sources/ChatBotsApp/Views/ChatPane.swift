@@ -13,7 +13,6 @@ struct ChatPane: View {
     let turns: [Turn]
     let pendingSteeringIDs: Set<UUID>
     let showReasoning: Bool
-    let contextEstimate: Int
     /// True when the pane is narrower than a comfortable column, so the header drops its
     /// sampler row instead of being clipped.
     var isCompact: Bool = false

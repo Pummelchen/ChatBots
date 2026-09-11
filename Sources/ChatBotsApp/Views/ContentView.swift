@@ -136,7 +136,6 @@ struct AgentPanes: View {
             turns: controller.turns,
             pendingSteeringIDs: controller.pendingSteeringIDs,
             showReasoning: controller.showReasoning,
-            contextEstimate: controller.contextEstimate,
             // Panes adapt their header to the width they actually get, rather than
             // overflowing it and being clipped at the window edge.
             isCompact: width < Self.comfortablePaneWidth

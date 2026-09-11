@@ -464,10 +464,6 @@ public final class ChatController: ObservableObject {
         return panes.first { $0.id == speakerID }?.seatIndex
     }
 
-    public var contextEstimate: Int {
-        turns.reduce(0) { $0 + max(1, $1.content.count / 4) }
-    }
-
     /// How full the context is, for the footer. Includes the compaction threshold so the
     /// bar can show where the log will be condensed rather than the reader having to guess.
     public var contextUsage: (tokens: Int, window: Int, fraction: Double) {
