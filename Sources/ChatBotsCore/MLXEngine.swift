@@ -108,7 +108,24 @@ public actor MLXEngine: LLMEngine {
             let progressBox = ProgressBox()
 
             return try await MLXGate.exclusive {
-                try await #huggingFaceLoadModelContainer(
+                // A checkpoint already in the project's `models/` folder is loaded straight
+                // from disk — no hub round trip, and no dependence on whatever happens to
+                // be in a shared cache. Anything else goes through the hub, which
+                // `ModelStore.prepare()` has already pointed at the same folder, so a
+                // download lands in the project too.
+                if let local = ModelStore.localCheckpoint(for: spec.modelID) {
+                    FileHandle.standardError.write(
+                        Data("[ChatBots] \(spec.id) loading \(spec.modelID) from \(local.path)\n".utf8))
+                    let tokenizerLoader: any TokenizerLoader = #huggingFaceTokenizerLoader()
+                    return try await LLMModelFactory.shared.loadContainer(
+                        from: local, using: tokenizerLoader)
+                }
+                FileHandle.standardError.write(
+                    Data(
+                        "[ChatBots] \(spec.id) \(spec.modelID) not found in \(ModelStore.directory().path); fetching it there\n"
+                            .utf8))
+
+                return try await #huggingFaceLoadModelContainer(
                     configuration: ModelConfiguration(id: spec.modelID)
                 ) { progress in
                     let fraction =

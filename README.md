@@ -446,6 +446,47 @@ false` on a seat to deny it tools entirely.
 
 ---
 
+## Where the models live
+
+Checkpoints are kept in **`models/` in the project folder**, not in the shared Hugging
+Face cache, so a checkout is self-contained and it is obvious which weights a run used.
+
+```
+models/
+  Qwen3.5-4B-MLX-4bit/          ← flat checkout, loaded straight from disk
+    config.json  tokenizer.json  model.safetensors  chat_template.jinja  …
+```
+
+Two layouts are understood, because local tooling produces both: the flat one above (what
+LM Studio writes) and the Hugging Face hub cache layout
+(`models--org--name/snapshots/<rev>/…`). A complete flat checkpoint is loaded directly; a
+missing file makes a directory *not* count, so a half-finished download can never be
+mistaken for a usable model.
+
+If a checkpoint is not present, it is downloaded through the Hub into the same folder:
+`ModelStore.prepare()` points `HF_HUB_CACHE` there at launch. `HF_HOME` is deliberately
+left alone, because that is also where a Hub token lives — so this never disturbs an
+existing Hugging Face setup.
+
+The folder is resolved at runtime, first match wins:
+
+1. `CHATBOTS_MODELS_DIR` (override, for a different layout),
+2. walking up from the running bundle — so `dist/ChatBots.app` finds the checkout's
+   `models/`, and so does `swift run`,
+3. the current working directory,
+4. `models/` beside the executable.
+
+`models/` is in `.gitignore`: it is multi-GB local data, not source. The resolved path is
+printed at startup, and each seat logs whether it loaded from disk or fetched:
+
+```
+  models    : /Users/you/ChatBots/models
+[ChatBots] Agent 1 loading mlx-community/Qwen3.5-4B-MLX-4bit from /Users/you/ChatBots/models/Qwen3.5-4B-MLX-4bit
+```
+
+Note the OpenAI/API backend is separate: LM Studio serves its own copy from
+`~/.lmstudio/models`, so an API-backed seat does not use this folder.
+
 ## Requirements
 
 * macOS 14+ on Apple Silicon (built and tested on macOS 26.6, M3)

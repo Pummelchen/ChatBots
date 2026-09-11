@@ -159,6 +159,9 @@ func header(_ title: String) {
 
 // MARK: - Setup
 
+// Model storage lives in the project's `models/` folder; set before any engine loads.
+let modelsRoot = ModelStore.prepare()
+
 let options = Options.parse(Array(CommandLine.arguments.dropFirst()))
 
 if let key = options.tavilyKey {
@@ -339,6 +342,7 @@ for spec in specs {
             + (spec.backend == .openAIResponses
                 ? " → \(spec.openAI.baseURL) as \(spec.openAI.model)" : ""))
 }
+log("  models    : \(modelsRoot.path)")
 log("  tavily    : \(TavilyClient.isConfigured ? "configured" : "MISSING")")
 print("")
 

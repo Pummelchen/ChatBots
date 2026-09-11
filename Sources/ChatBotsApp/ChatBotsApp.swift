@@ -11,6 +11,12 @@ import SwiftUI
 @main
 struct ChatBotsApp: App {
     @StateObject private var controller = ChatController()
+
+    init() {
+        // Before any engine loads: point model storage at the project's `models/` folder
+        // and make sure it exists. See ModelStore for how the path is resolved.
+        ModelStore.prepare()
+    }
     @StateObject private var theme = ThemeStore()
 
     /// Below this the two panes stop being usable side by side.

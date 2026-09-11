@@ -3,3 +3,6 @@
 .swiftpm/
 *.xcodeproj
 dist/
+
+# Downloaded checkpoints (multi-GB local data, never committed)
+models/
