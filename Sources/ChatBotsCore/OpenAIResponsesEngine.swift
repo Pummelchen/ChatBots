@@ -120,7 +120,7 @@ public actor OpenAIResponsesEngine: LLMEngine {
             let status = (response as? HTTPURLResponse)?.statusCode ?? -1
             throw OpenAIResponsesError.http(
                 status: status,
-                body: String(data: data.prefix(300), encoding: .utf8) ?? "")
+                body: UTF8Text.decodeTruncated(UTF8Text.bytePrefix(data, 300)) ?? "")
         }
         let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         let entries = root?["data"] as? [[String: Any]] ?? []

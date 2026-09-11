@@ -396,7 +396,7 @@ let activityTask = Task {
     for await event in engine.events {
         switch event {
         case .toolCall(let agentID, let name, let query):
-            log("  [\(agentID)] → \(name)(\(query.prefix(70)))")
+            log("  [\(agentID)] → \(name)(\(UTF8Text.prefix(query, 70)))")
         case .toolResult(let agentID, let name, let summary, _):
             log("  [\(agentID)] ← \(name): \(summary)")
         case .toolFailure(let agentID, let name, let message):

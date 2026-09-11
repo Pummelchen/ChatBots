@@ -179,7 +179,8 @@ public struct TavilyClient: Sendable {
             throw ChatBotsError.toolFailed("no HTTP response")
         }
         guard (200..<300).contains(http.statusCode) else {
-            let snippet = String(data: data.prefix(400), encoding: .utf8) ?? ""
+            // Cut bytes safely: a raw `data.prefix` can split a multi-byte character.
+            let snippet = UTF8Text.decodeTruncated(UTF8Text.bytePrefix(data, 400)) ?? ""
             throw ChatBotsError.toolFailed("HTTP \(http.statusCode) \(snippet)")
         }
 

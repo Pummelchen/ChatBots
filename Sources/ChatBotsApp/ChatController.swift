@@ -217,7 +217,9 @@ public final class ChatController: ObservableObject {
             pending[agentID, default: Delta()].reasoning += text
 
         case .toolCall(let agentID, let name, let query):
-            pending[agentID, default: Delta()].activity = "\(name)(\(query.prefix(48)))…"
+            // `prefix` on a String counts grapheme clusters, so a query full of emoji or
+            // CJK is shortened without being cut mid-character.
+            pending[agentID, default: Delta()].activity = "\(name)(\(UTF8Text.prefix(query, 48)))"
 
         case .toolResult(let agentID, let name, let summary, _):
             pending[agentID, default: Delta()].activity = "reading results…"

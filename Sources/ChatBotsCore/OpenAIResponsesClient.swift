@@ -26,7 +26,7 @@ public enum OpenAIResponsesError: LocalizedError, Sendable {
         case .badURL(let value):
             "Not a usable base URL: \(value)"
         case .http(let status, let body):
-            "Server returned HTTP \(status): \(body.prefix(300))"
+            "Server returned HTTP \(status): \(UTF8Text.prefix(body, 300))"
         case .streamFailed(let message):
             "The response failed: \(message)"
         case .noOutput:
@@ -231,6 +231,54 @@ public struct OpenAIResponsesClient: Sendable {
         }
     }
 
+    /// Accumulates decoded text, holding back a trailing partial UTF-8 sequence until the
+    /// next chunk completes it.
+    ///
+    /// A server that cuts its stream between bytes rather than between characters would
+    /// otherwise deliver `U+FFFD` in place of the character. MLX's own streaming
+    /// detokenizer guards this explicitly — "if the new segment ends with REPLACEMENT
+    /// CHARACTER this means that the token didn't produce a complete unicode character" —
+    /// and this is the equivalent for the HTTP path.
+    public struct UTF8StreamBuffer: Sendable {
+        public init() {}
+        private var pending = Data()
+
+        /// Feed raw bytes, which may end mid-character.
+        ///
+        /// Prefer this over the `String` overload: decoding a byte fragment on its own
+        /// produces replacement characters *before* the buffer can reassemble it, which is
+        /// the very thing this exists to prevent.
+        public mutating func append(_ bytes: Data) -> String {
+            pending.append(bytes)
+            guard let text = String(data: pending, encoding: .utf8) else {
+                // Incomplete tail: wait for the rest. Bounded, so a genuinely undecodable
+                // stream cannot buffer without limit.
+                if pending.count > 16 {
+                    let salvaged = UTF8Text.decodeTruncated(pending) ?? ""
+                    pending = Data()
+                    return salvaged
+                }
+                return ""
+            }
+            pending = Data()
+            return text
+        }
+
+        /// Feed an already-decoded chunk. Safe only when the chunk is known to be whole;
+        /// see `append(_:)` for the byte form.
+        public mutating func append(_ chunk: String) -> String {
+            append(Data(chunk.utf8))
+        }
+
+        /// Bytes still held when the stream ends. An incomplete final character is dropped
+        /// rather than emitted as a replacement character.
+        public mutating func flush() -> String {
+            defer { pending = Data() }
+            return UTF8Text.decodeTruncated(pending) ?? ""
+        }
+    }
+
+
     private func run(
         _ request: Request,
         into continuation: AsyncThrowingStream<OpenAIStreamEvent, Error>.Continuation
@@ -250,6 +298,7 @@ public struct OpenAIResponsesClient: Sendable {
             withJSONObject: body(for: request), options: [])
 
         let (bytes, response) = try await session.bytes(for: urlRequest)
+        // `flush()` is applied after the loop, below.
 
         guard let http = response as? HTTPURLResponse else {
             throw OpenAIResponsesError.streamFailed("no HTTP response")
@@ -265,6 +314,7 @@ public struct OpenAIResponsesClient: Sendable {
         }
 
         var sawText = false
+        var utf8 = UTF8StreamBuffer()
         for try await line in bytes.lines {
             try Task.checkCancellation()
             guard let payload = Self.dataPayload(from: line) else { continue }
@@ -277,8 +327,12 @@ public struct OpenAIResponsesClient: Sendable {
             switch type {
             case "response.output_text.delta":
                 if let delta = event["delta"] as? String, !delta.isEmpty {
-                    sawText = true
-                    continuation.yield(.text(delta))
+                    // Through the buffer: a chunk may end mid-character.
+                    let safe = utf8.append(delta)
+                    if !safe.isEmpty {
+                        sawText = true
+                        continuation.yield(.text(safe))
+                    }
                 }
 
             case "response.reasoning_text.delta", "response.reasoning_summary_text.delta":
@@ -303,6 +357,9 @@ public struct OpenAIResponsesClient: Sendable {
                 break
             }
         }
+
+        let tail = utf8.flush()
+        if !tail.isEmpty { continuation.yield(.text(tail)) }
     }
 
     /// `data: {...}` → `{...}`, or nil for comments, blank lines and other SSE fields.
