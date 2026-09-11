@@ -285,19 +285,22 @@ public final class APIServer {
 
     public let port: UInt16
     private let engine: ConversationEngine
+    /// One dispatch for both transports. The HTTP routes are translations into it, so a
+    /// command cannot work here and fail over WebTransport.
+    private let service: EngineService
     private var server: HTTPServer?
     private var feedTask: Task<Void, Never>?
     private var tokenTask: Task<Void, Never>?
     private var streams: [HTTPServer.EventStream] = []
 
-    /// Whether the web interface shows the models' thinking blocks. A view preference, but
-    /// it belongs to the server because both front ends share one conversation.
-    public var showReasoning = true
-
     public init(engine: ConversationEngine, port: UInt16 = 7788) {
         self.engine = engine
         self.port = port
+        self.service = EngineService(engine: engine)
     }
+
+    /// The shared dispatch, so a caller can treat both transports alike.
+    public var engineService: EngineService { service }
 
     public var isRunning: Bool { server?.isRunning ?? false }
 
@@ -349,16 +352,12 @@ public final class APIServer {
     }
 
     private func route(_ request: HTTPRequest) async -> HTTPResponse {
+        // Transport-specific, and none of it is the engine's business.
         switch (request.method, request.path) {
         case ("GET", "/api/health"):
             return .json(["status": "ok", "port": "\(port)"])
 
-        case ("GET", "/api/state"):
-            return .json(snapshot())
-
         case ("GET", "/api/devices"):
-            // The whole profile list, so the capture harness and the interface share one
-            // source of truth for what a device is.
             return .json(
                 DeviceList(
                     profiles: DeviceProfiles.all.enumerated().map { index, profile in
@@ -367,25 +366,19 @@ public final class APIServer {
                     captureSet: DeviceProfiles.captureSet.map(\.id)))
 
         case ("GET", "/api/device"):
-            // Identify the screen, so the interface can name it and so support can ask what
-            // a report came from. An unknown device is a valid answer, not an error: the
-            // layout branches on width, and the profiles exist to check the widths in use.
+            // Identify the screen, so the interface can name it and support can ask what a
+            // report came from. An unknown device is a valid answer, not an error.
             let width = request.int("w") ?? 0
             let height = request.int("h") ?? 0
             let isMobile = request.string("mobile") != "false"
-            guard width > 0 else {
-                return .error("w is required", status: 400)
-            }
+            guard width > 0 else { return .error("w is required", status: 400) }
             if let match = DeviceProfiles.nearest(width: width, height: height, isMobile: isMobile) {
                 return .json(DeviceMatch(matched: true, profile: match, width: width, height: height))
             }
             return .json(DeviceMatch(matched: false, profile: nil, width: width, height: height))
 
         case ("GET", "/api/personas"):
-            // Per mode, because the libraries are different: offering a research seat "The
-            // Villain" would be the modes sharing a philosophy through the back door.
-            // The list carries both modes, so nothing is filtered here; the client picks the
-            // one matching the room. `requested` used to be computed and then ignored.
+            // Both libraries, so a picker can switch modes without a second request.
             return .json(DiscussionMode.allCases.map { mode in
                 PersonaOption(
                     mode: mode.rawValue,
@@ -398,203 +391,108 @@ public final class APIServer {
                     })
             })
 
-        case ("POST", "/api/mode"):
-            guard let command = request.json(APICommand.self), let raw = command.value,
-                let mode = DiscussionMode(rawValue: raw)
-            else {
-                return .error("a mode of entertainment or research is required", status: 400)
-            }
-            guard engine.setMode(mode) else {
-                return .error("the mode cannot be changed once the conversation has started", status: 409)
-            }
-            return .json(snapshot())
-
-        case ("POST", "/api/topic"):
-            guard let command = request.json(APICommand.self), let topic = command.topic else {
-                return .error("a topic is required", status: 400)
-            }
-            // Refused once the conversation has started, the same as attachments: the
-            // topic is the frame the whole log was written against.
-            guard engine.setTopic(topic) else {
-                return .error(
-                    "the topic cannot be changed once the conversation has started", status: 409)
-            }
-            return .json(snapshot())
-
-        case ("POST", "/api/start"):
-            engine.startOrRestart()
-            return .json(snapshot())
-
-        case ("POST", "/api/pause"):
-            engine.pause()
-            return .json(snapshot())
-
-        case ("POST", "/api/resume"):
-            engine.resume()
-            return .json(snapshot())
-
-        case ("POST", "/api/stop"):
-            engine.stop()
-            return .json(snapshot())
-
-        case ("POST", "/api/reset"):
-            engine.reset()
-            // Any open page may still be mid-render of turns that no longer exist.
-            broadcast(encode(snapshot()) ?? "{}", event: "snapshot")
-            return .json(snapshot())
-
-        case ("POST", "/api/research/budget"):
-            guard let command = request.json(APICommand.self), let raw = command.value,
-                let depth = ResearchBudget.Depth(rawValue: raw)
-            else {
-                return .error("a depth of quick, standard or deep is required", status: 400)
-            }
-            guard engine.setResearchBudget(depth) else {
-                return .error("the budget cannot be changed once the investigation has started", status: 409)
-            }
-            return .json(snapshot())
-
         case ("GET", "/api/report"):
-            guard let report = engine.researchReport() else {
+            // Plain markdown rather than JSON, so it opens in a browser.
+            guard let report = service.snapshot().report else {
                 return .error("no report has been produced yet", status: 404)
             }
-            // Plain markdown rather than JSON, so it can be opened directly in a browser.
             return HTTPResponse(
-                contentType: "text/markdown; charset=utf-8", body: Data(report.markdown().utf8))
-
-        case ("POST", "/api/compact"):
-            engine.compactNow()
-            return .json(snapshot())
-
-        case ("POST", "/api/message"):
-            guard let command = request.json(APICommand.self), let text = command.text,
-                !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            else {
-                return .error("a message is required", status: 400)
-            }
-            engine.steer(text)
-            return .json(snapshot())
-
-        case ("POST", "/api/settings"):
-            guard let command = request.json(APICommand.self) else {
-                return .error("a JSON body is required", status: 400)
-            }
-            if let show = command.showReasoning { showReasoning = show }
-            return .json(snapshot())
-
-        case ("POST", "/api/seat"):
-            return applySeatCommand(request)
-
-        case ("POST", "/api/client-report"):
-            // The client telling us what it measured. Written to stderr so a capture run
-            // leaves a record of the real viewport and any element overflowing it — the
-            // question "is this laid out correctly on a 360-point screen" is otherwise
-            // answered by squinting at a screenshot.
-            if let report = request.json(ClientReport.self) {
-                var line = "[client] \(report.width)x\(report.height) @\(report.pixelRatio)x"
-                line += " device=\(report.device) layout=\(report.layout)"
-                line += " scrollWidth=\(report.scrollWidth)"
-                if let profile = report.profile { line += " profile=\(profile)" }
-                if report.overflowing.isEmpty {
-                    line += " overflow=none"
-                } else {
-                    line += " overflow=\(report.overflowing.joined(separator: ","))"
-                }
-                FileHandle.standardError.write(Data((line + "\n").utf8))
-            }
-            return .json(["ok": "true"])
-
-        case ("POST", "/api/attachments"):
-            return addAttachment(request)
-
-        case ("POST", "/api/attachments/remove"):
-            guard let command = request.json(APICommand.self), let id = command.value else {
-                return .error("an attachment id is required", status: 400)
-            }
-            engine.setAttachments(engine.attachments.filter { $0.id.uuidString != id })
-            return .json(snapshot())
-
-        case ("POST", "/api/attachments/clear"):
-            engine.setAttachments([])
-            return .json(snapshot())
+                contentType: "text/markdown; charset=utf-8", body: Data(report.markdown.utf8))
 
         default:
+            break
+        }
+
+        // Everything else is the engine's, and goes through the same dispatch the
+        // WebTransport server uses. A command that works on one channel therefore works on
+        // the other, because there is only one implementation of it.
+        guard let command = translate(request) else {
             return .error("no route for \(request.method) \(request.path)", status: 404)
         }
+        let reply = await service.handle(command)
+        return respond(to: reply)
     }
 
-    private func applySeatCommand(_ request: HTTPRequest) -> HTTPResponse {
-        guard let command = request.json(APICommand.self),
-            let seatID = command.seat,
-            let index = engine.specs.firstIndex(where: { $0.id == seatID })
-        else {
-            return .error("a seat id is required", status: 400)
-        }
+    /// Turn an HTTP request into an engine request.
+    private func translate(_ request: HTTPRequest) -> EngineRequest? {
+        switch (request.method, request.path) {
+        case ("GET", "/api/state"): return .fetchState
+        case ("POST", "/api/start"): return .start
+        case ("POST", "/api/pause"): return .pause
+        case ("POST", "/api/resume"): return .resume
+        case ("POST", "/api/stop"): return .stop
+        case ("POST", "/api/reset"): return .reset
+        case ("POST", "/api/compact"): return .compact
+        case ("POST", "/api/attachments/clear"): return .clearAttachments
 
-        var spec = engine.specs[index]
-        if let name = command.name, !name.trimmingCharacters(in: .whitespaces).isEmpty {
-            spec.displayName = String(name.trimmingCharacters(in: .whitespaces).prefix(40))
-        }
-        if let personaID = command.personaID { spec.personaID = personaID }
-        if let raw = command.thinking, let mode = ThinkingMode(rawValue: raw) {
-            spec.thinking = mode
-        }
-        if let raw = command.backend, let backend = AgentSpec.Backend(rawValue: raw) {
-            spec.backend = backend
-        }
-        if let url = command.baseURL {
-            spec.openAI.baseURL = url.trimmingCharacters(in: .whitespaces)
-        }
-        if let model = command.apiModel { spec.openAI.model = model }
-        if let key = command.apiKey { spec.openAI.apiKey = key }
-        if let showVision = command.on { spec.visionOverride = showVision ? .supported : .unsupported }
-        if let value = command.value, let temperature = Double(value) { spec.temperature = temperature }
+        case ("POST", "/api/topic"):
+            guard let body = request.json(APICommand.self), let topic = body.topic,
+                !topic.isEmpty
+            else { return .setTopic("") }   // an empty topic is refused by the engine
+            return .setTopic(topic)
 
-        engine.updateSeat(spec)
-        return .json(snapshot())
-    }
-
-    private func addAttachment(_ request: HTTPRequest) -> HTTPResponse {
-        guard let command = request.json(APICommand.self),
-            let filename = command.filename, let content = command.content
-        else {
-            return .error("filename and content are required", status: 400)
-        }
-        guard let data = Data(base64Encoded: content) else {
-            return .error("content must be base64-encoded", status: 400)
-        }
-        guard engine.attachments.count < 24 else {
-            return .error("too many attached files", status: 409)
-        }
-
-        // Written to a temporary file because the extractors take a URL — the app's own
-        // import path is file-based, and duplicating it for an in-memory case would mean
-        // two code paths that could disagree about what a file contains.
-        let temporary = FileManager.default.temporaryDirectory
-            .appending(path: "chatbots-upload-\(UUID().uuidString)")
-            .appending(path: filename)
-        do {
-            try FileManager.default.createDirectory(
-                at: temporary.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try data.write(to: temporary)
-        } catch {
-            return .error("could not stage the upload: \(error.localizedDescription)")
-        }
-        defer { try? FileManager.default.removeItem(at: temporary.deletingLastPathComponent()) }
-
-        do {
-            let document = try DocumentIngestorProvider.ingestor.add(url: temporary)
-            guard !document.kind.isImage || engine.allSeatsSupportVision else {
-                return .error("images need every seat to support vision", status: 409)
+        case ("POST", "/api/message"):
+            guard let body = request.json(APICommand.self), let text = body.text else {
+                return .steer("")
             }
-            engine.setAttachments(engine.attachments + [document])
-            return .json(snapshot())
-        } catch let error as DocumentError {
-            return .error(error.errorDescription ?? "the file could not be read", status: 400)
-        } catch {
-            return .error(error.localizedDescription, status: 400)
+            return .steer(text)
+
+        case ("POST", "/api/settings"):
+            let body = request.json(APICommand.self)
+            return .setShowReasoning(body?.showReasoning ?? service.showReasoning)
+
+        case ("POST", "/api/mode"):
+            guard let raw = request.json(APICommand.self)?.value,
+                let mode = DiscussionMode(rawValue: raw)
+            else { return .setMode(.entertainment) }
+            return .setMode(mode)
+
+        case ("POST", "/api/research/budget"):
+            guard let raw = request.json(APICommand.self)?.value,
+                let depth = ResearchBudget.Depth(rawValue: raw)
+            else { return .setResearchBudget(.standard) }
+            return .setResearchBudget(depth)
+
+        case ("POST", "/api/seat"):
+            guard let body = request.json(APICommand.self), let seatID = body.seat else {
+                return nil
+            }
+            return .updateSeat(
+                .init(
+                    seatID: seatID, name: body.name, personaID: body.personaID,
+                    thinking: body.thinking.flatMap(ThinkingMode.init(rawValue:)),
+                    backend: body.backend.flatMap(AgentSpec.Backend.init(rawValue:)),
+                    baseURL: body.baseURL, apiModel: body.apiModel, apiKey: body.apiKey))
+
+        case ("POST", "/api/attachments"):
+            guard let body = request.json(APICommand.self), let filename = body.filename,
+                let content = body.content, let data = Data(base64Encoded: content)
+            else { return nil }
+            return .addAttachment(filename: filename, contents: data)
+
+        case ("POST", "/api/attachments/remove"):
+            guard let id = request.json(APICommand.self)?.value else { return nil }
+            return .removeAttachment(id: id)
+
+        default:
+            return nil
         }
     }
+
+    /// Turn an engine reply into an HTTP response.
+    private func respond(to reply: EngineReply) -> HTTPResponse {
+        switch reply {
+        case .state(let snapshot): return .json(snapshot)
+        case .report(let markdown):
+            return HTTPResponse(
+                contentType: "text/markdown; charset=utf-8", body: Data(markdown.utf8))
+        case .refused(let reason):
+            // A refusal is an answer, so it is 409 rather than 500 — the client shows the
+            // reason and carries on.
+            return .error(reason, status: 409)
+        }
+    }
+
 
     // MARK: - State
 
