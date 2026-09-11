@@ -28,6 +28,11 @@ public final class AgentPaneState: ObservableObject, Identifiable {
     @Published public var liveReasoning = ""
     /// Short line under the header: "searching…", token rate, last stats.
     @Published public var activity: String = ""
+    /// True once generation has finished but text is still being revealed. The live view is
+    /// held until this clears, so nothing appears to be cut off mid-sentence, and the next
+    /// speaker waits for it — which is what makes the hand-off look immediate rather than
+    /// leaving a pause while the previous seat catches up.
+    @Published public var isAwaitingDisplayClear = false
     @Published public var lastStats: TurnStats?
     @Published public var toolLog: [String] = []
     /// Bumped when the transcript should jump to the newest entry. A counter rather than
@@ -57,8 +62,16 @@ public final class AgentPaneState: ObservableObject, Identifiable {
         scrollSignal += 1
     }
 
+    /// Generation has stopped. The display may not have caught up.
+    func finishGenerating() {
+        isGenerating = false
+        isAwaitingDisplayClear = true
+    }
+
+    /// Everything generated has now been shown.
     func endTurn() {
         isGenerating = false
+        isAwaitingDisplayClear = false
         liveText = ""
         liveBlocks = []
         liveReasoning = ""
@@ -176,8 +189,13 @@ public final class ChatController: ObservableObject {
                 for await status in stream {
                     guard let self else { return }
                     self.status = status
-                    if !status.isActive {
-                        for pane in self.panes { pane.endTurn() }
+                    // Do not clear panes while text is still being revealed: stopping or
+                    // pausing should not swallow the end of a reply mid-sentence. The
+                    // pacer finishes it and clears the pane itself.
+                    if !status.isActive && !self.isDisplayingAnything {
+                        for pane in self.panes where !pane.isAwaitingDisplayClear {
+                            pane.endTurn()
+                        }
                     }
                 }
             }
@@ -211,10 +229,14 @@ public final class ChatController: ObservableObject {
         // streaming UI stutter; a turn finishes in well under a frame's worth of tokens
         // at these rates either way.
         case .token(let agentID, let text):
-            pending[agentID, default: Delta()].text += text
+            // Straight into the pacer: what arrives is queued, not shown. The queue is what
+            // absorbs a burst, and what builds the backfill that hides the next turn's wait.
+            pacer.enqueue(text, agentID: agentID, channel: StreamPacerPool.Channel.answer)
+            sampleGenerationRate(agentID: agentID, characters: text.count)
 
         case .reasoning(let agentID, let text):
-            pending[agentID, default: Delta()].reasoning += text
+            pacer.enqueue(text, agentID: agentID, channel: StreamPacerPool.Channel.reasoning)
+            sampleGenerationRate(agentID: agentID, characters: text.count)
 
         case .toolCall(let agentID, let name, let query):
             // `prefix` on a String counts grapheme clusters, so a query full of emoji or
@@ -231,6 +253,9 @@ public final class ChatController: ObservableObject {
         case .turnStarted(let agentID, _):
             flush()  // the previous turn's tail must land before its row is cleared
             threadScrollSignal += 1
+            // A new turn on this seat invalidates anything still queued for the last one.
+            pacer.clear(agentID: agentID)
+            rateSamples[agentID] = nil
             for pane in panes {
                 if pane.spec.id == agentID {
                     pane.beginTurn()
@@ -244,7 +269,9 @@ public final class ChatController: ObservableObject {
             threadScrollSignal += 1
             if let pane = pane(agentID) {
                 pane.lastStats = stats
-                pane.endTurn()
+                // Keep the live text on screen until the pacer has revealed all of it.
+                pane.finishGenerating()
+                if !isDisplaying(agentID: pane.id) { pane.endTurn() }
             }
 
         case .turnFailed(_, let message):
@@ -262,8 +289,28 @@ public final class ChatController: ObservableObject {
 
     private var pending: [String: Delta] = [:]
     private var flushTask: Task<Void, Never>?
+    /// Reveals queued text at a steady rate instead of in model-sized bursts.
+    private let pacer = StreamPacerPool()
+    /// Per-seat rate sampling, used to match the reveal rate to this hardware.
+    private var rateSamples: [String: (characters: Int, since: Date)] = [:]
 
-    /// Applies buffered deltas to the panes, in one published update per seat.
+    /// True while a seat still has generated text waiting to be shown. A turn is not
+    /// visually finished until this is false, which is what lets the next speaker begin
+    /// the moment this one stops appearing to type.
+    public func isDisplaying(agentID: String) -> Bool {
+        pacer.backlog(agentID: agentID) > 0
+    }
+
+    /// True while any seat is still revealing text.
+    public var isDisplayingAnything: Bool { pacer.isDraining }
+
+    /// Characters per second this conversation's models actually produce, for display.
+    public private(set) var measuredGenerationRate: Double = 0
+
+    /// Applies buffered *non-text* deltas to the panes.
+    ///
+    /// Streamed text no longer passes through here: it goes into the pacer, which releases
+    /// it at a steady rate. This only carries the cheap state changes.
     private func flush() {
         guard !pending.isEmpty else { return }
         let buffered = pending
@@ -271,24 +318,62 @@ public final class ChatController: ObservableObject {
 
         for (agentID, delta) in buffered {
             guard let pane = pane(agentID) else { continue }
-            if !delta.reasoning.isEmpty { pane.liveReasoning += delta.reasoning }
-            if !delta.text.isEmpty {
-                pane.liveText += delta.text
-                // Keeps the per-frame layout cost proportional to one paragraph rather
-                // than to the whole answer.
-                pane.moveCompletedBlocksToBuffer()
-            }
             if let activity = delta.activity { pane.activity = activity }
         }
     }
 
+    /// Record how fast this seat is producing characters, so the reveal rate can match it.
+    ///
+    /// Sampled over a window rather than per token, because per-token arrival is bursty by
+    /// nature and would make the reveal rate jitter with it.
+    private func sampleGenerationRate(agentID: String, characters: Int) {
+        let now = Date()
+        guard var sample = rateSamples[agentID] else {
+            rateSamples[agentID] = (characters, now)
+            return
+        }
+        sample.characters += characters
+        let elapsed = now.timeIntervalSince(sample.since)
+        guard elapsed >= 0.5 else {
+            rateSamples[agentID] = sample
+            return
+        }
+        let rate = Double(sample.characters) / elapsed
+        rateSamples[agentID] = (0, now)
+        measuredGenerationRate = rate
+        pacer.observe(agentID: agentID, charactersPerSecond: rate)
+    }
+
     private func startFlushLoop() {
+        // A steady 50 ms tick: fast enough that revealed text looks continuous, slow enough
+        // that the transcript is not re-laid-out more than twenty times a second.
+        let tick = 0.05
         flushTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(100))
+                try? await Task.sleep(for: .milliseconds(50))
                 guard let self else { return }
                 self.flush()
+                self.reveal(elapsed: tick)
             }
+        }
+    }
+
+    /// Release whatever text is due, and finish any turn whose text has now been fully
+    /// shown.
+    private func reveal(elapsed: Double) {
+        for release in pacer.drain(elapsed: elapsed) {
+            guard let pane = pane(release.agentID) else { continue }
+            switch release.channel {
+            case StreamPacerPool.Channel.answer:
+                pane.liveText += release.text
+                // Keeps the per-frame layout cost proportional to one paragraph.
+                pane.moveCompletedBlocksToBuffer()
+            case StreamPacerPool.Channel.reasoning:
+                pane.liveReasoning += release.text
+            }
+        }
+        for pane in panes where pane.isAwaitingDisplayClear && !isDisplaying(agentID: pane.id) {
+            pane.endTurn()
         }
     }
 
@@ -319,11 +404,23 @@ public final class ChatController: ObservableObject {
 
     public func stop() {
         engine.stop()
-        for pane in panes { pane.endTurn() }
+        // An explicit stop means stop: drop whatever is still queued rather than continuing
+        // to type it out.
+        for pane in panes {
+            pacer.clear(agentID: pane.id)
+            pane.endTurn()
+        }
     }
 
     public func reset() {
         engine.reset()
+        // Drop anything still queued for display: a fresh conversation must not begin by
+        // revealing the tail of the one that was just cleared.
+        for pane in panes {
+            pacer.clear(agentID: pane.id)
+            pane.endTurn()
+        }
+        rateSamples.removeAll()
         errorBanner = nil
     }
 

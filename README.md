@@ -189,6 +189,36 @@ removing the modifier from one view at a time until the freezes stopped.
 
 Instead, **Edit ▸ Copy Conversation (⇧⌘C)** copies the whole transcript as plain text.
 
+### Smooth output and an immediate hand-off
+
+Model output does not arrive at a constant rate — tokens come in clumps, sometimes several
+at once — so a pane that draws each chunk as it lands appears in jumps: a word, a pause,
+half a sentence. Streamed text is therefore queued and revealed at a steady character rate
+(~20 updates a second), which reads as typing rather than as bursts.
+
+The same queue does something more useful. A turn generates for twenty-odd seconds, so the
+obvious idea — buffer for a fixed three to five seconds — does not work: the buffer drains
+long before the next turn is ready and the visible gap comes straight back. What removes
+the gap is matching the reveal rate to the *model's own* rate, measured from this
+conversation's throughput. The queue then holds roughly a constant amount of unshown text,
+so a seat finishes displaying just as the next one finishes generating and starts speaking
+without a pause.
+
+Two consequences worth knowing:
+
+* **The reveal rate is capped at the measured generation rate.** Revealing faster would
+  drain the queue, and an empty queue is the pause this exists to remove. Smoothness is
+  traded for the hand-off when they conflict — a slow model dribbling text is honest,
+  whereas a drained queue brings the visible gap back.
+* **A turn is not finished until its text has been *shown*.** The pane keeps drawing the
+  tail of a reply after generation ends, so nothing appears cut off mid-sentence. The next
+  speaker waits for that, which is what makes the hand-off look immediate rather than
+  leaving the previous seat still catching up. Stop and Clear drop the queue immediately,
+  because there an explicit instruction beats smoothness.
+
+The arithmetic is separate from the timer (`StreamPacer`) and covered by tests, including
+the invariant that the reveal rate never outpaces generation.
+
 ### Context: maximum window, and compaction instead of truncation
 
 Both seats run at Qwen 3.5's own maximum context — **262,144 tokens**. The window comes from
