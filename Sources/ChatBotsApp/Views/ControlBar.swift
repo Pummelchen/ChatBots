@@ -138,6 +138,15 @@ struct ControlBar: View {
             .keyboardShortcut(".", modifiers: .command)
 
             Button {
+                controller.saveConversation()
+            } label: {
+                Label("Save", systemImage: "square.and.arrow.down")
+            }
+            .buttonStyle(.bordered)
+            .disabled(controller.turns.isEmpty)
+            .help("Save the full conversation log to a text file")
+
+            Button {
                 controller.reset()
             } label: {
                 Label("Clear", systemImage: "trash")

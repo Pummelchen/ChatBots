@@ -179,6 +179,53 @@ audited:
 [ChatBots] Agent A sampler: temp=1.00 topP=0.95 topK=20 minP=0.00 presence=-1.50 repetition=1.00 maxOut=32768
 ```
 
+### Saving the conversation
+
+**Save** in the toolbar (or File ▸ Save Conversation, ⌘S) opens the standard macOS save
+panel and writes the whole log as a plain text file, named after the topic with the export
+time. `Edit ▸ Copy Conversation` (⇧⌘C) puts the same text on the clipboard.
+
+There is one shared log, so the export is **one merged conversation with each message
+once** — including the messages the two seats addressed to each other, which *are* the
+conversation rather than duplicates of it. The writer walks the shared log a single time,
+and a test asserts that each message body appears exactly once.
+
+Timestamps are the format you asked for, with each entry stamped and attributed:
+
+```
+ChatBots — conversation log
+Topic: Why are eggs not round?
+Participant: Mira (Qwen3.5-4B-4bit)
+Participant: Otto (Qwen3.5-4B-4bit)
+Exported: 2026-12-25 13:20:00
+
+------------------------------------------------------------------------
+
+[2026-12-25 13:15:41] MIRA
+    An ovoid resists a point load at the tip far better than a sphere does.
+    The shell thickens where curvature is highest.
+
+[2026-12-25 13:16:02] OTTO
+    Which part of that is established?
+```
+
+A few details worth knowing:
+
+* Timestamps are a **fixed format in a fixed locale** (`en_US_POSIX`), so the same instant
+  reads identically whatever the Mac's region is set to. A day-first or 12-hour locale
+  cannot change the file.
+* **Continuation lines are indented**, so a multi-line message reads as one entry rather
+  than as several.
+* The format has three kinds of line — a header, a `[timestamp] SPEAKER` line, and indented
+  body — which makes it easy to grep: `grep '^\[' log.txt` lists every turn.
+* The setup brief is left out, since it is not something anyone said. A condensation is
+  included and labelled, because it replaced part of the history. Tool traffic is kept,
+  since it is part of what happened.
+* Writing is atomic, so a failure cannot leave a half-written log where a complete one was
+  expected. A failure is reported in the banner rather than passing silently.
+
+`chatbots-cli --export-sample` prints the format without loading a model.
+
 ### Copying text out
 
 The panes contain **no selectable text**, deliberately. `.textSelection(.enabled)` inside

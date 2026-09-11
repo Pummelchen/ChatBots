@@ -24,6 +24,7 @@ struct Options {
     var memoryProbe = false
     var sessionProbe = false
     var compactThreshold: Double?
+    var exportSample = false
     var contextWindow: Int?
     var keepRecent: Int?
     /// Cap on answer tokens per turn; `nil` keeps the seat's own budget.
@@ -81,6 +82,7 @@ struct Options {
             case "--benchmark": options.benchmark = true
             case "--memory-probe": options.memoryProbe = true
             case "--session-probe": options.sessionProbe = true
+            case "--export-sample": options.exportSample = true
             case "--compact-threshold": options.compactThreshold = Double(next() ?? "")
             case "--context-window": options.contextWindow = Int(next() ?? "")
             case "--compact-keep": options.keepRecent = Int(next() ?? "")
@@ -164,12 +166,43 @@ func header(_ title: String) {
     print(String(repeating: "─", count: 78))
 }
 
+
 // MARK: - Setup
 
 // Model storage lives in the project's `models/` folder; set before any engine loads.
 let modelsRoot = ModelStore.prepare()
 
 let options = Options.parse(Array(CommandLine.arguments.dropFirst()))
+
+// Printing the export format, with no model involved: handy for checking what a saved
+// conversation looks like, and for support.
+if options.exportSample {
+    let specA = AgentSpec.seat(index: 0)
+    let specB = AgentSpec.seat(index: 1)
+    let stamp: (String) -> Date = { value in
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter.date(from: value) ?? Date()
+    }
+    let turns = [
+        Turn(
+            sequence: 1, speakerName: "Moderator", kind: .topic,
+            content: options.topic, timestamp: stamp("2026-12-25 13:15:04")),
+        Turn(
+            sequence: 2, speakerName: specA.displayName, kind: .chat,
+            content: "An ovoid resists a point load at the tip far better than a sphere does.\nThe shell thickens where curvature is highest.",
+            timestamp: stamp("2026-12-25 13:15:41")),
+        Turn(
+            sequence: 3, speakerName: specB.displayName, kind: .chat,
+            content: "Which part of that is established? A sphere is the minimal surface for a given volume.",
+            timestamp: stamp("2026-12-25 13:16:02")),
+    ]
+    print(TranscriptWriter.text(
+        topic: options.topic, turns: turns, participants: [specA, specB],
+        exportedAt: stamp("2026-12-25 13:20:00")))
+    exit(0)
+}
 
 if let key = options.tavilyKey {
     setenv("TAVILY_API_KEY", key, 1)

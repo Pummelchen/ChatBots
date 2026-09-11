@@ -501,31 +501,18 @@ public final class ChatController: ObservableObject {
         }
     }
 
-    /// The whole conversation as plain text, for Edit ▸ Copy Conversation.
+    /// The whole conversation as plain text.
     ///
-    /// On-screen selection is not available in the panes (see `AppKitScrollView`), so
-    /// this is the supported way to lift the transcript out of the app.
-    public func transcriptAsText() -> String {
-        var lines: [String] = ["# \(topic)", ""]
-        for turn in engine.displayTurns {
-            switch turn.kind {
-            case .topic, .steering:
-                lines.append("**\(turn.speakerName):** \(turn.content)")
-            case .introduction:
-                continue
-            case .summary:
-                lines.append("> **[condensed earlier discussion]** \(turn.content)")
-            case .tool:
-                lines.append("> tool → \(turn.content)")
-            case .chat:
-                lines.append("**\(turn.speakerName):** \(turn.content)")
-            }
-            lines.append("")
-        }
-        if let stats = panes.compactMap(\.lastStats).first {
-            lines.append("— \(Format.rate(stats))")
-        }
-        return lines.joined(separator: "\n")
+    /// One shared log walked once, so each message appears exactly once — including the
+    /// messages the two seats addressed to each other, which are the conversation rather
+    /// than duplicates of it. Timestamps are the format the moderator asked for.
+    public func transcriptAsText(exportedAt: Date = Date()) -> String {
+        TranscriptWriter.text(
+            topic: topic,
+            turns: engine.displayTurns,
+            participants: currentSeats,
+            exportedAt: exportedAt
+        )
     }
 
     public func copyConversation() {
@@ -533,6 +520,35 @@ public final class ChatController: ObservableObject {
         guard !text.isEmpty else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    /// Save the conversation to a text file, through the standard macOS save dialog.
+    ///
+    /// Returns the chosen URL, or nil if the moderator cancelled.
+    @discardableResult
+    public func saveConversation() -> URL? {
+        let panel = NSSavePanel()
+        panel.title = "Save Conversation"
+        panel.message = "Save the full conversation log as a plain text file."
+        panel.prompt = "Save"
+        panel.allowedContentTypes = [.plainText]
+        panel.isExtensionHidden = false
+        panel.canCreateDirectories = true
+        panel.nameFieldStringValue = TranscriptWriter.suggestedFilename(topic: topic)
+
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
+
+        let text = transcriptAsText()
+        do {
+            // Atomic, so a failure part-way through cannot leave a half-written log where
+            // the moderator expects a complete one.
+            try Data(text.utf8).write(to: url, options: .atomic)
+            errorBanner = nil
+            return url
+        } catch {
+            errorBanner = "Could not save the conversation: \(error.localizedDescription)"
+            return nil
+        }
     }
 
     /// Rename a seat.

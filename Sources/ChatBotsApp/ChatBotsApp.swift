@@ -96,6 +96,10 @@ struct ChatBotsApp: App {
             }
 
             CommandGroup(after: .saveItem) {
+                Button("Save Conversation…") { controller.saveConversation() }
+                    .keyboardShortcut("s", modifiers: .command)
+                    .disabled(controller.turns.isEmpty)
+
                 Button("Clear Conversation") { controller.reset() }
                     .keyboardShortcut("k", modifiers: .command)
                     .disabled(controller.isRunning)
