@@ -65,6 +65,13 @@ struct UnifiedConversation: View {
                     Text(pane.spec.displayName)
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
 
+                    PersonaControl(
+                        persona: pane.spec.persona,
+                        isEnabled: !pane.isGenerating
+                    ) { personaID in
+                        controller.setPersona(personaID, for: pane.id)
+                    }
+
                     PaneThinkingControl(
                         mode: pane.spec.thinking,
                         isEnabled: !pane.isGenerating

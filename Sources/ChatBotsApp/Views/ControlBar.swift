@@ -29,6 +29,13 @@ struct ControlBar: View {
 
             HStack(spacing: 10) {
                 statusPill
+
+                // Before the conversation starts, show what the two seats are configured
+                // as. Afterwards the per-pane controls carry it and this would be noise.
+                if controller.turns.isEmpty {
+                    PersonaSummary(specs: controller.panes.map(\.spec), palette: palette)
+                }
+
                 Spacer(minLength: 0)
 
                 Picker("Layout", selection: $theme.windowMode) {

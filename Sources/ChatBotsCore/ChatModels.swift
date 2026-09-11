@@ -117,11 +117,16 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
     public var maxTokens: Int
     /// Whether this seat may call the web-search tools.
     public var webSearchEnabled: Bool
-    /// How much this seat may think before answering. Changeable at runtime from the pane.
+    /// How much this seat may think before answering. Changeable at runtime from the pane;
+    /// `LLMEngine.currentSpec` carries the live value, `spec` the value at construction.
     public var thinking: ThinkingMode
-    /// Extra per-seat persona note. Deliberately short: the design goal is to watch
-    /// two models run the conversation, not to script them.
-    public var persona: String
+    /// Which style this seat argues in. Stored as an id so the library can be extended
+    /// or reworded without invalidating saved configuration; an unknown id resolves to
+    /// `PersonaLibrary.neutral`.
+    ///
+    /// Changeable at runtime from the pane; `LLMEngine.currentSpec` carries the live
+    /// value.
+    public var personaID: String
 
     public init(
         id: String,
@@ -137,7 +142,7 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
         maxTokens: Int = 1024,
         webSearchEnabled: Bool = true,
         thinking: ThinkingMode = .medium,
-        persona: String = ""
+        personaID: String = PersonaLibrary.neutral.id
     ) {
         self.id = id
         self.displayName = displayName
@@ -152,7 +157,7 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
         self.maxTokens = maxTokens
         self.webSearchEnabled = webSearchEnabled
         self.thinking = thinking
-        self.persona = persona
+        self.personaID = personaID
     }
 
     public static let defaultModelID = "mlx-community/Qwen3.5-4B-MLX-4bit"
@@ -195,7 +200,8 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
     private static func qwen(
         id: String,
         modelID: String,
-        shortName: String
+        shortName: String,
+        personaID: String
     ) -> AgentSpec {
         AgentSpec(
             id: id,
@@ -209,20 +215,36 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
             presencePenalty: QwenSampling.presencePenalty,
             repetitionPenalty: QwenSampling.repetitionPenalty,
             maxTokens: QwenSampling.maxOutputTokens,
-            thinking: QwenSampling.thinking
+            thinking: QwenSampling.thinking,
+            personaID: personaID
         )
     }
 
-    /// Seat A — the default opening speaker.
-    public static func seatA(modelID: String = AgentSpec.defaultModelID) -> AgentSpec {
-        qwen(id: "Agent A", modelID: modelID, shortName: "Qwen3.5-4B-4bit")
+    /// Seat A — opens the conversation, and by default argues from evidence.
+    public static func seatA(
+        modelID: String = AgentSpec.defaultModelID,
+        personaID: String = defaultPersonaA
+    ) -> AgentSpec {
+        qwen(
+            id: "Agent A", modelID: modelID, shortName: "Qwen3.5-4B-4bit",
+            personaID: personaID)
     }
 
-    /// Seat B — identical settings and, by default, identical weights to seat A, but a
+    /// Seat B — identical sampler and, by default, identical weights to seat A, but a
     /// *separate* model instance. Point `modelID` at another checkpoint to mix LLMs.
-    public static func seatB(modelID: String = AgentSpec.defaultModelID) -> AgentSpec {
-        qwen(id: "Agent B", modelID: modelID, shortName: "Qwen3.5-4B-4bit")
+    public static func seatB(
+        modelID: String = AgentSpec.defaultModelID,
+        personaID: String = defaultPersonaB
+    ) -> AgentSpec {
+        qwen(
+            id: "Agent B", modelID: modelID, shortName: "Qwen3.5-4B-4bit",
+            personaID: personaID)
     }
+
+    /// The two default styles are chosen to disagree productively rather than to be
+    /// arbitrary: one wants a source, the other doubts the consensus.
+    public static let defaultPersonaA = "fact-checker"
+    public static let defaultPersonaB = "skeptic"
 
     /// A separate instance of the same weights still deserves a distinct sampling
     /// seed-stream, otherwise the two seats converge on identical phrasing.
@@ -231,6 +253,9 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
     public var generationCap: Int {
         maxTokens + (thinking.reasoningTokenBudget ?? 0)
     }
+
+    /// The resolved style. Never fails: an unknown id yields `neutral`.
+    public var persona: Persona { PersonaLibrary.persona(id: personaID) }
 
     public var samplingSeed: UInt64 {
         var hasher = Hasher()
@@ -317,6 +342,11 @@ public struct PromptMessage: Sendable, Hashable, Codable {
 /// different backend without touching the conversation logic.
 public protocol LLMEngine: Sendable {
     var spec: AgentSpec { get }
+
+    /// The seat's configuration *as it stands now*, including anything the user changed
+    /// from the UI since `spec` was captured — thinking level and persona. The
+    /// orchestrator builds prompts from this so a change takes effect on the next turn.
+    var currentSpec: AgentSpec { get async }
     /// Load weights. Idempotent; safe to call from several tasks.
     func load() async throws
     var isLoaded: Bool { get async }

@@ -40,7 +40,8 @@ struct ChatPane: View {
             isGenerating: pane.isGenerating,
             tint: tint,
             palette: palette,
-            onThinkingChange: { controller.setThinking($0, for: pane.id) }
+            onThinkingChange: { controller.setThinking($0, for: pane.id) },
+            onPersonaChange: { controller.setPersona($0, for: pane.id) }
         )
     }
 

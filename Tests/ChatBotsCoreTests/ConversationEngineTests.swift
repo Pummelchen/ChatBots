@@ -32,6 +32,8 @@ actor StubEngine: LLMEngine {
 
     var isLoaded: Bool { true }
     var contextWindow: Int { 32_768 }
+    /// Mirrors the real engine: the stub has no UI, so `spec` is already live.
+    var currentSpec: AgentSpec { spec }
 
     func load() async throws {}
     func unload() async {}

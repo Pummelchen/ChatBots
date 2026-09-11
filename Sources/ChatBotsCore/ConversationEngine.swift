@@ -341,9 +341,12 @@ public final class ConversationEngine {
             publishTranscript()
         }
 
+        // Built from the engine's live configuration, not the spec captured at
+        // construction, so a persona or thinking change made in the UI takes effect here.
+        let liveSpec = await seat.engine.currentSpec
         let prompt = PromptBuilder.prompt(
-            for: seat.spec,
-            others: seats.map(\.spec).filter { $0.id != seat.spec.id },
+            for: liveSpec,
+            others: seats.map(\.spec).filter { $0.id != liveSpec.id },
             conversation: conversation
         )
 

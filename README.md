@@ -34,6 +34,7 @@ hallucinated.
 | **Moderator box** | Your message goes into the shared log — **both** models read it |
 | **Show thinking** | Streams each model's `<think>` block into its own pane (never into the log) |
 | **Models ▸ Load …** | Pre-loads weights, optionally per seat |
+| **Persona** | Per seat: 26 styles plus Neutral, from the library |
 | **Layout** | `Split` (two panes) or `Thread` (one chat-style conversation) |
 | **Theme** | `Original` (default) follows the Mac's appearance; `Black` is flat pure-black |
 
@@ -186,6 +187,30 @@ result is the same re-entrant update that stops the window drawing; it was found
 removing the modifier from one view at a time until the freezes stopped.
 
 Instead, **Edit ▸ Copy Conversation (⇧⌘C)** copies the whole transcript as plain text.
+
+### Personas
+
+Each seat has its own style, picked from a library of **26 styles plus Neutral**, grouped
+in the menu as *Evidence & logic*, *Analysis*, *Practical*, *Creative*, *Social* and
+*Character*: fact-checker, skeptic, empiricist, logician, Bayesian, causal thinker,
+devil's advocate, peer reviewer, reductionist, systems thinker, engineer, operator,
+project manager, teacher, historian, provocateur, storyteller, contrarian, generalist,
+empath, diplomat, journalist, negotiator, curious child, expert outsider, comedian.
+
+Before a conversation starts the bar shows the pairing (`Agent A: The Fact-Checker ⇄
+Agent B: The Skeptic`), and each seat's control shows its current style. The defaults are
+chosen to disagree productively: one wants a source for every claim, the other doubts the
+obvious explanation. Use `chatbots-cli --list-personas` to print the library.
+
+A persona is a *communication style*, not a character to role-play. Every directive says
+what the model pays attention to and how it reacts; none of them ask for an invented
+biography, because the point is to watch two models think rather than to run a sketch. The
+directives are deliberately short — a long persona competes with the topic for a 4B model's
+attention, and that shows up as the persona swallowing the discussion.
+
+A style applies to **one seat only**. It is injected into that seat's own system message and
+never into the shared log, so each model's style shapes what *it* writes and cannot tell the
+other how to behave. There is a test for exactly that.
 
 ### Thinking controls
 

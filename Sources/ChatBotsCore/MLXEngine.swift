@@ -42,6 +42,8 @@ public actor MLXEngine: LLMEngine {
     /// Live thinking level. Starts from the seat's spec and is changed between turns by
     /// the pane control; `spec` itself stays immutable because it is a protocol property.
     private var currentThinking: ThinkingMode
+    /// Live persona id, same reasoning as `currentThinking`.
+    private var currentPersonaID: String
 
     /// Throughput of this seat's most recent turn, for diagnostics and benchmarks.
     public private(set) var lastStats: TurnStats?
@@ -53,6 +55,7 @@ public actor MLXEngine: LLMEngine {
     ) {
         self.spec = spec
         self.currentThinking = spec.thinking
+        self.currentPersonaID = spec.personaID
         self.toolRegistry = toolRegistry
         self.onStateChange = onStateChange
     }
@@ -67,6 +70,22 @@ public actor MLXEngine: LLMEngine {
 
     /// The level this seat will use on its next turn.
     public var thinking: ThinkingMode { currentThinking }
+
+    /// The style this seat will use on its next turn.
+    public func setPersona(_ personaID: String) {
+        currentPersonaID = personaID
+    }
+
+    public var persona: Persona { PersonaLibrary.persona(id: currentPersonaID) }
+
+    /// `spec` plus whatever the user has changed since. Mirrors `setThinking`/`setPersona`
+    /// so there is a single place the live configuration is assembled.
+    public var currentSpec: AgentSpec {
+        var live = spec
+        live.thinking = currentThinking
+        live.personaID = currentPersonaID
+        return live
+    }
 
     public var contextWindow: Int { loadedContextWindow }
 

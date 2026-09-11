@@ -81,8 +81,16 @@ public enum PromptBuilder {
         name tag — the app adds that.
         """
 
-        if !spec.persona.isEmpty {
-            text += "\n\n" + spec.persona
+        // The persona applies to this seat only. It is presentation of *how* the seat
+        // argues, so it belongs in the system message and never in the shared log — the
+        // other participant reads the log, and must not be told how to behave.
+        let persona = spec.persona
+        if !persona.directive.isEmpty {
+            text += """
+
+                Your style in this discussion — \(persona.name):
+                \(persona.directive)
+                """
         }
         return text
     }

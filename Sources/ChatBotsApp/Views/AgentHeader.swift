@@ -27,6 +27,7 @@ struct PaneHeader: View {
     let tint: Color
     let palette: AppPalette
     let onThinkingChange: (ThinkingMode) -> Void
+    let onPersonaChange: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -46,6 +47,12 @@ struct PaneHeader: View {
                 }
 
                 Spacer(minLength: 8)
+
+                PersonaControl(
+                    persona: spec.persona,
+                    isEnabled: !isGenerating,
+                    onSelect: onPersonaChange
+                )
 
                 PaneThinkingControl(
                     mode: spec.thinking,
@@ -187,5 +194,75 @@ struct CompactAgentSettings: View {
             top-k \(spec.topK) · min-p \(String(format: "%.1f", spec.minP)) · presence \(presence) · \
             repetition \(repetition) · max \(spec.maxTokens) tok · thinking \(spec.thinking.label)
             """
+    }
+}
+
+/// Per-seat persona picker.
+///
+/// Same isolation as `PaneThinkingControl`: plain values plus a callback, never an
+/// observation of the streaming pane, because a `Menu` rebuilt on every streaming update
+/// sends the hosting view into a transaction loop that stops the window drawing.
+///
+/// Styled after the macOS way of picking a value from a list with an indicator.
+struct PersonaControl: View {
+    let persona: Persona
+    let isEnabled: Bool
+    let onSelect: (String) -> Void
+
+    var body: some View {
+        Menu {
+            ForEach(Persona.Category.allCases) { category in
+                Section(category.rawValue) {
+                    ForEach(PersonaLibrary.personas(in: category)) { candidate in
+                        Button {
+                            onSelect(candidate.id)
+                        } label: {
+                            if candidate.id == persona.id {
+                                Label(candidate.name, systemImage: "checkmark")
+                            } else {
+                                Text(candidate.name)
+                            }
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "theatermasks")
+                    .font(.system(size: 9))
+                Text(persona.name)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .lineLimit(1)
+            }
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .disabled(!isEnabled)
+        .help(persona.summary + " — applies to this seat only")
+    }
+}
+
+/// A one-line summary of both seats' styles, shown before the conversation starts.
+struct PersonaSummary: View {
+    let specs: [AgentSpec]
+    let palette: AppPalette
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "theatermasks")
+                .font(.system(size: 10))
+            ForEach(Array(specs.enumerated()), id: \.offset) { index, spec in
+                if index > 0 {
+                    Image(systemName: "arrow.left.arrow.right")
+                        .font(.system(size: 8))
+                        .foregroundStyle(palette.textTertiary)
+                }
+                Text("\(spec.id): \(spec.persona.name)")
+                    .font(.system(size: 10.5, weight: .medium, design: .rounded))
+                    .foregroundStyle(AgentTheme.tint(for: spec.id, palette: palette))
+            }
+        }
+        .help(specs.map { "\($0.id) — \($0.persona.name): \($0.persona.summary)" }
+            .joined(separator: "\n"))
     }
 }

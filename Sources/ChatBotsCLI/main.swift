@@ -26,6 +26,8 @@ struct Options {
     var maxTokens: Int?
     /// Thinking level for both seats; `nil` keeps the preset (medium).
     var thinking: ThinkingMode?
+    var personaA: String?
+    var personaB: String?
 
     static func parse(_ arguments: [String]) -> Options {
         var options = Options()
@@ -43,6 +45,16 @@ struct Options {
             case "--model-b": options.modelB = next() ?? options.modelB
             case "--key": options.tavilyKey = next()
             case "--max-tokens": options.maxTokens = Int(next() ?? "")
+            case "--persona-a": options.personaA = next()
+            case "--persona-b": options.personaB = next()
+            case "--list-personas":
+                for category in Persona.Category.allCases {
+                    print("\(category.rawValue):")
+                    for persona in PersonaLibrary.personas(in: category) {
+                        print("  \(persona.id.padding(toLength: 18, withPad: " ", startingAt: 0)) \(persona.summary)")
+                    }
+                }
+                exit(0)
             case "--thinking":
                 let raw = next() ?? ""
                 guard let mode = ThinkingMode(rawValue: raw.lowercased()) else {
@@ -80,6 +92,9 @@ struct Options {
               --key <key>          Tavily API key (env TAVILY_API_KEY, else built-in dev key)
               --max-tokens <n>     Cap answer tokens per turn
               --thinking <mode>    off | minimal | low | medium | high | unlimited
+              --persona-a <id>     Style for seat A (see --list-personas)
+              --persona-b <id>     Style for seat B
+              --list-personas      Print the persona library and exit
               --benchmark          Measure seat throughput instead of chatting
               --solo               With --benchmark: measure seat A only, then exit
               --memory-probe       Report MLX GPU memory across loading and turns
@@ -88,15 +103,16 @@ struct Options {
         parameters, so a headless run exercises exactly the same path as the GUI.
         """
 
-    private func configured(_ spec: AgentSpec) -> AgentSpec {
+    private func configured(_ spec: AgentSpec, persona: String?) -> AgentSpec {
         var spec = spec
         if let maxTokens { spec.maxTokens = maxTokens }
         if let thinking { spec.thinking = thinking }
+        if let persona { spec.personaID = persona }
         return spec
     }
 
-    var specA: AgentSpec { configured(AgentSpec.seatA(modelID: modelA)) }
-    var specB: AgentSpec { configured(AgentSpec.seatB(modelID: modelB)) }
+    var specA: AgentSpec { configured(AgentSpec.seatA(modelID: modelA), persona: personaA) }
+    var specB: AgentSpec { configured(AgentSpec.seatB(modelID: modelB), persona: personaB) }
 }
 
 // MARK: - Output helpers
@@ -249,6 +265,9 @@ log("  turns     : \(options.turns)")
 log("  seat A    : \(options.modelA)")
 log("  seat B    : \(options.modelB)")
 log("  thinking  : \(specs[0].thinking.rawValue) — \(specs[0].thinking.detail)")
+for spec in specs {
+    log("  \(spec.id) style: \(spec.persona.name) — \(spec.persona.summary)")
+}
 log("  tavily    : \(TavilyClient.isConfigured ? "configured" : "MISSING")")
 print("")
 

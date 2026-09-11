@@ -368,6 +368,18 @@ public final class ChatController: ObservableObject {
         NSPasteboard.general.setString(text, forType: .string)
     }
 
+    /// Change one seat's style. Applies from its next turn.
+    public func setPersona(_ personaID: String, for agentID: String) {
+        guard var spec = engine.specs.first(where: { $0.id == agentID }) else { return }
+        spec.personaID = personaID
+        if let seat = engine.allSeats.first(where: { $0.spec.id == agentID }) as? MLXEngine {
+            Task { await seat.setPersona(personaID) }
+        }
+        if let pane = pane(agentID) {
+            pane.spec = spec
+        }
+    }
+
     public func warmUp(_ agentID: String) {
         errorBanner = nil
         guard let seatEngine = engine.seatEngine(for: agentID) else { return }
