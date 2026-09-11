@@ -4,13 +4,13 @@
 #
 #     bash tools/start-app.sh
 #
-# Opens ChatBots.app, which runs its own conversation engine in-process — the app needs
-# nothing else, and will start the models itself when you press Start.
+# Opens ChatBots.app. The app starts its own engine as a child process and talks to it over
+# WebTransport, so this script has little to do that the app does not do itself: it is here so
+# the engine can be started deliberately, in the foreground, with its output visible.
 #
-# An API server is also brought up, on the same port the website uses, so that the web
-# interface can attach to the same conversation while the app is running. That is the point of
-# this script over simply double-clicking the app: the desktop window and a browser page then
-# show one conversation rather than two.
+# The engine serves both channels from one conversation, so a browser at
+# http://localhost:7789 shows the same thing the app does. Caddy and the website use HTTP;
+# the app uses WebTransport.
 #
 # Options:
 #   --no-engine    just open the app, without also serving the web interface
@@ -115,7 +115,8 @@ if [ "$START_ENGINE" -eq 1 ]; then
       fi
     fi
     if [ "$START_ENGINE" -eq 1 ]; then
-      "$BINARY_CLI" --serve --port "$ENGINE_PORT" >"$ENGINE_LOG" 2>&1 &
+      "$BINARY_CLI" --serve --transport both --port "$ENGINE_PORT" \
+        --transport-port "$((ENGINE_PORT + 1))" >"$ENGINE_LOG" 2>&1 &
       ENGINE_PID_VALUE=$!
       echo "$ENGINE_PID_VALUE" > "$ENGINE_PID"
       ready=0
@@ -151,7 +152,7 @@ $( [ "$START_ENGINE" -eq 1 ] \
     the app is having. It appears once the app has fetched some state, so give it a
     moment after you press Start.
 
-    The API server keeps running until you run:  bash tools/start-app.sh --stop" \
+    The engine keeps running until you run:  bash tools/start-app.sh --stop" \
     || echo "    No API server is running, so there is no web interface for this session.
     Start it with:  bash tools/start-app.sh" )
 
