@@ -28,6 +28,7 @@ struct Options {
     var check = false
     var checkTransport = false
     var checkClient = false
+    var prepareIdentity = false
     /// webtransport, http, or both. Both by default, so the website and the app can each be
     /// run against the same engine while the app is being moved onto the new channel.
     var transport = "both"
@@ -101,6 +102,7 @@ struct Options {
             case "--check": options.check = true
             case "--check-transport": options.checkTransport = true
             case "--check-client": options.checkClient = true
+            case "--prepare-identity": options.prepareIdentity = true
             case "--transport": options.transport = next() ?? "both"
             case "--transport-port":
                 if let value = UInt16(next() ?? "") { options.transportPort = value }
@@ -222,6 +224,26 @@ let options = Options.parse(Array(CommandLine.arguments.dropFirst()))
 // The self-test an installer runs: it proves the runtime, the Metal library and the
 // checkpoint all work together on this machine, and it does so without needing to read or
 // interpret a conversation.
+// Generate the engine's certificate, if it is not there yet.
+//
+// Run by the installer so the first launch does not do it. Two reasons: the work happens
+// during setup, where a pause is expected, rather than in the app where it looks like a hang,
+// and the fingerprint is printed where someone installing can see it.
+if options.prepareIdentity {
+    let directory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        .appending(path: ".run")
+    do {
+        let identity = try CertificateStore.loadOrCreate(in: directory)
+        print("engine certificate: \(identity.fingerprintDisplay)")
+        print("  stored in \(directory.path)")
+        exit(0)
+    } catch {
+        FileHandle.standardError.write(
+            Data("could not create the engine certificate: \(error.localizedDescription)\n".utf8))
+        exit(1)
+    }
+}
+
 // The transport check runs before anything else, and needs no model: it starts a real
 // WebTransport server and drives it with a real client, so a broken channel is found here
 // rather than in the app.

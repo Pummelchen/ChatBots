@@ -929,42 +929,68 @@ public final class ChatController: ObservableObject {
     }
 
     /// Add already-chosen files. Returns how many were accepted.
+    ///
+    /// The file is sent to the engine and extracted there, rather than being read here.
+    ///
+    /// That is a change of direction from the in-process design, and it is deliberate: the
+    /// engine holds the attachment, so the engine must be the one that decides what is in the
+    /// file. Extracting here as well would mean two implementations of "what does this
+    /// document say" that could disagree, and the app's copy would be the one on screen while
+    /// the engine used its own.
+    ///
+    /// The cost is that the whole file crosses the wire. On loopback, for a document a person
+    /// chose by hand, that is nothing.
+    /// Returns how many files were accepted for upload.
+    ///
+    /// The upload runs in the background: reading a large PDF and sending it should not freeze
+    /// the window, and the engine publishes the new attachment list when it is done, so there
+    /// is no local state to keep in step.
     @discardableResult
     public func addFiles(_ urls: [URL], allowImages: Bool = true) -> Int {
-        let (documents, reportedFailures) = SystemDocumentExtractor.add(urls: urls)
-        var failures = reportedFailures
-        var accepted = documents.filter { document in
-            guard document.kind.isImage else { return true }
-            guard allowImages, allSeatsSupportVision else { return false }
-            return true
+        guard let client else {
+            errorBanner = "Not connected to the engine."
+            return 0
         }
-        let rejectedImages = documents.count - accepted.count
-        if rejectedImages > 0 {
-            failures.append(
-                DocumentError.imageNotAllowed.errorDescription ?? "Images are unavailable.")
+        let imagesAllowed = allowImages && allSeatsSupportVision
+
+        // Checked before reading, so an unreadable or unwanted file costs nothing.
+        var queued: [(name: String, data: Data)] = []
+        var failures: [String] = []
+        for url in urls {
+            let name = url.lastPathComponent
+            if !imagesAllowed, let kind = DocumentKind.forFilename(name), kind.isImage {
+                failures.append(
+                    DocumentError.imageNotAllowed.errorDescription ?? "Images are unavailable.")
+                continue
+            }
+            do {
+                queued.append((name, try Data(contentsOf: url)))
+            } catch {
+                failures.append("\(name): \(error.localizedDescription)")
+            }
         }
-        guard !accepted.isEmpty else {
+
+        guard !queued.isEmpty else {
             errorBanner = failures.first
             return 0
         }
 
-        // Replace an attachment with the same name and size rather than stacking copies.
-        var current = attachments
-        for document in accepted {
-            if let existing = current.firstIndex(where: {
-                $0.name == document.name && $0.byteCount == document.byteCount
-            }) {
-                current[existing] = document
-            } else {
-                current.append(document)
+        errorBanner = nil
+        let pending = queued
+        Task { [weak self] in
+            var rejected: [String] = failures
+            for file in pending {
+                do {
+                    try await client.addAttachment(filename: file.name, contents: file.data)
+                } catch {
+                    // The engine's reason, which is what the user needs to read.
+                    rejected.append("\(file.name): \(error.localizedDescription)")
+                }
             }
+            guard let self else { return }
+            self.errorBanner = rejected.isEmpty ? nil : rejected.joined(separator: "\n")
         }
-        accepted = documents
-        syncAttachments(current)
-        // A failure alongside successes is reported without hiding the successes.
-        errorBanner = failures.isEmpty ? nil : failures.joined(separator: "\n")
-        saveSettings()
-        return accepted.count
+        return queued.count
     }
 
     /// Seed the attached material at launch, before any turn can run.

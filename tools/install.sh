@@ -326,6 +326,38 @@ run_with_timeout() {
   wait "$pid"
 }
 
+# The engine's certificate is made here rather than on first launch.
+#
+# Two reasons: generating a key takes a moment, and during setup a pause is expected while in
+# the app it reads as a hang; and the fingerprint is printed where whoever is installing can
+# see it. It is also the one step that touches the filesystem outside the build, so a failure
+# is better reported here than discovered by the app later.
+step "Preparing the engine certificate"
+if CERT_OUTPUT="$(cd "$ROOT" && swift run -c release chatbots-cli --prepare-identity 2>&1)"; then
+  ok "$(echo "$CERT_OUTPUT" | head -1 | sed 's/^engine certificate: //')"
+  dim "stored in $ROOT/.run — the engine reads it from there and never touches the keychain"
+else
+  # Not fatal: the app creates one on first launch if it is missing.
+  warn "The certificate could not be prepared; the app will create one on first launch."
+  echo "$CERT_OUTPUT" | tail -3 | sed 's/^/      /'
+fi
+
+# The channel the desktop app uses, proved separately from the model check.
+#
+# These fail independently: a model can generate text while the transport is broken, and the
+# app would then open a window that never updates. It needs no model, so it is quick.
+step "Checking the app's connection to the engine"
+TRANSPORT_LOG="$ROOT/.install-transport.log"
+if run_with_timeout 180 \
+  bash -c "cd '$ROOT' && swift run -c release chatbots-cli --check-transport" \
+  > "$TRANSPORT_LOG" 2>&1
+then
+  ok "The app can reach the engine over WebTransport"
+else
+  warn "The app's connection could not be verified. The website will still work."
+  tail -4 "$TRANSPORT_LOG" | sed 's/^/      /'
+fi
+
 run_with_timeout "$CHECK_TIMEOUT" \
   bash -c "cd '$ROOT' && swift run -c release chatbots-cli --check" > "$CHECK_LOG" 2>&1
 CHECK_STATUS=$?

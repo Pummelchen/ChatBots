@@ -28,6 +28,9 @@ public final class WebTransportEngineClient {
     public enum ClientError: LocalizedError {
         case cannotConnect(String)
         case streamFailed(String)
+        /// The engine understood the request and declined it. Distinct from a transport
+        /// failure, because the reason is something to show a user rather than retry.
+        case refused(String)
 
         public var errorDescription: String? {
             switch self {
@@ -35,6 +38,7 @@ public final class WebTransportEngineClient {
                 "Could not connect to the conversation engine: \(detail)"
             case .streamFailed(let detail):
                 "The connection to the conversation engine failed: \(detail)"
+            case .refused(let reason): reason
             }
         }
     }
@@ -152,6 +156,22 @@ public final class WebTransportEngineClient {
             return reply
         }
         throw ClientError.streamFailed("the engine closed the connection")
+    }
+
+    /// Send a file to the engine, which extracts it and holds it as source material.
+    ///
+    /// The bytes go over the request channel rather than the event channel: it is a one-shot
+    /// command with a reply, and it can be large. The engine writes them to a temporary file
+    /// and reads that, so there is one implementation of what a document contains — the
+    /// engine's — instead of one on each side that could disagree.
+    ///
+    /// Throws when the engine refuses, which it does for an unsupported type, an image no seat
+    /// can see, or too many attachments. The reason is what should be shown to the user.
+    public func addAttachment(filename: String, contents: Data) async throws {
+        let reply = try await send(.addAttachment(filename: filename, contents: contents))
+        if case .refused(let reason) = reply {
+            throw ClientError.refused(reason)
+        }
     }
 
     /// Ask for the current state, which is also how a client confirms it is connected.
