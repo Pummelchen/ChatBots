@@ -26,6 +26,7 @@ struct Options {
     var compactThreshold: Double?
     var exportSample = false
     var check = false
+    var checkTransport = false
     var serve = false
     var mode = DiscussionMode.entertainment
     var listCharacters = false
@@ -93,6 +94,7 @@ struct Options {
             case "--session-probe": options.sessionProbe = true
             case "--export-sample": options.exportSample = true
             case "--check": options.check = true
+            case "--check-transport": options.checkTransport = true
             case "--serve": options.serve = true
             case "--attach": options.attachments.append(next() ?? "")
             case "--seed": options.seed = true
@@ -211,6 +213,23 @@ let options = Options.parse(Array(CommandLine.arguments.dropFirst()))
 // The self-test an installer runs: it proves the runtime, the Metal library and the
 // checkpoint all work together on this machine, and it does so without needing to read or
 // interpret a conversation.
+// The transport check runs before anything else, and needs no model: it starts a real
+// WebTransport server and drives it with a real client, so a broken channel is found here
+// rather than in the app.
+if options.checkTransport {
+    let directory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        .appending(path: ".run")
+    let report = await TransportCheck.run(in: directory)
+    print("WebTransport check")
+    print(report.describe())
+    if report.succeeded {
+        print("\nThe transport works: requests, replies, refusals and events all arrived.")
+        exit(0)
+    }
+    print("\nThe transport does NOT work.")
+    exit(2)
+}
+
 if options.check {
     let spec = AgentSpec.seat(index: 0, modelID: options.modelA)
     log("Checking seat A: \(spec.modelID)")

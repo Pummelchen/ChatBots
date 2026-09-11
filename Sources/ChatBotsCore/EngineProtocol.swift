@@ -9,19 +9,24 @@
 // silently, and they can be tested exhaustively with no socket, no certificate and no QUIC.
 // The WebTransport layer above this only has to move bytes.
 //
-// **Two channels, because they have different shapes.**
+// **One stream, with every frame tagged.**
 //
-//   · A *request* channel carries one command at a time and one reply per command. Each
-//     message is length-prefixed, because a command body can contain newlines — a topic, a
-//     pasted question — and a delimiter would split it in the wrong place.
-//   · An *event* channel carries a stream of updates with no replies. Here newline-delimited
-//     JSON is right: events are frequent and small, and the delimiter costs less than a
-//     length prefix on every one. JSON encoders never emit a bare newline inside a string, so
-//     the delimiter cannot be forged by the payload.
+// Two streams was the first design: one for requests and their replies, one for the event
+// feed. It deadlocked. The library serialises stream operations on a session, so a server
+// waiting to accept its second stream stops serving the first, while a client waiting for a
+// reply never opens the second. Opening both up front failed differently — the second
+// `openBidirectionalStream` does not succeed on this transport.
 //
-// Both are strict about the same thing: a partial message is never guessed at. Bytes are
-// buffered until the message is complete, so a read that lands inside a frame is held rather
-// than misparsed.
+// So there is one stream. Every frame is length-prefixed and carries a tag saying what it is,
+// which is what lets replies and events share it without either side guessing. A tag costs a
+// few bytes and removes a class of deadlock entirely.
+//
+// Length-prefixed rather than newline-delimited for everything, including events: it costs
+// four bytes a frame and works when a payload contains a newline, which a topic or a pasted
+// question does.
+//
+// A partial message is never guessed at. Bytes are buffered until the message is complete, so
+// a read that lands inside a frame is held rather than misparsed.
 
 import Foundation
 
@@ -98,6 +103,32 @@ public enum EngineReply: Sendable, Codable {
 
     public var snapshot: APISnapshot? {
         if case .state(let snapshot) = self { return snapshot }
+        return nil
+    }
+}
+
+/// Anything that travels on the channel.
+///
+/// Tagged rather than two stream types, because there is one stream. See the note at the top
+/// of this file for why.
+public enum EngineFrame: Sendable, Codable {
+    /// A client asking for something.
+    case request(EngineRequest)
+    /// The engine's answer to a request.
+    case reply(EngineReply)
+    /// The engine telling a client about a change, unprompted.
+    case event(EngineEvent)
+
+    public var asRequest: EngineRequest? {
+        if case .request(let value) = self { return value }
+        return nil
+    }
+    public var asReply: EngineReply? {
+        if case .reply(let value) = self { return value }
+        return nil
+    }
+    public var asEvent: EngineEvent? {
+        if case .event(let value) = self { return value }
         return nil
     }
 }
@@ -243,6 +274,14 @@ public enum ProtocolCodec {
 
     public static func decodeReply(_ data: Data) throws -> EngineReply {
         try unwrap { try decoder.decode(EngineReply.self, from: data) }
+    }
+
+    public static func encode(_ frame: EngineFrame) throws -> Data {
+        try wrap { try encoder.encode(frame) }
+    }
+
+    public static func decodeFrame(_ data: Data) throws -> EngineFrame {
+        try unwrap { try decoder.decode(EngineFrame.self, from: data) }
     }
 
     public static func encode(_ event: EngineEvent) throws -> Data {
