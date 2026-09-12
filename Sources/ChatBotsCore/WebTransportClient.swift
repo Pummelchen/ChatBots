@@ -194,8 +194,34 @@ public final class WebTransportEngineClient {
             throw ClientError.streamFailed(error.localizedDescription)
         }
 
-        for await reply in replies {
-            return reply
+        // The wait is bounded, and that is not a nicety.
+        //
+        // A request whose reply never arrives used to wait forever, and the cost of that is not
+        // a slow request — it is an interface that stops responding with nothing to show for
+        // it. A command is the only thing that can move the engine, so a `send` that never
+        // returns means every control in the app is silently dead: pressing Start changes
+        // nothing, no error appears, and the only symptom is a window that looks fine. A
+        // timeout turns that into a sentence the user can read.
+        //
+        // A reply also has to lose the race when the reader has already stopped, because the
+        // engine could not answer a channel it is no longer reading.
+        let reply: EngineReply?
+        do {
+            reply = try await withTimeout(.milliseconds(Int64(configuration.timeoutMilliseconds))) {
+                for await reply in replies { return reply }
+                return nil
+            }
+        } catch {
+            if let readerError {
+                throw ClientError.streamFailed("live updates stopped: \(readerError)")
+            }
+            throw ClientError.streamFailed(
+                "the engine did not answer within \(configuration.timeoutMilliseconds)ms")
+        }
+
+        if let reply { return reply }
+        if let readerError {
+            throw ClientError.streamFailed("live updates stopped: \(readerError)")
         }
         throw ClientError.streamFailed("the engine closed the connection")
     }
@@ -267,4 +293,35 @@ public final class WebTransportEngineClient {
         }
         eventContinuation?.finish()
     }
+}
+
+/// Run `operation`, giving up after `timeout`.
+///
+/// A timeout is a failure and not a result, so the operation is cancelled and the caller is told
+/// it ran out of time. The operation has to be cancellation-aware for its resources to be
+/// released promptly, which the one caller here is: it is iterating an `AsyncStream`, and those
+/// end on cancellation.
+///
+/// Written by hand rather than taken from the transport, whose equivalent is internal — and this
+/// deliberately does not swallow the operation's own error, so a failure that arrives before the
+/// deadline is reported as itself.
+func withTimeout<T: Sendable>(
+    _ timeout: Duration, _ operation: @escaping @Sendable () async throws -> T
+) async throws -> T {
+    try await withThrowingTaskGroup(of: T.self) { group in
+        group.addTask { try await operation() }
+        group.addTask {
+            try await Task.sleep(for: timeout)
+            throw TimeoutError(seconds: timeout)
+        }
+        defer { group.cancelAll() }
+        guard let first = try await group.next() else {
+            throw TimeoutError(seconds: timeout)
+        }
+        return first
+    }
+}
+
+struct TimeoutError: Error {
+    let seconds: Duration
 }

@@ -36,6 +36,14 @@ else
   echo "      Build it with: swift build -c $CONFIG --product chatbots-cli" >&2
 fi
 
+# The app's own transport client, runnable from a terminal. It travels with the app so the
+# diagnostic the troubleshooting notes tell you to run exists on a machine that installed a
+# bundle rather than a checkout — which is exactly the machine that needs it. It is the same
+# client the app uses, so what it reports is what the app sees.
+if [ -x "$BIN/chatbots-probe" ]; then
+  cp "$BIN/chatbots-probe" "$APP/Contents/MacOS/chatbots-probe"
+fi
+
 # swift-transformers and swift-crypto ship resources as SwiftPM bundles next to the
 # binary. MLX's default.metallib is fetched separately, because mlx-swift's SwiftPM
 # build does not compile the Metal kernels (see tools/fetch-metal.sh).
