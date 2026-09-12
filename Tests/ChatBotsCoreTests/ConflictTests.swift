@@ -335,8 +335,9 @@ struct SocialPromptTests {
             topic: "Egg shape",
             turns: [Turn(sequence: 1, speakerName: "Moderator", kind: .topic, content: "Egg shape")])
         conversation.conflict = conflict
-        // The social state is its own system message, not part of the seat's instructions —
-        // a model mid-conversation should meet it as news. So the whole prompt is joined.
+        // The social state is a section of the prompt's one system message, not part of the
+        // seat's instructions — a model mid-conversation should meet it as news. The chat
+        // template refuses a second system message, so the whole prompt is joined here.
         return PromptBuilder.prompt(
             for: spec, others: [AgentSpec.seat(index: 1)], conversation: conversation
         ).map(\.content).joined(separator: "\n")

@@ -348,25 +348,39 @@ public enum PromptBuilder {
         steering: [Turn] = [],
         moderator: ModeratorIdentity = ModeratorIdentity()
     ) -> [PromptMessage] {
-        var messages: [PromptMessage] = [
-            .init(
-                role: .system,
-                content: systemMessage(
-                    for: spec, others: others, topic: conversation.topic, moderator: moderator)
-            )
+        // **One** system message, always.
+        //
+        // The Qwen chat template raises `System message must be at the beginning.` for any
+        // system message that is not first, and this prompt used to send up to three: the
+        // seat's brief, the moderator's source material, and the social state. A conversation
+        // with an attachment therefore failed on its first generation, and an entertainment
+        // conversation began failing as soon as there was anything to say about the room.
+        // Because the raise happens inside the template, the whole turn came back as
+        // `Jinja.TemplateException error 1`, which names neither the message nor the rule.
+        //
+        // They are three paragraphs of one briefing rather than three turns, so they are
+        // joined into the single message the template allows. Order is kept: who the seat is,
+        // then what it has been given to read, then how the room stands.
+        var briefing = [
+            systemMessage(
+                for: spec, others: others, topic: conversation.topic, moderator: moderator)
         ]
-
-        // The moderator's source material, as its own message: obvious in the log, and it
-        // keeps a seat's own instructions from being buried under pages of document.
+        // The moderator's source material, as its own section rather than folded into the
+        // instructions, so a seat's character is not buried under pages of document.
         if let material = attachmentContext(conversation.attachments) {
-            messages.append(.init(role: .system, content: material))
+            briefing.append(material)
         }
         // Social state, entertainment only. A research seat is told about method, not about
         // who it is annoyed with — the brief is explicit that the modes must not share a
         // philosophy, and importing the conflict engine into research would be exactly that.
-        if spec.mode == .entertainment, let social = socialContext(for: spec, others: others, conversation: conversation) {
-            messages.append(.init(role: .system, content: social))
+        if spec.mode == .entertainment,
+            let social = socialContext(for: spec, others: others, conversation: conversation)
+        {
+            briefing.append(social)
         }
+        var messages: [PromptMessage] = [
+            .init(role: .system, content: briefing.joined(separator: "\n\n"))
+        ]
 
         // One user message carrying the entire shared log. Folding history into a single
         // user turn keeps the role sequence valid for strict chat templates (user /

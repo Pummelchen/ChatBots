@@ -229,7 +229,7 @@ struct AttachmentPromptTests {
         #expect(PromptBuilder.attachmentContext([document("empty.txt", "  ")]) == nil)
     }
 
-    @Test("The prompt includes the source material as its own system message")
+    @Test("The prompt includes the source material in the one system message")
     func promptCarriesMaterial() {
         var spec = AgentSpec.seat(index: 0)
         spec.personaID = PersonaLibrary.neutral.id
@@ -240,9 +240,11 @@ struct AttachmentPromptTests {
 
         let prompt = PromptBuilder.prompt(
             for: spec, others: [AgentSpec.seat(index: 1)], conversation: conversation)
+        // One system message, because the Qwen template refuses a second one; the material is
+        // a section of it rather than a message of its own. See `PromptShapeTests`.
         let systemMessages = prompt.filter { $0.role == .system }
-        #expect(systemMessages.count == 2, "instructions plus source material")
-        #expect(systemMessages.last?.content.contains("Ovoid shells resist point loads.") == true)
+        #expect(systemMessages.count == 1, "the brief and the source material share one message")
+        #expect(systemMessages.first?.content.contains("Ovoid shells resist point loads.") == true)
     }
 
     @Test("Attachments count towards the context estimate")
