@@ -23,3 +23,8 @@ captures/
 
 # Local API keys. Never committed, by design: a key in a repository is a public key.
 .secrets.env
+
+# The wiki, checked out beside the code so the two are edited together. It is its own
+# repository (ChatBots.wiki.git) and is pushed there; without this line git would record it
+# here as a submodule-like gitlink and the pages would be committed to the wrong repository.
+ChatBots.wiki/
