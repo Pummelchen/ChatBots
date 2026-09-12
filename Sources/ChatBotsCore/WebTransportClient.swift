@@ -70,6 +70,14 @@ public final class WebTransportEngineClient {
 
     public var isConnected: Bool { session != nil }
 
+    /// The engine's state as it was when this client connected.
+    ///
+    /// Collected by the first frame `connect` sends, which exists to put the stream prefix on
+    /// the wire before the engine reads it. Exposed because it is the freshest thing the client
+    /// has at that moment, and because a connection that never produced one did not really
+    /// arrive: a client can be attached and still be told nothing.
+    public private(set) var greeting: APISnapshot?
+
     // MARK: - Connecting
 
     public func connect() async throws {
@@ -103,6 +111,40 @@ public final class WebTransportEngineClient {
                 readerTask = Task { [weak self] in
                     await self?.read(from: stream)
                 }
+            }
+
+            // Then speak first, before anyone asks. This is not politeness, and it is not
+            // optional.
+            //
+            // The transport writes the WebTransport stream prefix lazily, as part of the first
+            // `send` on the stream: opening a stream puts no byte on the wire. The engine
+            // accepts the stream and reads it exactly once, to consume that prefix. If nothing
+            // has been written yet, that read finds zero bytes and fails the session outright —
+            // "truncated: needed 1 bytes, available 0" — the engine's serve loop returns, and
+            // the client is left holding a connection that will never carry anything.
+            //
+            // So a client that connects and then waits to be spoken to kills its own session,
+            // and waiting is the natural thing to do. This looked intermittent because it was a
+            // race: any frame sent in the same instant as connecting won it. That is why the
+            // app sometimes drew a conversation and usually drew nothing.
+            //
+            // Asking for the state is the cheapest possible first frame, and its answer is
+            // worth keeping: it is the same snapshot every front end draws when it opens.
+            do {
+                greeting = try await send(.fetchState).snapshot
+            } catch {
+                // Fail the connect rather than hand back a client whose channel is already
+                // dead. A caller can retry a connection; it cannot retry a silent connection.
+                readerTask?.cancel()
+                readerTask = nil
+                eventContinuation?.finish()
+                eventContinuation = nil
+                for reply in pendingReplies { reply.finish() }
+                pendingReplies.removeAll()
+                try? await session.close()
+                self.session = nil
+                self.stream = nil
+                throw error
             }
         } catch {
             throw ClientError.cannotConnect(error.localizedDescription)

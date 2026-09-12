@@ -62,7 +62,7 @@ Then pick one, or run all three — they share one conversation engine, so a con
 started in the app appears in the browser:
 
 ```bash
-bash tools/start-app.sh           # the macOS app, with an API server behind it
+bash tools/start-app.sh           # the macOS app, plus an API server for the website
 bash tools/start-web-desktop.sh   # the website, two-pane desktop layout
 bash tools/start-web-mobile.sh    # the website, forced into the phone layout
 ```
@@ -92,6 +92,7 @@ Full guides are in the **[wiki](https://github.com/Pummelchen/ChatBots/wiki)**:
 
 Apple silicon (M1 or later) — the models run on the GPU, and Intel Macs are not supported.
 **macOS 26 or newer** — the desktop app reaches the engine over WebTransport, which requires it.
+The app uses that transport and nothing else; the website is the HTTP side of the same engine.
 Around 8 GB of free disk space; 16 GB of memory is comfortable.
 
 ## Licence

@@ -19,6 +19,7 @@ let package = Package(
         .library(name: "ChatBotsCore", targets: ["ChatBotsCore"]),
         .executable(name: "ChatBots", targets: ["ChatBots"]),
         .executable(name: "chatbots-cli", targets: ["ChatBotsCLI"]),
+        .executable(name: "chatbots-probe", targets: ["ChatBotsProbe"]),
     ],
     dependencies: [
         .package(url: "https://github.com/ml-explore/mlx-swift-lm.git", from: "3.31.4"),
@@ -28,7 +29,7 @@ let package = Package(
         .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0"),
         // The channel between the desktop app and the engine. Internal only: the website is
         // served by Caddy, which does not speak WebTransport.
-        .package(url: "https://github.com/Pummelchen/WebTransport.git", from: "1.3.5"),
+        .package(url: "https://github.com/Pummelchen/WebTransport.git", from: "1.3.6"),
     ],
     targets: [
         // MARK: - Core
@@ -78,6 +79,16 @@ let package = Package(
             // Swift 6 language mode, stated rather than inferred from the tools version. The
             // engine is actor-isolated throughout, so this describes the code rather than
             // aspiring to it — and it is what makes the compiler check that claim.
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+
+        // The app's own client, runnable from a terminal. The desktop app is a poor instrument
+        // for a transport failure — the symptom is an empty thread — so this exists to make the
+        // same connection observable as text, and repeatable in a loop.
+        .executableTarget(
+            name: "ChatBotsProbe",
+            dependencies: ["ChatBotsCore"],
+            path: "Sources/ChatBotsProbe",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
 

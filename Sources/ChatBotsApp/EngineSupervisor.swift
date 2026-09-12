@@ -47,8 +47,6 @@ public final class EngineSupervisor: ObservableObject {
     public struct Configuration: Sendable {
         /// Where the engine serves WebTransport. Loopback only.
         public var port: UInt16 = 7790
-        /// The engine's HTTP port, which Caddy and the website use.
-        public var httpPort: UInt16 = 7789
         /// How long to wait for a freshly started engine to answer.
         public var startupTimeout: Duration = .seconds(90)
 
@@ -88,20 +86,6 @@ public final class EngineSupervisor: ObservableObject {
         // Anything already listening is adopted rather than duplicated.
         if await isEngineAnswering() {
             state = .running(owned: false)
-            return
-        }
-
-        // Answering on the HTTP port but not on the transport: an engine is running that this
-        // app cannot talk to. Starting a second one used to "work" — SO_REUSEADDR let both
-        // bind the same ports — and the two then split incoming connections, so the browser and
-        // the app showed different conversations. Saying so is the honest answer.
-        if HTTPServer.isSomethingListening(on: configuration.httpPort) {
-            state = .failed(
-                """
-                An engine is already running on port \(configuration.httpPort), but it is not \
-                answering over WebTransport, which is how this app talks to it. Stop the other \
-                engine and start again, or point the app at a free port.
-                """)
             return
         }
 
@@ -218,10 +202,12 @@ public final class EngineSupervisor: ObservableObject {
         process.executableURL = executable
         process.arguments = [
             "--serve",
-            // Both channels: the app uses WebTransport, and the website needs HTTP.
-            "--transport", "both",
+            // WebTransport only. The app does not use the engine's HTTP server, and asking for
+            // it was actively harmful: running both transports in one process is what stopped
+            // the app ever receiving state. The website is served separately, by `tools/start.sh`
+            // and Caddy, so nothing needs this child to open an HTTP port.
+            "--transport", "webtransport",
             "--transport-port", String(configuration.port),
-            "--port", String(configuration.httpPort),
         ]
         // Run it from the project directory when there is one, because that is where `.run/`
         // and the certificate live, and a second identity would be a second fingerprint.
@@ -282,14 +268,30 @@ public final class EngineSupervisor: ObservableObject {
         configuration.port = self.configuration.port
         configuration.timeoutMilliseconds = 4_000
         let client = WebTransportEngineClient(configuration: configuration)
+        // Every path closes the connection, including the failure one.
+        //
+        // This looked harmless — a client that fails to connect holds nothing — and it was not:
+        // a probe that connected and then failed to fetch state used to return here leaving a
+        // live QUIC session behind, and a startup loop that retried left one per attempt. The
+        // cost turned up later as "Network.NWError error 12 - Cannot allocate memory" on the
+        // *next* connection, so the app's own real connection failed because of the probes that
+        // went before it.
         do {
             try await client.connect()
-            let snapshot = try await client.state()
-            await client.disconnect()
-            return snapshot != nil
         } catch {
+            await client.disconnect()
             return false
         }
+        let answered: Bool
+        do {
+            answered = try await client.state() != nil
+        } catch {
+            answered = false
+        }
+        // Awaited rather than handed to a detached task: the sockets must be back before the
+        // caller tries again, which is the whole point of closing them here.
+        await client.disconnect()
+        return answered
     }
 
     /// The end of the engine log, for saying what went wrong.

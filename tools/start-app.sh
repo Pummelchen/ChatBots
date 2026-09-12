@@ -8,13 +8,14 @@
 # WebTransport, so this script has little to do that the app does not do itself: it is here so
 # the engine can be started deliberately, in the foreground, with its output visible.
 #
-# The engine serves both channels from one conversation, so a browser at
-# http://localhost:7789 shows the same thing the app does. Caddy and the website use HTTP;
-# the app uses WebTransport.
+# The two channels are independent. The app speaks only WebTransport and never asks its engine
+# for an HTTP port; the website is served over HTTP by the engine this script starts. So the
+# engine started here exists for the web interface — the app works either way, and when an engine
+# is already running it adopts that one rather than starting a rival.
 #
 # Options:
 #   --no-engine    just open the app, without also serving the web interface
-#   --port <n>     port for the API server (default 7789)
+#   --port <n>     port for the web interface and API (default 7789)
 #   --stop         stop the API server this script started
 
 set -u
