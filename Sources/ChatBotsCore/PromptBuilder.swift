@@ -63,8 +63,31 @@ public enum PromptBuilder {
         return text
     }
 
+    /// The search sentence in the opening brief.
+    ///
+    /// The brief is shared by every seat, so this cannot track one seat's `webSearchEnabled`.
+    /// It can refuse to promise a tool that does not exist on this machine: a fresh clone has
+    /// no `TAVILY_API_KEY` and no `.secrets.env`, and a model told it can search will invent a
+    /// source rather than say it cannot. The rule is about honesty, not about capability.
+    ///
+    /// The ambient read is here and the wording is in the pure overload below, so the two
+    /// sentences can be tested without the machine's configuration deciding the outcome.
     private static func searchRule(count: Int) -> String {
-        """
+        searchRule(available: TavilyClient.isConfigured)
+    }
+
+    /// The same rule as a function of whether search can actually run.
+    ///
+    /// Public so the wording is testable without the machine's configuration deciding the
+    /// outcome.
+    public static func searchRule(available: Bool) -> String {
+        guard available else {
+            return """
+            Web search is not available in this run. Do not claim to have searched, and do \
+            not invent a source or a URL.
+            """
+        }
+        return """
         You have web search tools: prefer them over guessing when a claim is checkable. \
         Never invent a source or a URL.
         """

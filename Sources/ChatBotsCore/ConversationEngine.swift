@@ -1337,6 +1337,16 @@ public final class ConversationEngine {
 public enum WebToolbox {
     public static let client = TavilyClient()
 
+    /// The tools this app knows how to offer.
+    ///
+    /// Listed regardless of whether a key is configured, deliberately. Whether a seat is
+    /// offered tools at all is the seat's own `webSearchEnabled`, and that has to stay a
+    /// property of the seat rather than of the machine — otherwise the same conversation
+    /// behaves differently on a clone with a `.secrets.env` and one without, which is exactly
+    /// the kind of hidden condition that is hard to reason about. Whether a search can
+    /// actually run is decided where it matters: the opening brief says search is unavailable
+    /// when there is no key, and the client refuses with a readable reason rather than sending
+    /// an empty token.
     public static let tools: [any ToolProvider] = [
         WebSearchTool(client: client, maxResults: 5),
         FetchPageTool(client: client, maxCharacters: 6_000),

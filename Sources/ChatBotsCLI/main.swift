@@ -159,7 +159,7 @@ struct Options {
           -n, --turns <count>      Number of LLM turns to run (default: 4)
               --model-a <id>       MLX checkpoint for seat A (default: \(AgentSpec.defaultModelID))
               --model-b <id>       MLX checkpoint for seat B
-              --key <key>          Tavily API key (env TAVILY_API_KEY, else built-in dev key)
+              --key <key>          Tavily API key (else env TAVILY_API_KEY or .secrets.env)
               --max-tokens <n>     Cap answer tokens per turn
               --thinking <mode>    off | minimal | low | medium | high | unlimited
               --backend-a <mlx|openAIResponses>   Engine for seat A (default: mlx)

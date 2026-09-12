@@ -7,8 +7,43 @@ import Foundation
 
 public struct TavilyClient: Sendable {
 
-    /// The project's dev key. Override with `TAVILY_API_KEY` in the environment.
-    public static let defaultAPIKey = "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"
+    /// The environment variable that supplies the key.
+    public static let environmentKey = "TAVILY_API_KEY"
+
+    /// The key, from the `TAVILY_API_KEY` environment variable or the gitignored
+    /// `.secrets.env` at the project root.
+    ///
+    /// There is deliberately **no built-in default**. This repository is public, so a key
+    /// written into the source is a key in every clone — and one was, which is why this has
+    /// the shape it has now. `BuiltInKeys` already reads `.secrets.env` for the DeepSeek key,
+    /// and this reuses that rather than growing a second mechanism.
+    public static var configuredKey: String? {
+        resolveKey(
+            environment: ProcessInfo.processInfo.environment[environmentKey],
+            secretsFile: BuiltInKeys.secretsFile())
+    }
+
+    /// The resolution itself, with both sources passed in.
+    ///
+    /// Separated from the environment so it can be tested without touching the process's
+    /// variables or the developer's own `.secrets.env`: a test that reads the real file
+    /// passes on the machine that wrote it and fails on a fresh clone.
+    public static func resolveKey(environment: String?, secretsFile: [String: String]) -> String? {
+        // `whitespacesAndNewlines`, not `whitespaces`: a key exported from a shell or pasted
+        // from a file routinely carries a trailing newline, and `whitespaces` does not strip it.
+        if let environment = environment?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !environment.isEmpty
+        {
+            return environment
+        }
+        if let fromFile = secretsFile[environmentKey]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !fromFile.isEmpty
+        {
+            return fromFile
+        }
+        return nil
+    }
 
     public enum Depth: String, Sendable {
         case basic
@@ -32,10 +67,7 @@ public struct TavilyClient: Sendable {
     private let session: URLSession
 
     public init(apiKey: String? = nil) {
-        self.apiKey =
-            apiKey
-            ?? ProcessInfo.processInfo.environment["TAVILY_API_KEY"]
-            ?? Self.defaultAPIKey
+        self.apiKey = apiKey ?? Self.configuredKey ?? ""
 
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 60
@@ -44,9 +76,8 @@ public struct TavilyClient: Sendable {
         self.session = URLSession(configuration: configuration)
     }
 
-    public static var isConfigured: Bool {
-        !(ProcessInfo.processInfo.environment["TAVILY_API_KEY"] ?? defaultAPIKey).isEmpty
-    }
+    /// Whether a key is available. False on a fresh clone, which has no `.secrets.env`.
+    public static var isConfigured: Bool { configuredKey != nil }
 
     // MARK: - Search
 
@@ -158,6 +189,13 @@ public struct TavilyClient: Sendable {
         body: Body,
         as: Result.Type
     ) async throws -> Result {
+        // Refused here rather than sent: an empty bearer token comes back as a 401, which
+        // reads as "the key is wrong" when the truth is that there is no key at all.
+        guard !apiKey.isEmpty else {
+            throw ChatBotsError.toolFailed(
+                "no Tavily key is configured — set \(Self.environmentKey) or add it to "
+                    + BuiltInKeys.secretsFileName)
+        }
         guard let url = URL(string: "https://api.tavily.com" + path) else {
             throw ChatBotsError.toolFailed("bad Tavily URL")
         }
