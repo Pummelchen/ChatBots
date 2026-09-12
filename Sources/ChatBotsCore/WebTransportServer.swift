@@ -4,18 +4,17 @@
 // phone all see one conversation. The website does not use this: Caddy serves browsers over
 // HTTP, which is what browsers speak and what Caddy is for.
 //
-// **How a session works.** A client opens two bidirectional streams.
+// **How a session works.** A client opens one bidirectional stream, and everything travels on
+// it: length-framed `EngineRequest`s go up, and length-framed `EngineReply` and `EngineEvent`
+// frames come back, told apart by the tag each frame carries rather than by which stream it
+// arrived on.
 //
-//   1. The *request* stream, first. It sends one length-framed `EngineRequest` and reads back
-//      one length-framed `EngineReply`, repeatedly, for the life of the session.
-//   2. The *event* stream, which sends a single subscribe marker and then reads
-//      newline-delimited `EngineEvent` until it closes. State after every change, and output
-//      fragments as the models produce them.
-//
-// Two streams rather than one, because they carry different shapes: a request is a
-// conversation with replies, an event feed is a push with none. Multiplexing them onto one
-// stream would mean inventing a way to tell them apart, and would let a slow reply block an
-// event.
+// It was two streams — one for requests and their replies, one for the event feed — and that
+// deadlocked on this transport: the library serialises stream operations on a session, so a
+// server waiting to accept its second stream stops serving the first, while a client waiting
+// for a reply never opens the second. Opening both up front failed differently: the second
+// `openBidirectionalStream` does not open at all. One tagged stream removes that class of
+// deadlock. `EngineProtocol.swift` has the full account.
 //
 // **A slow client cannot stall the engine.** Events are broadcast from the engine's own stream
 // through a per-session continuation with a bounded buffer. A session that stops reading fills
@@ -251,35 +250,6 @@ public final class WebTransportEngineServer {
     public private(set) var lastSessionError: String?
 
     // MARK: - Events
-
-    /// Attach a session's event stream, and keep pushing until it goes away.
-    ///
-    /// Returns when the client stops reading or the stream ends. Cleanup is the caller's, in
-    /// one place, so a session cannot leave a continuation behind.
-    private func subscribe(id: UUID, to stream: WebTransportBidirectionalStream) async {
-        // Bounded, and small. The buffer exists to absorb a burst, not to hold a backlog: a
-        // client that falls this far behind is better off dropped and reconnected, because
-        // the alternative is an unbounded memory growth in the engine or, worse, back-pressure
-        // that reaches the model.
-        let (events, continuation) = AsyncStream<EngineEvent>.makeStream(
-            bufferingPolicy: .bufferingNewest(256))
-        subscribers[id] = continuation
-
-        // The current state first, so a client that has just connected can draw something
-        // without waiting for the next change.
-        if let encoded = try? ProtocolCodec.encode(EngineEvent.state(service.snapshot())) {
-            try? await stream.send(LineFraming.frame(encoded))
-        }
-        for await event in events {
-            guard let encoded = try? ProtocolCodec.encode(event) else { continue }
-            do {
-                try await stream.send(LineFraming.frame(encoded))
-            } catch {
-                // The client is gone or has stopped reading.
-                return
-            }
-        }
-    }
 
     /// Forward the engine's events to every subscribed session.
     private func startEventPump() {

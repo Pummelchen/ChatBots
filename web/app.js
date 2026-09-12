@@ -210,6 +210,25 @@
   const rendered = new Map();
   const threadCopy = new Map();
 
+  /**
+   * Mark the verdicts on the messages already drawn.
+   *
+   * A vote changes only the two buttons inside one message, and a turn is drawn once — so
+   * rebuilding the transcript to show it would throw away the scroll position and any output
+   * still arriving. The buttons are updated where they are instead.
+   */
+  function drawVotes() {
+    for (const el of document.querySelectorAll(".msg[data-id]")) {
+      const cast = voteFor(el.dataset.id);
+      for (const button of el.querySelectorAll(".vote")) {
+        const isStrong = button.getAttribute("aria-label") === "Moved it forward";
+        const on = cast && ((isStrong && cast === "strong") || (!isStrong && cast === "weak"));
+        if (on) button.dataset.on = "1";
+        else delete button.dataset.on;
+      }
+    }
+  }
+
   function seatIndexOf(message) {
     if (!state.snapshot) return -1;
     return state.snapshot.seats.findIndex(
@@ -236,8 +255,9 @@
 
   function labelFor(message) {
     switch (message.kind) {
-      case "topic": return "MODERATOR · TOPIC";
-      case "steering": return "MODERATOR";
+      case "topic": return String(message.speaker || "Moderator").toUpperCase() + " · TOPIC";
+      case "steering": return String(message.speaker || "Moderator").toUpperCase();
+      case "direction": return "RESEARCH MODERATOR · ASSIGNMENT";
       case "summary": return "CONDENSED EARLIER DISCUSSION";
       case "tool": return "TOOL";
       default: return String(message.speaker || "?").toUpperCase();
@@ -267,7 +287,57 @@
     body.innerHTML = bodyHTML(message.text || "");
 
     el.append(head, body);
+    // Only a contribution can be scored. A vote on the topic or on the moderator's own
+    // assignment would be a judgement of something nobody argued.
+    if (message.kind === "chat") el.append(voteRow(message));
     return el;
+  }
+
+  /** The audience's verdict on one contribution. */
+  function voteRow(message) {
+    const row = document.createElement("div");
+    row.className = "vote-row";
+    const cast = voteFor(message.id);
+    for (const [verdict, title] of [
+      ["strong", "Moved it forward"],
+      ["weak", "Did not hold up"],
+    ]) {
+      const button = document.createElement("button");
+      button.className = "vote";
+      button.textContent = verdict === "strong" ? "▲" : "▼";
+      button.title = title;
+      button.setAttribute("aria-label", title);
+      if (cast === verdict) button.dataset.on = "1";
+      button.onclick = () => {
+        // Clicking the verdict already cast withdraws it, so a mis-click does not have to be
+        // reversed by casting its opposite — which would leave a wrong judgement in the record.
+        const next = cast === verdict ? null : verdict;
+        run(() => api.post("/api/vote", { id: message.id, verdict: next }));
+      };
+      row.append(button);
+    }
+    return row;
+  }
+
+  function voteFor(turnID) {
+    if (!state.snapshot || !state.snapshot.votes) return null;
+    const found = state.snapshot.votes.find((v) => v.turnID === turnID);
+    return found ? found.verdict : null;
+  }
+
+  /** The scorecard, in the status row. */
+  function drawAudience() {
+    const el = $("audience");
+    const entries = (state.snapshot && state.snapshot.audience) || [];
+    if (!entries.length) {
+      el.textContent = "";
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    el.textContent = "Audience: " + entries
+      .map((entry) => `${entry.name} ${entry.score > 0 ? "+" : ""}${entry.score}`)
+      .join(" · ");
   }
 
   /**
@@ -344,7 +414,7 @@
     for (const message of state.snapshot.messages) {
       const seat = seatIndexOf(message);
       const shared = message.kind === "steering" || message.kind === "topic" ||
-                     message.kind === "summary";
+                     message.kind === "summary" || message.kind === "direction";
 
       // The single-column view holds everything once.
       if (inThread) {
@@ -481,6 +551,7 @@
     }
     if (first) $("topic").value = next.topic || "";
     drawMessages();
+    drawVotes();
     drawLive();
     drawControls();
     drawSeats();
@@ -488,6 +559,7 @@
     drawAttachments();
     drawContext();
     drawResearch();
+    drawIdentity();
     if (first && next.messages.length && state.follow) scrollToBottom();
   }
 
@@ -501,6 +573,8 @@
     $("stop").disabled = !running;
     $("clear").disabled = s.messages.length === 0 && !running;
     $("save").disabled = s.messages.length === 0;
+    drawAudience();
+    $("votes-clear").hidden = !s.votes || s.votes.length === 0;
     $("condense").disabled = s.messages.length === 0;
     $("send").disabled = !running;
     $("topic").disabled = s.messages.length > 0;
@@ -775,6 +849,251 @@
     }
   }
 
+  // ── Kept conversations ───────────────────────────────────────────────────────────
+
+  function stamp(iso) {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return "";
+    const today = new Date();
+    const sameDay = date.toDateString() === today.toDateString();
+    return sameDay
+      ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      : date.toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" });
+  }
+
+  async function refreshKept() {
+    const body = $("kept-body");
+    body.textContent = "";
+    let list;
+    try {
+      list = await api.get("/api/conversations");
+    } catch (error) {
+      toast(error.message);
+      return;
+    }
+    $("kept-meta").textContent = list.length
+      ? `${list.length} kept`
+      : "";
+
+    if (!list.length) {
+      const empty = document.createElement("div");
+      empty.className = "kept-empty";
+      empty.textContent =
+        "Nothing kept yet. A conversation is kept as soon as it starts and stays after this window closes.";
+      body.append(empty);
+      return;
+    }
+
+    for (const item of list) {
+      const row = document.createElement("div");
+      row.className = "kept-row";
+
+      const text = document.createElement("div");
+      text.className = "kept-text";
+      const topic = document.createElement("div");
+      topic.className = "kept-topic";
+      topic.textContent = item.topic || "Untitled";
+      const sub = document.createElement("div");
+      sub.className = "kept-sub";
+      sub.textContent = item.summary || "";
+      const meta = document.createElement("div");
+      meta.className = "kept-meta";
+      meta.textContent = `${item.replies} messages · ${stamp(item.updatedAt)}`;
+      text.append(topic, sub, meta);
+
+      const actions = document.createElement("div");
+      actions.className = "kept-actions";
+
+      const open = document.createElement("button");
+      open.className = "small";
+      open.textContent = "Open";
+      open.disabled = Boolean(state.snapshot && state.snapshot.isRunning);
+      if (open.disabled) open.title = "Stop the conversation before opening another one";
+      open.onclick = async () => {
+        await run(() => api.post("/api/conversations/load", { value: item.id }));
+        $("kept-panel").hidden = true;
+      };
+
+      const remove = document.createElement("button");
+      remove.className = "small";
+      remove.textContent = "Delete";
+      // A kept conversation is a file on disk, so this asks first: a mis-tap here destroys
+      // work rather than hiding it.
+      remove.onclick = async () => {
+        if (!window.confirm(`Delete "${item.topic || "Untitled"}" from disk?`)) return;
+        try {
+          await api.post("/api/conversations/delete", { value: item.id });
+        } catch (error) {
+          toast(error.message);
+        }
+        await refreshKept();
+      };
+
+      const link = document.createElement("button");
+      link.className = "small";
+      link.textContent = "Link";
+      link.title = "Copy a read-only link to this conversation";
+      link.onclick = async () => {
+        // The engine tells us where it is listening; falling back to this page's own origin
+        // covers the case of a browser reaching the app through a proxy or another host.
+        const base = (state.snapshot && state.snapshot.shareBase) || window.location.origin;
+        const url = `${base}/s/${item.id}`;
+        try {
+          await navigator.clipboard.writeText(url);
+          toast("Link copied.");
+        } catch {
+          // Clipboard access needs a secure context; showing the link is the honest fallback
+          // rather than reporting a copy that did not happen.
+          window.prompt("Copy this link:", url);
+        }
+      };
+
+      actions.append(open, link, remove);
+      row.append(text, actions);
+      body.append(row);
+    }
+  }
+
+  // ── Who the moderator is ─────────────────────────────────────────────────────────
+
+  function saveIdentity() {
+    run(() => api.post("/api/moderator", {
+      name: $("mod-name").value.trim() || "Moderator",
+      personaID: $("mod-persona").value,
+    }));
+  }
+
+  /**
+   * Fill the moderator's identity controls from the state.
+   *
+   * Only while the panel is closed or the field is untouched: the engine is the source of truth,
+   * but overwriting a half-typed name on the next poll would make the field unusable.
+   */
+  function drawIdentity() {
+    const s = state.snapshot;
+    if (!s) return;
+
+    const select = $("mod-persona");
+    if (select.options.length !== s.availablePersonas.length + 1) {
+      select.textContent = "";
+      const neutral = document.createElement("option");
+      neutral.value = "neutral";
+      neutral.textContent = "Neutral — no style imposed";
+      select.append(neutral);
+      for (const persona of s.availablePersonas) {
+        const option = document.createElement("option");
+        option.value = persona.id;
+        option.textContent = `${persona.emoji} ${persona.name}`;
+        select.append(option);
+      }
+    }
+    // The engine reports the display name; the select needs the identifier.
+    const style = s.availablePersonas.find((p) => p.name === s.moderatorPersona);
+    const identifier = s.moderatorPersona.startsWith("Neutral") ? "neutral" : (style ? style.id : "neutral");
+    if (document.activeElement !== select) select.value = identifier;
+
+    if (document.activeElement !== $("mod-name")) {
+      $("mod-name").value = s.moderatorName || "";
+    }
+    const persona = s.moderatorPersona.startsWith("Neutral") ? "" : ` · ${s.moderatorPersona}`;
+    $("you-summary").textContent = `You: ${s.moderatorName || "Moderator"}${persona}`;
+  }
+
+  // ── Line-up and scenarios ────────────────────────────────────────────────────────
+
+  function currentMode() {
+    return state.snapshot && state.snapshot.mode === "research" ? "research" : "entertainment";
+  }
+
+  function lineupRow(entry) {
+    const row = document.createElement("div");
+    row.className = "lineup-row";
+
+    const text = document.createElement("div");
+    text.className = "lineup-text";
+    const name = document.createElement("div");
+    name.className = "lineup-name";
+    name.textContent = entry.title;
+    const note = document.createElement("div");
+    note.className = "lineup-note";
+    note.textContent = entry.note;
+    text.append(name, note);
+    if (entry.who) {
+      const who = document.createElement("div");
+      who.className = "lineup-who";
+      who.textContent = entry.who;
+      text.append(who);
+    }
+
+    const apply = document.createElement("button");
+    apply.className = "small";
+    apply.textContent = "Apply";
+    apply.disabled = Boolean(state.snapshot && state.snapshot.isRunning);
+    if (apply.disabled) apply.title = "Stop the conversation first";
+    apply.onclick = () => run(() => api.post(entry.path, entry.body));
+
+    row.append(text, apply);
+    return row;
+  }
+
+  async function refreshLineup() {
+    const body = $("lineup-body");
+    body.textContent = "";
+    const mode = currentMode();
+    $("lineup-meta").textContent = mode === "research" ? "research" : "show";
+
+    // The libraries come from the engine rather than being compiled in here, so a line-up
+    // added on the other side appears in this panel without the page being rebuilt.
+    let rosters = [];
+    let scenarios = [];
+    try {
+      [rosters, scenarios] = await Promise.all([
+        api.get(`/api/rosters?mode=${mode}`),
+        api.get(`/api/scenarios?mode=${mode}`),
+      ]);
+    } catch (error) {
+      toast(error.message);
+      return;
+    }
+
+    const heading = (label) => {
+      const el = document.createElement("div");
+      el.className = "lineup-section";
+      el.textContent = label;
+      return el;
+    };
+
+    body.append(heading("Line-ups"));
+    const random = lineupRow({
+      title: "Surprise me — a random room",
+      note: "Drawn from every participant in this mode. The seed is reported in the log, so the draw can be repeated.",
+      who: "",
+      path: "/api/roster",
+      body: { id: "random" },
+    });
+    body.append(random);
+    for (const roster of rosters) {
+      body.append(lineupRow({
+        title: roster.name,
+        note: roster.summary,
+        who: roster.personaIDs.join(" · "),
+        path: "/api/roster",
+        body: { id: roster.id },
+      }));
+    }
+
+    body.append(heading("Scenarios"));
+    for (const scenario of scenarios) {
+      body.append(lineupRow({
+        title: scenario.topic,
+        note: scenario.note,
+        who: scenario.depth ? `budget: ${scenario.depth}` : "",
+        path: "/api/scenario",
+        body: { id: scenario.id },
+      }));
+    }
+  }
+
   function wire() {
     $("start").onclick = () => run(() => api.post("/api/start"));
     $("pause").onclick = () => run(() =>
@@ -802,6 +1121,11 @@
       }
     });
 
+    $("votes-clear").onclick = () => run(() => api.post("/api/votes/clear"));
+    // Applied on change rather than behind a Save button: it takes effect from the next turn,
+    // so there is nothing to protect the user from and a button would only be a step to forget.
+    $("mod-name").addEventListener("change", saveIdentity);
+    $("mod-persona").addEventListener("change", saveIdentity);
     $("save").onclick = save;
     $("attach").onclick = () => $("files").click();
     $("files").onchange = (event) => addFiles([...event.target.files]);
@@ -812,6 +1136,40 @@
     $("depth-standard").onclick = () => setDepth("standard");
     $("depth-deep").onclick = () => setDepth("deep");
     $("report-close").onclick = () => { $("report-panel").hidden = true; };
+    $("kept").onclick = () => {
+      $("kept-panel").hidden = false;
+      refreshKept();
+    };
+    $("kept-close").onclick = () => { $("kept-panel").hidden = true; };
+    $("lineup").onclick = () => {
+      $("lineup-panel").hidden = false;
+      refreshLineup();
+    };
+    $("lineup-close").onclick = () => { $("lineup-panel").hidden = true; };
+    $("lineup-surprise").onclick = async () => {
+      // A scenario rather than a line-up: it sets the question as well, which is the point of
+      // asking to be surprised.
+      const mode = currentMode();
+      let pool = [];
+      try {
+        pool = await api.get(`/api/scenarios?mode=${mode}`);
+      } catch (error) {
+        toast(error.message);
+        return;
+      }
+      if (!pool.length) return;
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      await run(() => api.post("/api/scenario", { id: pick.id }));
+      $("lineup-panel").hidden = true;
+    };
+    $("kept-refresh").onclick = refreshKept;
+    $("kept-new").onclick = async () => {
+      // The engine has already kept what is on screen, so this clears the view rather than
+      // destroying anything — which is why it does not ask first.
+      await run(() => api.post("/api/conversations/new"));
+      await refreshKept();
+      $("kept-panel").hidden = true;
+    };
     $("report-download").onclick = () => {
       const report = state.snapshot && state.snapshot.report;
       if (!report) return;
@@ -872,6 +1230,8 @@
 
   async function setMode(mode) {
     await run(() => api.post("/api/mode", { value: mode }));
+    // The line-ups and scenarios are per mode, so anything already drawn is now wrong.
+    if (!$("lineup-panel").hidden) refreshLineup();
   }
 
   async function setDepth(depth) {

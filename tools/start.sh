@@ -25,7 +25,7 @@
 #   --view <mode>    auto | phone | desktop    (default: auto)
 #
 # `--view phone` forces the single-column phone layout even in a desktop browser, which is
-# what `start-mobile.sh` uses. The page honours `?view=` on load and remembers nothing, so
+# what `start-web-mobile.sh` uses. The page honours `?view=` on load and remembers nothing, so
 # the mode is a property of the URL rather than of the browser.
 
 set -u
@@ -184,7 +184,12 @@ if ! python3 "$SCRIPT_DIR/embed-names.py" --check >/dev/null 2>&1; then
 fi
 
 if ! python3 "$SCRIPT_DIR/embed-web.py" --check >/dev/null 2>&1; then
+  # web/ is the source of truth and WebAssets.swift is generated from it, so regenerating is
+  # the right repair — but it overwrites an edit made in the generated file, which is exactly
+  # how the interface once drifted and then lost the newer work. Say which way the repair goes
+  # rather than doing it silently, and leave `swift test` as the guard that fails on drift.
   step "Regenerating the embedded web interface"
+  dim "web/ is the source; an edit made in WebAssets.swift is discarded here."
   python3 "$SCRIPT_DIR/embed-web.py" >/dev/null || {
     fail "Could not regenerate Sources/ChatBotsCore/WebAssets.swift"
     exit 1

@@ -41,7 +41,7 @@ interjections are read, and it tags your messages in the log and the export. Und
 contribution, two buttons let you mark whether it moved the argument forward; the scorecard
 sits in the status bar, and votes are never sent to a model.
 
-**You do not have to invent a session.** Nine hand-written line-ups and sixteen ready-made
+**You do not have to invent a session.** Ten hand-written line-ups and sixteen ready-made
 questions, each paired with the panel that suits it — *"Does the trial design support the
 claim?"* is the wrong question for a room of comedians. **Line-up** applies either one in a
 single step, or draws a random room from a seed you can read in the log and repeat.
@@ -87,6 +87,7 @@ Full guides are in the **[wiki](https://github.com/Pummelchen/ChatBots/wiki)**:
 | [Documents and images](https://github.com/Pummelchen/ChatBots/wiki/Documents-and-images) | giving the models something to read or look at |
 | [Troubleshooting](https://github.com/Pummelchen/ChatBots/wiki/Troubleshooting) | when it will not start, crashes, or is slow |
 | [How it works](https://github.com/Pummelchen/ChatBots/wiki/How-it-works) | the architecture, if you are curious |
+| [What is left to do](https://github.com/Pummelchen/ChatBots/wiki/What-is-left-to-do) | the open work, and the limits that are accepted |
 
 ## Requirements
 
@@ -97,4 +98,5 @@ Around 8 GB of free disk space; 16 GB of memory is comfortable.
 
 ## Licence
 
-See [LICENSE](LICENSE).
+No licence has been granted: this repository has no `LICENSE` file, so the default applies —
+all rights reserved. Ask the author if you want to reuse it.

@@ -273,10 +273,15 @@ public enum LengthFraming {
     }
 }
 
-/// Newline-delimited framing, for the event channel.
+/// Newline-delimited framing.
 ///
 /// JSON encoders escape newlines inside strings, so a bare newline can only be a delimiter —
 /// the payload cannot forge one.
+///
+/// The transport carries tagged, length-framed messages on its single stream, so nothing in
+/// the engine sends over this. It is kept as the protocol's second framing primitive and its
+/// behaviour is pinned by `ProtocolTests`; whether the project still wants it is an open
+/// question rather than an oversight.
 public enum LineFraming {
 
     public static func frame(_ payload: Data) -> Data {

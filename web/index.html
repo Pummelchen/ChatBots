@@ -29,6 +29,8 @@
       <button id="pause" disabled>Pause</button>
       <button id="stop" disabled>Stop</button>
       <button id="save" disabled title="Download the conversation log">Save</button>
+      <button id="kept" title="Reopen a conversation the engine kept">Kept</button>
+      <button id="lineup" title="Choose who is in the room, or let the app choose">Line-up</button>
       <button id="clear" disabled>Clear</button>
     </div>
   </div>
@@ -44,6 +46,8 @@
     <span id="status" class="pill">Idle</span>
     <span id="counts" class="note"></span>
     <span class="personas" id="persona-summary"></span>
+    <span class="note" id="audience" hidden></span>
+    <button id="votes-clear" class="small" hidden title="Forget every vote">Clear votes</button>
     <div class="spacer"></div>
     <label class="toggle" title="Stream the models' thinking into the panes">
       <input id="thinking" type="checkbox" checked> <span class="toggle-text">Show thinking</span>
@@ -91,6 +95,19 @@
 </main>
 
 <footer class="bar footer">
+  <details class="you">
+    <summary id="you-summary" title="Who you are, as the room sees you">You</summary>
+    <div class="you-panel">
+      <label>Name
+        <input id="mod-name" type="text" maxlength="40" placeholder="Moderator" autocomplete="off">
+      </label>
+      <label>Reads as
+        <select id="mod-persona"></select>
+      </label>
+      <p class="note">The participants are told who is asking and how to read an interruption. It never writes your messages.</p>
+    </div>
+  </details>
+
   <textarea id="message" rows="1" placeholder="Message…"></textarea>
   <button id="send" class="primary" disabled>Send</button>
   <div class="spacer"></div>
@@ -120,6 +137,32 @@
     <button id="report-close" class="small">Close</button>
   </div>
   <div id="report-body" class="report-body"></div>
+</div>
+
+<!-- Every conversation is kept on disk as it runs, so this is how one comes back. -->
+<div id="kept-panel" class="report-panel" hidden>
+  <div class="report-head">
+    <b>Kept conversations</b>
+    <span id="kept-meta" class="note"></span>
+    <div class="spacer"></div>
+    <button id="kept-refresh" class="small">Refresh</button>
+    <button id="kept-new" class="small">New</button>
+    <button id="kept-close" class="small">Close</button>
+  </div>
+  <div id="kept-body" class="report-body"></div>
+</div>
+
+<!-- Who is in the room, and what they are put in front of. One panel, because a panel is the
+     wrong room for the wrong question and the pairing is the thing worth choosing. -->
+<div id="lineup-panel" class="report-panel" hidden>
+  <div class="report-head">
+    <b>Line-up</b>
+    <span id="lineup-meta" class="note"></span>
+    <div class="spacer"></div>
+    <button id="lineup-surprise" class="small">Surprise me</button>
+    <button id="lineup-close" class="small">Close</button>
+  </div>
+  <div id="lineup-body" class="report-body"></div>
 </div>
 
 <div id="toast" class="toast" hidden></div>
