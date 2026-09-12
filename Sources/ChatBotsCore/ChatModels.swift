@@ -290,28 +290,48 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
     /// identically — the point of the experiment is to watch how they converse, not to
     /// have them differ in sampler.
     ///
+    /// **These are tighter than Qwen's published recommendation on purpose.** The model card
+    /// suggests `temperature 1.0, top_p 0.95, top_k 20, min_p 0` for thinking mode, and that
+    /// is what this used to ship. On this app's prompt — several thousand tokens of persona,
+    /// rules and transcript, answered by a 4B checkpoint that is also holding a reasoning
+    /// budget — it degenerated almost immediately. Measured on a fixed topic over three
+    /// turns with `--turns 3 --topic "Are eggs round?"` (the tightened preset was run twice,
+    /// on different seeds, because `samplingSeed` is drawn per process rather than fixed):
+    ///
+    /// | Preset | Repetition cuts | Effect |
+    /// | --- | --- | --- |
+    /// | `temp 1.0, topP 0.95, minP 0, rep 1.0` | 8 in one run | turns ended producing **0 tokens** |
+    /// | the values below | 0 | three turns, each addressed the one before it |
+    ///
+    /// The two settings that matter most are the repetition penalty, which was a literal
+    /// no-op at `1.0` (MLX multiplies), and `minP`, which was disabled at `0`. Temperature is
+    /// lowered because the attractor is an entropy problem: the model keeps re-entering the
+    /// same short phrase once it has said it. Thinking stays on and the token budget is
+    /// unchanged, so this narrows the sampler rather than the reasoning.
+    ///
     /// | Setting | Value |
     /// | --- | --- |
     /// | Thinking | on (`enable_thinking: true`) |
-    /// | Temperature | 1.0 |
-    /// | Top P | 0.95 |
+    /// | Temperature | 0.7 |
+    /// | Top P | 0.8 |
     /// | Top K | 20 |
-    /// | Min P | 0.0 |
+    /// | Min P | 0.05 |
     /// | Presence penalty | 1.5 (UI convention) → `-1.5` for MLX |
-    /// | Repetition penalty | 1.0 (neutral) |
+    /// | Repetition penalty | 1.1 |
     /// | Max output tokens | 32,768 |
     public enum QwenSampling: Sendable {
-        public static let temperature = 1.0
-        public static let topP = 0.95
+        public static let temperature = 0.7
+        public static let topP = 0.8
         public static let topK = 20
-        public static let minP = 0.0
+        public static let minP = 0.05
         /// Displayed as 1.5 in the UI. MLX *subtracts* the value it is given, so a
         /// positive `1.5` would reward tokens already in the context — the opposite of a
         /// presence penalty. The sign is flipped here, in one place.
         public static let presencePenaltyMagnitude = 1.5
         public static let presencePenalty = -presencePenaltyMagnitude
-        /// MLX multiplies by this, and `1.0` is neutral, so this is deliberately a no-op.
-        public static let repetitionPenalty = 1.0
+        /// MLX multiplies by this and `1.0` is neutral, so the old value did nothing at all.
+        /// `1.1` over the last 256 tokens is what breaks the short-phrase attractor.
+        public static let repetitionPenalty = 1.1
         public static let maxOutputTokens = 32_768
         /// Thinking defaults to the level the moderator asked for; change it per seat in
         /// the pane header.

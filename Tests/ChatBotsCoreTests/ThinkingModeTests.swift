@@ -57,14 +57,18 @@ struct ThinkingModeTests {
         let a = AgentSpec.seatA()
         let b = AgentSpec.seatB()
         for spec in [a, b] {
-            #expect(spec.temperature == 1.0)
-            #expect(spec.topP == 0.95)
+            #expect(spec.temperature == 0.7)
+            #expect(spec.topP == 0.8)
             #expect(spec.topK == 20)
-            #expect(spec.minP == 0.0)
-            #expect(spec.repetitionPenalty == 1.0)
+            #expect(spec.minP == 0.05)
+            #expect(spec.repetitionPenalty == 1.1)
             #expect(spec.maxTokens == 32_768)
             #expect(spec.thinking.thinks)
         }
+        // The repetition penalty must not be neutral. `1.0` is what MLX treats as "off", and
+        // shipping that is part of why the seats looped on a fixed topic — see `QwenSampling`
+        // for the measurement.
+        #expect(a.repetitionPenalty != 1.0)
         // MLX subtracts the presence penalty, so the stored value must be negative.
         #expect(a.presencePenalty == -1.5)
         #expect(b.presencePenalty == -1.5)
