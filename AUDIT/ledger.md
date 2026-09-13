@@ -17,14 +17,15 @@ does not advance without its artifact.
 
 | Metric | Count |
 | --- | --- |
-| Tasks enumerated | 19 |
+| Tasks enumerated | 28 |
 | DONE | 8 (A05, A08 — concurrency and dependency pinning; A12, A13 — sanitizer baselines; A14, A17 — the two HTTPServer races; A18 — hermetic suite; A19 — the commit that claimed A14/A17) |
-| START (proven / reproduced, expected behaviour written) | 11 |
+| START (proven / reproduced, expected behaviour written) | 20 (A20-A28 added by the line-depth passes) |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-Phase B is **not finished**: L3, L5 and L7 have not been run, and the deeper §5 hunt continues.
-Per §11, all findings are enumerated before any fix begins.
+Phase B's remaining depth is now being run as line-depth passes over every file (see
+[Phase D](#phase-d--the-line-depth-passes) below), which produced A20-A28. Per §11, findings are
+enumerated before they are fixed.
 
 ---
 
@@ -525,3 +526,66 @@ swift-tools-version 6.3 and emits a manifest warning. Suppressing a warning is f
 the non-deprecated labelled form `exact:` was used: the same exact requirement, without the
 warning. Verified independently by the coordinator — the manifest builds with 0 warnings and
 `swift package resolve` still resolves to 1.3.7 (`3df28f2a`).
+
+---
+
+## Phase D — the line-depth passes
+
+Phase B's L1 (architecture/module) and L3 (line) passes were recorded as run but had not been
+taken to line depth over the code, and the §5 placeholder hunt was closed on a single sweep. They
+have now been run as seven read-only passes over disjoint slices covering **every file in
+`Sources/`** (except the generated `WebAssets.swift`, which has its own byte-for-byte drift test),
+**all 12 files in `tools/`** and the whole `web/` front end. Each pass reports what it examined and
+found sound as well as what it found wrong, so the coverage claim is checkable rather than
+asserted.
+
+**What the passes found, in severity order.** Detail and evidence for each are in `ledger.json`.
+
+| id | sev | finding |
+| --- | --- | --- |
+| **A20** | **S1** | **Stored DOM XSS.** `web/app.js:502` interpolated the moderator-supplied seat name straight into `innerHTML`. `POST /api/seat` accepts an arbitrary name, so `<img src=x onerror=…>` is stored and runs in every client rendering a live turn. Reachable by anyone who can reach the API — which, per A01, is anyone on the LAN. |
+| A21 | S2 | `tools/install.sh:191` — the model **integrity check fails open**: when the HEAD request yields no `Content-Length` the expected size is recorded as 0, which then means "accept any size" and skips the post-download check. |
+| A22 | S2 | `tools/start.sh:99` — `stop_all` kills a stale PID from a pid file with no ownership check, though the correct `ps … \| grep -qE "chatbots\|caddy"` check already exists on the by-port branch. |
+| A23 | S2 | `tools/capture-devices.py:277` — a viewport mismatch only prints; it cannot fail the run, though the docstring promises otherwise. |
+| A24 | S2 | `tools/fetch-metal.sh:51` — a **native binary artifact** is downloaded with no digest or signature and embedded in the ad-hoc-signed app. |
+| A28 | S2 | **Three recorded counts are wrong** and the rest are not reproducible from the commands that produced them — see the correction below. |
+| A25 | S3 | `tools/install.sh:352` — the project path is interpolated into `bash -c`, so a directory name containing an apostrophe is command injection at install time. |
+| A26 | S3 | `tools/install.sh:313` — `run_with_timeout` kills the wrapper, not the `swift run` grandchild it timed out on. |
+| A27 | S3 | `tools/cdp.py:226` — `stop()` hardcodes the profile marker instead of checking `self.profile`, so a custom `--user-data-dir` leaves Chrome running. |
+
+### A28 — the baseline counts are wrong, and it matters which way
+
+Every number the audit measures against was re-derived from the tree. Three are wrong and several
+cannot be reproduced at all:
+
+| Recorded | Actual | How the wrong number happened |
+| --- | --- | --- |
+| `swiftlint` 401 findings | 401 when scoped to `Sources`/`Tests` | an **unscoped** `swiftlint lint` also lints `.build/checkouts` and reports ~37 000, so the scoping is load-bearing and was never written down |
+| `swift-format` 29 900 diagnostics | not reproducible | 29 904 is the baseline file's *line* count |
+| shellcheck 24 notes | **7** findings | 24 is the baseline file's *line* count |
+| test-target warnings 5 sites | **8** | the capturing grep truncated multi-line diagnostics |
+| "Force unwraps in `Sources/`: two … not a task" | **12** `!` sites | the review under-counted and signed off clean |
+| ruff 11 · pyright 2 · semgrep 3 · gitleaks 0 · `try?` 72 across 23 files · ASan clean · TSan one race then clean | all reproduce exactly | — |
+
+The errors run **both ways** — the warning count was understated, the shellcheck count overstated,
+the force-unwrap review understated — so a reader cannot assume the error is conservative. Each
+number in `plan.md` now carries the method that produced it, and A28's fix is to make that true of
+every one of them.
+
+The twelve `!` sites are themselves part of A28: all are currently unreachable traps
+(`ZoomStore.levels.first!`/`.last!` on a 7-element literal; `mlx ?? openAI!` where both inits
+guarantee `mlx`; three `Continuation!` that are only ever read with `?.`), so the fix is to declare
+them as the optionals they already behave as, not to add runtime checks.
+
+### Also re-verified while re-deriving the baseline
+
+- **`main` is untouched**: local and `origin/main` both at `a6d6999`, zero commits on `main` since
+  the audit branch was cut.
+- **§5 placeholder sweep over tracked source: 0 markers.**
+- **No `try!`, `as!` or `-Wno-` anywhere in `Sources/` or `Tests/`** — §0's forbidden fixes are absent.
+- **No real credential is tracked**: the `sk-`/`tvly-` matches in the tree are test fixtures
+  (`sk-test-…`, `tvly-test-…`), the gitignored `.secrets.env`, an ignored `.run/` log, and one
+  binary false positive in `promo/App.png`. `AUDIT/` contains none.
+- **The single `precondition`** (`ConversationEngine.swift:221`, seats non-empty) is **not**
+  reachable from the network: `POST /api/roster` takes a roster *id* resolved from `RosterLibrary`,
+  never a caller-supplied seat list. Not a finding.
