@@ -222,6 +222,14 @@ public final class ConversationEngine {
     /// what lets a rename change future turns without rewriting history.
     private var currentSpeakerName: String?
     private var lastMeasuredDialogueTokens = 0
+    /// The context window each seat's engine last reported, keyed by seat id.
+    ///
+    /// The spec's `contextWindow` is only the fallback for an engine that cannot report one.
+    /// The MLX backend reads the real number from the checkpoint's own config, and measuring
+    /// the auto-compaction threshold against the spec's guess (262 144) meant it never fired
+    /// for a model whose actual window is 32 768 — so the provider truncated the start of the
+    /// discussion, which is the failure compaction exists to prevent.
+    private var reportedContextWindows: [String: Int] = [:]
     /// Turns that have begun generating (unlike `turnsCompleted`, counts the current one).
     public private(set) var startedTurns = 0
     private var generationTask: Task<Void, Never>?
@@ -820,8 +828,14 @@ public final class ConversationEngine {
         // Reclaim context before composing this turn, so the seat that is about to speak
         // is the one whose window is measured and whose style shapes the digest. Only the
         // *automatic* path consults the switch; `compactNow` calls this directly.
+        //
+        // The window is asked of the engine once, here, and handed to compaction and to the
+        // usage snapshot both: the spec's value is a fallback, not the measurement. Asking
+        // once avoids a second round trip on every turn (the API backend resolves it from
+        // disk).
+        let window = await refreshContextWindow(for: seat)
         if configuration.autoCompact {
-            await compactIfNeeded(using: seat)
+            await compactIfNeeded(using: seat, window: window)
         }
 
         let pending = drainSteering()
@@ -1076,6 +1090,11 @@ public final class ConversationEngine {
     /// before a single turn of conversation — enough that estimating from transcript text
     /// alone made the threshold unreachable. The transcript estimate is used only until a
     /// first turn has run.
+    ///
+    /// The window is the tightest of what the seats' engines actually report, so this and the
+    /// auto-compaction threshold are measured against the same number. `refreshContextWindow`
+    /// keeps `reportedContextWindows` current; before any turn has run the spec's value stands
+    /// in, which is all that is known then.
     public var contextUsage: (tokens: Int, window: Int, fraction: Double) {
         let dialogue = conversation.dialogueTurns.reduce(0) { $0 + max(1, $1.content.count / 4) }
             + PromptBuilder.attachmentCharacters(conversation.attachments) / 4
@@ -1083,9 +1102,37 @@ public final class ConversationEngine {
         // the prompt for the turn being composed now.
         let measured = measuredPromptTokens.map { $0 + dialogue - lastMeasuredDialogueTokens } ?? dialogue
         let tokens = max(dialogue, measured)
-        let window = seats.map(\.spec.contextWindow).min() ?? AgentSpec.defaultContextWindow
+        let window =
+            seats.map { knownContextWindow(for: $0) }.min() ?? AgentSpec.defaultContextWindow
         let fraction = window > 0 ? Double(tokens) / Double(window) : 0
         return (tokens, window, fraction)
+    }
+
+    /// What a seat's window falls back to when its engine reports nothing useful: the spec's
+    /// own value, or the shared default when even that is unset.
+    private func fallbackContextWindow(for seat: Seat) -> Int {
+        seat.spec.contextWindow > 0 ? seat.spec.contextWindow : AgentSpec.defaultContextWindow
+    }
+
+    /// The window last heard from a seat's engine, for the synchronous display path.
+    private func knownContextWindow(for seat: Seat) -> Int {
+        if let reported = reportedContextWindows[seat.spec.id], reported > 0 { return reported }
+        return fallbackContextWindow(for: seat)
+    }
+
+    /// Ask a seat's engine for its real context window and remember it.
+    ///
+    /// This is what `compactIfNeeded` measures the threshold against and what `contextUsage`
+    /// reports, so a learned window reaches both. An engine that reports zero or less — a
+    /// stub, or a backend that cannot discover one — falls back to the spec.
+    @discardableResult
+    private func refreshContextWindow(for seat: Seat) async -> Int {
+        let reported = await seat.engine.contextWindow
+        if reported > 0 {
+            reportedContextWindows[seat.spec.id] = reported
+            return reported
+        }
+        return fallbackContextWindow(for: seat)
     }
 
     /// The log the UI should draw: delivered turns plus any not-yet-delivered steering.
@@ -1158,21 +1205,28 @@ public final class ConversationEngine {
     /// Returns true when compaction ran, so the caller can tell that the transcript has
     /// been rewritten underneath it.
     @discardableResult
-    func compactIfNeeded(using seat: Seat, force: Bool = false) async -> Bool {
+    func compactIfNeeded(using seat: Seat, force: Bool = false, window: Int? = nil) async -> Bool {
         _ = force  // an explicit call always runs; see `compactNow`
 
         let spec = await seat.engine.currentSpec
-        let window = spec.contextWindow > 0 ? spec.contextWindow : AgentSpec.defaultContextWindow
+        // The caller in `runTurn` has already asked the engine; `compactNow` has not, so ask
+        // here. Either way this is the seat's real window, and the spec is only the fallback.
+        let effectiveWindow: Int
+        if let window {
+            effectiveWindow = window
+        } else {
+            effectiveWindow = await refreshContextWindow(for: seat)
+        }
         let usage = contextUsage
         let tokens = usage.tokens
-        let fraction = Double(tokens) / Double(window)
+        let fraction = Double(tokens) / Double(effectiveWindow)
         guard force || fraction >= configuration.compactThreshold else { return false }
 
         let dialogue = conversation.turns.filter { $0.kind != .tool }
         guard dialogue.count > configuration.compactKeepRecentTurns + 2 else {
             // Too little to condense usefully — the window is simply small for this topic.
             note(
-                "Prompt is \(tokens) tokens of a \(window)-token window but there is not enough history to condense yet.")
+                "Prompt is \(tokens) tokens of a \(effectiveWindow)-token window but there is not enough history to condense yet.")
             return false
         }
 
