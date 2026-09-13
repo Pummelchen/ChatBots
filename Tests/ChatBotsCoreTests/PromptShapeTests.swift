@@ -109,7 +109,10 @@ struct PromptShapeTests {
             for: spec(mode: .entertainment), others: [spec(mode: .entertainment, index: 1)],
             conversation: conversation(attachments: [text("study.md")]))
         expectTemplateCompatible(messages, "entertainment with an attachment")
-        #expect(messages[0].content.contains("Ovoid shells resist point loads."))
+        // The document is data in the user turn, not a section of the system message (A103).
+        let user = messages.filter { $0.role == .user }.map(\.content).joined(separator: "\n")
+        #expect(user.contains("Ovoid shells resist point loads."))
+        #expect(!messages[0].content.contains("Ovoid shells resist point loads."))
     }
 
     @Test("An entertainment prompt with a social history is template-compatible")
@@ -130,14 +133,15 @@ struct PromptShapeTests {
             conversation: conversation(attachments: [text("study.md")], conflict: conflictWithHistory()))
         expectTemplateCompatible(messages, "every optional section at once")
         #expect(messages.filter { $0.role == .system }.count == 1)
-        // Order is part of the contract: who the seat is, then the material, then the room.
+        // The system message carries pointers, not the data: the room's state and the source
+        // material are both in the user turn. A document's text is untrusted (A103), so it must
+        // not be system-role instruction.
         let system = messages[0].content
-        let material = system.range(of: "Ovoid shells")
-        let social = system.range(of: "Where things stand")
-        #expect(material != nil && social != nil, "both sections should be present")
-        if let material, let social {
-            #expect(material.lowerBound < social.lowerBound, "material comes before the room")
-        }
+        #expect(system.contains("Where things stand"), "the pointer to the room's state")
+        #expect(!system.contains("Ovoid shells"), "the document text is not system-role text")
+        let user = messages.filter { $0.role == .user }.map(\.content).joined(separator: "\n")
+        #expect(user.contains("Ovoid shells"), "the material reaches the seat in the log")
+        #expect(user.contains("Where things stand"), "so does the room's state")
     }
 
     @Test("A research prompt with source material is template-compatible")

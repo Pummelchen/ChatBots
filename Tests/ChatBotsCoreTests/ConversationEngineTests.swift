@@ -315,12 +315,18 @@ func steeringStartsIdleConversation() async {
     #expect(turns.contains { $0.kind == .introduction }, "the brief explains the rules to the seats")
     #expect(turns.filter { $0.kind == .steering }.count == 1, "the message appears once in the log")
 
-    let prompt = (await stubA.prompts.first ?? []).map(\.content).joined(separator: "\n")
+    let messages = await stubA.prompts.first ?? []
+    let prompt = messages.map(\.content).joined(separator: "\n")
     let occurrences = prompt.components(separatedBy: "Why are eggs not round?").count - 1
-    // Three is correct: the topic in the seat's system message, the topic line in the opening
-    // brief, and the moderator's own message in the log. Four would mean the message had been
-    // delivered twice — which is what happened while it was also sitting in the steering queue.
-    #expect(occurrences == 3, "the question reached the prompt \(occurrences) times")
+    // Two is correct: the topic line in the opening brief and the moderator's own message in
+    // the log. Three used to be "correct" because the system message interpolated the topic as
+    // well — which made the moderator's text system-role instruction to every seat (audit
+    // A103). The topic must not be in the system message at all.
+    #expect(occurrences == 2, "the question reached the prompt \(occurrences) times")
+    let system = messages.first { $0.role == .system }?.content ?? ""
+    #expect(
+        !system.contains("Why are eggs not round?"),
+        "the topic reached the system role")
     #expect(prompt.contains("open discussion"))
 }
 

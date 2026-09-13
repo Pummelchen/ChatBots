@@ -247,7 +247,7 @@ struct AttachmentPromptTests {
         #expect(PromptBuilder.attachmentContext([document("empty.txt", "  ")]) == nil)
     }
 
-    @Test("The prompt includes the source material in the one system message")
+    @Test("The source material is data in the user turn, never the system message")
     func promptCarriesMaterial() {
         var spec = AgentSpec.seat(index: 0)
         spec.personaID = PersonaLibrary.neutral.id
@@ -258,11 +258,20 @@ struct AttachmentPromptTests {
 
         let prompt = PromptBuilder.prompt(
             for: spec, others: [AgentSpec.seat(index: 1)], conversation: conversation)
-        // One system message, because the Qwen template refuses a second one; the material is
-        // a section of it rather than a message of its own. See `PromptShapeTests`.
+        // One system message, because the Qwen template refuses a second one. The material is
+        // not part of it: document text arrives over the unauthenticated attachment API, so it
+        // is untrusted data and belongs in the user turn beside the log, fenced (audit A103).
         let systemMessages = prompt.filter { $0.role == .system }
-        #expect(systemMessages.count == 1, "the brief and the source material share one message")
-        #expect(systemMessages.first?.content.contains("Ovoid shells resist point loads.") == true)
+        #expect(systemMessages.count == 1, "the brief is still one message")
+        #expect(
+            systemMessages.first?.content.contains("Ovoid shells resist point loads.") == false,
+            "document text must not be system-role instruction")
+        #expect(
+            systemMessages.first?.content.contains("source material") == true,
+            "the system message still says where the material is")
+        let user = prompt.filter { $0.role == .user }.map(\.content).joined(separator: "\n")
+        #expect(user.contains("Ovoid shells resist point loads."), "the material still reaches the seat")
+        #expect(user.contains(PromptBuilder.materialBegin), "the material is fenced as data")
     }
 
     @Test("Attachments count towards the context estimate")
