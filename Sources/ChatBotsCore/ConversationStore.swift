@@ -72,6 +72,15 @@ public struct StoredConversation: Codable, Sendable, Identifiable {
         public var content: String
         public var timestamp: Date
         public var toolDetail: String?
+        /// The subject an unaddressed-subject assignment asked the room at (audit A105).
+        ///
+        /// Optional, and deliberately not accompanied by a format bump: a decoder ignores a key
+        /// it does not know, so an older build reads a record that carries this exactly as it
+        /// did before — its own wording match still finds the assignment, because the
+        /// instruction text is unchanged — and this build reads a record written before the
+        /// field as a nil marker, which is what the reader's legacy fallback exists for. A bump
+        /// would make every conversation unreadable to the older build for no gain.
+        public var unaddressedSubject: String?
     }
 
     /// A one-line description, for a list of saved conversations.
@@ -265,7 +274,7 @@ extension StoredConversation {
                 id: turn.id, sequence: turn.sequence, speakerID: turn.speakerID,
                 speakerName: turn.speakerName, kind: turn.kind.rawValue,
                 content: turn.content, timestamp: turn.timestamp,
-                toolDetail: turn.toolDetail)
+                toolDetail: turn.toolDetail, unaddressedSubject: turn.unaddressedSubject)
         }
     }
 
@@ -284,6 +293,7 @@ extension StoredConversation {
                 kind: Turn.Kind(rawValue: stored.kind) ?? .chat,
                 content: stored.content,
                 toolDetail: stored.toolDetail,
+                unaddressedSubject: stored.unaddressedSubject,
                 timestamp: stored.timestamp)
         }
     }

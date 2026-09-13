@@ -651,16 +651,28 @@ public final class ConversationEngine {
 
         note("Research Moderator → \(directed.spec.displayName): \(direction.reason).")
         conversation.turns.append(
-            Turn(
-                sequence: nextSequence(),
-                speakerID: nil,
-                speakerName: "Research Moderator",
-                kind: .direction,
-                content: direction.instruction
-            )
-        )
+            Self.directionTurn(sequence: nextSequence(), direction: direction))
         publishTranscript()
         return directed
+    }
+
+    /// The transcript entry for one of the director's decisions.
+    ///
+    /// The turn carries `unaddressedSubject` only for the assignment that points at a subject
+    /// nobody has addressed, because that is the one where a single seat's answer counts as the
+    /// room engaging with it. Reading it from an explicit marker rather than from the
+    /// instruction's wording is what stops a copy edit from silently disabling the rule
+    /// (audit A105). Pure, so the marker the emit path sets is asserted without running a
+    /// conversation.
+    static func directionTurn(sequence: Int, direction: ResearchDirection) -> Turn {
+        Turn(
+            sequence: sequence,
+            speakerID: nil,
+            speakerName: "Research Moderator",
+            kind: .direction,
+            content: direction.instruction,
+            unaddressedSubject: direction.kind == .unaddressedSubject
+                ? direction.subQuestion : nil)
     }
 
     /// Write the report that ends a research session.

@@ -30,6 +30,23 @@ import Foundation
 
 /// What the investigation needs next, and why.
 public struct ResearchDirection: Sendable, Equatable {
+    /// Which of the director's rules produced this direction.
+    ///
+    /// Exposed so the turn the engine writes can carry the decision structurally rather than
+    /// have the reader re-derive it from the instruction's wording (audit A105).
+    public enum Kind: String, Sendable, Equatable {
+        /// A claim carried without a basis.
+        case unsupportedClaim
+        /// Two analysts disagreeing about the same sub-question.
+        case conflict
+        /// A subject nobody has addressed yet — the assignment a single seat may answer.
+        case unaddressedSubject
+        /// Someone who has barely been heard from.
+        case quietestSeat
+        /// Nothing in particular to direct; the rotation stands.
+        case rotation
+    }
+
     /// The analyst to hear from, by seat id. Nil means the rotation stands.
     public var seatID: String?
     /// What the moderator is asking for, in its own words, to be given to that analyst.
@@ -39,6 +56,8 @@ public struct ResearchDirection: Sendable, Equatable {
     public var reason: String
     /// Which sub-question this turn is aimed at.
     public var subQuestion: String?
+    /// Which rule produced this direction.
+    public var kind: Kind = .rotation
 
     public var isDirected: Bool { seatID != nil }
 }
@@ -154,13 +173,18 @@ public enum ResearchReading {
         // left-to-right, and a settled question is one that was agreed *and not* reopened.
         for turn in turns {
             // A direction the app itself wrote, asking the room at a subject nobody has
-            // addressed. Recorded so the answer to it counts as engagement below. The
-            // instruction for an unanswered subject begins with a fixed phrase, which is what
-            // identifies it without adding a field to `Turn`.
+            // addressed. Recorded so the answer to it counts as engagement below. Which
+            // assignment it was is carried on the turn as `unaddressedSubject`, so editing
+            // the instruction's wording cannot change what the reading sees (audit A105); a
+            // turn written before that field existed is still read from its wording, once,
+            // by `legacyUnaddressedSubject`.
             if turn.kind == .direction {
-                for question in ResearchSubQuestion.allCases
-                where turn.content.contains("Nothing so far has addressed \(question.label)") {
+                if let marker = turn.unaddressedSubject,
+                    let question = ResearchSubQuestion(rawValue: marker)
+                {
                     directed.insert(question)
+                } else if let legacy = ResearchDirector.legacyUnaddressedSubject(in: turn.content) {
+                    directed.insert(legacy)
                 }
                 continue
             }
@@ -480,6 +504,20 @@ public struct ResearchDirector: Sendable {
         return basisMarkers.contains { wholeWord($0, in: lowered) }
     }
 
+    /// The sub-question an assignment named, read from the wording a transcript was written
+    /// with *before* `Turn.unaddressedSubject` existed.
+    ///
+    /// This is a migration and not the rule. Directions the director writes now carry the
+    /// marker, so a copy edit or a localisation of the instruction cannot change what the
+    /// reading sees (audit A105). The phrase below is the historical wording, kept only so a
+    /// conversation saved by an older build still reads the way it did; it is deliberately not
+    /// shared with the emitter, because sharing it is exactly the coupling A105 removed.
+    public static func legacyUnaddressedSubject(in content: String) -> ResearchSubQuestion? {
+        ResearchSubQuestion.allCases.first {
+            content.contains("Nothing so far has addressed \($0.label)")
+        }
+    }
+
     /// The words that count as a basis. Inflections are explicit: "estimated" and "estimates"
     /// are here, "statistically" deliberately is not, and the bare noun "report" is not either —
     /// "Report says" with nothing behind it is the unsourced case, which is why the original list
@@ -536,7 +574,8 @@ public struct ResearchDirector: Sendable {
                     cannot be checked, say that plainly rather than letting it stand.
                     """,
                 reason: "a claim from \(name) has no evidence attached",
-                subQuestion: ResearchSubQuestion.methodology.rawValue)
+                subQuestion: ResearchSubQuestion.methodology.rawValue,
+                kind: .unsupportedClaim)
         }
 
         // 2. Two analysts disagreeing about the same thing.
@@ -561,7 +600,8 @@ public struct ResearchDirector: Sendable {
                     what would settle it and what is missing.
                     """,
                 reason: "\(names) conflict on \(question.label)",
-                subQuestion: question.rawValue)
+                subQuestion: question.rawValue,
+                kind: .conflict)
         }
 
         // 3. Something nobody has looked at.
@@ -574,7 +614,8 @@ public struct ResearchDirector: Sendable {
                     you are relying on.
                     """,
                 reason: "\(question.label) has not been covered",
-                subQuestion: question.rawValue)
+                subQuestion: question.rawValue,
+                kind: .unaddressedSubject)
         }
 
         // 4. Someone who has barely been heard from, on a question the room has stopped
@@ -589,7 +630,8 @@ public struct ResearchDirector: Sendable {
                     relied on.
                     """,
                 reason: "\(displayName(quietest)) has contributed least",
-                subQuestion: nil)
+                subQuestion: nil,
+                kind: .quietestSeat)
         }
 
         // 5. Nothing in particular to direct. Either the investigation has nothing left, or the
@@ -602,7 +644,8 @@ public struct ResearchDirector: Sendable {
             reason: hasOpenWork
                 ? "the open question has just gone to whoever fits it; the rotation stands"
                 : "nothing outstanding; the rotation stands",
-            subQuestion: nil)
+            subQuestion: nil,
+            kind: .rotation)
     }
 
     /// The analyst role a seat is on, when it is on one.

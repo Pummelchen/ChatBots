@@ -53,6 +53,16 @@ public struct Turn: Identifiable, Sendable, Hashable {
     public var content: String
     /// Populated for `.tool` turns.
     public var toolDetail: String?
+    /// The research sub-question a `.direction` turn asks the room to address *because
+    /// nothing has addressed it yet*, as a `ResearchSubQuestion` raw value.
+    ///
+    /// Set only for that assignment, and only by the director. It matters to one rule: a
+    /// subject the moderator has pointed the room at counts as covered when a single seat
+    /// answers the assignment, where an ordinary mention needs two seats. The reader used to
+    /// recognise the assignment by matching the instruction's exact wording, so a copy edit or
+    /// a localisation silently disabled the rule; the marker makes the coupling structural
+    /// (audit A105).
+    public var unaddressedSubject: String?
     public var timestamp: Date
 
     public init(
@@ -63,6 +73,7 @@ public struct Turn: Identifiable, Sendable, Hashable {
         kind: Kind,
         content: String,
         toolDetail: String? = nil,
+        unaddressedSubject: String? = nil,
         timestamp: Date = Date.now
     ) {
         self.id = id
@@ -72,6 +83,7 @@ public struct Turn: Identifiable, Sendable, Hashable {
         self.kind = kind
         self.content = content
         self.toolDetail = toolDetail
+        self.unaddressedSubject = unaddressedSubject
         self.timestamp = timestamp
     }
 }
