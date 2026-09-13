@@ -772,3 +772,21 @@ package resource so it reaches the bundle, and copy it into the `.app` beside th
 that keeps it true belongs in the `generated-files` CI job that already fails a push when a
 generated file has drifted — so a dependency added without its notice fails the push rather than
 shipping.
+
+### A78 — the bundle's copyright key carries a description
+
+**S3** · compliance · found by the same go-live check as A77
+
+`tools/make-app.sh` generates `NSHumanReadableCopyright` as `Local build — two MLX models in
+conversation.` That key is the copyright line macOS shows in the Finder's Get Info panel, and the
+value is a description of the app: it names no holder and no year, so a shipped build would show
+no copyright at all, while `LICENSE` states `Copyright (c) 2026 André Borchert`.
+
+The same single-source problem applies to two neighbours in the same heredoc:
+`CFBundleIdentifier` is `local.chatbots.twollms` — right for a local build, wrong for
+distribution, and it exists in exactly one place — and the version is two literals (`1.0`, `1`)
+tied to no release or tag.
+
+Recorded with A77 because they are one piece of work: the app cannot be published until the
+libraries are attributed *and* the bundle says who made it and which version it is. The
+`generated-files` CI job is the natural guard for both.

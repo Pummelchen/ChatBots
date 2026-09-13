@@ -1315,6 +1315,23 @@
       "commit": null,
       "notes": "Cheap and mechanical to fix, and it is a release blocker for a public release rather than a security issue: generate a THIRD-PARTY-NOTICES file from the resolved dependency graph (Package.resolved pins exact revisions, so it is deterministic), commit it, include it as a package resource so it lands in the bundle, and copy it into the .app's Resources in make-app.sh alongside the icon. The check that keeps it true is that the generation step runs in the same CI job that already verifies generated files are in step (the `generated-files` job), so a dependency added without its notice fails the push rather than shipping.",
       "blocked_reason": null
+    },
+    {
+      "id": "A78",
+      "severity": "S3",
+      "unit": "distribution / bundle metadata",
+      "file_line": "tools/make-app.sh:119-120, :129-132, :139-140",
+      "title": "`NSHumanReadableCopyright` carries a description instead of a copyright, and the bundle identifier and version are single-sourced in one script only",
+      "category": "compliance",
+      "status": "START",
+      "host_used": "this Mac",
+      "discovered_by": "go-live readiness check on bundle metadata, run while the fix lanes were busy",
+      "evidence_before": "The generated Info.plist sets `NSHumanReadableCopyright` to `Local build - two MLX models in conversation.` That key has a defined meaning - it is the copyright line macOS shows in the Finder's Get Info panel and in About boxes - and the value is a description of the app instead. It names no holder and no year, so a shipped build would display no copyright at all. Related, and recorded together because it is the same single-source problem: `CFBundleIdentifier` is `local.chatbots.twollms` (fine for a local build, wrong for distribution, and it appears only here), `CFBundleShortVersionString` is `1.0` and `CFBundleVersion` is `1`, both literals in the same heredoc, so an app version exists in exactly one place with nothing tying it to a release or a tag, and the repository's own LICENSE says `Copyright (c) 2026 Andre Borchert` - the holder A77 also needs for attribution.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "Small and in the same family as A77: this is publishing readiness rather than a runtime defect, and it is cheap because make-app.sh already generates the plist in one place. The fix is to put the real copyright line in the key, state where the bundle identifier and version come from (and change the identifier if a distributed build is intended), and make the version a single value rather than a literal repeated across the plist and any release notes. It should be done alongside A77 so the two distribution fixes land coherently, and the generated-files CI job is the natural place to keep them true.",
+      "blocked_reason": null
     }
   ]
 }
