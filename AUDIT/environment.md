@@ -69,6 +69,35 @@ brew install swift-format swiftlint llvm gitleaks osv-scanner semgrep ruff pyrig
 **Nothing.** No tool was installed, upgraded, or removed on any host. The fleet is in the state it
 was found in, apart from the audit branch and `AUDIT/` directory committed to this repository.
 
+## Contention on the development Mac, measured
+
+Worth recording because Phase E's timings and any flakiness have to be read against it, and
+because it is the reason the final verification runs on `node1` rather than here.
+
+The development Mac is an **8-core, 24 GB** machine, and during the fix phase it was running
+three concurrent Swift lanes, each with its own `--scratch-path`, while **not** being otherwise
+idle:
+
+| Observed | Value |
+| --- | --- |
+| Load average | **66–92** on 8 cores |
+| Memory free | **11 %**, with 3.3 M pageouts |
+| An unrelated process | `NVMAIServer`, from a different project under `Coding/`, at ~32 % CPU |
+| `fileproviderd` | ~50 % CPU — the CloudStorage file provider reacting to a working tree that lives inside it |
+| Build scratch | ~4.7 GB across three `/tmp/chatbots-scratch-*` trees |
+
+So three parallel Swift lanes were oversubscribed, and the scratch trees were cleaned up once the
+lanes finished rather than being left in `/tmp`. Two consequences are recorded rather than
+discovered later:
+
+- **A green local run is not evidence about a quiet machine.** Phase E therefore runs on `node1`,
+  which is not running this workload, and the acceptance script records the commit it tested so the
+  result is tied to a revision rather than to a moment.
+- **Any timing-sensitive observation taken from this Mac during the fix phase is suspect.** None of
+  the conclusions in the ledger rest on a duration; the ones that could have (the import timeout,
+  the readiness wait) were verified by asserting behaviour with faked clocks rather than by
+  measuring elapsed time on a loaded machine.
+
 ## Hosts touched
 
 | Host | What was written | Removed afterwards |
