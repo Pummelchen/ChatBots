@@ -62,27 +62,71 @@ public struct PDFTextExtractor: DocumentExtracting {
             throw DocumentError.unreadable("the PDF could not be opened")
         }
 
-        var pages: [String] = []
-        var characters = 0
+        var budget = PDFTextBudget(maximum: limits.maximumTextCharacters)
         for index in 0..<document.pageCount {
             guard let page = document.page(at: index), let pageText = page.string else { continue }
-            // Stop reading once the budget is spent rather than extracting a whole
-            // book to then throw most of it away.
-            if characters + pageText.count > limits.maximumTextCharacters {
-                pages.append(String(pageText.prefix(max(0, limits.maximumTextCharacters - characters))))
-                characters = limits.maximumTextCharacters
-                break
-            }
-            pages.append(pageText)
-            characters += pageText.count
+            // Stop reading once the budget is spent rather than extracting a whole book to
+            // then throw most of it away.
+            if !budget.append(pageText) { break }
         }
 
-        let text = pages.joined(separator: "\n\n")
         return AttachedDocument(
-            name: "", kind: .pdf, text: text,
+            name: "", kind: .pdf, text: budget.text,
             pageCount: document.pageCount,
-            wasTruncated: characters >= limits.maximumTextCharacters
+            wasTruncated: budget.wasTruncated
         )
+    }
+}
+
+/// Accumulates a PDF's pages under the per-file character ceiling.
+///
+/// The ceiling is on the text that is actually **stored**, which is the pages joined by a blank
+/// line, so the separator counts against the budget too. Joining after the fact let a document
+/// at the limit be stored up to `2 × (pages − 1)` characters over the declared ceiling — the
+/// exact amount being the separators the budget never accounted for. And `wasTruncated` was
+/// `characters >= maximumTextCharacters`, which reported "shortened" for a document whose text
+/// ended precisely on the ceiling and lost nothing; it is now set only when a page is cut or
+/// dropped (audit A58).
+///
+/// Separate from the extractor so the arithmetic can be tested without building a PDF. The
+/// extractor still stops reading as soon as `append` returns false, so a whole book is not
+/// extracted to be thrown away.
+struct PDFTextBudget {
+    private static let separator = "\n\n"
+
+    private let maximum: Int
+    private var count = 0
+    /// The stored text, which never exceeds `maximum`.
+    private(set) var text = ""
+    /// True only when a page was cut or could not be added at all.
+    private(set) var wasTruncated = false
+
+    init(maximum: Int) { self.maximum = maximum }
+
+    /// Add a page, and return false when there is no room for any more.
+    ///
+    /// An empty page adds nothing — not even a separator — so it neither counts as shortening
+    /// nor consumes budget.
+    mutating func append(_ pageText: String) -> Bool {
+        guard !pageText.isEmpty else { return true }
+
+        let separatorCount = text.isEmpty ? 0 : Self.separator.count
+        let remaining = maximum - count - separatorCount
+        if remaining <= 0 {
+            wasTruncated = true
+            return false
+        }
+
+        if !text.isEmpty { text += Self.separator }
+        if pageText.count > remaining {
+            text += String(pageText.prefix(remaining))
+            count = maximum
+            wasTruncated = true
+            return false
+        }
+        text += pageText
+        count += separatorCount + pageText.count
+        return true
     }
 }
 
