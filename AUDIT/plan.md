@@ -3,7 +3,8 @@
 Companion files: [`environment.md`](environment.md) (fleet/toolchain), [`inventory.md`](inventory.md)
 (scope, §2), [`ledger.md`](ledger.md) + `ledger.json` (tasks), [`baseline/`](baseline) (raw evidence).
 
-Branch `audit/2026-09-13` from `main` @ `a6d6999`. `main` is untouched and nothing is force-pushed.
+Branch `audit/2026-09-13` from `main` @ `a6d6999`. `main` was untouched for the whole audit, and the
+branch was landed on it as a fast-forward once Phase E was green. Nothing is force-pushed.
 
 > **Scope.** This project only, for the reason recorded at the top of `inventory.md`: the
 > workspace is a set of sibling repositories, not a monorepo, and `Converter` (Phase A) and
@@ -220,6 +221,9 @@ being marked DONE without a commit that backs it.
 | Command | Purpose | Rollback |
 | --- | --- | --- |
 | `git switch -c audit/2026-09-13` (from `main` @ `a6d6999`) | create the audit branch | `git switch main && git branch -D audit/2026-09-13` — but the branch is never deleted, per §0; if abandoned it is simply left unmerged |
+| `git merge --ff-only audit/2026-09-13` on `main`, then push | land the audited code on the repository's only supported branch | `git push --force-with-lease origin a6d6999:main` — a force-push, which §0 otherwise forbids, and which is safe here only because `main` had not moved since the branch was cut. The branch is left in place either way, so nothing is lost. |
 
-No force-push, no history rewrite, no branch or tag deletion, no `reset`. `main` has not been
-committed to since the branch was created.
+No force-push, no history rewrite, no branch or tag deletion, no `reset`. Until the landing above,
+`main` had not been committed to since the branch was created — which is what made the fast-forward
+possible and why it was chosen over a squash: a squash would delete the per-task commits that
+`verify-done-commits.sh` checks, so the audit's own gate would fail on `main`.

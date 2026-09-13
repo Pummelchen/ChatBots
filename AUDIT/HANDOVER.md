@@ -11,13 +11,13 @@ the then-116 tasks and stopped at A89, which is recorded as A118.
 
 | | |
 | --- | --- |
-| Branch | `audit/2026-09-13`, cut from `main@a6d6999`. **`main` has never been committed to** — `origin/main` is still `a6d6999`, verified at the end of the session as at the start |
+| Branch | `audit/2026-09-13`, cut from `main@a6d6999`. **Landed on `main` as a fast-forward** once the audit was complete and Phase E was green; the branch is kept unmerged-looking only in the sense that it is now an ancestor of `main`, not deleted — it is the audit's own record |
 | Tasks | **127 enumerated: 127 DONE, 0 open, 0 BLOCKED** |
 | Severity | Every S0 and every S1 is fixed. The last five (A123–A127) were defects in the Phase E gates, found by running them |
 | Tests | **824 tests in 139 suites**, green, 0 compiler warnings (`Package.swift` sets `.treatAllWarnings(as: .error)`, so no build command can bypass it) |
 | Coverage | `Sources/` 71.6 % lines at baseline, **77.15 %** at acceptance |
 | Phases | A ✅ · B ✅ (two waves) · C ✅ · D continuous (12 findings after Phase C) · **E ✅ green** |
-| Deliverable | The branch plus `AUDIT/`. `main` is untouched, deliberately: merging it is the owner's decision, not the audit's |
+| Deliverable | The branch plus `AUDIT/`, fast-forwarded into `main`. Squashing was rejected on purpose: it would delete the per-task commits that `verify-done-commits.sh` resolves each DONE task against, so the audit's own gate would fail on `main` |
 
 Full detail: `ledger.json` (the authoritative enumeration and status, what the gates read) ·
 `ledger.md` (the prose record, its status tables generated from the JSON) · `plan.md` (phases,
@@ -29,9 +29,10 @@ wrong and why) · `baseline/phaseE/` (the acceptance run's own logs and summary)
 
 **Nothing in the audit.** What remains is a decision and two stated residuals:
 
-1. **Merge `audit/2026-09-13` into `main`, or review it first.** The branch is strictly ahead of
-   `main` (0 behind, fast-forwardable), and the audit's §0 forbids it merging itself. If the owner
-   wants a reviewable step, this is it.
+1. ~~**Merge `audit/2026-09-13` into `main`, or review it first.**~~ **Done** — the branch was
+   strictly ahead of `main` (0 behind, fast-forwardable) and was fast-forwarded into it. A squash was
+   rejected because it would delete the per-task commits `verify-done-commits.sh` resolves each DONE
+   task against; the branch is kept, so the audit's own record is intact.
 2. **`--share-base` is only set by `tools/start.sh`.** An engine the desktop app spawns without that
    script keeps the loopback base, which is right for the Mac it runs on and not for a phone (A99).
 3. **The style waivers are a measured residual, not a budget** — `swiftlint` 255 and authored
@@ -174,7 +175,10 @@ is the useful part.
   from another project, `fileproviderd` watching the Dropbox tree). This is why **no ledger
   conclusion rests on a duration**, and why anything timing-sensitive must be asserted against a
   fake clock rather than measured — A36 and A81's fixes are built that way deliberately.
-- **`main` must stay untouched.** The audit's deliverable is the branch plus `AUDIT/`.
+- **`main` stayed untouched for the whole audit.** Every fix is on the branch and the acceptance run
+  names the branch's commit. It was landed on `main` as a fast-forward once the audit was complete —
+  the owner's instruction, and the safe direction for a repository whose only supported branch is
+  `main`: until then the S0 and the sixteen S1s were invisible to anyone who cloned it.
 - **This is a public repository.** Never print, log or commit a secret; `gitleaks` runs with
   `--redact` and only rule id, file and line are ever read out of its report.
 
