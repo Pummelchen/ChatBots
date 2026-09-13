@@ -62,15 +62,34 @@ private func makeChattyEngine(burst: Int) -> ConversationEngine {
         seats: [.init(spec: spec, engine: stub)], configuration: configuration)
 }
 
-/// Read whatever the stream buffered, then stop. Nothing is producing any more by the time
-/// this is called, so the count is the buffer's contents.
+/// Read the stream until it stops producing, then stop.
+///
+/// The producer has already finished by the time this is called, so what is buffered is what the
+/// stream holds — but the *reader* still has to be scheduled, and a fixed window was a race against
+/// whatever else the machine was doing. On a loaded host this test reported 172 events, and once 7,
+/// against an expected 256 (A108). Reading until nothing new has arrived for a quiet period is a
+/// property of the stream rather than of the machine's load.
 @MainActor
-private func drain(_ stream: AsyncStream<TurnEvent>, for duration: Duration) async -> [TurnEvent] {
+private func drain(_ stream: AsyncStream<TurnEvent>) async -> [TurnEvent] {
     let recorder = EventRecorder()
     let reader = Task {
         for await event in stream { await recorder.record(event) }
     }
-    try? await Task.sleep(for: duration)
+    // 50 ms per step, giving up after eight steps with nothing new: 400 ms of quiet.
+    let step = Duration.milliseconds(50)
+    let quietSteps = 8
+    var lastCount = 0
+    var quiet = 0
+    while quiet < quietSteps {
+        try? await Task.sleep(for: step)
+        let count = await recorder.events.count
+        if count == lastCount {
+            quiet += 1
+        } else {
+            quiet = 0
+            lastCount = count
+        }
+    }
     reader.cancel()
     return await recorder.events
 }
@@ -87,13 +106,13 @@ struct AuditEngineStateEventStreamTests {
         engine.start(topic: "Why are eggs not round?")
         await engine.waitUntilFinished()
 
-        let received = await drain(engine.events, for: .milliseconds(300))
+        let received = await drain(engine.events)
 
         // The bound matches the one the WebTransport server gives each client
         // (`WebTransportServer.swift`: `.bufferingNewest(256)`).
         #expect(
             received.count == 256,
-            "the stream handed back \(received.count) events; an unobserved buffer is not bounded")
+            "the stream handed back \(received.count) events; an unobserved buffer keeps the newest 256 and no more")
 
         // Newest-kept, so the end of the run — the part a live consumer cares about — is what
         // survives a fall-behind, and the terminal event is not the casualty.
