@@ -153,12 +153,14 @@ public struct AttachedDocument: Identifiable, Sendable, Equatable, Codable {
 }
 
 extension AttachedDocument {
-    /// The media type for an attached image, from its bytes rather than its filename.
+    /// The media type for image bytes, from the bytes rather than the filename.
     ///
     /// The extension can lie — a `.png` that is really a JPEG is common — and servers
-    /// validate the declared type, so the magic bytes are what is believed.
-    public var imageMediaType: String? {
-        guard kind.isImage, let data = imageData, data.count >= 4 else { return nil }
+    /// validate the declared type, so the magic bytes are what is believed. `nil` means the
+    /// bytes are not a type this app can describe to a model; the intake path converts what it
+    /// can into one of these and refuses the rest, so `nil` never reaches a request silently.
+    public static func mediaType(of data: Data) -> String? {
+        guard data.count >= 4 else { return nil }
         let bytes = [UInt8](data.prefix(12))
         if bytes.starts(with: [0x89, 0x50, 0x4E, 0x47]) { return "image/png" }
         if bytes.starts(with: [0xFF, 0xD8, 0xFF]) { return "image/jpeg" }
@@ -173,6 +175,12 @@ extension AttachedDocument {
             return "image/tiff"
         }
         return nil
+    }
+
+    /// The media type for an attached image.
+    public var imageMediaType: String? {
+        guard kind.isImage, let data = imageData else { return nil }
+        return Self.mediaType(of: data)
     }
 
     /// The image as base64, for an API that takes a data URL.

@@ -10,7 +10,9 @@
 
 import Darwin
 import Foundation
+import ImageIO
 import PDFKit
+import UniformTypeIdentifiers
 
 /// Reads a plain text file, honouring a byte-order mark and falling back sensibly.
 ///
@@ -104,6 +106,15 @@ public struct TextutilExtractor: DocumentExtracting {
 }
 
 /// Reads an image's bytes, for seats that can see.
+///
+/// The bytes that are stored are the bytes that go on the wire, so this is where an image the
+/// model cannot be given is either converted or refused. HEIC is the case that matters: it is
+/// the default format of an iPhone photo and it is offered in the picker, but the Responses API
+/// does not take it, so it used to be stored, pass `isUsable`, pass the vision gate, appear as
+/// a chip — and then be dropped by the OpenAI backend with nothing logged or shown, while the
+/// MLX backend read it fine. A silent, backend-dependent difference is the worst of the
+/// options; converting here means both backends get bytes they can use, and an image that
+/// cannot be converted is refused where the moderator can see the reason.
 public struct ImageExtractor: DocumentExtracting {
     public func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument {
         let data: Data
@@ -112,17 +123,66 @@ public struct ImageExtractor: DocumentExtracting {
         } catch {
             throw DocumentError.unreadable(error.localizedDescription)
         }
-        let lowered = url.pathExtension.lowercased()
+        let payload = try Self.wireRepresentation(
+            of: data, filename: url.lastPathComponent, limits: limits)
         return AttachedDocument(
-            name: "", kind: .image, text: "", byteCount: data.count, imageData: data
-        ).withKindHint(lowered)
+            name: "", kind: .image, text: "", byteCount: data.count, imageData: payload
+        )
     }
-}
 
-private extension AttachedDocument {
-    /// Images keep their kind; the hint exists only so a future format (HEIC, for instance)
-    /// could be converted to a universally readable one at this point.
-    func withKindHint(_ extension: String) -> AttachedDocument { self }
+    /// The image bytes as a type a model can be given, converting when the bytes are not one.
+    ///
+    /// Everything `AttachedDocument.mediaType(of:)` recognises is passed through untouched, so
+    /// a PNG stays the PNG the moderator chose. Anything else is decoded with ImageIO — the
+    /// same framework that reads HEIC, which is why the app can decode it even though the API
+    /// will not take it — and re-encoded as PNG when the image has transparency and JPEG
+    /// otherwise, both of which the API accepts. An image ImageIO cannot decode is refused with
+    /// its name, which is the honest answer for a file whose extension claims to be a picture.
+    static func wireRepresentation(
+        of data: Data, filename: String, limits: AttachmentLimits
+    ) throws -> Data {
+        if AttachedDocument.mediaType(of: data) != nil { return data }
+
+        let name = filename.isEmpty ? "the image" : filename
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+            let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
+        else {
+            throw DocumentError.unreadable(
+                "\(name) is not an image format a model can be given, and it could not be "
+                    + "converted")
+        }
+
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        let hasAlpha = (properties?[kCGImagePropertyHasAlpha] as? NSNumber)?.boolValue ?? false
+        let type: UTType = hasAlpha ? .png : .jpeg
+
+        let output = NSMutableData()
+        guard
+            let destination = CGImageDestinationCreateWithData(
+                output, type.identifier as CFString, 1, nil)
+        else {
+            throw DocumentError.unreadable("\(name) could not be converted to \(type.preferredFilenameExtension ?? "an image")")
+        }
+        var encoding: [CFString: Any] = [:]
+        if type == .jpeg {
+            // The API's own ceiling is on bytes, and a photograph at 0.9 is visually the same
+            // as the original for a model to read while being a fraction of a lossless copy.
+            encoding[kCGImageDestinationLossyCompressionQuality] = 0.9
+        }
+        CGImageDestinationAddImage(destination, image, encoding as CFDictionary)
+        guard CGImageDestinationFinalize(destination) else {
+            throw DocumentError.unreadable("\(name) could not be converted to a readable image")
+        }
+
+        let converted = output as Data
+        // The converted bytes travel base64-encoded inside one message, and the protocol cap is
+        // derived from `maximumFileBytes` for exactly that reason: a conversion that grew past
+        // it would be accepted here and then refused on the wire.
+        guard converted.count <= limits.maximumFileBytes else {
+            throw DocumentError.tooLarge(name, limit: limits.maximumFileBytes)
+        }
+        return converted
+    }
 }
 
 /// Runs a system tool and collects its output.

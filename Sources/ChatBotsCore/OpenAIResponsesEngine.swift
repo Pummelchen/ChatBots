@@ -167,13 +167,30 @@ public actor OpenAIResponsesEngine: LLMEngine {
     // MARK: - Generation
 
     /// Images the seat was given, refreshed by the orchestrator each turn.
+    ///
+    /// An image whose bytes are not a type the Responses API accepts is *named* rather than
+    /// dropped in silence. Intake converts anything ImageIO can read into PNG or JPEG and
+    /// refuses the rest, so in normal use this cannot happen; it is reachable for an attachment
+    /// restored from settings that was added before that, or built by a caller that bypassed
+    /// intake. Either way the model must not be given a text-only turn with no indication that
+    /// a picture was left behind.
     public func setAttachments(_ documents: [AttachedDocument]) async {
-        images = documents.compactMap { document in
+        var accepted: [OpenAIResponsesClient.ImageAttachment] = []
+        for document in documents {
+            guard document.kind.isImage else { continue }
             guard let mediaType = document.imageMediaType,
                 let base64 = document.imageBase64
-            else { return nil }
-            return OpenAIResponsesClient.ImageAttachment(mediaType: mediaType, base64: base64)
+            else {
+                let notice =
+                    "[ChatBots] \(spec.id): image '\(document.name)' was not sent — its bytes "
+                    + "are not a format the Responses API accepts\n"
+                FileHandle.standardError.write(Data(notice.utf8))
+                continue
+            }
+            accepted.append(
+                OpenAIResponsesClient.ImageAttachment(mediaType: mediaType, base64: base64))
         }
+        images = accepted
     }
 
     private var images: [OpenAIResponsesClient.ImageAttachment] = []
