@@ -110,9 +110,11 @@ public struct HTTPResponse: Sendable {
         case 400: "Bad Request"
         case 404: "Not Found"
         case 405: "Method Not Allowed"
+        case 408: "Request Timeout"
         case 409: "Conflict"
         case 413: "Payload Too Large"
         case 500: "Internal Server Error"
+        case 503: "Service Unavailable"
         default: "OK"
         }
     }
@@ -320,9 +322,9 @@ public enum HTTPError: LocalizedError {
 /// Serves a routing closure over HTTP on a port, on the loopback interface only.
 ///
 /// `@unchecked Sendable` with the parts written down, because the compiler cannot check them:
-/// `connections`, `streams`, `running` and `failure` are read and written under `stateLock`, and
-/// no lock is held across a call that could re-enter this type. `listener` is only touched by
-/// `start()` and `stop()`, which the owning actor calls.
+/// `connections`, `streams`, `idleDeadlines`, `refusals`, `running` and `failure` are read and
+/// written under `stateLock`, and no lock is held across a call that could re-enter this type.
+/// `listener` is only touched by `start()` and `stop()`, which the owning actor calls.
 ///
 /// ThreadSanitizer is what verifies the claim rather than the comment: it reported a data race on
 /// `isRunning` while every one of 555 tests passed, and inspection alongside it found `streams`
@@ -414,6 +416,46 @@ public final class HTTPServer: @unchecked Sendable {
     /// Streams that are still open, so they can be closed when the server stops.
     private var streams: [EventStream] = []
 
+    /// How long a connection may go without sending anything before it is dropped.
+    ///
+    /// A peer that opens a connection, sends a partial head and then stalls used to hold the
+    /// connection, its buffer and its table entry until `stop()` — there was no deadline at
+    /// all, so nothing reported it either. This is an *idle* deadline, re-armed on every chunk,
+    /// rather than a wall-clock one from accept: a client genuinely uploading a large
+    /// attachment must not be cut off for being slow, while one that has gone quiet is.
+    public let requestTimeout: TimeInterval
+
+    /// The most connections the server will hold at once.
+    ///
+    /// A cap has to be sized against what one connection can buffer, and that answer changed
+    /// under this finding: A32 made `HTTPParser.maximumBodyBytes` the base64 form of the
+    /// documented 64 MB attachment limit — about 85.4 MB — so each accepted connection can now
+    /// buffer roughly ten times the 8 MB it could when the missing cap was recorded. 32 is far
+    /// above what this loopback-only server holds legitimately (the app's URLSession pool is a
+    /// handful, and a browser keeps at most six connections per host plus one event stream per
+    /// open page), and it bounds the worst case where every connection is simultaneously
+    /// holding a maximum body to roughly 2.7 GB. The number is not larger because of that
+    /// product, not because of what the app actually does.
+    public let maximumConnections: Int
+
+    /// The current idle deadline token for each connection, under `stateLock`.
+    ///
+    /// A token rather than the work item itself: re-arming replaces the token, and a deadline
+    /// that has already fired for a previous token is a no-op rather than a cancellation of
+    /// the connection it was armed for.
+    private var idleDeadlines: [ObjectIdentifier: UUID] = [:]
+
+    /// How many connections have been refused for being over `maximumConnections`.
+    ///
+    /// Counted and answerable because the finding's other half was that nothing reported this
+    /// at all. Read under `stateLock`, like every other access to the connection tables.
+    public var refusedConnectionCount: Int {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return refusals
+    }
+    private var refusals = 0
+
     /// Whether the listener is actually accepting connections.
     ///
     /// Driven by the listener's own state rather than set when `start()` returns. `NWListener`
@@ -475,10 +517,20 @@ public final class HTTPServer: @unchecked Sendable {
         stateLock.unlock()
     }
 
-    public init(port: UInt16, handler: @escaping Handler, streamer: Streamer? = nil) {
+    public init(
+        port: UInt16,
+        handler: @escaping Handler,
+        streamer: Streamer? = nil,
+        maximumConnections: Int = 32,
+        requestTimeout: TimeInterval = 30
+    ) {
         self.port = port
         self.handler = handler
         self.streamer = streamer
+        // Clamped rather than trapped: a nonsensical cap is a caller's mistake, and the safe
+        // reading of both of these is the strict one.
+        self.maximumConnections = max(1, maximumConnections)
+        self.requestTimeout = max(0.1, requestTimeout)
     }
 
     /// Start listening. Throws if the port cannot be taken, which the caller must report
@@ -578,6 +630,7 @@ public final class HTTPServer: @unchecked Sendable {
         streams.removeAll()
         let active = Array(connections.values)
         connections.removeAll()
+        idleDeadlines.removeAll()
         stateLock.unlock()
         for stream in open { stream.close() }
         for connection in active { connection.cancel() }
@@ -615,11 +668,64 @@ public final class HTTPServer: @unchecked Sendable {
 
     private func accept(_ connection: NWConnection) {
         stateLock.lock()
-        connections[ObjectIdentifier(connection)] = connection
+        let atCapacity = connections.count >= maximumConnections
+        if atCapacity {
+            refusals += 1
+        } else {
+            connections[ObjectIdentifier(connection)] = connection
+        }
         stateLock.unlock()
 
         connection.start(queue: queue)
+        guard !atCapacity else {
+            // Refused rather than queued, and refused with an answer rather than silence: a
+            // peer over the cap is told, and the connection is not entered in the table.
+            write(
+                .error("the server is at its connection limit", status: 503), to: connection,
+                thenClose: true)
+            return
+        }
+        armIdleDeadline(for: connection)
         receive(on: connection, buffer: Data())
+    }
+
+    /// Start, or restart, the idle deadline for a connection whose request is not complete.
+    ///
+    /// The token replaces any previous one, so the earlier deadline — if it has not fired
+    /// already — finds itself stale and does nothing. It is not cancelled, because a dispatch
+    /// work item cannot be cancelled once it is executing anyway and a stale one costs a UUID
+    /// comparison.
+    private func armIdleDeadline(for connection: NWConnection) {
+        let token = UUID()
+        stateLock.lock()
+        idleDeadlines[ObjectIdentifier(connection)] = token
+        stateLock.unlock()
+
+        queue.asyncAfter(deadline: .now() + requestTimeout) { [weak self] in
+            self?.idleDeadlineFired(for: connection, token: token)
+        }
+    }
+
+    /// The connection's request has been read in full; it is no longer idle.
+    private func disarmIdleDeadline(for connection: NWConnection) {
+        stateLock.lock()
+        idleDeadlines[ObjectIdentifier(connection)] = nil
+        stateLock.unlock()
+    }
+
+    /// Drop a connection whose request did not arrive in time.
+    private func idleDeadlineFired(for connection: NWConnection, token: UUID) {
+        stateLock.lock()
+        let isCurrent = idleDeadlines[ObjectIdentifier(connection)] == token
+        let isLive = connections[ObjectIdentifier(connection)] != nil
+        if isCurrent { idleDeadlines[ObjectIdentifier(connection)] = nil }
+        stateLock.unlock()
+
+        // Stale token, or the connection has already been answered or reaped: nothing to do.
+        guard isCurrent, isLive else { return }
+        write(
+            .error("the request was not completed in time", status: 408), to: connection,
+            thenClose: true)
     }
 
     /// Accumulate until a whole request has arrived, then answer it.
@@ -643,6 +749,10 @@ public final class HTTPServer: @unchecked Sendable {
 
             do {
                 let request = try HTTPParser.parse(accumulated)
+                // The request is complete, so the connection is no longer idle. This is what
+                // lets an event stream stay open past `requestTimeout`: the deadline covers
+                // reading the request, not the conversation the connection is kept for.
+                self.disarmIdleDeadline(for: connection)
                 self.respond(to: request, on: connection)
             } catch is HTTPParser.Incomplete {
                 if isComplete {
@@ -653,6 +763,8 @@ public final class HTTPServer: @unchecked Sendable {
                         .error("Request body is too large", status: 413), to: connection,
                         thenClose: true)
                 } else {
+                    // Progress restarts the idle clock; a client that sends nothing does not.
+                    if chunk != nil { self.armIdleDeadline(for: connection) }
                     self.receive(on: connection, buffer: accumulated)
                 }
             } catch let error as HTTPError {
@@ -751,6 +863,7 @@ public final class HTTPServer: @unchecked Sendable {
         }
         stateLock.lock()
         connections[ObjectIdentifier(connection)] = nil
+        idleDeadlines[ObjectIdentifier(connection)] = nil
         for stream in streams where stream.matches(connection) { stream.markClosed() }
         streams.removeAll { !$0.isOpen }
         stateLock.unlock()
