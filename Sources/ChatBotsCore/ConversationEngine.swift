@@ -178,14 +178,24 @@ public final class ConversationEngine {
     /// Everyone watching the output. See `observeEvents`.
     private var eventObservers: [UUID: (TurnEvent) -> Void] = [:]
 
-    /// Every token, tool call and note, in order.
-    /// Every token, tool call and note, in order.
+    /// Every token, tool call and note, in order, for a consumer following a run live.
     ///
-    /// Built once, in `init`, and never rebuilt. It was a `lazy var` whose closure assigned
-    /// the continuation, which meant *reading the property a second time replaced the
-    /// continuation* — so a second consumer silently took the stream away from the first, and
-    /// the first received nothing more. Two subscribers are exactly what this is for: the
-    /// HTTP API forwards these events to its clients while the engine uses them itself.
+    /// Built once, in `init`, so the continuation is stable. It was a `lazy var` whose closure
+    /// assigned the continuation, which meant *reading the property a second time replaced the
+    /// continuation* — so a second reader silently took the stream away from the first, and the
+    /// first received nothing more. A stream is still a single-consumer channel, though:
+    /// `observeEvents` is the multi-subscriber path, and it is what the HTTP API, the
+    /// WebTransport server and the engine's own live panes use. This stream is for a headless
+    /// consumer — the CLI.
+    ///
+    /// **Bounded on purpose.** This was `.unbounded`, which retained every event for the life
+    /// of the process whenever nobody iterated it, and in the app nobody does: `publishEvent`
+    /// yields on every token, reasoning chunk and tool event, and every `.turnStarted` carries
+    /// the whole prompt, so an unobserved run accumulated a full event-by-event copy of the
+    /// conversation including one copy of a multi-thousand-token prompt per turn. A consumer
+    /// that falls behind now loses the oldest events instead of the process retaining them
+    /// forever — the same policy and bound the WebTransport server gives each client. The CLI
+    /// only reads the coarse tool and turn events, so dropping stale fragments cannot starve it.
     public private(set) var events: AsyncStream<TurnEvent>
 
     /// The run status as it changes. Built once; see `events` for why.
@@ -230,12 +240,16 @@ public final class ConversationEngine {
         self.configuration = configuration
 
         // Built here rather than lazily. A `lazy var` whose closure assigns the continuation
-        // hands the stream to whoever reads the property last, so a second subscriber takes
-        // it from the first — which is how the API's token feed silently starved the engine's
-        // own transcript feed. Built once in `init`, every reader gets the same stream, which
-        // is what makes it safe for the API and the engine to both listen.
+        // hands the stream to whoever reads the property last, so a second reader takes it from
+        // the first — which is how the API's token feed silently starved the engine's own
+        // transcript feed. Built once in `init`, the continuation is stable and every reader
+        // gets the same stream; the API servers subscribe through `observeEvents` rather than
+        // competing for it.
+        //
+        // The event buffer is bounded: with no iterative reader, an unbounded stream retained
+        // every token and every full prompt for the life of the process. See `events`.
         let (eventStream, eventSink) = AsyncStream.makeStream(
-            of: TurnEvent.self, bufferingPolicy: .unbounded)
+            of: TurnEvent.self, bufferingPolicy: .bufferingNewest(256))
         let (statusStream, statusSink) = AsyncStream.makeStream(
             of: RunStatus.self, bufferingPolicy: .bufferingNewest(1))
         let (transcriptStream, transcriptSink) = AsyncStream.makeStream(
