@@ -157,7 +157,8 @@ public enum TransportCheck {
         engineProcess.arguments = [
             "--serve", "--transport", "webtransport",
             "--transport-port", String(port),
-            // A port that is not in use, so the HTTP listener cannot collide with a real run.
+            // WebTransport only, so no HTTP listener is opened at all (A120). The unused port is
+            // passed anyway, so that this stays harmless if that gating ever changes.
             "--port", String(port - 1),
         ]
         // The child's output goes to the null device rather than into pipes.

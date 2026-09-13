@@ -838,29 +838,44 @@ if !options.attachments.isEmpty {
     // `RunDirectory` rather than from the working directory, so an engine started from inside
     // `ChatBots.app` does not write its state into its own bundle.
     let runDirectory = RunDirectory.current
+    // The `APIServer` owns the one `EngineService` that both transports dispatch through, so it is
+    // always built. Only its HTTP listener is optional.
     let server = APIServer(
         engine: engine, store: ConversationStore(directory: runDirectory),
         port: options.port)
-    do {
-        try server.start()
-    } catch {
-        FileHandle.standardError.write(
-            Data("could not start the server on port \(options.port): \(error.localizedDescription)\n".utf8))
-        exit(1)
-    }
-    // `start()` returning only means the listener was created. A port already in use is reported
-    // asynchronously, so without this the server would announce itself as listening and then
-    // serve nothing — the same false green the transport check used to have.
-    guard await server.waitUntilReady() else {
-        FileHandle.standardError.write(
-            Data("could not listen on port \(options.port): the port is already in use\n".utf8))
-        exit(1)
-    }
 
-    log("ChatBots server listening on http://127.0.0.1:\(options.port)")
-    log("  state   : GET  /api/state")
-    log("  events  : GET  /api/events  (server-sent events)")
-    log("  control : POST /api/start | /api/pause | /api/resume | /api/stop | /api/reset")
+    // The HTTP listener is opened only when the requested transport includes it.
+    //
+    // It used to be opened unconditionally, so `--serve --transport webtransport` — the exact
+    // command the app's supervisor runs — also bound port 7788. 7788 is the port the documented
+    // website deployment publishes through Caddy, so with the website running, the app's engine died
+    // on a collision that had nothing to do with the transport it was asked for, and the app
+    // reported an engine that failed to start (A120).
+    let servesHTTP = options.transport == "http" || options.transport == "both"
+    if servesHTTP {
+        do {
+            try server.start()
+        } catch {
+            FileHandle.standardError.write(
+                Data("could not start the server on port \(options.port): \(error.localizedDescription)\n".utf8))
+            exit(1)
+        }
+        // `start()` returning only means the listener was created. A port already in use is reported
+        // asynchronously, so without this the server would announce itself as listening and then
+        // serve nothing — the same false green the transport check used to have.
+        guard await server.waitUntilReady() else {
+            FileHandle.standardError.write(
+                Data("could not listen on port \(options.port): the port is already in use\n".utf8))
+            exit(1)
+        }
+
+        log("ChatBots server listening on http://127.0.0.1:\(options.port)")
+        log("  state   : GET  /api/state")
+        log("  events  : GET  /api/events  (server-sent events)")
+        log("  control : POST /api/start | /api/pause | /api/resume | /api/stop | /api/reset")
+    } else {
+        log("  http    : not served (--transport \(options.transport))")
+    }
 
     // The WebTransport endpoint, for the desktop app. Caddy and the website keep using HTTP:
     // browsers speak that, and it is what Caddy is for.
