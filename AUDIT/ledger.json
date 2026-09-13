@@ -1663,14 +1663,31 @@
       "file_line": "Caddyfile (and the header set added by A76)",
       "title": "In the documented configuration Caddy serves the page, so the CSP, nosniff, frame denial and referrer policy A76 added never reach it",
       "category": "defect",
-      "status": "START",
+      "status": "DONE",
       "host_used": "this Mac",
       "discovered_by": "reported by the S1 lane while fixing A67/A75/A76, and left unfixed because it falls outside those tasks' scope",
       "evidence_before": "A76's headers are emitted by the Swift server. But `tools/start*.sh` start Caddy when it is installed, and Caddyfile serves `./web` itself while only PROXYING /api/* to the engine - so in the normal deployment the HTML the browser loads is served by Caddy and carries none of the new headers. The API responses get them; the document that needs a CSP most does not. The lane could not fix this because the Caddyfile was outside its file set, and it said so rather than letting the fix look complete.",
+      "fix_summary": "The Caddyfile's static `handle` block now emits the same four browser-boundary headers A76 added to the Swift server - nosniff, no-referrer, X-Frame-Options DENY and a Content-Security-Policy that is byte-for-byte A76's interface policy, with no 'unsafe-inline'. It is scoped to the static block, so the engine's own headers on /api/* are untouched, which `caddy adapt` confirms: the four response handlers appear in the static subroute only.",
+      "evidence_after": "Measured rather than read, on a spare port, started the way tools/start.sh starts Caddy. `curl -sI http://127.0.0.1:7993/` returns all four headers; /app.js, /style.css and a file_server 404 return them too; /api/conversations with the engine down returns Caddy's own 502 with no security headers, which is the intended scoping since the engine supplies them when it is up. `caddy validate` => 'Valid configuration', exit 0. Caddy stopped afterwards: lsof on the port exits 1 and no caddy process remains. The lane re-read web/ itself rather than trusting A76's note and found no inline script, handler or style, no external origin, no eval/new Function/document.write, and no url() or @import in the stylesheet - so no directive had to be weakened to make the page work.",
+      "commit": "f14fac2",
+      "notes": "The pre-existing `caddy fmt` warning (a blank line above the change) was confirmed identical before and after, so no unrelated reformat was introduced. Not verified and stated as such: live browser rendering under the policy, and the /api/* pass-through with the engine actually running - the latter is inferred from Caddy's semantics because the lane may not run swift build.",
+      "blocked_reason": null
+    },
+    {
+      "id": "A99",
+      "severity": "S2",
+      "unit": "web surface / routing",
+      "file_line": "Caddyfile (proxy rules) vs Sources/ChatBotsCore/APIServer.swift:407",
+      "title": "Kept-conversation share links 404 in the documented deployment, because Caddy proxies only /api/* and the engine serves /s/<id>",
+      "category": "defect",
+      "status": "START",
+      "host_used": "this Mac",
+      "discovered_by": "reported by the A98 lane, which measured /s/ while checking where Caddy's new headers applied",
+      "evidence_before": "`APIServer.swift:407` serves `GET /s/<id>` when `request.path.hasPrefix(\"/s/\")`, but the Caddyfile reverse-proxies only `/api/*`; everything else falls through to the static file_server. Measured with Caddy running on a spare port and the engine down: `curl -sI http://127.0.0.1:7993/s/any-id` => `HTTP/1.1 404 Not Found`, served by Caddy's file_server rather than the engine. So in the deployment the start scripts actually create, every share link is broken. Compounding it, the generated shareBase still points at the engine port (127.0.0.1:7789), which a phone on the LAN cannot reach even if the path resolved.",
       "fix_summary": null,
       "evidence_after": null,
       "commit": null,
-      "notes": "This does not weaken A76, which is correct for the path it covers and is what applies when Caddy is absent - but it does mean A76's protection is missing exactly where the product is normally run. The fix is the same four headers as Caddy `header` directives in the Caddyfile, and `--local-only` does not change the need. Worth treating as S2 rather than S3 for that reason: it is a boundary defence that silently does not apply in the shipped configuration.",
+      "notes": "A user-visible feature failing in the shipped configuration, found by measuring a path nobody had asked about while checking headers - which is the second time this audit has found something by verifying an adjacent thing rather than the thing itself (A75 came out of reading a stylesheet). The fix is small - a `handle /s/*` reverse_proxy - but the shareBase question is a second half: a link that resolves but points at a loopback port is still unusable from the phone the feature exists for.",
       "blocked_reason": null
     }
   ]
