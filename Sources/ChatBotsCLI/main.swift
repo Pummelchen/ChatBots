@@ -430,7 +430,14 @@ func loadSeat(_ engine: MLXEngine, label: String) async -> Bool {
 /// Measures how two seats behave when they share the GPU: each answers the same prompt
 /// alone, then both answer simultaneously. Also the cheapest way to prove a given
 /// checkpoint loads and generates at all.
-func runBenchmark() async {
+///
+/// Returns the process exit code, and `0` means every seat loaded and every measurement
+/// produced tokens. The load result used to be logged and then discarded, so a corrupt or
+/// incompatible checkpoint printed `A loaded: false` and the caller still exited 0 — an
+/// install or CI script checking the status code accepted a broken checkpoint (A60). A
+/// generation that failed is the same false success in the second place the doc claims to
+/// prove, so it fails the run too.
+func runBenchmark() async -> Int32 {
     log("max tokens per turn: \(options.maxTokens.map(String.init) ?? "seat default")")
     let prompt = [
         PromptMessage(role: .system, content: "Answer in about 120 words. Be concrete."),
@@ -439,7 +446,10 @@ func runBenchmark() async {
             content: "In about 120 words: why are bird eggs ovoid rather than spherical?"),
     ]
 
-    func measure(_ engine: MLXEngine, label: String) async -> Double {
+    /// The measured rate, or nil when the seat failed to generate. Nil rather than `0`,
+    /// because "failed" and "measured zero tokens per second" are different facts and only
+    /// one of them is a measurement.
+    func measure(_ engine: MLXEngine, label: String) async -> Double? {
         log("  starting \(label)…")
         do {
             _ = try await engine.generate(
@@ -453,20 +463,21 @@ func runBenchmark() async {
             return rate
         } catch {
             log("  \(label): FAILED — \(error.localizedDescription)")
-            return 0
+            return nil
         }
     }
 
     log("loading…")
     let loadedA = await loadSeat(engines[0], label: "A")
     log("  A loaded: \(loadedA)")
-    guard loadedA, !options.solo else {
-        if loadedA { _ = await measure(engines[0], label: "A") }
-        return
+    guard loadedA else { return 1 }
+    if options.solo {
+        return await measure(engines[0], label: "A") == nil ? 1 : 0
     }
 
     let loadedB = await loadSeat(engines[1], label: "B")
     log("  B loaded: \(loadedB)")
+    guard loadedB else { return 1 }
 
     log("alone, sequential:")
     let aloneA = await measure(engines[0], label: "A")
@@ -477,30 +488,37 @@ func runBenchmark() async {
     async let concurrentB = measure(engines[1], label: "B")
     let (sharedA, sharedB) = await (concurrentA, concurrentB)
 
-    func verdict(_ alone: Double, _ shared: Double) -> String {
-        guard alone > 0, shared > 0 else { return "n/a" }
+    func verdict(_ alone: Double?, _ shared: Double?) -> String {
+        guard let alone, let shared, alone > 0, shared > 0 else { return "n/a" }
         return String(format: "%.0f%% of its solo rate", shared / alone * 100)
     }
     log("verdict:")
     log("  A: \(verdict(aloneA, sharedA))")
     log("  B: \(verdict(aloneB, sharedB))")
+
+    guard aloneA != nil, aloneB != nil, sharedA != nil, sharedB != nil else { return 1 }
+    return 0
 }
 
 if options.benchmark {
-    await runBenchmark()
-    exit(0)
+    exit(await runBenchmark())
 }
 
 // Measures what keeping one conversation alive across turns would save: three prompts
 // that share a growing prefix, through one engine, with prefill reported each time.
 if options.sessionProbe {
     let engine = engines[0]
-    try? await engine.load()
+    // The load has to be believed: this probe exists to measure what retaining a session
+    // saves, and a process that could not load has measured nothing. This was
+    // `try? await engine.load()`, whose failure was discarded, and the probe exited 0
+    // having run against no model at all (A60).
+    guard await loadSeat(engine, label: "A") else { exit(1) }
     var turns: [PromptMessage] = [
         .init(role: .system, content: "You are a participant in a discussion about eggs.")
     ]
     log("session probe — one engine, three prompts sharing a growing prefix")
-    if let results = try? await engine.sessionReuseProbe() {
+    do {
+        let results = try await engine.sessionReuseProbe()
         log("  one ChatSession, three successive calls:")
         for (index, result) in results.enumerated() {
             log(
@@ -508,6 +526,9 @@ if options.sessionProbe {
                     format: "    call %d: prefilled %d tok in %.2fs",
                     index + 1, result.prefilled, result.prefillSeconds))
         }
+    } catch {
+        log("  session reuse probe failed: \(error.localizedDescription)")
+        exit(1)
     }
     for turn in 1...3 {
         turns.append(
@@ -516,8 +537,15 @@ if options.sessionProbe {
                 content: turn == 1
                     ? "Why are bird eggs ovoid rather than spherical? Answer in one sentence."
                     : "And what does that imply for shell thickness? Answer in one sentence."))
-        _ = try? await engine.generate(
-            messages: turns, tools: [], onToolCall: { _, _ in }, onEvent: { _ in })
+        do {
+            _ = try await engine.generate(
+                messages: turns, tools: [], onToolCall: { _, _ in }, onEvent: { _ in })
+        } catch {
+            // A swallowed `try?` here was the same false success: the probe reported a
+            // window of statistics for a turn that never happened (A60).
+            log("  turn \(turn) failed: \(error.localizedDescription)")
+            exit(1)
+        }
         if let stats = await engine.lastStats {
             log(
                 String(
@@ -545,9 +573,11 @@ if options.memoryProbe {
     }
     log("GPU memory (one seat, then both, then a turnaround):")
     report("start")
-    _ = await loadSeat(engines[0], label: "A")
+    // A failed load makes every number below it meaningless; exiting 0 after logging the
+    // failure is the same false success as the benchmark's (A60).
+    guard await loadSeat(engines[0], label: "A") else { exit(1) }
     report("after load A")
-    _ = await loadSeat(engines[1], label: "B")
+    guard await loadSeat(engines[1], label: "B") else { exit(1) }
     report("after load B")
     let prompt = [
         PromptMessage(role: .system, content: "Answer briefly."),
