@@ -12,6 +12,19 @@ ROOT="$PWD"
 CONFIG="${CONFIG:-release}"
 APP="$ROOT/dist/ChatBots.app"
 
+# The bundle's version, stated once. `CFBundleShortVersionString` is what a person reads;
+# `CFBundleVersion` is what macOS compares, and it has to increase for an update to be offered.
+# Both are written into Info.plist below, which is why they live here rather than as two
+# literals inside it — A78 found the version existing only as two strings in a heredoc, tied to
+# no release or tag.
+APP_VERSION="1.0"
+APP_BUILD="1"
+
+# The bundle identifier. `local.*` because this build is assembled and ad-hoc signed on the
+# machine that runs it, which is what makes it a local build rather than a distributed one; a
+# signed and notarised release would need an identifier under a domain the publisher controls.
+APP_IDENTIFIER="local.chatbots.twollms"
+
 # Indent captured multi-line output so it reads as part of the warning above it.
 #
 # What SC2001 suggests — `${variable//search/replace}` — does not apply here: a parameter
@@ -118,7 +131,10 @@ fi
 # 14.0 while the app needs 26 for WebTransport, so macOS would happily launch it on Sonoma and
 # Sequoia and the app would then fail at the transport — the confusing failure the README warns
 # about, instead of the system saying which version it needs.
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+# The heredoc is deliberately UNQUOTED so the version and identifier above expand into it. That
+# is safe here because the plist contains no other `$`, backtick or backslash; if one is ever
+# added it must be escaped, and this comment is the reason to look.
+cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -128,7 +144,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleDisplayName</key>
     <string>ChatBots</string>
     <key>CFBundleIdentifier</key>
-    <string>local.chatbots.twollms</string>
+    <string>${APP_IDENTIFIER}</string>
     <key>CFBundleExecutable</key>
     <string>ChatBots</string>
     <key>CFBundleIconFile</key>
@@ -138,9 +154,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>${APP_VERSION}</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>${APP_BUILD}</string>
     <key>LSMinimumSystemVersion</key>
     <string>26.0</string>
     <key>NSHighResolutionCapable</key>
@@ -148,7 +164,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>NSSupportsAutomaticTermination</key>
     <false/>
     <key>NSHumanReadableCopyright</key>
-    <string>Local build — two MLX models in conversation.</string>
+    <string>Copyright © 2026 André Borchert. MIT licensed; see LICENSE.</string>
 </dict>
 </plist>
 PLIST
