@@ -344,9 +344,19 @@ if options.check {
 // Printing the export format, with no model involved: handy for checking what a saved
 // conversation looks like, and for support.
 if options.exportSample {
-    // Named, so the sample shows what a real log looks like.
-    let specA = AgentSpec.SeatRoster.namedSpecs()[0]
-    let specB = AgentSpec.SeatRoster.namedSpecs()[1]
+    // Named, so the sample shows what a real log looks like. Built here rather than read
+    // from the roster: the sample demonstrates the export format, so it needs two seats
+    // whatever this run's roster is — and indexing `namedSpecs()[1]` trapped with a
+    // "Fatal error: Index out of range" for the legal one-seat `CHATBOTS_SEATS=1`
+    // configuration (A61).
+    var sampleSeats = [
+        AgentSpec.seat(index: 0, modelID: options.modelA),
+        AgentSpec.seat(index: 1, modelID: options.modelB),
+    ]
+    var nameGenerator = SystemRandomNumberGenerator()
+    AgentSpec.assignNames(to: &sampleSeats, using: &nameGenerator)
+    let specA = sampleSeats[0]
+    let specB = sampleSeats[1]
     let stamp: (String) -> Date = { value in
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -467,6 +477,17 @@ func runBenchmark() async -> Int32 {
         }
     }
 
+    // The two-seat comparison genuinely needs a second seat. A one-seat roster is a
+    // supported configuration (`CHATBOTS_SEATS=1`), so this is a usage answer before any
+    // model is loaded, rather than the "Fatal error: Index out of range" that `engines[1]`
+    // produced (A61).
+    guard options.solo || engines.count > 1 else {
+        log(
+            "benchmark: the two-seat comparison needs a second seat — "
+                + "use --solo to measure one seat, or set CHATBOTS_SEATS=2")
+        return 2
+    }
+
     log("loading…")
     let loadedA = await loadSeat(engines[0], label: "A")
     log("  A loaded: \(loadedA)")
@@ -571,20 +592,29 @@ if options.memoryProbe {
             Double(Memory.memoryLimit) / mib,
             Double(Memory.memoryLimit) / mib))
     }
-    log("GPU memory (one seat, then both, then a turnaround):")
+    log(
+        engines.count > 1
+            ? "GPU memory (one seat, then both, then a turnaround):"
+            : "GPU memory (one seat, then a turnaround):")
     report("start")
     // A failed load makes every number below it meaningless; exiting 0 after logging the
     // failure is the same false success as the benchmark's (A60).
     guard await loadSeat(engines[0], label: "A") else { exit(1) }
     report("after load A")
-    guard await loadSeat(engines[1], label: "B") else { exit(1) }
-    report("after load B")
+    // The second seat is optional: a one-seat roster is a supported configuration, and
+    // `engines[1]` used to trap rather than report anything (A61).
+    if engines.count > 1 {
+        guard await loadSeat(engines[1], label: "B") else { exit(1) }
+        report("after load B")
+    }
     let prompt = [
         PromptMessage(role: .system, content: "Answer briefly."),
         PromptMessage(role: .user, content: "Name three shapes."),
     ]
     for turn in 1...3 {
-        _ = try? await engines[turn % 2].generate(
+        // Alternates A and B when both exist, and stays on A when the roster has one seat:
+        // `turn % 2` asked for `engines[1]` on a one-seat roster and trapped (A61).
+        _ = try? await engines[turn % min(2, engines.count)].generate(
             messages: prompt, tools: [], onToolCall: { _, _ in }, onEvent: { _ in })
         report("after turn \(turn)")
     }
