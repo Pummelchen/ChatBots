@@ -6,9 +6,10 @@
 #   browser ──▶ :7788 Caddy ──┬──▶ /            static files from ./web
 #                              └──▶ /api/*      127.0.0.1:7789  (the Swift engine)
 #
-# HTTP only, deliberately. This is a local chat app: the traffic does not leave the machine,
-# and the engine already binds to loopback. Automatic HTTPS would try to obtain a
-# certificate for a name that is not public and fail noisily for no benefit.
+# HTTP only, deliberately. This is a local chat app: it is not exposed beyond the local
+# network unless something else is put in front of it, and the engine behind Caddy already
+# binds to loopback. Automatic HTTPS would try to obtain a certificate for a name that is not
+# public and fail noisily for no benefit.
 #
 # Run it with:  caddy run --config Caddyfile
 # Or let tools/start.sh manage it.
@@ -24,7 +25,21 @@
 	}
 }
 
+# The site address below carries no host, and that is what decides the listener: Caddy listens
+# on ":7788" — **every** interface (0.0.0.0 and ::). The host part of a site address only
+# chooses which Host header a request must carry; it does not narrow the listener. So the
+# website, and with it the whole unauthenticated /api/* surface, is reachable by anyone who can
+# reach this port on the network: every kept conversation, the run controls, the roster and the
+# share pages. That is deliberate — it is what lets a phone on the same Wi-Fi use the interface
+# — and the engine behind Caddy stays on loopback regardless.
+#
+# To bind this Mac only, run `tools/start.sh --local-only`. It generates a copy of this file
+# with `bind 127.0.0.1` inserted inside the site block below, which is the directive that
+# actually picks the listening interface — a site address of `127.0.0.1:7788` would not, it
+# would still listen on ":7788". See "Using the website" in the wiki.
 http://:7788 {
+	# tools/start.sh --local-only inserts `bind 127.0.0.1` here. Absent, this site listens
+	# on every interface, by design.
 	encode zstd gzip
 
 	# The engine. `flush_interval -1` disables response buffering, which server-sent events

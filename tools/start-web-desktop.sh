@@ -14,6 +14,7 @@
 #
 #     bash tools/start-web-desktop.sh --port 7990
 #     bash tools/start-web-desktop.sh --open none      # just print the URL
+#     bash tools/start-web-desktop.sh --local-only     # 127.0.0.1 only, no LAN access
 #     bash tools/start-web-desktop.sh --stop
 #
 # To see the phone layout on this machine instead, use tools/start-web-mobile.sh.

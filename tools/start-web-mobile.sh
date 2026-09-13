@@ -21,10 +21,14 @@
 #
 #     bash tools/start-web-mobile.sh --port 7990
 #     bash tools/start-web-mobile.sh --open none       # just print the URL
+#     bash tools/start-web-mobile.sh --local-only      # 127.0.0.1 only; no phone access
 #     bash tools/start-web-mobile.sh --stop
 #
-# To open it on an actual phone, start the desktop version and use your Mac's local address —
-# see the wiki page "Using the website".
+# To open it on an actual phone, use your Mac's local address instead of localhost — see the
+# wiki page "Using the website". That reachability is the website's one deliberate exposure:
+# by default it binds every interface, and the whole API behind it has no authentication, so
+# anyone on the same network can read and steer the conversation. `--local-only` binds
+# 127.0.0.1 and gives the phone access up.
 
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -10,10 +10,16 @@
 #     browser ──▶ :7788 Caddy ──┬──▶ /         the web interface
 #                                └──▶ /api/*   the engine
 #
-# If Caddy is not installed the engine serves the interface itself on 7788, so the web
-# interface works either way — it just does not get Caddy's compression and access logging.
-# Nothing here needs the SwiftUI app: the web interface and the desktop app are two front
-# ends onto the same engine, and either can run without the other.
+# Caddy's site address has no host, so by default it binds **every** interface: the website,
+# and with it the whole unauthenticated /api/* surface, is reachable by anyone on the same
+# network. That is what makes phone access work. Pass --local-only to bind 127.0.0.1 only and
+# reach it from this Mac alone.
+#
+# If Caddy is not installed the engine serves the interface itself on its own port (7789),
+# where it is already loopback-only, so the web interface works either way — it just does not
+# get Caddy's compression and access logging, and a phone cannot reach it. Nothing here needs
+# the SwiftUI app: the web interface and the desktop app are two front ends onto the same
+# engine, and either can run without the other.
 #
 # Options:
 #   --port <n>       port for the web interface   (default 7788)
@@ -23,6 +29,7 @@
 #   --status         report what is running
 #   --open <where>   desktop | mobile | none   (default: none — print the URL)
 #   --view <mode>    auto | phone | desktop    (default: auto)
+#   --local-only     bind 127.0.0.1 only, not every interface
 #
 # `--view phone` forces the single-column phone layout even in a desktop browser, which is
 # what `start-web-mobile.sh` uses. The page honours `?view=` on load and remembers nothing, so
@@ -40,6 +47,7 @@ ENGINE_PORT=7789
 ACTION=run
 OPEN_WHERE=none
 VIEW_MODE=auto
+LOCAL_ONLY=0
 LOG_DIR="$ROOT/.run"
 ENGINE_LOG="$LOG_DIR/engine.log"
 CADDY_LOG="$LOG_DIR/caddy.log"
@@ -53,9 +61,10 @@ while [ $# -gt 0 ]; do
     --foreground) ACTION=run; shift ;;
     --open) OPEN_WHERE="${2:-none}"; shift 2 ;;
     --view) VIEW_MODE="${2:-auto}"; shift 2 ;;
+    --local-only) LOCAL_ONLY=1; shift ;;
     --stop) ACTION=stop; shift ;;
     --status) ACTION=status; shift ;;
-    -h|--help) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
 done
@@ -280,21 +289,35 @@ if [ -n "$CADDY_BIN" ]; then
     USE_CADDY=1
   fi
 else
-  dim "Caddy is not installed — the engine will serve the interface itself."
+  # Without Caddy the engine serves the interface itself. Its HTTPServer sets
+  # `requiredLocalEndpoint` to 127.0.0.1, so this path is already loopback-only and
+  # --local-only has nothing to change here; a phone cannot reach it either way.
+  dim "Caddy is not installed — the engine will serve the interface itself on loopback only."
   dim "To get it:  brew install caddy"
 fi
 
 if [ "$USE_CADDY" -eq 1 ]; then
   step "Starting Caddy on port $PORT"
-  # The Caddyfile hard-codes 7788/7789, so an alternate port needs a generated config
-  # rather than an edit to the repository's copy.
+  # The Caddyfile's site address is host-less, so its listener is ":PORT" — every interface.
+  # An alternate port, or --local-only, needs a generated config rather than an edit to the
+  # repository's copy.
   CONFIG="$ROOT/Caddyfile"
-  if [ "$PORT" != "7788" ] || [ "$ENGINE_PORT" != "7789" ]; then
+  if [ "$PORT" != "7788" ] || [ "$ENGINE_PORT" != "7789" ] || [ "$LOCAL_ONLY" -eq 1 ]; then
     CONFIG="$LOG_DIR/Caddyfile.runtime"
     sed -e "s|http://:7788|http://:$PORT|" \
         -e "s|127.0.0.1:7789|127.0.0.1:$ENGINE_PORT|g" \
         "$ROOT/Caddyfile" > "$CONFIG"
-    dim "using a generated config for the alternate ports: $CONFIG"
+    if [ "$LOCAL_ONLY" -eq 1 ]; then
+      # The site address says which Host a request must carry; it does not choose the
+      # interface, so naming 127.0.0.1 there would still leave Caddy on ":PORT" (that is
+      # what `caddy adapt` reports). `bind` is the directive that picks the listener, so
+      # the generated copy gets one and the listener becomes 127.0.0.1:$PORT.
+      sed -e "/^http:\/\/:$PORT {/a\\
+	bind 127.0.0.1" "$CONFIG" > "$CONFIG.local-only"
+      mv "$CONFIG.local-only" "$CONFIG"
+      dim "binding the website to 127.0.0.1 only (--local-only)"
+    fi
+    dim "using a generated config: $CONFIG"
   fi
 
   "$CADDY_BIN" run --config "$CONFIG" --adapter caddyfile >"$CADDY_LOG" 2>&1 &
@@ -339,15 +362,29 @@ if [ "$OPEN_WHERE" != "none" ]; then
   open "$PAGE_URL" 2>/dev/null || true
 fi
 
+# The banner states which interface the website is bound to rather than leaving the reader to
+# infer it: Caddy's host-less address is the one thing in this script that is reachable from
+# off this Mac, and it is the whole point of --local-only.
+SERVED_NOTE="    Served by the engine on 127.0.0.1:$ENGINE_PORT (Caddy not in use, loopback only)."
+EXPOSURE_NOTE=""
+if [ "$USE_CADDY" -eq 1 ]; then
+  if [ "$LOCAL_ONLY" -eq 1 ]; then
+    SERVED_NOTE="    Served by Caddy on 127.0.0.1:$PORT only (--local-only). The engine is on 127.0.0.1:$ENGINE_PORT (loopback only)."
+  else
+    SERVED_NOTE="    Served by Caddy on port $PORT, on every interface. The engine is on 127.0.0.1:$ENGINE_PORT (loopback only)."
+    EXPOSURE_NOTE="    Anyone on this network can use the whole interface and API without a password.
+    Add --local-only to serve this Mac alone."
+  fi
+fi
+
 cat <<EOF
 
 ${GREEN}${BOLD}ChatBots web interface${OFF}
 
     ${BOLD}$PAGE_URL${OFF}
 
-$( [ "$USE_CADDY" -eq 1 ] \
-    && echo "    Served by Caddy on port $PORT; the engine is on 127.0.0.1:$ENGINE_PORT (loopback only)." \
-    || echo "    Served by the engine on port $ENGINE_PORT (Caddy not in use)." )
+$SERVED_NOTE
+$EXPOSURE_NOTE
 
     The page drives the same conversation engine as the desktop app, so either can be
     used on its own and both see the same conversation.
