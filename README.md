@@ -1,7 +1,7 @@
 # ChatBots
 
 [![Stars](https://img.shields.io/github/stars/Pummelchen/ChatBots?style=flat-square&logo=github&label=Stars&color=e3b341)](https://github.com/Pummelchen/ChatBots/stargazers)
-[![Profile Visitors](https://komarev.com/ghpvc/?username=Pummelchen&label=Profile%20Visitors&color=blueviolet&style=flat-square)](https://github.com/Pummelchen)
+[![Visitors (14d)](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Pummelchen/ChatBots/main/.github/traffic.json)](https://github.com/Pummelchen/ChatBots)
 [![Last Commit](https://img.shields.io/github/last-commit/Pummelchen/ChatBots?style=flat-square&logo=git&label=Last%20Commit&color=2ea44f)](https://github.com/Pummelchen/ChatBots/commits/main)
 [![Contact](https://img.shields.io/badge/Contact-0xa0b1%40gmail.com-blue?style=flat-square&logo=gmail&logoColor=white)](mailto:0xa0b1@gmail.com)
 
