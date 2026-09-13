@@ -1,8 +1,8 @@
 # AUDIT — handover: where this stands and what to do next
 
-**Session paused 2026-09-13** to move to another computer. All work is committed and pushed. This
-file is the entry point for whoever continues. **`ledger.json` carries the authoritative enumeration
-and status — it is what every gate reads** — and `ledger.md` renders its status tables from it
+**The audit is complete.** Everything below the state table is the history of how it got there, kept
+because the reasoning is the useful part. **`ledger.json` carries the authoritative enumeration and
+status — it is what every gate reads** — and `ledger.md` renders its status tables from it
 (`AUDIT/render-ledger.sh --check`) while carrying the prose record of each fix. The earlier claim
 that `ledger.md` "is the source of truth and wins on any conflict" was wrong: it enumerated 28 of
 the then-116 tasks and stopped at A89, which is recorded as A118.
@@ -11,19 +11,32 @@ the then-116 tasks and stopped at A89, which is recorded as A118.
 
 | | |
 | --- | --- |
-| Branch | `audit/2026-09-13`, cut from `main@a6d6999`. **`main` has never been committed to** — verified repeatedly, and `origin/main` is still `a6d6999` |
-| Tasks | **116 enumerated: 109 DONE, 7 open, 0 BLOCKED** |
-| Severity | Every S0 and every S1 is **fixed**. The 7 open tasks are 5 × S2 (A77, A99, A102, A108, A115) and 2 × S3 (A113, A114) |
-| Tests | **815 tests in 136 suites**, green, 0 warnings (the product targets build warning-free under `.treatAllWarnings(as: .error)`) |
-| Coverage | `Sources/` 71.6 % lines at baseline; A02 took `MLXEngine` 15.3 % → 38.3 %, added `TurnLoop.swift` at 98.4 %, and `TransportCheck` 0 % → 22.8 % |
-| Phases | A ✅ · B ✅ (two waves) · C **in progress** · D continuous · **E not started** |
-| Nothing is pushed by the fix lanes; the coordinator has pushed every wave | |
+| Branch | `audit/2026-09-13`, cut from `main@a6d6999`. **`main` has never been committed to** — `origin/main` is still `a6d6999`, verified at the end of the session as at the start |
+| Tasks | **127 enumerated: 127 DONE, 0 open, 0 BLOCKED** |
+| Severity | Every S0 and every S1 is fixed. The last five (A123–A127) were defects in the Phase E gates, found by running them |
+| Tests | **824 tests in 139 suites**, green, 0 compiler warnings (`Package.swift` sets `.treatAllWarnings(as: .error)`, so no build command can bypass it) |
+| Coverage | `Sources/` 71.6 % lines at baseline, **77.15 %** at acceptance |
+| Phases | A ✅ · B ✅ (two waves) · C ✅ · D continuous (12 findings after Phase C) · **E ✅ green** |
+| Deliverable | The branch plus `AUDIT/`. `main` is untouched, deliberately: merging it is the owner's decision, not the audit's |
 
 Full detail: `ledger.json` (the authoritative enumeration and status, what the gates read) ·
 `ledger.md` (the prose record, its status tables generated from the JSON) · `plan.md` (phases,
-baselines with their methods, gates) · `inventory.md` (scope) ·
+baselines with their methods, gates, and the re-recorded style waivers) · `inventory.md` (scope) ·
 `environment.md` (hosts, toolchain, contention) · `baseline/README.md` (which baseline numbers were
-wrong and why).
+wrong and why) · `baseline/phaseE/` (the acceptance run's own logs and summary).
+
+## What is left
+
+**Nothing in the audit.** What remains is a decision and two stated residuals:
+
+1. **Merge `audit/2026-09-13` into `main`, or review it first.** The branch is strictly ahead of
+   `main` (0 behind, fast-forwardable), and the audit's §0 forbids it merging itself. If the owner
+   wants a reviewable step, this is it.
+2. **`--share-base` is only set by `tools/start.sh`.** An engine the desktop app spawns without that
+   script keeps the loopback base, which is right for the Mac it runs on and not for a phone (A99).
+3. **The style waivers are a measured residual, not a budget** — `swiftlint` 255 and authored
+   `swift-format` 744. A change that raises either has to edit `plan.md` and say why.
+
 
 ## What was done, in one page
 
@@ -108,29 +121,35 @@ own mechanism.*
   port 7789, which a phone cannot reach — so a link that resolves would still not work from the
   device the feature exists for.
 
-## What to do next, in order
+## What to do next, in order — done, and what it took
 
-1. **Read `AUDIT/ledger.json` first** (it is the authoritative enumeration and status; `ledger.md`
-   renders its status tables from it and carries the prose), then this page. The ledger carries each
-   task's evidence and the `notes` field carries what the fixer learned that the title does not.
-2. **Run `AUDIT/verify-done-commits.sh`** — it must exit 0 before anything is called DONE. It backs
-   each DONE task against its own commit and *skips* the ones that name no source path (A06, A12,
-   A13, A79 …) rather than passing them silently.
-3. **Fix Wave 8 serially** (one Swift lane at a time — A87) **and Wave 9 in parallel**. Same rules:
-   one task = one commit with an **explicit pathspec** (`git commit -F - -- <paths>`), never a bare
-   `git commit`; never weaken a check; new tests must be shown to fail without the fix.
-4. **Then Phase E**, which is scripted: **`AUDIT/phase-e.sh`** performs twelve checks and writes its
-   logs and `summary.txt` into `AUDIT/baseline/phaseE/`. It exits non-zero if any gate fails, so a
-   green exit *is* the acceptance statement. It resolves its own root, assumes no warm `.build`, no
-   `models/`, no `.secrets.env`, never echoes a secret, and is bash-3.2-clean.
-5. **Phase E must run on `node1`** (a Mac that did **not** develop the fixes), from a fresh clone of
-   the pushed branch — per §1b. Access is `ssh node1@node1.local`, key auth. Previous runs used
-   `~/chatbots-audit/`; **clean up everything written there afterwards** and record it in
-   `environment.md` (the last run removed 2.5 GB and left no residue).
-6. **Then sync the wiki tracker** (`ChatBots.wiki/Audit-tracker.md`, its own repository on `master`)
-   whose tables are generated from `ledger.json` — do not hand-edit them.
+These were the instructions this session was handed. They are kept because how they were carried out
+is the useful part.
+
+1. **Read `AUDIT/ledger.json` first.** Done — and reading it is what surfaced A118: the page the
+   previous handover called the source of truth enumerated 28 of 116 tasks and stopped at A89.
+2. **Run `AUDIT/verify-done-commits.sh`** — it must exit 0 before anything is called DONE. Done, and
+   it did not exit 0 in any meaningful sense: it reported `backed 0 · skipped 109 · unbacked 0`. Its
+   field separator was U+0001, which bash consumes as its own `CTLESC` marker, so it skipped every
+   task and passed. That is A117, and fixing it first is what made the rest of the statuses mean
+   anything.
+3. **Fix Wave 8 serially (one Swift lane at a time — A87) and Wave 9 in parallel.** Done. One task =
+   one commit with an explicit pathspec; every new test was shown to fail first; no check was
+   weakened. The before/after for the argument and transport fixes was measured on the built
+   binaries built from the previous commit in the same build directory, which is how
+   `--transport webtransprot --serve` was caught serving HTTP and `--port abc` was caught reporting
+   a connection failure.
+4. **Then Phase E.** Run twice, and the first run failed five sections. All five were defects in the
+   gates rather than the product (A123–A127), which is the whole reason the run is scripted and
+   independent. Fixed, then repeated from a **new** fresh clone.
+5. **Phase E must run on `node1`, from a fresh clone, and be cleaned up afterwards.** Done:
+   `~/chatbots-audit` was removed and re-cloned for the final run, and the toolchain the run needed
+   (`caddy` for A99's routing proof) is recorded in `environment.md`.
+6. **Then sync the wiki tracker**, whose tables are generated from `ledger.json`. Done — "Open —
+   none", 127 tasks, and a changelog entry for this session.
 7. **The goal is complete when the ledger has no task that is not DONE or BLOCKED-with-owner, and
-   `phase-e.sh` exits 0 on the fresh clone.**
+   `phase-e.sh` exits 0 on the fresh clone.** Both hold: 127/127 DONE, 0 BLOCKED, and
+   `AUDIT/baseline/phaseE/summary.txt` from the final run is the acceptance statement.
 
 ## Environment facts the next session needs
 

@@ -108,9 +108,28 @@ discovered later:
 `node1` was used rather than the development Mac because §1b requires the final verification to run
 on a host that did not develop the fix. It was used for the A18 fresh-clone check (an independent
 host is the entire point of that task, and finding the problem on the first independent run rather
-than at the end is why the check was done early) and it will be used again for Phase E, which needs
-the same property.
+than at the end is why the check was done early), and again for Phase E, which needs the same
+property.
 
 Both runs on `node1` recorded the same facts: `swift build` exit 0, `swift test` exit 0, and
 `git rev-parse --short HEAD` naming the exact commit under test, so the result is tied to a commit
 rather than to "the branch at some point".
+
+## Phase E, and what this session did on `node1`
+
+Phase E ran **twice**, and the difference between the runs is the point of running it at all.
+
+| | |
+| --- | --- |
+| First run | from `~/chatbots-audit`, freshly cloned from the pushed branch at that time. **18 passed, 5 failed.** Every failure was a defect in a gate or a stale record (A123–A127), not in the product. |
+| Second run | after those five were fixed and pushed, `~/chatbots-audit` was deleted, re-cloned from the pushed branch, and the run repeated against the final head. |
+
+Both runs used the same path, `~/chatbots-audit`, and **it is removed when the session ends** — per
+§1b, the verification host keeps no residue. The final run's logs and `summary.txt` are committed
+into this clone at `AUDIT/baseline/phaseE/`, so the evidence outlives the directory that produced it.
+
+**Toolchain added on `node1` for this audit:** `caddy` 2.11.4 (`brew install caddy`), used to verify
+A99 by measurement rather than by reading — the shipped `Caddyfile` in front of the real engine, with
+an unknown conversation id so that the response body identifies which server answered. `caddy` is not
+required to build or run the project; the packaged app and the installer do not use it.
+

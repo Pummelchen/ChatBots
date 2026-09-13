@@ -139,7 +139,7 @@ and marked L1, L2, L4 and L6 "in progress". The table was the stale artifact, no
 
 ## Phase C — fix → test → audit
 
-**In progress: 109 of 116 tasks DONE, 7 open, 0 blocked.** Work order: S0, then S1, then S2, then S3. One task = one commit,
+**Complete: 127 of 127 tasks DONE, 0 open, 0 blocked.** Work order: S0, then S1, then S2, then S3. One task = one commit,
 `audit(<id>): <title>`, on `audit/2026-09-13`.
 
 A DONE status is a claim about the tree, so it is checked against the tree and not against the
@@ -150,17 +150,32 @@ fix was still uncommitted. A DONE task naming no source path (a sanitizer baseli
 document) is reported as *skipped*, not as *passed*, so the gate cannot be satisfied by naming
 nothing.
 
+That guard was itself wrong when this session began: it separated its fields with U+0001, which is
+bash's own `CTLESC` marker, so it skipped all 109 DONE tasks and exited 0 — A117, and the reason the
+number above is quoted from a run on the verification host rather than from the ledger.
+
 ## Phase D — new findings
 
-Continuous; every new finding gets a ledger id the moment it is found.
+Continuous; every new finding gets a ledger id the moment it is found. It did not stop when Phase C
+finished: the first Phase E run produced five more (A123–A127), and the handover check produced six
+before that (A117–A122). Both batches are DONE and recorded rather than absorbed.
 
 ## Phase E — final verification
 
-**Not started.** Scripted as `AUDIT/phase-e.sh` (see below), and must run on a Mac that did not
-develop the fixes. Requires a fresh clone on a Mac that did **not** develop the fix, clean build with
-zero warnings, full suite green, coverage report, scanners clean or waived in writing, zero
-placeholders, no non-BLOCKED open task, `AUDIT/verify-done-commits.sh` exit 0, and the wiki
-tracker synced.
+**Complete, and green.** Scripted as `AUDIT/phase-e.sh` (see below), run on a Mac that did not
+develop the fixes — `node1` — from a fresh clone of the pushed branch. It requires a clean build with
+zero compiler warnings, the full suite green, ASan and TSan clean, a coverage report, scanners clean
+or waived in writing, zero placeholders, no non-BLOCKED open task, `AUDIT/verify-done-commits.sh`
+exit 0, and the generated files in step.
+
+The first run **failed five of the twelve sections** and every failure was a defect in a gate or a
+stale record rather than in the product: A123 (the build gate counted SwiftPM's cache notices as
+compiler warnings), A124 (the dependency scan walked the sanitizer scratch checkouts and reported
+third-party example projects), A125 (the style gates linted generated code, and the recorded waivers
+were below the tree they governed), A126 (a semgrep finding in A99's own new code), A127 (the
+acceptance statement read the blank line above the guard's summary). All five were fixed in
+`9fa23a7`, and the run was repeated from a new clone of the final head.
+
 
 **The run is scripted: `AUDIT/phase-e.sh`.** It performs all twelve checks in one pass and writes
 its logs and a `summary.txt` into `AUDIT/baseline/phaseE/` (or a directory you name), so Phase E's
