@@ -624,11 +624,23 @@ public struct ResearchDirector: Sendable {
     ///
     /// The analyst's declared domain, matched against the question's vocabulary. This is the
     /// "assign the task to the analyst whose method fits" job, made concrete.
+    ///
+    /// The match begins a word, the same rule coverage uses, rather than a bare substring: "law"
+    /// used to match "flaw" and "source" used to match "resource" when deciding which seat is
+    /// asked, which is a poorer question rather than a false claim (audit A96). Exposed as a
+    /// function of a role so the scoring rule can be tested directly, rather than only through
+    /// the seat it happens to choose.
+    public static func affinity(of role: AnalystRole, for question: ResearchSubQuestion) -> Int {
+        let haystack = "\(role.domain) \(role.method) \(role.preferredData)".lowercased()
+        return keywords(for: question).reduce(0) { total, needle in
+            total + (mentions(needle.lowercased(), in: haystack) ? 1 : 0)
+        }
+    }
+
+    /// The same score for one seat, with the role's own penalties applied.
     private func affinity(_ spec: AgentSpec, for question: ResearchSubQuestion) -> Int {
         guard let role = role(for: spec) else { return 0 }
-        let haystack = "\(role.domain) \(role.method) \(role.preferredData)".lowercased()
-        let needles = Self.keywords(for: question).map { $0.lowercased() }
-        var score = needles.reduce(0) { $0 + (haystack.contains($1) ? 1 : 0) }
+        var score = Self.affinity(of: role, for: question)
         // The moderator is never assigned analytical work; it directs and synthesises.
         if role.id == AnalystLibrary.moderatorID { score -= 100 }
         return score
