@@ -37,7 +37,8 @@ Nothing later may be worse on any of these without an explicit, numbered, justif
 | Dependency CVE (`osv-scanner`) | **no issues found** | `baseline/osv-scanner.txt` |
 | SAST (`semgrep --config auto`) | 3 findings, all in `tools/cdp.py` | `baseline/semgrep.json` |
 | §5 placeholder sweep | **0 markers** (TODO/FIXME/HACK/XXX/WIP/STUB) | `inventory.md` §2.3 note |
-| AddressSanitizer / ThreadSanitizer | **not run yet** — attempt in progress against a scratch path; result recorded under A12 | — |
+| AddressSanitizer, full suite | **clean** — 555 tests, exit 0, no sanitizer report | `baseline/swift-test-asan.log` |
+| ThreadSanitizer, full suite | in flight — see A13 | `baseline/swift-test-tsan.log` |
 
 Three baseline results are worth stating plainly because they are *good* and should not
 regress: **no secret in the full history**, **no known CVE in the dependency set**, and

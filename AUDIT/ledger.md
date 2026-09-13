@@ -17,11 +17,11 @@ does not advance without its artifact.
 
 | Metric | Count |
 | --- | --- |
-| Tasks enumerated | 12 |
-| DONE | 0 |
+| Tasks enumerated | 13 |
+| DONE | 1 (A12 — AddressSanitizer clean) |
 | START (proven / reproduced, expected behaviour written) | 11 |
-| PROGRESS | 0 |
-| BLOCKED | 1 (A12 — sanitizer run in flight; see its entry) |
+| PROGRESS | 1 (A13 — ThreadSanitizer in flight) |
+| BLOCKED | 0 |
 
 Phase B is **not finished**: L3, L5 and L7 have not been run, and the deeper §5 hunt continues.
 Per §11, all findings are enumerated before any fix begins.
@@ -43,7 +43,8 @@ Per §11, all findings are enumerated before any fix begins.
 | A09 | S3 | tooling | `tools/cdp.py:42,44,180` | SAST: insecure-websocket and dynamic-urllib findings in the dev-only DevTools client | unsafe | START | this Mac | baseline (semgrep) |
 | A10 | S3 | tooling | `tools/*.sh` (24 notes) | `shellcheck -S style` reports 24 notes, mostly SC2001 | style | START | this Mac | baseline |
 | A11 | S3 | docs/ops | `README.md`, wiki | Neither the README nor the wiki states that running the website exposes the API to the LAN | docs | START | this Mac | L4 pass (same evidence as A01) |
-| A12 | — | tests | — | Sanitizer coverage (ASan/TSan) for the Swift suite is unmeasured | test | BLOCKED | this Mac | §1 tooling requirement |
+| A12 | — | tests | `AUDIT/baseline/swift-test-asan.log` | AddressSanitizer over the whole suite: **clean** | test | DONE | this Mac | §1 tooling requirement |
+| A13 | — | tests | `AUDIT/baseline/swift-test-tsan.log` | ThreadSanitizer over the whole suite: in flight | test | PROGRESS | this Mac | §1 tooling requirement |
 
 ---
 
@@ -176,25 +177,40 @@ already uses elsewhere.
 
 ---
 
-## A12 — sanitizer coverage for the Swift suite is unmeasured — **BLOCKED**
+## A12 — AddressSanitizer over the whole suite — **DONE (clean)**
 
-**BLOCKED** · test · discovered by §1's tooling requirement
+**DONE** · test · discovered by §1's tooling requirement
 
-`swift test --sanitize=address` is being attempted against a scratch path outside the Dropbox
-folder (`~/Library/Caches/ChatBots/audit-asan`). The result is not known at the time of writing;
-`baseline/swift-test-asan.log` will hold it.
+```bash
+swift test --sanitize=address --scratch-path ~/Library/Caches/ChatBots/audit-asan
+# exit 0 — Test run with 555 tests in 77 suites passed
+```
 
-**Why this matters enough to keep open:** in the sibling `MCPSearch` audit the AddressSanitizer run
-is what surfaced its only S0 — a deeply nested HTML document killing the process. A clean
-non-sanitized suite proves nothing about that class of defect.
+Evidence: [`baseline/swift-test-asan.log`](baseline/swift-test-asan.log). No `AddressSanitizer`
+line appears anywhere in the log, no `error:`, and the exit status is 0.
 
-**Options for a human if it cannot be made to run here:**
+**Why this was worth the ~20-minute instrumented rebuild:** in the sibling `MCPSearch` audit the
+same command is what surfaced its only S0 — a deeply nested HTML document killing the process,
+which the plain suite passed. A clean non-sanitized suite proves nothing about that class. Here it
+is clean, which is a real result about this codebase rather than an assumption.
 
-1. Run it on one of the Mac Minis (`node1`–`node4`) with more free disk and memory — one heavy job
-   at a time, per §1b; the toolchain there would need `swift-format`/`swiftlint` only if the
-   sanitizer run needs them.
-2. Waive it in writing, recording that MLX's Metal kernels cannot be instrumented and that the
-   logic-only targets are therefore what would be run — with the waiver recorded here and in the
-   wiki tracker rather than being silently dropped.
+The scratch path is outside the Dropbox folder deliberately: instrumented builds are large, and
+`.build` inside a synced folder was already the cause of one outage during this project's history.
 
-It is not marked DONE, and will not be, until one of those happens.
+---
+
+## A13 — ThreadSanitizer over the whole suite — **PROGRESS**
+
+**PROGRESS** · test · discovered by §1's tooling requirement
+
+```bash
+swift test --sanitize=thread --scratch-path ~/Library/Caches/ChatBots/audit-tsan
+```
+
+Running at the time of writing; `baseline/swift-test-tsan.log` will hold the result. The engine is
+actor-isolated throughout in Swift 6 mode and the transport is explicitly serialised, so the
+expectation is clean — but "expected" is not a result, and this project's own history includes a
+data race found by the compiler that a human had not seen.
+
+**Done when:** the run completes, the log is committed, and the result (clean, or findings) is
+recorded here and in the plan's baseline table.
