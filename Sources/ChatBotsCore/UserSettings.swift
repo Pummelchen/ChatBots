@@ -27,9 +27,18 @@ public struct UserSettings: Codable, Sendable, Equatable {
     public var seatCount: Int
     /// Per-seat configuration: model, backend, endpoint, persona, thinking, sampler.
     public var seats: [AgentSpec]
-    /// Source material the moderator added, with its text already extracted. Stored rather
-    /// than re-read from disk because extraction is the slow part and the original file may
-    /// have moved or changed since.
+    /// Source material the moderator added, as far as this side knows it.
+    ///
+    /// This is the **engine's own description** of each attachment — its name and kind, its
+    /// summary and token estimate, whether it was shortened, and for an image the encoded bytes
+    /// the engine sent back — and not the extracted text. The engine does the extraction (the
+    /// file crosses the wire to it, not the other way round), and a rebuilt document here has an
+    /// empty `text` because the engine deliberately does not send its copy back. So a stored
+    /// record can show what was read and cannot hand the material to a fresh engine: that is why
+    /// `ChatController.setAttachments` reports a restored file as not loaded rather than
+    /// re-uploading it (audit A47), and why the doc used to be wrong when it said the text was
+    /// stored (audit A111). Persisting the bytes so a restore could re-upload is a change to the
+    /// stored format and a product decision, not a correction to this comment.
     public var attachments: [AttachedDocument]
     /// Who the human moderator is: their name, and the persona their interjections read as.
     public var moderator: ModeratorIdentity
