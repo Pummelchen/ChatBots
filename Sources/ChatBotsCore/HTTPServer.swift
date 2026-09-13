@@ -549,7 +549,11 @@ public final class HTTPServer: @unchecked Sendable {
         let parameters = NWParameters.tcp
         // Loopback only: this server drives a local chat app and has no business being
         // reachable from the network. The Caddy front end is the one that faces outwards.
-        parameters.requiredLocalEndpoint = NWEndpoint.hostPort(host: "127.0.0.1", port: .init(rawValue: port)!)
+        //
+        // `integerLiteral` rather than the failable `init?(rawValue:)`: `port` is already the
+        // raw value, and the literal initialiser cannot fail, so there is nothing to unwrap.
+        parameters.requiredLocalEndpoint = NWEndpoint.hostPort(
+            host: "127.0.0.1", port: NWEndpoint.Port(integerLiteral: port))
         parameters.allowLocalEndpointReuse = true
 
         let listener = try NWListener(using: parameters)

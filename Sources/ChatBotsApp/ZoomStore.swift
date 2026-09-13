@@ -25,25 +25,32 @@ final class ZoomStore: ObservableObject {
     static let levels: [Double] = [0.85, 1.0, 1.15, 1.3, 1.5, 1.75, 2.0]
     static let `default` = 1.0
 
+    /// The smallest and largest steps.
+    ///
+    /// `levels` is an ascending literal, so these are its ends; the fallback to `default` is
+    /// what a caller would see if that ever stopped being true, rather than a trap (audit A28).
+    static var minimumScale: Double { levels.min() ?? `default` }
+    static var maximumScale: Double { levels.max() ?? `default` }
+
     @AppStorage("textScale") private var storedScale: Double = ZoomStore.default
 
     var scale: Double {
         get { storedScale }
-        set { storedScale = min(max(newValue, Self.levels.first!), Self.levels.last!) }
+        set { storedScale = min(max(newValue, Self.minimumScale), Self.maximumScale) }
     }
 
     var percent: Int { Int((scale * 100).rounded()) }
     /// 100, for comparing against `percent`.
     var resetPercent: Int { Int((Self.default * 100).rounded()) }
-    var canEnlarge: Bool { scale < Self.levels.last! - 0.001 }
-    var canReduce: Bool { scale > Self.levels.first! + 0.001 }
+    var canEnlarge: Bool { scale < Self.maximumScale - 0.001 }
+    var canReduce: Bool { scale > Self.minimumScale + 0.001 }
 
     /// Move one step, in the direction of `larger`.
     func step(larger: Bool) {
         if larger {
-            scale = Self.levels.first { $0 > scale + 0.001 } ?? Self.levels.last!
+            scale = Self.levels.first { $0 > scale + 0.001 } ?? Self.maximumScale
         } else {
-            scale = Self.levels.last { $0 < scale - 0.001 } ?? Self.levels.first!
+            scale = Self.levels.last { $0 < scale - 0.001 } ?? Self.minimumScale
         }
     }
 

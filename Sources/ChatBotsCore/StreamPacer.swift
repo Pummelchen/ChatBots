@@ -180,9 +180,8 @@ public final class StreamPacerPool {
     public func observe(agentID: String, charactersPerSecond: Double) {
         for channel in [Channel.answer, .reasoning] {
             let key = Key(agentID: agentID, channel: channel)
-            guard pacers[key] != nil else { continue }
+            guard var pacer = pacers[key] else { continue }
             generationRates[key] = charactersPerSecond
-            var pacer = pacers[key]!
             pacer.observeGeneration(charactersPerSecond: charactersPerSecond)
             pacers[key] = pacer
         }

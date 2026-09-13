@@ -118,7 +118,10 @@ public final class ConversationEngine {
     /// backend without losing the loaded MLX weights or re-resolving the endpoint.
     public struct Seat: Sendable {
         public var spec: AgentSpec
-        public let mlx: (any LLMEngine)?
+        /// The MLX engine. Every seat has one — both initialisers install an engine here — so
+        /// the fallback in `engine` below cannot be empty (audit A28).
+        public let mlx: any LLMEngine
+        /// The API engine, present only when the seat was built for both backends.
         public let openAI: (any LLMEngine)?
 
         public init(spec: AgentSpec, engine: any LLMEngine) {
@@ -133,11 +136,12 @@ public final class ConversationEngine {
             self.openAI = openAI
         }
 
-        /// The engine the spec currently selects.
+        /// The engine the spec currently selects. A backend with no engine of its own falls
+        /// back to the MLX one, which every seat is guaranteed to hold.
         public var engine: any LLMEngine {
             switch spec.backend {
-            case .mlx: mlx ?? openAI!
-            case .openAIResponses: openAI ?? mlx!
+            case .mlx: mlx
+            case .openAIResponses: openAI ?? mlx
             }
         }
     }
@@ -161,9 +165,12 @@ public final class ConversationEngine {
 
     // MARK: Streams
 
-    private var eventContinuation: AsyncStream<TurnEvent>.Continuation!
-    private var statusContinuation: AsyncStream<RunStatus>.Continuation!
-    private var transcriptContinuation: AsyncStream<[Turn]>.Continuation!
+    /// The sinks for the three streams above. Optional rather than implicitly unwrapped: every
+    /// read is `?.yield(…)`, so an unset sink already behaves as "nobody is listening", and the
+    /// type can say that instead of asserting it was set (audit A28).
+    private var eventContinuation: AsyncStream<TurnEvent>.Continuation?
+    private var statusContinuation: AsyncStream<RunStatus>.Continuation?
+    private var transcriptContinuation: AsyncStream<[Turn]>.Continuation?
     /// Where the conversation is kept between runs. Set by whoever creates the engine, so the
     /// engine itself does not decide where files live.
     public var conversationStore: ConversationStore?
