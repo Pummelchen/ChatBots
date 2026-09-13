@@ -55,10 +55,37 @@ public final class WebTransportEngineClient {
     public let configuration: Configuration
     private var session: WebTransportSession?
     private var stream: WebTransportBidirectionalStream?
-    /// Replies waiting for their reader. A request is one writer and one reader, so a single
-    /// pending reply is all there can be at a time.
-    private var pendingReplies: [AsyncStream<EngineReply>.Continuation] = []
+    /// The requests waiting for their replies, oldest first.
+    ///
+    /// There is at most one *live* entry: `send` takes the request slot before it registers, so
+    /// the queue position is the request identity. An entry whose sender has given up stays in
+    /// the queue marked abandoned, so the reply still owed to it is consumed and discarded
+    /// rather than handed to the next request.
+    private var pendingReplies: [PendingRequest] = []
     private var readerTask: Task<Void, Never>?
+
+    /// One request waiting for its reply.
+    ///
+    /// A class rather than a bare continuation because a send that gives up waiting has to be
+    /// told apart from its reply: a continuation is a struct and cannot be compared or marked.
+    private final class PendingRequest {
+        let request: EngineRequest
+        let continuation: AsyncStream<EngineReply>.Continuation
+        /// The sender stopped waiting. Its reply is still owed and will be consumed and dropped.
+        var abandoned = false
+
+        init(request: EngineRequest, continuation: AsyncStream<EngineReply>.Continuation) {
+            self.request = request
+            self.continuation = continuation
+        }
+    }
+
+    /// Whether a `send` currently owns the request channel, and the sends waiting for it.
+    ///
+    /// The channel is one request wide. See `acquireRequestSlot` for why that is enforced here
+    /// rather than assumed.
+    private var requestSlotHeld = false
+    private var waitingForRequestSlot: [CheckedContinuation<Void, Never>] = []
 
     /// Events and states, in order, for as long as the connection lasts.
     private var eventContinuation: AsyncStream<EngineEvent>.Continuation?
@@ -178,7 +205,7 @@ public final class WebTransportEngineClient {
         readerTask = nil
         eventContinuation?.finish()
         eventContinuation = nil
-        for reply in pendingReplies { reply.finish() }
+        for reply in pendingReplies { reply.continuation.finish() }
         pendingReplies.removeAll()
         if let session {
             try? await session.close()
@@ -191,30 +218,41 @@ public final class WebTransportEngineClient {
 
     /// Send one request and wait for its reply.
     ///
-    /// Replies and events share the stream, so the reader sorts them out and hands the reply
-    /// to whoever is waiting for it. A reply arriving while nobody waits is dropped rather
-    /// than queued: the protocol is one request at a time, so that can only be a stray from a
-    /// request that already timed out.
+    /// Replies and events share the stream, so the reader sorts them out and hands each reply
+    /// to the request it answers. Replies are matched to requests, not to queue position: the
+    /// request slot below makes the registering order the wire order, and the entry holds the
+    /// request so a reply can be checked against it. A reply that matches nothing is a reader
+    /// failure with that reason, not a wait that runs out.
     public func send(_ request: EngineRequest) async throws -> EngineReply {
-        guard let stream, readerTask != nil else {
+        await acquireRequestSlot()
+        defer { releaseRequestSlot() }
+        guard let stream = self.stream, readerTask != nil else {
             throw ClientError.cannotConnect("not connected")
         }
+
         let (replies, continuation) = AsyncStream<EngineReply>.makeStream(
             bufferingPolicy: .bufferingNewest(4))
-        pendingReplies.append(continuation)
+        let pending = PendingRequest(request: request, continuation: continuation)
+        pendingReplies.append(pending)
         defer {
             continuation.finish()
-            // One request is outstanding at a time, so removing the first is exact rather than
-            // a best guess — and a continuation is a struct, so it cannot be compared by
-            // identity anyway.
-            if !pendingReplies.isEmpty { pendingReplies.removeFirst() }
+            // A reply the reader has already delivered removed this entry, so marking it here
+            // is then harmless. If the reader has *not* delivered it, the reply is still owed
+            // and the entry deliberately stays in the queue: consuming and discarding that
+            // reply is what keeps the next request's reply next. Removing the first entry, as
+            // this used to, let a late reply be handed to whichever send happened to be
+            // waiting when it arrived.
+            pending.abandoned = true
         }
 
         do {
             try await stream.send(LengthFraming.frameChecked(try ProtocolCodec.encode(request)))
         } catch {
             // A message over the cap fails here, with its size named, rather than being framed
-            // for a receiver that would refuse it and leave the session unreadable.
+            // for a receiver that would refuse it and leave the session unreadable. Nothing
+            // reached the wire, so no reply is owed: remove the entry rather than leave a
+            // phantom at the head that would swallow the next real reply.
+            pendingReplies.removeAll { $0 === pending }
             throw ClientError.streamFailed(error.localizedDescription)
         }
 
@@ -256,6 +294,39 @@ public final class WebTransportEngineClient {
             throw ClientError.streamFailed("live updates stopped: \(readerError)")
         }
         throw ClientError.streamFailed("the engine closed the connection")
+    }
+
+    /// Wait for the request channel.
+    ///
+    /// The wire protocol carries no correlation id — `EngineFrame.reply` is the reply and
+    /// nothing else — so a reply can only be matched while there is exactly one request
+    /// outstanding. The file used to *claim* that ("a single pending reply is all there can be
+    /// at a time") and enforce nothing: every send appended its continuation and the reader
+    /// gave each reply to `pendingReplies.first`. `ChatController` polls `state()` at 1 Hz
+    /// beside a user's command, so two sends overlap routinely; the two `stream.send` calls can
+    /// reach the wire in either order, and a reply was then delivered to the wrong waiter or
+    /// dropped. This gate makes the claim true, and `PendingRequest.request` is the identity
+    /// the reply is checked against.
+    private func acquireRequestSlot() async {
+        if !requestSlotHeld {
+            requestSlotHeld = true
+            return
+        }
+        await withCheckedContinuation { continuation in
+            waitingForRequestSlot.append(continuation)
+        }
+    }
+
+    /// Hand the request channel to the next waiter, or release it.
+    ///
+    /// The slot is handed straight over rather than released and re-taken, so two sends can
+    /// never both believe they hold it.
+    private func releaseRequestSlot() {
+        if waitingForRequestSlot.isEmpty {
+            requestSlotHeld = false
+        } else {
+            waitingForRequestSlot.removeFirst().resume()
+        }
     }
 
     /// Send a file to the engine, which extracts it and holds it as source material.
@@ -325,8 +396,28 @@ public final class WebTransportEngineClient {
                 guard let frame = try? ProtocolCodec.decodeFrame(payload) else { continue }
                 switch frame {
                 case .reply(let reply):
-                    // The oldest waiting request gets it.
-                    pendingReplies.first?.yield(reply)
+                    // Matched to the request, not to the position. The slot held by the sender
+                    // means the head of the queue is the request the engine is answering.
+                    guard let pending = pendingReplies.first else {
+                        // No request can be waiting for this. A protocol the client cannot
+                        // misalign — one request, one reply, in order — so the only honest
+                        // reading is that the frame order is no longer trustworthy.
+                        failReader("a reply arrived when no request was outstanding")
+                        return
+                    }
+                    pendingReplies.removeFirst()
+                    if pending.abandoned {
+                        // The sender gave up waiting, so its reply is still owed and is being
+                        // consumed here. That is what keeps the next request's reply next.
+                        continue
+                    }
+                    guard Self.reply(reply, answers: pending.request) else {
+                        failReader(
+                            "the engine answered \(Self.name(of: pending.request)) with "
+                                + Self.name(of: reply))
+                        return
+                    }
+                    pending.continuation.yield(reply)
                 case .event(let event):
                     eventContinuation?.yield(event)
                 case .request:
@@ -339,6 +430,69 @@ public final class WebTransportEngineClient {
         eventContinuation?.finish()
     }
 
+    /// Whether `reply` can be the answer to `request`.
+    ///
+    /// The wire has no correlation id, so the request is the only identity available and this
+    /// is the one check the reply itself supports. `EngineService`'s answers are known exactly:
+    /// `.refused` and `.failed` can follow any request, `.state` is the generic answer to most
+    /// commands, and the reads that have their own reply case are never answered by a state
+    /// snapshot. A snapshot arriving while one of them is outstanding is a misdelivered reply
+    /// and is reported as one rather than handed over.
+    private static func reply(_ reply: EngineReply, answers request: EngineRequest) -> Bool {
+        switch reply {
+        case .refused, .failed:
+            return true
+        case .state:
+            switch request {
+            case .fetchReport, .listSavedConversations, .deleteSavedConversation, .listRosters,
+                .listScenarios:
+                return false
+            default:
+                return true
+            }
+        case .report:
+            if case .fetchReport = request { return true }
+            return false
+        case .savedConversations:
+            // Both of the saved-conversation commands answer with the list.
+            switch request {
+            case .listSavedConversations, .deleteSavedConversation: return true
+            default: return false
+            }
+        case .rosters:
+            if case .listRosters = request { return true }
+            return false
+        case .scenarios:
+            if case .listScenarios = request { return true }
+            return false
+        }
+    }
+
+    /// How a frame is named in a mismatch, so the failure says what crossed with what.
+    private static func name(of request: EngineRequest) -> String {
+        switch request {
+        case .fetchReport: return "a report request"
+        case .listSavedConversations: return "a saved-conversation list request"
+        case .deleteSavedConversation: return "a delete-conversation request"
+        case .listRosters: return "a line-up request"
+        case .listScenarios: return "a scenario request"
+        default: return "the outstanding request"
+        }
+    }
+
+    /// How a reply is named in a mismatch.
+    private static func name(of reply: EngineReply) -> String {
+        switch reply {
+        case .state: return "a state snapshot"
+        case .report: return "a report"
+        case .savedConversations: return "a saved-conversation list"
+        case .rosters: return "a line-up list"
+        case .scenarios: return "a scenario list"
+        case .refused: return "a refusal"
+        case .failed: return "a failure"
+        }
+    }
+
     /// End the reader with a reason, and wake anything waiting on it immediately.
     ///
     /// A waiting `send` learns the reason now rather than at its own timeout, and the event
@@ -346,7 +500,7 @@ public final class WebTransportEngineClient {
     /// wait that eventually gives up.
     private func failReader(_ reason: String) {
         readerError = reason
-        for reply in pendingReplies { reply.finish() }
+        for reply in pendingReplies { reply.continuation.finish() }
         eventContinuation?.finish()
     }
 }
