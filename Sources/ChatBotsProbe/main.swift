@@ -38,7 +38,20 @@ func parseOptions() -> Options {
         case "--port":
             if let value = next(), let port = UInt16(value) { options.port = port }
         case "--cycles":
-            if let value = next(), let count = Int(value) { options.cycles = count }
+            // `Int(value)` with no positivity check meant `--cycles 0` ran nothing and left
+            // `allSucceeded` true, so the probe printed "all cycles succeeded" over an
+            // untested transport, and a negative value formed `0..<(-n)`, whose `Range`
+            // has a precondition, killing the probe. This is the check the supervisor's
+            // pre-connect probe runs, so a green light has to have probed something (A59).
+            let cyclesRaw = next() ?? ""
+            guard let count = Int(cyclesRaw), count >= 1 else {
+                FileHandle.standardError.write(
+                    Data(
+                        "invalid cycle count: \(cyclesRaw.isEmpty ? "(nothing)" : cyclesRaw) — expected 1 or more\n"
+                            .utf8))
+                exit(2)
+            }
+            options.cycles = count
         case "--hold":
             if let value = next(), let seconds = Int(value) { options.holdSeconds = seconds }
         case "--quiet":
@@ -64,6 +77,12 @@ func parseOptions() -> Options {
 
 @MainActor
 func probe(port: UInt16, cycles: Int, holdSeconds: Int, quiet: Bool) async -> Bool {
+    // Defence in depth behind the parser: "no cycles ran" is not "all cycles succeeded", and
+    // this must not depend on every caller having validated the count first (A59).
+    guard cycles >= 1 else {
+        print("cycles must be at least 1 — a probe that runs no cycles proves nothing")
+        return false
+    }
     var allSucceeded = true
     for cycle in 0..<cycles {
         var configuration = WebTransportEngineClient.Configuration()
