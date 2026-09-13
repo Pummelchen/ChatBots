@@ -224,26 +224,15 @@ if command -v semgrep >/dev/null 2>&1; then
     # gate has to distinguish "a finding this audit has justified" from "a new one", which a
     # count cannot do: swapping one for another would keep the count the same. Hence an
     # allowlist read from plan.md, matched on rule id and path suffix.
+    # The waivers, why they exist, and the matching rule are in `tools/semgrep-waivers.py`, which
+    # is also what CI runs: one implementation, so the Mac gate and the hosted one cannot disagree
+    # about which findings have been justified (A129).
     semgrep scan --config auto --quiet --json --output "$out/semgrep.json" \
         Sources tools web > "$out/semgrep.log" 2>&1
-    semgrep_waivers="$(sed -n 's/^semgrep waiver: \([^ ]*\) \(.*\)$/\1\t\2/p' AUDIT/plan.md)"
-    unwaived=0
-    while IFS=$'\t' read -r rule path; do
-        [ -n "$rule" ] || continue
-        if printf '%s\n' "$semgrep_waivers" | awk -F'\t' -v r="$rule" -v p="$path" \
-            '$1 == r && index(p, $2) == length(p) - length($2) + 1 { found = 1 } END { exit !found }'
-        then
-            printf '        waived:  %s  %s\n' "$rule" "$path"
-        else
-            printf '        UNWAIVED: %s  %s\n' "$rule" "$path"
-            unwaived=$((unwaived + 1))
-        fi
-    done <<< "$(jq -r '.results[] | "\(.check_id)\t\(.path)"' "$out/semgrep.json" 2>/dev/null)"
-    total_findings="$(jq '.results | length' "$out/semgrep.json" 2>/dev/null || echo unknown)"
-    if [ "$unwaived" = "0" ]; then
-        pass "semgrep: $total_findings finding(s), all covered by a recorded waiver"
+    if python3 tools/semgrep-waivers.py "$out/semgrep.json" > "$out/semgrep-waivers.txt" 2>&1; then
+        pass "$(tail -1 "$out/semgrep-waivers.txt")"
     else
-        fail "semgrep: $unwaived finding(s) not covered by any waiver — see $out/semgrep.json"
+        fail "semgrep: $(tail -1 "$out/semgrep-waivers.txt") — see $out/semgrep.json"
     fi
 else
     fail "semgrep is not installed"

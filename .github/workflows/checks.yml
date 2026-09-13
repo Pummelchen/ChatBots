@@ -162,7 +162,18 @@ jobs:
       # Scoped to the source trees the audit's baseline scanned, so the captured scanner
       # output under AUDIT/ is not mistaken for code. `--error` is what makes a finding fail
       # the job; without it semgrep exits 0 on findings.
-      - name: The source passes semgrep
-        run: semgrep scan --config auto --error Sources tools web
+      # `--error` was wrong here. Three findings in `tools/cdp.py` are waived in writing in
+      # `AUDIT/plan.md` and deliberately left visible rather than suppressed, so `--error` failed on
+      # exactly the findings the audit had justified — and the workflow does not run on the audit
+      # branch, so this step had never executed (A129). The allowlist is one implementation shared
+      # with `AUDIT/phase-e.sh`, so the two gates cannot disagree about what is justified.
+      - name: The source passes semgrep, except the findings waived in writing
+        run: |
+          set -eu
+          semgrep scan --config auto --quiet --json --output semgrep.json Sources tools web
+          python3 tools/semgrep-waivers.py semgrep.json
+      # Scoped to the lockfile, the object this check is about. `-r .` scans the whole tree, which is
+      # how the same step in `phase-e.sh` came to report 16 vulnerabilities from dependencies' own
+      # example projects inside the sanitizer scratch directories (A124, A130 for this copy).
       - name: No known vulnerable dependency
-        run: osv-scanner scan source -r .
+        run: osv-scanner scan source --lockfile Package.resolved
