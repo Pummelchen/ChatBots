@@ -55,6 +55,33 @@ public enum ConflictReader {
             _ = phrase
         }
 
+        // ── Position change ───────────────────────────────────────────────────────────
+        // The speaker moved their own position. The case was declared and handled from the
+        // beginning, but the reader never emitted it, while the research engine counts
+        // `positionChange` as progress — so the second branch of that check could never fire,
+        // a turn that revised its conclusion without an evidence marker was counted as adding
+        // nothing, and a session could report that the analysts had converged while their
+        // positions were still moving (audit A71).
+        //
+        // The phrases are self-revision rather than disagreement with someone else. A
+        // concession ("I was wrong") is the clearest instance and is included, because
+        // conceding *is* a position moving. A false positive here costs a turn of budget, not
+        // a false claim, so the list deliberately errs towards noticing a revision.
+        let positionChangePhrases = [
+            "you're right", "you are right", "i was wrong", "i was mistaken",
+            "i stand corrected", "i take that back", "i concede", "i'll concede",
+            "i hadn't considered", "i had not considered", "i've changed my mind",
+            "i have changed my mind", "i changed my mind", "my position has changed",
+            "i changed my position", "i now think", "i now believe", "on reflection",
+            "having thought about", "having re-read", "having reread", "i revise",
+            "i'll revise", "i will revise", "i no longer", "i've come round",
+            "i have come round", "i was too quick", "in hindsight", "i withdraw",
+            "i retract",
+        ]
+        if firstMatch(positionChangePhrases, in: lowered) != nil {
+            signals.append(TurnSignal(kind: .positionChange, confidence: 0.7, target: target))
+        }
+
         // ── Reconciliation ────────────────────────────────────────────────────────────
         let reconciliationPhrases = [
             "i'm sorry", "i am sorry", "i apologise", "i apologize", "that was uncalled for",

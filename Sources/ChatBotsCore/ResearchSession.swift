@@ -126,7 +126,8 @@ public enum ResearchStop: String, Sendable, Hashable, Codable {
         case .durationReached: "The time budget was reached."
         case .roundsReached: "The planned number of contributions was reached."
         case .searchesReached: "The search budget was reached."
-        case .converged: "The analysts have converged and further discussion is not adding anything."
+        case .converged:
+            "The analysts have converged: recent contributions brought no new evidence and moved no position the app could detect, so further discussion is not adding anything."
         case .evidenceExhausted:
             "What remains in dispute cannot be settled by more discussion — it needs evidence nobody has gathered."
         case .answered:
