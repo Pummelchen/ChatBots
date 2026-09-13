@@ -186,6 +186,13 @@ public final class ChatController: ObservableObject {
     /// does not republish field by field.
     public private(set) var lastSnapshot: APISnapshot?
 
+    /// The engine's own clock for the newest snapshot applied. It is the only ordering a
+    /// snapshot offers, and it is what stops an older one being applied after a newer (A48).
+    private var appliedSnapshotTime: Date?
+    /// Snapshots actually applied. A poll reads it before its request and again after, so a
+    /// snapshot cannot be applied out of order behind one that landed while it was in flight.
+    private var appliedSnapshotCount = 0
+
     /// Called whenever anything the user set changes, so it can be written to disk.
     var onSettingsChanged: (() -> Void)?
     /// The moderator's identity as restored from settings, pushed to the engine when the
@@ -274,12 +281,25 @@ public final class ChatController: ObservableObject {
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .seconds(1))
                     guard let self, !Task.isCancelled else { return }
-                    if let snapshot = try? await client.state() {
+                    // A poll is the one snapshot whose order relative to the push feed cannot
+                    // be known: its reply can be produced before a push the pump applies while
+                    // the request is in flight, and `serverTime` is only second-accurate. So it
+                    // is applied only if nothing else landed meanwhile. Pushes are the primary
+                    // path and the poll exists for a push feed that has gone quiet, so dropping
+                    // a poll the engine has already superseded costs nothing.
+                    let appliedBefore = self.appliedSnapshotCount
+                    if let snapshot = try? await client.state(),
+                        self.appliedSnapshotCount == appliedBefore
+                    {
                         self.apply(snapshot)
                     }
                     // A reader that stopped is why the window would otherwise never update.
+                    // This also carries the client's explicit failure for a reply it could not
+                    // match (A39), which the `try?` above would otherwise swallow. Once the
+                    // reader has gone, every later poll repeats the same sentence, so stop.
                     if let error = client.readerError {
                         self.engineConnection = "Live updates stopped: \(error)"
+                        return
                     }
                 }
             }
@@ -367,6 +387,13 @@ public final class ChatController: ObservableObject {
     /// overwriting it mid-reveal would make the reply jump. Everything else is the engine's
     /// to decide.
     private func apply(_ snapshot: APISnapshot) {
+        // A snapshot the engine produced before one already applied must not be applied: it
+        // would regress the transcript and the status to an older state. Snapshots reach the
+        // controller down two paths — the push feed and the replies to commands and the poll —
+        // and the reply path wakes through a task group, so a newer push can be applied first.
+        guard !isStale(snapshot) else { return }
+        appliedSnapshotTime = snapshot.serverTime
+        appliedSnapshotCount += 1
         lastSnapshot = snapshot
         // A restored file that the engine turns out to hold under the same name is loaded, not
         // restored — an adopted engine that already had it, or a file re-added a moment ago.
@@ -455,6 +482,19 @@ public final class ChatController: ObservableObject {
             // being produced. `ready` is the honest description of "the engine is answering".
             pane.engineState = .ready
         }
+    }
+
+    /// Whether `snapshot` was produced before the newest state already applied.
+    ///
+    /// The wire carries no revision number, so the engine's own clock is the only ordering a
+    /// snapshot offers. `serverTime` is ISO-8601 to the second (`ProtocolCodec`), so two
+    /// snapshots inside one second compare equal; the poll's in-flight check below covers that
+    /// window, and it is the only one that matters here. The message log deliberately is *not*
+    /// used as a tie-break: `reset`, `newConversation` and loading a kept conversation all
+    /// legitimately shrink it, so a shorter log is a newer state as often as an older one.
+    private func isStale(_ snapshot: APISnapshot) -> Bool {
+        guard let appliedSnapshotTime else { return false }
+        return snapshot.serverTime < appliedSnapshotTime
     }
 
     /// Take one fragment of streamed output.
@@ -700,6 +740,17 @@ public final class ChatController: ObservableObject {
     ///
     /// Every command answers with the whole state, so the interface never has to guess what
     /// changed — and a refusal arrives the same way as a success, carrying the reason.
+    ///
+    /// **Why there is no second command queue here (audit A48).** Each command runs in its own
+    /// task, which used to let two sends overlap against a client that routed replies by queue
+    /// position, so replies could cross. That is fixed on the client (A39): `send` takes a
+    /// one-request-wide slot with a FIFO queue behind it, so the order commands register in is
+    /// the order they reach the wire, a reply is checked against the request it answers, and one
+    /// that cannot be matched fails the reader explicitly instead of being handed to the next
+    /// waiter. A queue here would duplicate that guarantee without adding one — the controls are
+    /// already mutually exclusive by run state, and the only concurrent sender is the poll,
+    /// which is a read. What the controller does owe is to surface the client's new explicit
+    /// failure, which the `catch` below does for a command and the poll does for itself.
     private func run(_ body: @escaping (WebTransportEngineClient) async throws -> Void) {
         guard let client else {
             engineConnection = "Not connected to the engine."
