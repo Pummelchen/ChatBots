@@ -123,6 +123,22 @@ def run_directory() -> pathlib.Path:
     return directory
 
 
+def output_directory() -> pathlib.Path:
+    """Where captures are written, created if it is not there yet.
+
+    `captures/` is gitignored, so it does not exist on a fresh checkout, and every writer in
+    this tool needs it: `capture()` has Chrome write a screenshot into it, `downscale()` writes
+    the display copy beside that, and `build_index()` writes the index page into it. `main()`
+    used to be the only place that created it, which made those writes correct from the
+    documented entry point and wrong from every other path through the file — the same shape
+    `run_directory()` above answers for `.run/`. One place decides where captures live and
+    that it exists, and all three writers go through it, so a caller that never runs `main()`
+    cannot write into a directory that is not there.
+    """
+    OUT.mkdir(parents=True, exist_ok=True)
+    return OUT
+
+
 def start_servers() -> subprocess.Popen[bytes] | None:
     """Start the engine, and Caddy if it is present. Returns the engine process."""
     if server_is_up():
@@ -217,14 +233,18 @@ def capture(
     profile: JsonObject,
     mode: str,
     orientation: str,
-    shot: pathlib.Path,
+    name: str,
 ) -> JsonObject | None:
     """Emulate one profile, screenshot it, and report what the page measured.
 
     Returns the page's own layout metrics, or None if the capture failed. The metrics are the
     point: a screenshot says what it looks like, the numbers say whether anything is wider
     than the screen, which is the failure that is easy to miss by eye at 3x.
+
+    `name` is the file name to write, resolved through `output_directory()` so that the
+    directory Chrome is handed a path inside exists before the write, whatever called this.
     """
+    shot = output_directory() / name
     width, height = profile["width"], profile["height"]
     if orientation == "landscape":
         width, height = height, width
@@ -249,9 +269,15 @@ def capture(
     return metrics
 
 
-def downscale(shot: pathlib.Path) -> None:
+def downscale(name: str) -> None:
     """Keep the capture at its real size but make a display copy, since a 3x phone capture is
-    three thousand pixels tall and unreasonable in an index page."""
+    three thousand pixels tall and unreasonable in an index page.
+
+    `name` is resolved through `output_directory()` for the same reason `capture()` does it:
+    the thumbnail is written next to the capture, into a directory this function does not
+    otherwise know has been created.
+    """
+    shot = output_directory() / name
     if shutil.which("magick"):
         subprocess.run(
             [
@@ -275,7 +301,7 @@ def build_index(rows: list[JsonObject]) -> None:
   </figure>"""
         for r in rows
     )
-    (OUT / "index.html").write_text(f"""<!DOCTYPE html>
+    (output_directory() / "index.html").write_text(f"""<!DOCTYPE html>
 <meta charset="utf-8">
 <title>ChatBots device captures</title>
 <style>
@@ -315,8 +341,10 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    OUT.mkdir(exist_ok=True)
-    for stale in OUT.glob("*.png"):
+    # The stale sweep goes through the helper too, so `main()` no longer carries a second,
+    # independent way to create `captures/`: there is one place that decides it exists, and
+    # this call and the writers' calls are the same mechanism rather than two that can drift.
+    for stale in output_directory().glob("*.png"):
         stale.unlink()
 
     engine = start_servers()
@@ -367,14 +395,13 @@ def main() -> int:
                         # What the client would choose for this device on its own.
                         mode = "thread" if profile["class"] == "phone" else "split"
                     file = f"{profile['id']}-{orientation}-{mode}.png"
-                    shot = OUT / file
                     print(f"  {profile['name']} ({orientation}, {mode})")
-                    metrics = capture(browser, profile, mode, orientation, shot)
+                    metrics = capture(browser, profile, mode, orientation, file)
                     if metrics is None:
                         failures += 1
                         continue
 
-                    downscale(shot)
+                    downscale(file)
                     row: JsonObject = {
                         "file": file,
                         "name": profile["name"],
