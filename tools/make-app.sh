@@ -103,6 +103,10 @@ fi
 
 "$ROOT/tools/fetch-metal.sh" --bin "$BIN" --into "$APP"
 
+# `LSMinimumSystemVersion` below must match `platforms: [.macOS(.v26)]` in Package.swift. It said
+# 14.0 while the app needs 26 for WebTransport, so macOS would happily launch it on Sonoma and
+# Sequoia and the app would then fail at the transport — the confusing failure the README warns
+# about, instead of the system saying which version it needs.
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -127,7 +131,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
-    <string>14.0</string>
+    <string>26.0</string>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSSupportsAutomaticTermination</key>

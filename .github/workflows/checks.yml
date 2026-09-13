@@ -36,3 +36,17 @@ jobs:
         run: for script in tools/*.sh; do bash -n "$script"; done
       - name: The helper scripts parse
         run: for script in tools/*.py; do python3 -m py_compile "$script"; done
+      # The bundle said 14.0 while the package needs macOS 26, so the app would launch on
+      # Sonoma and Sequoia and fail at the transport instead of the system saying why. The two
+      # declarations are one fact and are now checked as one.
+      - name: The bundle's minimum macOS matches the package's
+        run: |
+          set -eu
+          bundle="$(grep -A1 'LSMinimumSystemVersion' tools/make-app.sh \
+            | sed -n 's/.*<string>\(.*\)<\/string>.*/\1/p' | head -1)"
+          package="$(grep -oE '\.macOS\(\.v[0-9]+\)' Package.swift | grep -oE '[0-9]+' | head -1)"
+          echo "bundle: $bundle   package: $package.0"
+          [ "$bundle" = "$package.0" ] || {
+            echo "::error::make-app.sh declares macOS $bundle but Package.swift requires $package"
+            exit 1
+          }
