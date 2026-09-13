@@ -682,7 +682,10 @@ public actor MLXEngine: LLMEngine {
             var assembler = TurnTextAssembler(thinking: thinking)
             var toolCalls: [ToolCall] = []
 
-            for try await generation in stream {
+            // Labelled, because the ceiling below has to leave the *stream*, not merely the
+            // `switch`: an unlabelled `break` inside a switch case exits the switch and the
+            // loop then keeps consuming chunks the round has already decided to abandon.
+            chunks: for try await generation in stream {
                 try Task.checkCancellation()
                 switch generation {
                 case .chunk(let text):
@@ -699,7 +702,7 @@ public actor MLXEngine: LLMEngine {
                     // the model answered from the cut-off.
                     if step.ceilingReached {
                         reasoningWasTruncated = true
-                        break
+                        break chunks
                     }
 
                     // A loop is a stop condition regardless of the token budget, which is
@@ -733,7 +736,19 @@ public actor MLXEngine: LLMEngine {
             answer += tail.answer
             await report(ThinkingStripper.Segment(reasoning: tail.reasoning, answer: tail.answer))
 
-            guard !toolCalls.isEmpty, toolSpecs != nil, round < maxToolRounds else { break rounds }
+            // A round the ceiling abandoned ends the turn here, whatever fragments arrived
+            // while it was still inside reasoning. Dispatching a `.toolCall` collected in
+            // that round would run another round and spend more of the very budget the
+            // ceiling exists to bound. The decision is a pure function so the rule is
+            // testable without weights.
+            guard
+                Self.roundAdvance(
+                    reasoningWasTruncated: reasoningWasTruncated,
+                    toolCallCount: toolCalls.count,
+                    hasTools: toolSpecs != nil,
+                    round: round,
+                    maxToolRounds: maxToolRounds) == .dispatchTools
+            else { break rounds }
             round += 1
 
             // Assistant turn carrying the calls, then one tool result per call, then a
@@ -856,6 +871,36 @@ public actor MLXEngine: LLMEngine {
         answerBudget: Int, thinking: ThinkingMode, contextWindow: Int?
     ) -> Int {
         thinking.generationCap(answerBudget: answerBudget, contextWindow: contextWindow)
+    }
+
+    /// What the round loop does after one generation round has ended.
+    public enum RoundAdvance: Sendable, Equatable {
+        /// Run the calls this round collected, then generate again.
+        case dispatchTools
+        /// The turn is over.
+        case endTurn
+    }
+
+    /// Whether a finished round may run the tool calls it collected.
+    ///
+    /// A round the reasoning ceiling abandoned ends the turn whatever fragments arrived: a
+    /// `.toolCall` chunk that came in while the stripper still considered itself inside
+    /// reasoning is not a usable instruction, and acting on it would run another round and
+    /// spend more of the budget the ceiling exists to bound. This used to fall through to the
+    /// same `guard` as an ordinary round, so a protocol-violating model could turn a
+    /// ceiling-abandoned turn into another tool round (audit A91).
+    ///
+    /// Pure so the rule is testable without weights, like the rest of this section.
+    public static func roundAdvance(
+        reasoningWasTruncated: Bool,
+        toolCallCount: Int,
+        hasTools: Bool,
+        round: Int,
+        maxToolRounds: Int
+    ) -> RoundAdvance {
+        guard !reasoningWasTruncated else { return .endTurn }
+        guard toolCallCount > 0, hasTools, round < maxToolRounds else { return .endTurn }
+        return .dispatchTools
     }
 
     /// The truthful message for a turn the mode's reasoning ceiling cut short.
