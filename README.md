@@ -30,6 +30,15 @@ choice is saved with your settings and stays for that conversation.
 at `http://localhost:7788` for any browser, including your phone. They are clients of the same
 conversation engine, so anything you can do in one you can do in the other.
 
+The website is the one part of this that is reachable from off the Mac: it listens on every
+network interface, and the API behind it has no password. Anyone who can reach port 7788 on the
+same network — a shared or untrusted Wi-Fi, say — can read every kept conversation, start,
+pause and steer runs, change the topic and the seats, upload documents, and open any share
+link. That is deliberate, because reaching it from your phone is a real feature; what matters
+is that the cost is visible. `bash tools/start-web-desktop.sh --local-only` binds it to this Mac
+alone. The engine itself is always loopback-only, and with Caddy not installed the website is
+too.
+
 **Nothing is lost, and it can be shared.** Every conversation is written to disk as it runs, so
 closing the window — or quitting — does not lose it. **Kept** in either front end reopens one,
 deletes the ones you are done with, or gives you a read-only link that replays it in a browser.
@@ -68,6 +77,11 @@ bash tools/start-web-mobile.sh    # the website, forced into the phone layout
 ```
 
 The desktop app is also at `~/Applications/ChatBots.command`. Each script takes `--help`.
+
+One thing the website does that the app does not: it listens on every network interface, so a
+phone on the same Wi-Fi can open it — and so can anyone else on that network, because the API
+has no password. `bash tools/start-web-desktop.sh --local-only` keeps it on this Mac. See
+[Using the website](https://github.com/Pummelchen/ChatBots/wiki/Using-the-website).
 
 ## Documentation
 
