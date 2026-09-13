@@ -368,6 +368,16 @@ class Chrome:
         self, width: int, height: int, pixel_ratio: float, mobile: bool = True
     ) -> None:
         """Set the CSS viewport and the device pixel ratio, independently."""
+        # The orientation has to match the metrics being set. capture-devices.py swaps width and
+        # height for a landscape capture, and a page can read `screen.orientation`, so reporting
+        # portraitPrimary there would let an orientation-aware layout settle into the wrong
+        # arrangement even though the screenshot itself had the right shape. A square viewport is
+        # treated as portrait, which is the conventional default.
+        screen_orientation: JsonObject = (
+            {"type": "landscapePrimary", "angle": 90}
+            if width > height
+            else {"type": "portraitPrimary", "angle": 0}
+        )
         self.call(
             "Emulation.setDeviceMetricsOverride",
             {
@@ -377,7 +387,7 @@ class Chrome:
                 "mobile": mobile,
                 # A phone reports a touch screen; the interface does not depend on it, but a
                 # layout that did would otherwise be tested in the wrong mode.
-                "screenOrientation": {"type": "portraitPrimary", "angle": 0},
+                "screenOrientation": screen_orientation,
             },
         )
         self.call(
