@@ -36,7 +36,20 @@ func parseOptions() -> Options {
         arguments.removeFirst()
         switch flag {
         case "--port":
-            if let value = next(), let port = UInt16(value) { options.port = port }
+            // Validated rather than swallowed. `UInt16(String)` returns nil for a non-numeric or
+            // out-of-range value, so `--port abc` or `--port 70000` used to fall through to 7790
+            // and the probe reported on an engine the caller had not named — the silent-fallback
+            // class A62 removed from the CLI's `--transport-port` (A113). Zero is refused too: it
+            // announces a destination nothing can be listening on.
+            let portRaw = next() ?? ""
+            guard let port = UInt16(portRaw), port != 0 else {
+                FileHandle.standardError.write(
+                    Data(
+                        "invalid port: \(portRaw.isEmpty ? "(nothing)" : portRaw) — expected 1–65535\n"
+                            .utf8))
+                exit(2)
+            }
+            options.port = port
         case "--cycles":
             // `Int(value)` with no positivity check meant `--cycles 0` ran nothing and left
             // `allSucceeded` true, so the probe printed "all cycles succeeded" over an
@@ -53,7 +66,19 @@ func parseOptions() -> Options {
             }
             options.cycles = count
         case "--hold":
-            if let value = next(), let seconds = Int(value) { options.holdSeconds = seconds }
+            // A non-numeric or negative value used to be accepted and then ignored by the
+            // `holdSeconds > 0` gate, so `--hold abc` and `--hold -5` both silently did not hold
+            // while the probe went on to report success (A113). A hold of nothing is not a hold,
+            // so it is refused rather than quietly reinterpreted.
+            let holdRaw = next() ?? ""
+            guard let seconds = Int(holdRaw), seconds >= 1 else {
+                FileHandle.standardError.write(
+                    Data(
+                        "invalid hold: \(holdRaw.isEmpty ? "(nothing)" : holdRaw) — expected 1 or more seconds\n"
+                            .utf8))
+                exit(2)
+            }
+            options.holdSeconds = seconds
         case "--quiet":
             options.quiet = true
         case "--help", "-h":
