@@ -701,8 +701,9 @@ the passes were asked to report what they read rather than only what they found.
 | A73 | **S2** | `ResearchSession.swift:173-179` | The web-search ceiling is not reliably enforced and can also fire early | START |
 | A74 | **S3** | `ResearchDirector.swift:411` | The director picks a conflict by Dictionary iteration order, contradicting its own determinism contract | START |
 
-**Counts after every pass: 74 tasks — 9 DONE, 65 open, 0 BLOCKED**, of which **1 is S0**, 13 are S1,
-30 are S2 and 30 are S3 (A12-A19 carry no severity: they are baselines and process findings).
+**Counts after every pass: 74 tasks — 9 DONE, 65 open, 0 BLOCKED**, of which **1 is S0**, 11 are S1, 34 are S2 and 19 are S3 (A12-A19 carry no severity: they are
+baselines and process findings). Counted from `ledger.json`, because the first version of this
+line was written by hand and was wrong in three of the four figures.
 
 The two S1s that are not about a crash are worth separating from the rest. **A67** and **A33/A34/A36**
 are all the same failure: a guarantee the product states and the code does not implement. A67 is the
