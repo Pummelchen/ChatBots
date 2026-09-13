@@ -145,15 +145,20 @@ struct ControlBar: View {
     /// Everything that *does* something, on one line that is theirs.
     ///
     /// Grouped rather than run together — starting and stopping the conversation, then the things
-    /// you do with the transcript, then the models — because eight undifferentiated buttons is a
-    /// row you have to read every time.
+    /// you do with the transcript — because eight undifferentiated buttons is a row you have to
+    /// read every time.
+    ///
+    /// There used to be a "Models" menu here whose only action was `controller.warmUp(_:)`, a
+    /// body that set `errorBanner = nil` and nothing else, under help text promising "Pre-load
+    /// weights so the first turn starts immediately". A client cannot warm a seat — the engine
+    /// loads weights on the first turn — so the control lied about what it did and was removed
+    /// (audit A51) rather than left as a placeholder. Which model each seat runs is still shown,
+    /// as `spec.backendLabel` in the seat's own pane header.
     private var actionRow: some View {
         HStack(spacing: 6) {
             transport
             Divider().frame(height: 16)
             transcriptActions
-            Spacer(minLength: 8)
-            modelsMenu
         }
     }
 
@@ -261,21 +266,6 @@ struct ControlBar: View {
                         .disabled(controller.isRunning)
             .help("Forget the transcript. Loaded models stay in memory.")
         }
-    }
-
-    private var modelsMenu: some View {
-        Menu {
-            ForEach(controller.panes) { pane in
-                Button("Load \(pane.spec.displayName) — \(pane.spec.modelShortName)") {
-                    controller.warmUp(pane.spec.id)
-                }
-            }
-        } label: {
-            Label("Models", systemImage: "cpu")
-        }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
-        .help("Pre-load weights so the first turn starts immediately")
     }
 
     // MARK: Status

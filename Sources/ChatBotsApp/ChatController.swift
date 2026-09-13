@@ -915,12 +915,6 @@ public final class ChatController: ObservableObject {
         !panes.isEmpty && panes.allSatisfy { $0.spec.backend == .openAIResponses }
     }
 
-    public func warmUp(_ agentID: String) {
-        // Loading a model is the engine's business and happens on its first turn. A client
-        // cannot reach a seat's engine, so there is nothing to warm from here.
-        errorBanner = nil
-    }
-
     // MARK: - Derived
 
     public var canStart: Bool {
