@@ -1689,6 +1689,57 @@
       "commit": null,
       "notes": "A user-visible feature failing in the shipped configuration, found by measuring a path nobody had asked about while checking headers - which is the second time this audit has found something by verifying an adjacent thing rather than the thing itself (A75 came out of reading a stylesheet). The fix is small - a `handle /s/*` reverse_proxy - but the shareBase question is a second half: a link that resolves but points at a loopback port is still unusable from the phone the feature exists for.",
       "blocked_reason": null
+    },
+    {
+      "id": "A100",
+      "severity": "S2",
+      "unit": "transport client",
+      "file_line": "Sources/ChatBotsCore/WebTransportClient.swift (the reader's stream.receive timeout)",
+      "title": "The reader uses the REQUEST timeout as its idle receive timeout, so a stream quiet for longer than that fails the connection",
+      "category": "defect",
+      "status": "START",
+      "host_used": "this Mac",
+      "discovered_by": "reported by the core-lane while fixing A39/A52/A53, and left unfixed because it falls outside those tasks' scope",
+      "evidence_before": "The client passes `configuration.timeoutMilliseconds` to the reader's `stream.receive()` as well as to request timeouts, so a stream that stays silent longer than the request timeout kills the reader. Measured directly while writing A39: with a 2-second client timeout the reader died after 2 seconds of engine work. At the shipped 10-second default the consequence is concrete and now more likely: **A15 moved document conversion off the main actor, so a conversion can legitimately take longer than 10 seconds**, and an attachment upload longer than that kills the reader - the command then reports a connection failure while `isConnected` stays true, which is A38's shape. A client that does not poll at 1 Hz also loses its connection after any quiet period.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "Recorded as S2 rather than S3 because it is reachable through ordinary use and because A15 makes it more reachable, not less: the fix that stopped conversions freezing the interface made long conversions a normal thing for the transport to sit through. Verified at the client rather than end-to-end in the app, which is stated rather than glossed. The fix is to separate the two timeouts - an idle receive timeout should be its own (or absent) rather than borrowed from the request deadline.",
+      "blocked_reason": null
+    },
+    {
+      "id": "A101",
+      "severity": "S2",
+      "unit": "attachments",
+      "file_line": "Sources/ChatBotsCore/Attachments.swift:171-176, DocumentImport.swift intake",
+      "title": "BMP and TIFF are accepted and sent as media types the Responses API does not document, the mirror of A52",
+      "category": "defect",
+      "status": "START",
+      "host_used": "this Mac",
+      "discovered_by": "reported by the core-lane while fixing A39/A52/A53, and left unfixed because it falls outside those tasks' scope",
+      "evidence_before": "The magic-byte sniffer recognises BMP and TIFF and the intake path sends them as `image/bmp` and `image/tiff`. The same API documentation A52's lane checked lists png, jpeg, webp and gif; BMP and TIFF are not in it, so those attachments are sent and likely rejected with a 400. This is A52's defect in the other direction - A52 fixed a type the app offered but did not send; this is a type the app sends but the API may not take. Not fixed because `ImageUploadTests.mediaTypeFromMagicBytes` asserts those two media types, so the fix requires editing that existing test, and the equivalent decision (convert, or refuse at intake with a visible reason) belongs with a task that owns it.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "Same shape as A52 and the same conclusion is likely right: if ImageIO can decode BMP and TIFF, convert them to PNG or JPEG at intake as A52 does for HEIC, rather than sending a type the API does not document. Worth noting the pair together - A52 and A101 are why 'what the picker offers', 'what the sniffer recognises' and 'what the API accepts' should be one list rather than three.",
+      "blocked_reason": null
+    },
+    {
+      "id": "A102",
+      "severity": "S2",
+      "unit": "test infrastructure",
+      "file_line": "Tests/ChatBotsCoreTests (WebTransport suites under parallel execution)",
+      "title": "One full-suite run aborted with a Network.framework fatal error, reduced but not fixed by A40's single-close",
+      "category": "defect",
+      "status": "START",
+      "host_used": "this Mac",
+      "discovered_by": "reported by the core-lane while fixing A39/A52/A53, and left unfixed because it falls outside those tasks' scope",
+      "evidence_before": "One full run of the suite aborted with `Network/Connection.swift:5833: Fatal error: Neither nw nor nwGroup is initialized`, in WebTransportSessionTests while the new transport suites ran in parallel. A40's single-closer change removed a double `session.close()` - an obvious candidate cause - and the suite was clean over three consecutive full runs afterwards, but that is three runs, not a fix. Network.framework is known to be fragile with concurrent WebTransport endpoints on one host.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "Recorded rather than dismissed because the failure mode is a hard abort of the whole test process, which would look like a catastrophic product failure in CI and would be misattributed. The next step if it recurs is to serialise the WebTransport suites within the test target, or to gate them behind a single transport runner - not to retry. **Phase E must watch for this**: a fatal abort on node1 would be reported as a crash, and the honest response would be to determine whether it is Network.framework's concurrency rather than a defect introduced here. `Phase E`'s sanitizer and full-suite runs are the place it would show up.",
+      "blocked_reason": null
     }
   ]
 }
