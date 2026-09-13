@@ -716,9 +716,13 @@ the passes were asked to report what they read rather than only what they found.
 | A73 | **S2** | `ResearchSession.swift:173-179` | The web-search ceiling is not reliably enforced and can also fire early | START |
 | A74 | **S3** | `ResearchDirector.swift:411` | The director picks a conflict by Dictionary iteration order, contradicting its own determinism contract | START |
 
-**Counts after every pass: 74 tasks — 9 DONE, 65 open, 0 BLOCKED**, of which **1 is S0**, 11 are S1, 34 are S2 and 19 are S3 (A12-A19 carry no severity: they are
-baselines and process findings). Counted from `ledger.json`, because the first version of this
-line was written by hand and was wrong in three of the four figures.
+**Counts are deliberately not written here.** They were, three times, and they were wrong or
+stale each time — the last version of this line said 74 tasks and 9 DONE while the file beside it
+said otherwise. A count in a growing document goes stale the moment anything lands, so the numbers
+live in `ledger.json`, which is the machine-readable twin and the thing the tools read:
+`jq` for a status board, and `AUDIT/phase-e.sh` for the acceptance run, which fails when any task
+is left open that is not DONE or BLOCKED-with-owner. That is the same reason the wiki tracker and
+the Phase D status cells are generated from it rather than maintained by hand.
 
 The two S1s that are not about a crash are worth separating from the rest. **A67** and **A33/A34/A36**
 are all the same failure: a guarantee the product states and the code does not implement. A67 is the
