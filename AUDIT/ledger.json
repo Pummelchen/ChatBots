@@ -51,11 +51,11 @@
       "status": "START",
       "host_used": "this Mac",
       "discovered_by": "L0 pass",
-      "evidence_before": "baseline/swift-build-debug.log and -release.log both 0 warnings, 0 errors; no treatAllWarnings in Package.swift",
+      "evidence_before": "baseline/swift-build-debug.log and -release.log: 0 warnings, 0 errors. The TEST target adds 5 unique warning sites (EngineServiceTests x2, ResponsesRequestTests, ResearchEngineTests, LineupTests) - see baseline/test-warnings.txt",
       "fix_summary": null,
       "evidence_after": null,
       "commit": null,
-      "notes": "§1 requires warnings-as-errors for Swift.",
+      "notes": "Warnings-as-errors is required by the brief. The 5 test-target warnings must be fixed first or the gate cannot be switched on. Product code is already clean: 0 warnings in Sources/.",
       "blocked_reason": null
     },
     {
@@ -89,7 +89,7 @@
       "fix_summary": null,
       "evidence_after": null,
       "commit": null,
-      "notes": "Forbidden as a fix (§0); pre-existing, so justify or replace.",
+      "notes": "Forbidden as a fix (\u00a70); pre-existing, so justify or replace.",
       "blocked_reason": null
     },
     {
@@ -123,7 +123,7 @@
       "fix_summary": null,
       "evidence_after": null,
       "commit": null,
-      "notes": "§1 requires 3.14 + full annotations + strict typing.",
+      "notes": "\u00a71 requires 3.14 + full annotations + strict typing.",
       "blocked_reason": null
     },
     {
@@ -203,9 +203,9 @@
       "category": "test",
       "status": "DONE",
       "host_used": "this Mac",
-      "discovered_by": "§1 tooling requirement",
+      "discovered_by": "\u00a71 tooling requirement",
       "evidence_before": "no sanitizer baseline exists; ASan attempt in flight at baseline/swift-test-asan.log",
-      "fix_summary": "no fix needed — the instrumented run is the deliverable",
+      "fix_summary": "no fix needed \u2014 the instrumented run is the deliverable",
       "evidence_after": "swift test --sanitize=address --scratch-path ~/Library/Caches/ChatBots/audit-asan => exit 0, 555 tests in 77 suites passed, no AddressSanitizer report anywhere in the log",
       "commit": "f9a359b",
       "notes": "MCPSearchs only S0 was found by this exact command; a clean plain suite proves nothing about that class. Scratch path kept outside Dropbox on purpose.",
@@ -220,12 +220,12 @@
       "category": "test",
       "status": "DONE",
       "host_used": "this Mac",
-      "discovered_by": "§1 tooling requirement",
+      "discovered_by": "\u00a71 tooling requirement",
       "evidence_before": "not run",
-      "fix_summary": "no fix here — the finding is opened as A14",
+      "fix_summary": "no fix here \u2014 the finding is opened as A14",
       "evidence_after": "swift test --sanitize=thread --scratch-path ~/Library/Caches/ChatBots/audit-tsan => TSAN_EXIT=1, 555 tests passed, ThreadSanitizer: reported 1 warnings, SUMMARY: data race HTTPServer.swift:356 in closure #2 in HTTPServer.start()",
       "commit": null,
-      "notes": "The suite still passed — which is why the run matters. Expected clean; it was not.",
+      "notes": "The suite still passed \u2014 which is why the run matters. Expected clean; it was not.",
       "blocked_reason": null
     },
     {
@@ -235,14 +235,14 @@
       "file_line": "HTTPServer.swift:356 write vs :380 read",
       "title": "isRunning/lastError are raced between the listener callback and waitUntilReady",
       "category": "unsafe",
-      "status": "START",
+      "status": "DONE",
       "host_used": "this Mac",
       "discovered_by": "A13 (ThreadSanitizer)",
       "evidence_before": "TSan: Write of size 1 at HTTPServer.swift:356 (closure #2 in start(), GCD worker) vs Previous read at HTTPServer.swift:380 (waitUntilReady, concurrency thread); block allocated by APIServer.start() APIServer.swift:350",
-      "fix_summary": null,
-      "evidence_after": null,
-      "commit": null,
-      "notes": "Production path: chatbots-cli --serve calls APIServer.waitUntilReady (main.swift:649). Second half of A05 — HTTPServer is one of the four @unchecked Sendable types, and this is the state that conformance assumes needs no protecting. Graded S1 per §7 (unsafe concurrency); owner may call it S0 because a hoisted read would make a healthy server report as not ready.",
+      "fix_summary": "isRunning/lastError moved behind stateLock: private stored flags with markRunning()/markStopped() writers and lock-guarded computed accessors; the class doc now carries a true invariant instead of an assertion",
+      "evidence_after": "swift test --sanitize=thread --scratch-path ~/Library/Caches/ChatBots/audit-tsan => TSAN_AFTER_EXIT=0, 555 tests passed, no ThreadSanitizer report (baseline/swift-test-tsan-after.log); plain swift test: 555 pass",
+      "commit": "HEAD",
+      "notes": "The race is only observable under the instrument, so the failing-then-passing evidence is the TSan pair rather than a unit assertion. A17 was found while fixing this and shares the commit: same class, same conformance, same invariant.",
       "blocked_reason": null
     },
     {
@@ -276,7 +276,41 @@
       "fix_summary": null,
       "evidence_after": null,
       "commit": null,
-      "notes": "No data loss — ConversationStore writes per turn — but the port is never released and logs are not flushed.",
+      "notes": "No data loss \u2014 ConversationStore writes per turn \u2014 but the port is never released and logs are not flushed.",
+      "blocked_reason": null
+    },
+    {
+      "id": "A17",
+      "severity": "S1",
+      "unit": "HTTPServer",
+      "file_line": "HTTPServer.swift:555 append vs :588-596 finish()",
+      "title": "streams is appended on the main actor without the lock that every other access takes",
+      "category": "unsafe",
+      "status": "DONE",
+      "host_used": "this Mac",
+      "discovered_by": "found while fixing A14 (review beside the TSan report)",
+      "evidence_before": "stop(), closeStreams() and finish() all mutate streams under stateLock; the append in the SSE path ran on @MainActor carrying the comment that streams is only ever touched on the main actor, which was never true because finish() runs on the network queue",
+      "fix_summary": "addStream(_:) takes stateLock and is the only append; the false comment replaced with the reason",
+      "evidence_after": "swift test 555 pass; swift test --sanitize=thread exit 0 (baseline/swift-test-tsan-after.log)",
+      "commit": "HEAD",
+      "notes": "A concurrent append against a locked mutation of a Swift array is memory unsafety, not a stale value, so S1. Shares A14's commit deliberately: same class, same conformance, same invariant; splitting would have committed a knowingly half-fixed type.",
+      "blocked_reason": null
+    },
+    {
+      "id": "A18",
+      "severity": "S1",
+      "unit": "tests",
+      "file_line": "BuiltInKeyTests.swift:20, ImageUploadTests.swift:136, AttachmentTests.swift:308",
+      "title": "The suite is not hermetic: three tests need the developer's private models/ and .secrets.env and fail on a fresh clone",
+      "category": "test",
+      "status": "START",
+      "host_used": "node1 (independent host, fresh clone)",
+      "discovered_by": "early independent check on node1",
+      "evidence_before": "node1 fresh clone of audit/2026-09-13: build exit 0, test exit 1, 4 issues in 3 tests - BuiltInKeys.deepSeek nil (no .secrets.env) and ModelStore.declaresVision nil for the default checkpoint (no models/). BuiltInKeyTests.swift:18 says the test skips when the file is absent, but try #require throws, so it fails.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "Would have blocked Phase E, which requires a fresh clone to be green. Fix: .enabled(if:) traits for the machine-local assertions, and test declaresVision against a synthetic checkpoint in a temp dir so the logic stays covered hermetically.",
       "blocked_reason": null
     }
   ]

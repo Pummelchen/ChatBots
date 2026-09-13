@@ -23,8 +23,9 @@ Nothing later may be worse on any of these without an explicit, numbered, justif
 
 | Metric | Baseline @ `a6d6999` | Evidence |
 | --- | --- | --- |
-| Debug build | **success, 0 compiler warnings, 0 errors** | `baseline/swift-build-debug.log` |
-| Release build | **success, 0 warnings, 0 errors** | `baseline/swift-build-release.log` |
+| Debug build (products) | **success, 0 compiler warnings, 0 errors** | `baseline/swift-build-debug.log` |
+| Release build (products) | **success, 0 warnings, 0 errors** | `baseline/swift-build-release.log` |
+| Test target warnings | **5 unique sites** — `EngineServiceTests` ×2, `ResponsesRequestTests`, `ResearchEngineTests`, `LineupTests`; `Sources/` is clean | `baseline/test-warnings.txt` |
 | Tests | **555 tests, 77 suites, 0 failures** | `baseline/swift-test.log` |
 | Coverage `Sources/` | **71.6 % lines · 70.0 % functions · 66.1 % regions** | `baseline/coverage-sources.txt` |
 | Coverage, core inference path | `MLXEngine.swift` **2.2 %** (19/863), `TransportCheck.swift` **0 %**, `OpenAIResponsesEngine` 11.0 %, `WebTools` 11.4 %, `TavilyClient` 16.5 %, `APIServer` 60.2 % | same |
@@ -38,7 +39,7 @@ Nothing later may be worse on any of these without an explicit, numbered, justif
 | SAST (`semgrep --config auto`) | 3 findings, all in `tools/cdp.py` | `baseline/semgrep.json` |
 | §5 placeholder sweep | **0 markers** (TODO/FIXME/HACK/XXX/WIP/STUB) | `inventory.md` §2.3 note |
 | AddressSanitizer, full suite | **clean** — 555 tests, exit 0, no sanitizer report | `baseline/swift-test-asan.log` |
-| ThreadSanitizer, full suite | **1 data race** — `HTTPServer.swift:356` write vs `:380` read (A14); suite still passed | `baseline/swift-test-tsan.log` |
+| ThreadSanitizer, full suite | **before the fix: 1 data race** (`HTTPServer`, A14 + A17); **after: clean, exit 0** | `baseline/swift-test-tsan.log`, `-after.log` |
 
 Three baseline results are worth stating plainly because they are *good* and should not
 regress: **no secret in the full history**, **no known CVE in the dependency set**, and

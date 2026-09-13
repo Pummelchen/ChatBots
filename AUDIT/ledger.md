@@ -17,8 +17,8 @@ does not advance without its artifact.
 
 | Metric | Count |
 | --- | --- |
-| Tasks enumerated | 16 |
-| DONE | 2 (A12, A13 — both sanitizer baselines) |
+| Tasks enumerated | 18 |
+| DONE | 4 (A12, A13 — sanitizer baselines; A14, A17 — the two HTTPServer races) |
 | START (proven / reproduced, expected behaviour written) | 14 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
@@ -45,7 +45,9 @@ Per §11, all findings are enumerated before any fix begins.
 | A11 | S3 | docs/ops | `README.md`, wiki | Neither the README nor the wiki states that running the website exposes the API to the LAN | docs | START | this Mac | L4 pass (same evidence as A01) |
 | A12 | — | tests | `AUDIT/baseline/swift-test-asan.log` | AddressSanitizer over the whole suite: **clean** | test | DONE | this Mac | §1 tooling requirement |
 | A13 | — | tests | `AUDIT/baseline/swift-test-tsan.log` | ThreadSanitizer over the whole suite: **one data race found** | test | DONE | this Mac | §1 tooling requirement |
-| A14 | **S1** | `HTTPServer` | `HTTPServer.swift:356` write vs `:380` read | `isRunning`/`lastError` are written from a Network.framework callback and read from `waitUntilReady` with no synchronisation | unsafe | START | this Mac | A13 (ThreadSanitizer) |
+| A14 | **S1** | `HTTPServer` | `HTTPServer.swift:356` write vs `:380` read | `isRunning`/`lastError` are written from a Network.framework callback and read from `waitUntilReady` with no synchronisation | unsafe | DONE | this Mac | A13 (ThreadSanitizer) |
+| A17 | **S1** | `HTTPServer` | `HTTPServer.swift:555` append vs `:588-596` `finish()` | `streams` was appended on the main actor without the lock that every other access takes — a concurrent mutation of a Swift array | unsafe | DONE | this Mac | found while fixing A14 |
+| A18 | **S1** | tests | `BuiltInKeyTests.swift:20`, `ImageUploadTests.swift:136`, `AttachmentTests.swift:308` | Three tests need the developer's private `models/` and `.secrets.env`, so a fresh clone cannot pass | test | START | node1 | early independent check on node1 |
 | A15 | **S1** | `EngineService` / `DocumentImport` | `DocumentImport.swift:160-168`, `EngineService.swift:325-357` | Attaching a document blocks the engine's `@MainActor` for the whole conversion, subprocess wait included | perf | START | this Mac | L5 pass |
 | A16 | S3 | `ChatBotsCLI` | `Sources/ChatBotsCLI/main.swift:689` | `--serve` has no signal handling, so the listener is never shut down and nothing is flushed on exit | incomplete | START | this Mac | L7 pass |
 
@@ -336,3 +338,63 @@ what makes `tools/start.sh --stop` and the installer's lifecycle predictable.
   blocking wait is A15's `usleep` poll.
 * **L7 has a health endpoint** (`APIServer.swift:416`, `GET /api/health`) and the app flushes on
   `applicationWillTerminate`.
+
+---
+
+## A14 and A17 — the two `HTTPServer` races — **DONE**
+
+**DONE** · unsafe · discovered by A13 and by review beside it
+
+Both are the same defect in the same type: mutable state shared between the network queue and
+everything else, protected in some places and not others.
+
+| | Before | After |
+| --- | --- | --- |
+| A14 `isRunning` / `lastError` | plain stored properties, written by the listener's state handler on the network queue and read by `waitUntilReady` anywhere | private flags under `stateLock`, with `markRunning()` / `markStopped()` writers and lock-guarded accessors |
+| A17 `streams` | appended on `@MainActor` under a comment claiming the array "is only ever touched on the main actor" while `stop()`, `closeStreams()` and `finish()` mutated it under `stateLock` | `addStream(_:)` takes the lock and is the only append |
+
+**Failing → passing evidence is the sanitizer pair, and that is stated rather than worked around:**
+a data race is not observable from a plain assertion, so the TEST gate is satisfied by
+
+```
+before: swift test --sanitize=thread …   →  TSAN_EXIT=1, race reported, 555 tests still passed
+after:  swift test --sanitize=thread …   →  TSAN_AFTER_EXIT=0, 555 tests passed, no report
+```
+
+`baseline/swift-test-tsan.log` and `baseline/swift-test-tsan-after.log`. The plain suite passes
+both before and after, which is exactly why it could not have caught either.
+
+The two share one commit on purpose: same type, same `@unchecked Sendable` conformance, same
+invariant. Splitting them would have committed a knowingly half-fixed conformance. The class doc
+now states the invariant as it actually is — `connections`, `streams`, `running` and `failure`
+under `stateLock`, `listener` touched only by `start()`/`stop()` — rather than claiming every
+property is guarded.
+
+---
+
+## A18 — the suite is not hermetic — **START**
+
+**S1** · test · discovered by the early independent check on **node1**
+
+A fresh clone of this branch on node1 builds cleanly (exit 0) and then **fails four assertions in
+three tests**, because they read state that only exists on a machine where the project has been
+installed:
+
+| Test | Needs | On a fresh clone |
+| --- | --- | --- |
+| `BuiltInKeyTests.deepSeekGetsTheKey` (`:20`) | `.secrets.env` or `DEEPSEEK_API_KEY` | `BuiltInKeys.deepSeek` is nil → `try #require` **throws**, so it fails |
+| `ImageUploadTests.localCheckpointSees` (`:136`) | `models/Qwen3.5-4B-MLX-4bit/config.json` | `declaresVision` is nil → fails |
+| `AttachmentTests.localCheckpoint` (`:308`) | the same checkpoint | fails |
+
+`BuiltInKeyTests` even carries the comment *"this test skips rather than fails when the file is
+absent, as it would be in a fresh clone"* — and then uses `try #require`, which throws. The
+comment states the intent the code does not implement, which is why nobody noticed.
+
+**This would have blocked Phase E**, whose whole requirement is a green run from a fresh clone on
+a host that did not develop the fix. Finding it on the first independent run rather than at the end
+is the argument for doing that run early.
+
+**Expected-correct behaviour.** The suite passes on a machine with no `models/`, no `.secrets.env`
+and no network. Machine-local assertions become `.enabled(if:)`-gated, and `declaresVision` is
+covered hermetically by pointing it at a synthetic checkpoint in a temporary directory — which
+tests the logic rather than the presence of 3 GB of weights.

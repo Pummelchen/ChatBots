@@ -1,0 +1,5 @@
+EngineServiceTests.swift  warning: immutable value 'engine' was never used; consider replacing with '_' or removing it [#no-usage]
+EngineServiceTests.swift  warning: result of call to 'handle' is unused [#no-usage]
+LineupTests.swift  warning: '#require
+ResearchEngineTests.swift  warning: no 'async' operations occur within 'await' expression
+ResponsesRequestTests.swift  warning: initialization of immutable value 'client' was never used; consider replacing with assignment to '_' or removing it [#no-usage]
