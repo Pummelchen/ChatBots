@@ -18,8 +18,8 @@ does not advance without its artifact.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 28 |
-| DONE | 8 (A05, A08 — concurrency and dependency pinning; A12, A13 — sanitizer baselines; A14, A17 — the two HTTPServer races; A18 — hermetic suite; A19 — the commit that claimed A14/A17) |
-| START (proven / reproduced, expected behaviour written) | 20 (A20-A28 added by the line-depth passes) |
+| DONE | 9 (A05, A08 — concurrency and dependency pinning; A20 — the stored XSS; A12, A13 — sanitizer baselines; A14, A17 — the two HTTPServer races; A18 — hermetic suite; A19 — the commit that claimed A14/A17) |
+| START (proven / reproduced, expected behaviour written) | 19 (A21-A28 added by the line-depth passes, plus the five slices' findings) |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
@@ -543,7 +543,7 @@ asserted.
 
 | id | sev | finding |
 | --- | --- | --- |
-| **A20** | **S1** | **Stored DOM XSS.** `web/app.js:502` interpolated the moderator-supplied seat name straight into `innerHTML`. `POST /api/seat` accepts an arbitrary name, so `<img src=x onerror=…>` is stored and runs in every client rendering a live turn. Reachable by anyone who can reach the API — which, per A01, is anyone on the LAN. |
+| **A20** ✅ | **S1** | **Stored DOM XSS — FIXED.** `web/app.js:502` interpolated the moderator-supplied seat name straight into `innerHTML`; `POST /api/seat` accepts an arbitrary name, so `<img src=x onerror=…>` was stored and ran in every client rendering a live turn — reachable by anyone who can reach the API, which per A01 is anyone on the LAN. The scaffold is now a fixed string and the name is assigned with `textContent`; `WebAssets.swift` regenerated; a regression test reads the bytes the server serves. |
 | A21 | S2 | `tools/install.sh:191` — the model **integrity check fails open**: when the HEAD request yields no `Content-Length` the expected size is recorded as 0, which then means "accept any size" and skips the post-download check. |
 | A22 | S2 | `tools/start.sh:99` — `stop_all` kills a stale PID from a pid file with no ownership check, though the correct `ps … \| grep -qE "chatbots\|caddy"` check already exists on the by-port branch. |
 | A23 | S2 | `tools/capture-devices.py:277` — a viewport mismatch only prints; it cannot fail the run, though the docstring promises otherwise. |
@@ -589,3 +589,38 @@ them as the optionals they already behave as, not to add runtime checks.
 - **The single `precondition`** (`ConversationEngine.swift:221`, seats non-empty) is **not**
   reachable from the network: `POST /api/roster` takes a roster *id* resolved from `RosterLibrary`,
   never a caller-supplied seat list. Not a finding.
+
+### A20 — the stored XSS, closed
+
+**DONE** · unsafe · discovered by the line-depth pass over `web/` and `tools/`
+
+The live-pane header was the one render path in `web/app.js` that did not escape, and it carried
+the one string in the file that is entirely moderator-controlled. `createLiveElement` built it with
+
+```js
+el.innerHTML = `<div class="msg-head"><span class="msg-who">${name.toUpperCase()}</span>` + …
+```
+
+and `name` is the seat's name from the server snapshot. `POST /api/seat` accepts an arbitrary name
+and the rename field posts arbitrary `contentEditable` text, so renaming a seat to
+`<img src=x onerror=…>` stored a script that ran in every client rendering a live turn in that
+room. `.toUpperCase()` is not sanitisation — tag and attribute names are case-insensitive. Every
+other path in the file already escaped (`bodyHTML`, `escapeHTML`, `textContent`), which is why
+this read as safe.
+
+**The fix** is the shape the rest of the file already uses: the scaffold stays a fixed string and
+the name is assigned with `textContent`. `web/` remains the source of truth and
+`tools/embed-web.py` regenerated `WebAssets.swift`, so the bytes the server serves carry it —
+asserted by the existing byte-for-byte drift test.
+
+**The guard, and why it is a guard rather than a comment.** A test reads the asset the server
+actually serves — not the file — and asserts that `createLiveElement` sets the name as text and
+contains no `${name` interpolation. Its first version delimited the function with a 900-character
+window and **passed a body it had truncated**: adding the explanatory comment pushed `textContent`
+past the window, so the test failed on correct code. That is the same failure mode as the counts
+in A28 — a number standing in for the thing it was supposed to measure — so it now delimits the
+function by its own closing brace. Recorded because a guard that can silently stop guarding is
+worse than no guard: the A19 lesson in a different medium.
+
+**Verification.** `swift build --build-tests` 0 warnings 0 errors under the new A03 gate;
+`python3 tools/embed-web.py --check` exit 0; `swift test` **558 tests in 77 suites passed**.
