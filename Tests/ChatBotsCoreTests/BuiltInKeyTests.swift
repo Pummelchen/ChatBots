@@ -11,8 +11,13 @@ import Testing
 @Suite("Built-in keys")
 struct BuiltInKeyTests {
 
-    @Test("A DeepSeek endpoint picks up a configured key without anyone typing one")
+    @Test(
+        "A DeepSeek endpoint picks up a configured key without anyone typing one",
+        .enabled(if: BuiltInKeys.deepSeek != nil))
     func deepSeekGetsTheKey() throws {
+        // Gated on a key existing on this machine. The resolution rules are covered without
+        // one by the tests below; what cannot be covered without a key is that the real one
+        // reaches the endpoint, so that is what this checks where a key is present.
         // Resolution order: the environment, then the gitignored `.secrets.env`. On a machine
         // with neither, there is simply no key and the seat reports that — which is why this
         // test skips rather than fails when the file is absent, as it would be in a fresh

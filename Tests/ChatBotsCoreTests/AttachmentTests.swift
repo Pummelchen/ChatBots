@@ -54,6 +54,24 @@ private func file(named name: String, bytes: Int = 100) throws -> URL {
     return url
 }
 
+/// A throwaway models folder, so a checkpoint question is answered from files this test
+/// wrote rather than from whatever happens to be downloaded on the machine.
+private func modelsRoot() throws -> URL {
+    let root = FileManager.default.temporaryDirectory
+        .appending(path: "chatbots-models-\(UUID().uuidString)", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    return root
+}
+
+/// The files `ModelStore` insists on before it calls a directory a usable checkpoint, with a
+/// caller-supplied `config.json` — the only part these tests vary.
+private func checkpoint(at url: URL, config: String) throws {
+    try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    try Data(config.utf8).write(to: url.appending(path: "config.json"))
+    try Data("{}".utf8).write(to: url.appending(path: "tokenizer.json"))
+    try Data().write(to: url.appending(path: "model.safetensors"))
+}
+
 private func ingestor(
     text: String? = "Some document text.",
     pageCount: Int? = nil,
@@ -301,15 +319,42 @@ struct AttachmentPromptTests {
 @Suite("Vision support")
 struct VisionSupportTests {
 
-    @Test("A local checkpoint is asked what it declares")
-    func localCheckpoint() {
-        // The 4B model on disk ships a vision tower, so its weights can accept images.
-        let declared = ModelStore.declaresVision(for: AgentSpec.defaultModelID)
-        #expect(declared == true, "this checkpoint declares a vision_config")
+    @Test("A checkpoint whose config declares a vision tower is read as yes")
+    func checkpointDeclaresVision() throws {
+        let root = try modelsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try checkpoint(
+            at: root.appending(path: "has-vision", directoryHint: .isDirectory),
+            config: #"{"vision_config":{"depth":27},"text_config":{"hidden_size":2048}}"#)
 
+        // The multimodal wrapper keeps the tower beside the text config, so this is where a
+        // real 4B checkpoint declares it.
+        #expect(ModelStore.declaresVision(for: "has-vision", in: root) == true)
+    }
+
+    @Test("A config with no vision tower is a definite no, not an unknown")
+    func checkpointWithoutVision() throws {
+        let root = try modelsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try checkpoint(
+            at: root.appending(path: "text-only", directoryHint: .isDirectory),
+            config: #"{"text_config":{"hidden_size":2048}}"#)
+
+        #expect(ModelStore.declaresVision(for: "text-only", in: root) == false)
         // A model that is not on disk is unknown, not "no" — that distinction is what stops
         // the interface offering images on a guess.
-        #expect(ModelStore.declaresVision(for: "some/model-not-downloaded") == nil)
+        #expect(ModelStore.declaresVision(for: "some/model-not-downloaded", in: root) == nil)
+    }
+
+    @Test(
+        "The checkpoint downloaded on this machine declares vision",
+        .enabled(if: ModelStore.declaresVision(for: AgentSpec.defaultModelID) != nil))
+    func localCheckpoint() {
+        // Machine-local evidence: the 4B model on this disk ships a vision tower, so its
+        // weights can accept images. A fresh clone has no `models/` folder, so this is gated
+        // rather than mandatory — the parsing rules themselves are covered by the two
+        // hermetic tests above, which need no download.
+        #expect(ModelStore.declaresVision(for: AgentSpec.defaultModelID) == true)
     }
 
     @Test("A local seat without vision weights is unsupported")

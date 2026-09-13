@@ -17,8 +17,8 @@ does not advance without its artifact.
 
 | Metric | Count |
 | --- | --- |
-| Tasks enumerated | 18 |
-| DONE | 4 (A12, A13 — sanitizer baselines; A14, A17 — the two HTTPServer races) |
+| Tasks enumerated | 19 |
+| DONE | 5 (A12, A13 — sanitizer baselines; A14, A17 — the two HTTPServer races; A19 — the commit that claimed them) |
 | START (proven / reproduced, expected behaviour written) | 14 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
@@ -370,6 +370,13 @@ now states the invariant as it actually is — `connections`, `streams`, `runnin
 under `stateLock`, `listener` touched only by `start()`/`stop()` — rather than claiming every
 property is guarded.
 
+**Correction, from A19.** The commit that first recorded this work (`948ea29`) carried the ledger
+entry, the plan update and the sanitizer log — and no source change. The fix above was still
+uncommitted in the working tree. The evidence was real, because the ThreadSanitizer re-run was
+done against a tree with the fix applied; only the code was missing. It is committed for real in
+the repair commit that A19 records, and `verify-done-commits.sh` now checks this mechanically
+instead of trusting that it was done.
+
 ---
 
 ## A18 — the suite is not hermetic — **START**
@@ -398,3 +405,46 @@ is the argument for doing that run early.
 and no network. Machine-local assertions become `.enabled(if:)`-gated, and `declaresVision` is
 covered hermetically by pointing it at a synthetic checkpoint in a temporary directory — which
 tests the logic rather than the presence of 3 GB of weights.
+
+---
+
+## A19 — a DONE task was committed without its fix — **DONE**
+
+**S2** · process · found while re-entering Phase C
+
+`948ea29` is titled *"audit(A14,A17): the two HTTPServer races, verified gone by ThreadSanitizer"*
+and contains:
+
+```
+AUDIT/baseline/swift-test-tsan-after.log
+AUDIT/baseline/test-warnings.txt
+AUDIT/ledger.json
+AUDIT/ledger.json.tmp
+AUDIT/ledger.md
+AUDIT/plan.md
+```
+
+No file under `Sources/`. At `HEAD`, `HTTPServer.swift` still had
+`public private(set) var isRunning = false` — the plain stored property the commit message says
+is now a private flag behind `stateLock`. **The ledger said DONE; the code was in the working
+tree, uncommitted.** A 0-byte `ledger.json.tmp` rode along in the same commit.
+
+This is worth its own task because of what it is *not*: the evidence was genuine. ThreadSanitizer
+really had gone quiet, because the re-run was done against a tree with the fix applied. The
+ledger was not wrong about the result — it was wrong about *where the result lives*. No amount of
+care with evidence catches that, so the remedy is mechanical.
+
+**Fix.**
+
+- The fix is committed for real in the repair commit on this branch (see `ledger.json` for the
+  hash, which the ledger sync following it records).
+- `AUDIT/*.tmp` is ignored, so an interrupted ledger write cannot be committed again.
+- `AUDIT/verify-done-commits.sh` reads every DONE task, extracts the source paths that task's own
+  record names, and fails unless that task's commit touches one of them. It is deliberately
+  narrow: a DONE task naming no source path — a CI file, a document, a decision — is reported as
+  *skipped*, not as *passed*, so a clean run cannot be manufactured by naming nothing.
+
+**Verification.** `AUDIT/verify-done-commits.sh` exits 0 with every DONE task backed;
+`git show --stat` of the repair commit lists `Sources/ChatBotsCore/HTTPServer.swift`;
+`swift test` is 557 tests in 77 suites passing; `swift test --sanitize=thread` exits 0 with no
+report.

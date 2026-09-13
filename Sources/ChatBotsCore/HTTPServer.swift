@@ -230,6 +230,15 @@ public enum HTTPError: LocalizedError {
 // MARK: - Server
 
 /// Serves a routing closure over HTTP on a port, on the loopback interface only.
+///
+/// `@unchecked Sendable` with the parts written down, because the compiler cannot check them:
+/// `connections`, `streams`, `running` and `failure` are read and written under `stateLock`, and
+/// no lock is held across a call that could re-enter this type. `listener` is only touched by
+/// `start()` and `stop()`, which the owning actor calls.
+///
+/// ThreadSanitizer is what verifies the claim rather than the comment: it reported a data race on
+/// `isRunning` while every one of 555 tests passed, and inspection alongside it found `streams`
+/// being appended without the lock that every other access to it takes.
 public final class HTTPServer: @unchecked Sendable {
 
     /// A route handler. Handlers are called on the main actor, so a `@MainActor` engine can
@@ -316,10 +325,59 @@ public final class HTTPServer: @unchecked Sendable {
     /// running before it had bound anything: a second process on the same port looked like a
     /// server that was up, and the only sign otherwise was a line on stderr. Callers that need
     /// to know should `waitUntilReady()`.
-    public private(set) var isRunning = false
+    ///
+    /// **Read under `stateLock`.** These two flags used to be plain properties written by the
+    /// listener's state handler — which runs on the network queue — and read from
+    /// `waitUntilReady` on whichever thread called it. On arm64 a single byte does not tear, so
+    /// the suite passed; ThreadSanitizer still reported the race (A14), and a compiler free to
+    /// hoist the read out of the poll loop would leave a healthy server reporting itself as not
+    /// ready on the startup path.
+    public var isRunning: Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return running
+    }
 
-    /// Why the listener stopped, when it did.
-    public private(set) var lastError: String?
+    /// Why the listener stopped, when it did. Guarded like `isRunning`.
+    public var lastError: String? {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return failure
+    }
+
+    /// The two flags, behind `stateLock`. Private so every access goes through the accessors
+    /// above or the two writers below, and the invariant cannot be broken by accident.
+    private var running = false
+    private var failure: String?
+
+    /// The listener reported itself ready.
+    private func markRunning() {
+        stateLock.lock()
+        running = true
+        stateLock.unlock()
+    }
+
+    /// The listener reported itself stopped, with the reason when there is one.
+    ///
+    /// `failure` is only overwritten when a reason is given, which preserves the original
+    /// behaviour: a clean `cancelled` clears `isRunning` and leaves the last error readable.
+    private func markStopped(failure reason: String? = nil) {
+        stateLock.lock()
+        running = false
+        if let reason { failure = reason }
+        stateLock.unlock()
+    }
+
+    /// Take ownership of an open event stream.
+    ///
+    /// Every read and write of `streams` goes through `stateLock` — here, in `stop()`, in
+    /// `closeStreams()` and in `finish()` — because the last of those runs on the network queue
+    /// while the first three can run on the main actor.
+    private func addStream(_ stream: EventStream) {
+        stateLock.lock()
+        streams.append(stream)
+        stateLock.unlock()
+    }
 
     public init(port: UInt16, handler: @escaping Handler, streamer: Streamer? = nil) {
         self.port = port
@@ -353,14 +411,13 @@ public final class HTTPServer: @unchecked Sendable {
         listener.stateUpdateHandler = { [weak self] state in
             switch state {
             case .ready:
-                self?.isRunning = true
+                self?.markRunning()
             case .failed(let error):
-                self?.isRunning = false
-                self?.lastError = "\(error)"
+                self?.markStopped(failure: "\(error)")
                 FileHandle.standardError.write(
                     Data("[ChatBots] http listener failed: \(error)\n".utf8))
             case .cancelled:
-                self?.isRunning = false
+                self?.markStopped()
             default:
                 break
             }
@@ -428,7 +485,7 @@ public final class HTTPServer: @unchecked Sendable {
         stateLock.unlock()
         for stream in open { stream.close() }
         for connection in active { connection.cancel() }
-        isRunning = false
+        markStopped()
     }
 
     /// Close every open event stream. Used when the conversation is reset, so a connected
@@ -507,8 +564,14 @@ public final class HTTPServer: @unchecked Sendable {
                 let stream = EventStream(connection: connection)
                 let initial = streamer(request, stream)
                 if !initial.isEmpty {
-                    // No lock: `streams` is only ever touched on the main actor.
-                    self.streams.append(stream)
+                    // Appended under `stateLock`, like every other access to `streams`.
+                    //
+                    // This said "no lock: `streams` is only ever touched on the main actor", and
+                    // that was never true: `stop()`, `closeStreams()` and `finish()` all mutate
+                    // the same array under the lock, and `finish()` runs on the network queue.
+                    // Appending here without it is a concurrent mutation of a Swift array — the
+                    // kind that corrupts or crashes rather than merely reporting a stale value.
+                    self.addStream(stream)
                     // Head first, then the opening events, then the socket is left open —
                     // which is what makes server-sent events work.
                     let head =

@@ -31,3 +31,7 @@ captures/
 # repository (ChatBots.wiki.git) and is pushed there; without this line git would record it
 # here as a submodule-like gitlink and the pages would be committed to the wrong repository.
 ChatBots.wiki/
+
+# An interrupted ledger write leaves this behind. It was committed once by accident (A19);
+# the ledger is only ever the file without the suffix.
+AUDIT/*.tmp

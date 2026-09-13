@@ -130,8 +130,13 @@ struct VisionGatingTests {
         #expect(!spec.visionSupport.allowsImages)
     }
 
-    @Test("The shipped local checkpoint declares vision, so images are offered")
+    @Test(
+        "The shipped local checkpoint declares vision, so images are offered",
+        .enabled(if: ModelStore.declaresVision(for: AgentSpec.defaultModelID) != nil))
     func localCheckpointSees() {
+        // Gated on the checkpoint being on disk: this asserts what a download buys, and a
+        // fresh clone has not paid for it yet. The rule it exercises is covered hermetically
+        // in AttachmentTests.
         let declared = ModelStore.declaresVision(for: AgentSpec.defaultModelID)
         #expect(declared == true)
         var spec = AgentSpec.seat(index: 0)

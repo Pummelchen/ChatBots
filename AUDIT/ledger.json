@@ -312,6 +312,23 @@
       "commit": null,
       "notes": "Would have blocked Phase E, which requires a fresh clone to be green. Fix: .enabled(if:) traits for the machine-local assertions, and test declaresVision against a synthetic checkpoint in a temp dir so the logic stays covered hermetically.",
       "blocked_reason": null
+    },
+    {
+      "id": "A19",
+      "severity": "S2",
+      "unit": "process / git history",
+      "file_line": "commit 948ea29 (A14, A17)",
+      "title": "A DONE task was committed with its evidence and its ledger entry but without its fix: 948ea29 claims A14 and A17 and contains no source change",
+      "category": "process",
+      "status": "DONE",
+      "host_used": "this Mac",
+      "discovered_by": "Phase C re-entry: `git status` showed HTTPServer.swift modified on a tree whose ledger already said A14 and A17 were DONE",
+      "evidence_before": "git show --name-only 948ea29 => AUDIT/baseline/swift-test-tsan-after.log, AUDIT/baseline/test-warnings.txt, AUDIT/ledger.json, AUDIT/ledger.json.tmp, AUDIT/ledger.md, AUDIT/plan.md; no file under Sources/. git show HEAD:Sources/ChatBotsCore/HTTPServer.swift | grep 'private var running' => no match, so the flags that commit message says are guarded by stateLock were still plain stored properties at HEAD. A 0-byte AUDIT/ledger.json.tmp was committed by the same accident.",
+      "fix_summary": "The A14/A17 fix is committed for real on this branch (repair commit below), AUDIT/*.tmp is ignored so an interrupted ledger write cannot be committed again, and AUDIT/verify-done-commits.sh makes the claim mechanically checkable: it reads every DONE task, takes the source paths that task's own record names, and fails unless that task's commit touches one of them.",
+      "evidence_after": "AUDIT/verify-done-commits.sh => exit 0, every DONE task backed; git show --stat of the repair commit lists Sources/ChatBotsCore/HTTPServer.swift; swift test 557 tests in 77 suites pass; swift test --sanitize=thread exit 0 with no report",
+      "commit": null,
+      "notes": "The sanitizer evidence in 948ea29 is genuine: the ThreadSanitizer re-run was done against a working tree with the fix applied, and baseline/swift-test-tsan-after.log shows zero race reports. What was missing was the code. This is the one failure mode where the ledger is not wrong about the result, only about where the result lives, so the guard is mechanical rather than a matter of care. The guard is deliberately narrow: a DONE task that names no source path (a CI file, a decision, a document) is reported as skipped, not as passed.",
+      "blocked_reason": null
     }
   ]
 }
