@@ -8,6 +8,7 @@
 //   chatbots-cli --benchmark --solo                     measure one seat, then exit
 
 import ChatBotsCore
+import Dispatch
 import Foundation
 import MLX
 
@@ -800,12 +801,39 @@ if !options.attachments.isEmpty {
 
     log("  models  : \(specs.map(\.backendLabel).joined(separator: ", "))")
     log("Press Control-C to stop.")
-    _ = transportServer
 
-    // Keep the process alive; the HTTP listener runs on its own queue.
-    while true {
-        try? await Task.sleep(for: .seconds(3600))
+    // Stop on SIGINT or SIGTERM instead of being killed: `WebTransportEngineServer.stop()`
+    // and the HTTP server's teardown have to run so the listener releases its port and the
+    // logs are flushed, and the installer's lifecycle and `tools/start.sh --stop` both
+    // depend on that being predictable (A16). Installed only inside the serving branch, so
+    // a mode that does not serve keeps the default disposition — pressing Control-C in a
+    // headless conversation should end it immediately.
+    signal(SIGINT, SIG_IGN)
+    signal(SIGTERM, SIG_IGN)
+    let (shutdownSignals, shutdownContinuation) = AsyncStream<Int32>.makeStream()
+    // Held for the life of the process: a signal source that is released stops delivering.
+    var signalSources: [DispatchSourceSignal] = []
+    for number in [SIGINT, SIGTERM] {
+        // `.main`, not `.global`: top-level code in a Swift 6 `main.swift` is main-actor
+        // isolated, and the event handler inherits that isolation. Dispatching it to a
+        // global queue tripped the runtime's actor-isolation assertion (SIGTRAP) instead of
+        // shutting anything down. The main queue is the main actor's executor, so the
+        // handler is invoked where its isolation says it should be.
+        let source = DispatchSource.makeSignalSource(signal: number, queue: .main)
+        source.setEventHandler { shutdownContinuation.yield(number) }
+        source.resume()
+        signalSources.append(source)
     }
+    _ = signalSources
+
+    // Keep the process alive until a signal arrives; the HTTP listener runs on its own queue.
+    for await number in shutdownSignals {
+        log("received signal \(number) — stopping")
+        break
+    }
+    await transportServer?.stop()
+    server.stop()
+    exit(0)
 }
 
 // MARK: - Conversation
