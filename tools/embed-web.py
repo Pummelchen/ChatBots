@@ -11,20 +11,25 @@ Exits non-zero if the generated file was out of date and --check was passed, whi
 the build script uses to notice that someone edited one and not the other.
 """
 
+from __future__ import annotations
+
 import pathlib
 import sys
+from collections.abc import Sequence
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
-WEB = ROOT / "web"
-TARGET = ROOT / "Sources" / "ChatBotsCore" / "WebAssets.swift"
+ROOT: pathlib.Path = pathlib.Path(__file__).resolve().parent.parent
+WEB: pathlib.Path = ROOT / "web"
+TARGET: pathlib.Path = ROOT / "Sources" / "ChatBotsCore" / "WebAssets.swift"
 
-FILES = [
+# name, source file, content type, then the request paths it answers. Read-only, so the
+# annotation says so; the trailing paths are variadic because an asset may answer several.
+FILES: Sequence[tuple[str, str, str, *tuple[str, ...]]] = [
     ("indexHTML", "index.html", "text/html; charset=utf-8", "/", "/index.html"),
     ("styleCSS", "style.css", "text/css; charset=utf-8", "/style.css"),
     ("appJS", "app.js", "application/javascript; charset=utf-8", "/app.js"),
 ]
 
-HEADER = '''// ChatBotsCore — the web interface, embedded
+HEADER: str = """// ChatBotsCore — the web interface, embedded
 //
 // Generated from `web/` by `tools/embed-web.py`; edit the files there, not here. It is
 // embedded rather than read from disk so the server works from anywhere — a release build
@@ -46,7 +51,7 @@ public enum WebAssets {
     /// Look up a path from a request, or nil when it is not an asset.
     public static func asset(for path: String) -> Asset? {
         switch path {
-'''
+"""
 
 
 def literal(text: str) -> str:
@@ -55,7 +60,7 @@ def literal(text: str) -> str:
 
 
 def generate() -> str:
-    out = [HEADER]
+    out: list[str] = [HEADER]
     for name, filename, content_type, *paths in FILES:
         # One case with several patterns: Swift has no fallthrough between cases.
         patterns = ", ".join(f'"{p}"' for p in paths)
@@ -66,7 +71,9 @@ def generate() -> str:
     out.append('        case "/favicon.ico":\n            return nil\n')
     out.append("        default:\n            return nil\n        }\n    }\n\n")
     for name, filename, _, *_ in FILES:
-        out.append(f"    static let {name} = {literal((WEB / filename).read_text())}\n\n")
+        out.append(
+            f"    static let {name} = {literal((WEB / filename).read_text())}\n\n"
+        )
     out.append("}\n")
     return "".join(out)
 
@@ -91,4 +98,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

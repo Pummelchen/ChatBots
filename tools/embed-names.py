@@ -17,14 +17,15 @@ from __future__ import annotations
 
 import pathlib
 import sys
+from collections.abc import Mapping, Sequence
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
-SOURCE = ROOT / "names"
-TARGET = ROOT / "Sources" / "ChatBotsCore" / "NameLists.swift"
+ROOT: pathlib.Path = pathlib.Path(__file__).resolve().parent.parent
+SOURCE: pathlib.Path = ROOT / "names"
+TARGET: pathlib.Path = ROOT / "Sources" / "ChatBotsCore" / "NameLists.swift"
 
 # The language codes, and what to call each in the interface. The order here is the order in
-# the generated file, so the diff stays stable.
-LANGUAGES = [
+# the generated file, so the diff stays stable. Read-only, so the annotation says so.
+LANGUAGES: Sequence[tuple[str, str]] = [
     ("english", "English"),
     ("french", "French"),
     ("german", "German"),
@@ -33,7 +34,7 @@ LANGUAGES = [
     ("italian", "Italian"),
 ]
 
-FILES = {
+FILES: Mapping[str, str] = {
     "english": "english.txt",
     "french": "french.txt",
     "german": "german.txt",
@@ -64,7 +65,8 @@ def parse(path: pathlib.Path) -> dict[str, list[str]]:
             continue
         if current is None:
             raise SystemExit(
-                f"{path.name}:{number}: {line!r} appears before a [female] or [male] marker")
+                f"{path.name}:{number}: {line!r} appears before a [female] or [male] marker"
+            )
         if line in sections[current]:
             raise SystemExit(f"{path.name}:{number}: {line!r} is listed twice")
         sections[current].append(line)
@@ -75,9 +77,12 @@ def parse(path: pathlib.Path) -> dict[str, list[str]]:
 
 
 def generate() -> str:
-    lists = {code: parse(SOURCE / FILES[code]) for code, _ in LANGUAGES}
+    lists: dict[str, dict[str, list[str]]] = {
+        code: parse(SOURCE / FILES[code]) for code, _ in LANGUAGES
+    }
 
-    out = ['''// ChatBotsCore — the names participants are given at startup
+    out: list[str] = [
+        """// ChatBotsCore — the names participants are given at startup
 //
 // Generated from `names/` by `tools/embed-names.py`; edit the text files there, not here.
 // Six languages, each with a female and a male list.
@@ -90,15 +95,16 @@ import Foundation
 
 /// A language the app can draw names from.
 public enum NameLanguage: String, Sendable, Codable, CaseIterable, Identifiable {
-''' ]
-    for code, label in LANGUAGES:
-        out.append(f'    case {code}\n')
-    out.append('''
+"""
+    ]
+    for code, _ in LANGUAGES:
+        out.append(f"    case {code}\n")
+    out.append("""
     public var id: String { rawValue }
 
     public var label: String {
         switch self {
-''')
+""")
     for code, label in LANGUAGES:
         out.append(f'        case .{code}: "{label}"\n')
     out.append("        }\n    }\n\n")
@@ -114,7 +120,7 @@ public enum NameLanguage: String, Sendable, Codable, CaseIterable, Identifiable 
         )
     out.append("        }\n    }\n}\n\n")
 
-    out.append('''/// One language's names, split by gender.
+    out.append("""/// One language's names, split by gender.
 public struct NameList: Sendable, Hashable {
     public var female: [String]
     public var male: [String]
@@ -173,7 +179,7 @@ public enum Gender: String, Sendable, Codable, CaseIterable, Identifiable {
 
     public var id: String { rawValue }
 }
-''')
+""")
     return "".join(out)
 
 
@@ -186,7 +192,8 @@ def main() -> int:
     if check:
         print(
             "NameLists.swift is out of date with names/.\nRun: python3 tools/embed-names.py",
-            file=sys.stderr)
+            file=sys.stderr,
+        )
         return 1
     TARGET.write_text(wanted)
     print(f"wrote {TARGET.relative_to(ROOT)}")

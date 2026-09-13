@@ -21,13 +21,26 @@ is done properly.
 from __future__ import annotations
 
 import base64
+import http.client
 import json
 import os
-import sys
+import shutil
 import socket
 import struct
+import subprocess
+import sys
 import time
 import urllib.request
+from typing import Self
+
+# `json.load`/`json.loads` hand back `Any`, and a DevTools reply is genuinely dynamic until a
+# call site reads a field. These aliases name what that boundary actually carries — a JSON
+# value, and an object whose keys are strings — so the signatures below stay precise and the
+# one place a field is trusted is the place it is narrowed.
+type JsonValue = (
+    None | bool | int | float | str | list[JsonValue] | dict[str, JsonValue]
+)
+type JsonObject = dict[str, JsonValue]
 
 
 class DevToolsError(RuntimeError):
@@ -37,11 +50,14 @@ class DevToolsError(RuntimeError):
 class _WebSocket:
     """A client WebSocket, text frames only, no fragmentation."""
 
+    sock: socket.socket
+    _buffer: bytes
+
     def __init__(self, url: str, timeout: float = 20) -> None:
         # ws://127.0.0.1:9222/devtools/page/ABC
         if not url.startswith("ws://"):
             raise DevToolsError(f"unsupported websocket url: {url}")
-        rest = url[len("ws://"):]
+        rest = url[len("ws://") :]
         hostport, _, path = rest.partition("/")
         host, _, port = hostport.partition(":")
         self.sock = socket.create_connection((host, int(port or 80)), timeout=timeout)
@@ -74,7 +90,7 @@ class _WebSocket:
 
     def send(self, text: str) -> None:
         payload = text.encode()
-        header = bytearray([0x81])          # FIN + text opcode
+        header = bytearray([0x81])  # FIN + text opcode
         length = len(payload)
         if length < 126:
             header.append(0x80 | length)
@@ -113,12 +129,12 @@ class _WebSocket:
                 length = struct.unpack(">Q", self._read_exactly(8))[0]
             payload = self._read_exactly(length)
 
-            if opcode == 0x8:                       # close
+            if opcode == 0x8:  # close
                 raise DevToolsError("server closed the websocket")
-            if opcode == 0x9:                       # ping
+            if opcode == 0x9:  # ping
                 self.sock.sendall(b"\x8a\x80" + os.urandom(4))
                 continue
-            if opcode == 0xA:                       # pong
+            if opcode == 0xA:  # pong
                 continue
             pieces.append(payload)
             if fin:
@@ -134,15 +150,24 @@ class _WebSocket:
 class Chrome:
     """A headless Chrome instance driven over the DevTools protocol."""
 
-    def __init__(self, binary: str, port: int = 9222, profile: str = "/tmp/chatbots-cdp") -> None:
+    binary: str
+    port: int
+    profile: str
+    process: subprocess.Popen[bytes] | None
+    socket: _WebSocket | None
+    _next_id: int
+
+    def __init__(
+        self, binary: str, port: int = 9222, profile: str = "/tmp/chatbots-cdp"
+    ) -> None:
         self.binary = binary
         self.port = port
         self.profile = profile
         self.process = None
-        self.socket: _WebSocket | None = None
+        self.socket = None
         self._next_id = 1
 
-    def __enter__(self) -> "Chrome":
+    def __enter__(self) -> Self:
         self.start()
         return self
 
@@ -150,9 +175,6 @@ class Chrome:
         self.stop()
 
     def start(self, url: str = "about:blank") -> None:
-        import shutil
-        import subprocess
-
         shutil.rmtree(self.profile, ignore_errors=True)
         self.process = subprocess.Popen(
             [
@@ -173,22 +195,40 @@ class Chrome:
         )
 
         # Wait for the debugging endpoint, then find the page target.
-        target = None
+        target: JsonObject | None = None
         deadline = time.time() + 30
         while time.time() < deadline:
             try:
-                with urllib.request.urlopen(f"http://127.0.0.1:{self.port}/json", timeout=2) as r:
-                    pages = json.load(r)
-                target = next((p for p in pages if p.get("type") == "page"), None)
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{self.port}/json", timeout=2
+                ) as r:
+                    pages: JsonValue = json.load(r)
+                if not isinstance(pages, list):
+                    # A reply that is not the target list means the endpoint is not ready
+                    # yet, which is exactly what this loop waits out.
+                    time.sleep(0.3)
+                    continue
+                target = next(
+                    (
+                        page
+                        for page in pages
+                        if isinstance(page, dict) and page.get("type") == "page"
+                    ),
+                    None,
+                )
                 if target:
                     break
-            except Exception:
+            except (OSError, ValueError, http.client.HTTPException):
                 time.sleep(0.3)
         if not target:
             self.stop()
             raise DevToolsError("Chrome's debugging endpoint never came up")
 
-        self.socket = _WebSocket(target["webSocketDebuggerUrl"])
+        endpoint = target.get("webSocketDebuggerUrl")
+        if not isinstance(endpoint, str):
+            self.stop()
+            raise DevToolsError("Chrome's page target carries no websocket url")
+        self.socket = _WebSocket(endpoint)
 
     def stop(self) -> None:
         """Shut down only the browser this instance started.
@@ -207,40 +247,56 @@ class Chrome:
                 self.process.terminate()
                 try:
                     self.process.wait(timeout=5)
-                except Exception:
+                except subprocess.TimeoutExpired:
                     self.process.kill()
             else:
                 # Refuse rather than risk closing someone's browser.
-                print(f"  refusing to terminate pid {pid}: not the headless instance", file=sys.stderr)
+                print(
+                    f"  refusing to terminate pid {pid}: not the headless instance",
+                    file=sys.stderr,
+                )
             self.process = None
 
     def _is_our_headless_instance(self, pid: int) -> bool:
         """True only for a headless Chrome carrying this instance's private profile."""
-        import subprocess
         try:
-            out = subprocess.run(["ps", "-p", str(pid), "-o", "command="],
-                                 capture_output=True, text=True, timeout=5).stdout
-        except Exception:
+            out = subprocess.run(
+                ["ps", "-p", str(pid), "-o", "command="],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            ).stdout
+        except (OSError, subprocess.TimeoutExpired):
             return False
         # The configured profile, not a hard-coded default: a caller that passes its own
         # --user-data-dir must still be able to stop the Chrome it started, or the next
         # start() rmtree's the profile directory and races for the debugging port.
         return "--headless" in out and self.profile in out
 
-    def call(self, method: str, params: dict | None = None) -> dict:
+    def call(self, method: str, params: JsonObject | None = None) -> JsonObject:
         """Send a command and wait for its reply, ignoring events."""
         if not self.socket:
             raise DevToolsError("not connected")
         message_id = self._next_id
         self._next_id += 1
-        self.socket.send(json.dumps({"id": message_id, "method": method, "params": params or {}}))
+        self.socket.send(
+            json.dumps({"id": message_id, "method": method, "params": params or {}})
+        )
         while True:
-            message = json.loads(self.socket.receive())
+            message: JsonValue = json.loads(self.socket.receive())
+            if not isinstance(message, dict):
+                raise DevToolsError(
+                    f"{method}: reply was {type(message).__name__}, expected an object"
+                )
             if message.get("id") != message_id:
-                continue                       # an event, not our reply
+                continue  # an event, not our reply
             if "error" in message:
                 raise DevToolsError(f"{method}: {message['error']}")
-            return message.get("result", {})
+            result = message.get("result")
+            if not isinstance(result, dict):
+                return {}
+            return result
 
     def emulate(
         self, width: int, height: int, pixel_ratio: float, mobile: bool = True
@@ -258,7 +314,10 @@ class Chrome:
                 "screenOrientation": {"type": "portraitPrimary", "angle": 0},
             },
         )
-        self.call("Emulation.setTouchEmulationEnabled", {"enabled": mobile, "maxTouchPoints": 5})
+        self.call(
+            "Emulation.setTouchEmulationEnabled",
+            {"enabled": mobile, "maxTouchPoints": 5},
+        )
 
     def navigate(self, url: str, settle: float = 2.5) -> None:
         self.call("Page.enable")
@@ -268,12 +327,15 @@ class Chrome:
         # why the captures are reproducible.
         time.sleep(settle)
 
-    def evaluate(self, expression: str) -> object:
+    def evaluate(self, expression: str) -> JsonValue:
         result = self.call(
             "Runtime.evaluate",
             {"expression": expression, "returnByValue": True, "awaitPromise": True},
         )
-        return result.get("result", {}).get("value")
+        inner = result.get("result")
+        if not isinstance(inner, dict):
+            return None
+        return inner.get("value")
 
     def screenshot(self, path: str) -> None:
         result = self.call(
@@ -282,12 +344,15 @@ class Chrome:
             # off at the fold.
             {"format": "png", "captureBeyondViewport": True},
         )
+        data = result.get("data")
+        if not isinstance(data, str):
+            raise DevToolsError("Page.captureScreenshot returned no image data")
         with open(path, "wb") as handle:
-            handle.write(base64.b64decode(result["data"]))
+            handle.write(base64.b64decode(data))
 
-    def metrics(self) -> dict:
+    def metrics(self) -> JsonObject:
         """What the page actually measured about itself."""
-        return self.evaluate(
+        value = self.evaluate(
             """(() => {
                 const root = document.documentElement;
                 const vw = Math.round(window.visualViewport?.width ?? window.innerWidth);
@@ -315,3 +380,8 @@ class Chrome:
                 };
             })()"""
         )
+        if not isinstance(value, dict):
+            raise DevToolsError(
+                f"Runtime.evaluate returned {type(value).__name__}, expected an object"
+            )
+        return value
