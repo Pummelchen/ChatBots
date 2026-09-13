@@ -16,6 +16,10 @@ import MLX
 struct Options {
     var topic = "Why are eggs not round?"
     var turns = 4
+    /// Whether `--turns` was actually given. `--serve` builds its own engine configuration
+    /// and must apply the flag when present without overriding the engine's own default when
+    /// it is not (A66).
+    var turnsSpecified = false
     var modelA = AgentSpec.defaultModelID
     var modelB = AgentSpec.defaultModelID
     var tavilyKey: String?
@@ -68,7 +72,11 @@ struct Options {
             }
             switch argument {
             case "--topic", "-t": options.topic = next() ?? options.topic
-            case "--turns", "-n": options.turns = Int(next() ?? "") ?? options.turns
+            case "--turns", "-n":
+                if let value = Int(next() ?? "") {
+                    options.turns = value
+                    options.turnsSpecified = true
+                }
             case "--model-a": options.modelA = next() ?? options.modelA
             case "--model-b": options.modelB = next() ?? options.modelB
             case "--key": options.tavilyKey = next()
@@ -264,6 +272,17 @@ func header(_ title: String) {
 // Model storage lives in the project's `models/` folder; set before any engine loads.
 let modelsRoot = ModelStore.prepare()
 let options = Options.parse(Array(CommandLine.arguments.dropFirst()))
+
+// A flag that would otherwise be accepted and then ignored: `--seed` fills the server's
+// engine with a sample conversation, and outside `--serve` there is no server engine to
+// fill, so the run used to proceed silently as a real model conversation instead (A66).
+if options.seed, !options.serve {
+    FileHandle.standardError.write(
+        Data(
+            "--seed only applies with --serve: it seeds a sample conversation into the server's engine\n"
+                .utf8))
+    exit(2)
+}
 
 // The self-test an installer runs: it proves the runtime, the Metal library and the
 // checkpoint all work together on this machine, and it does so without needing to read or
@@ -685,15 +704,22 @@ if options.listRoles {
 // the web page and the SwiftUI app — talk to this, so there is one conversation engine and
 // one place where a conversation actually lives.
 if options.serve {
-    let configuration = ConversationEngine.Configuration()
+    // This engine is the same engine the headless run uses, so the tuning flags have to
+    // reach it too. The configuration was built from defaults and only `--research` was
+    // applied, so `--serve --turns 100`, `--compact-threshold` and `--compact-keep` were
+    // accepted and ignored (A66). `--turns` is applied only when it was actually given,
+    // so `--serve` on its own keeps the engine's own default rather than the CLI's 4.
+    var engineConfiguration = ConversationEngine.Configuration()
+    if options.turnsSpecified { engineConfiguration.maxTurns = max(1, options.turns) }
+    if let threshold = options.compactThreshold { engineConfiguration.compactThreshold = threshold }
+    if let keep = options.keepRecent { engineConfiguration.compactKeepRecentTurns = keep }
+    if let depth = options.researchDepth {
+        engineConfiguration.researchBudget = ResearchBudget.preset(depth)
+    }
     let seats = zip(specs, engines).map { spec, mlx in
         ConversationEngine.Seat(spec: spec, mlx: mlx, openAI: OpenAIResponsesEngine(spec: spec))
     }
-    var engineConfiguration = configuration
-if let depth = options.researchDepth {
-    engineConfiguration.researchBudget = ResearchBudget.preset(depth)
-}
-let engine = ConversationEngine(seats: seats, configuration: engineConfiguration)
+    let engine = ConversationEngine(seats: seats, configuration: engineConfiguration)
 
 // Source material, read the same way the app reads it.
 if !options.attachments.isEmpty {
