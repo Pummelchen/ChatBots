@@ -264,8 +264,13 @@ public enum DocumentIngestorProvider {
 
 /// Chooses an extractor per kind, and holds the shared rules — size limits and the
 /// blank-result check — so no individual extractor has to remember them.
-/// `@unchecked Sendable` because its stored values are immutable — a dictionary of sendable
-/// extractors and `FileManager`, which is documented as safe to share.
+///
+/// `@unchecked Sendable` because there is no mutable state to confine, so there is no lock,
+/// actor or queue to name: both stored properties are `let` and nothing in the type writes
+/// them. `extractors` is a dictionary of `DocumentExtracting`, which is `Sendable`, and the
+/// shared `FileManager` is only ever read through `attributesOfItem(atPath:)`. What keeps it
+/// true is that the type declares no `var` and exposes no setter, so `let` immutability is the
+/// whole of the confinement — there is no second access site a comment could disagree with.
 public final class DocumentIngestor: @unchecked Sendable {
     private let extractors: [DocumentKind: any DocumentExtracting]
     private let fileManager: FileManager

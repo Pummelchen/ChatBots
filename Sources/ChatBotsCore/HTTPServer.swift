@@ -257,6 +257,14 @@ public final class HTTPServer: @unchecked Sendable {
     public typealias Streamer = @MainActor @Sendable (HTTPRequest, EventStream) -> [String]
 
     /// A live event feed for one connection.
+    ///
+    /// `@unchecked Sendable` because its one piece of mutable state, `open`, is confined to
+    /// `lock`: `send`, `close`, `isOpen` and `markClosed` each take `lock` before reading or
+    /// writing it, so no access site can see a torn or stale value. `connection` is a `let`
+    /// and every call on it is handed to the Network framework, which serialises the work on
+    /// the queue the connection was started on. What keeps the confinement true is that `open`
+    /// is private and the type has no other `var`, so those four accessors are the only code
+    /// that can reach it.
     public final class EventStream: @unchecked Sendable {
         private let connection: NWConnection
         private let lock = NSLock()

@@ -788,6 +788,12 @@ actor MLXGate {
 }
 
 /// Progress callbacks arrive from download threads; throttle before touching UI state.
+///
+/// `@unchecked Sendable` because its one piece of mutable state, `lastReported`, is confined to
+/// `lock`: `report` is the only method that touches it and holds `lock` across the whole
+/// read-modify-write. The `handler` call is deliberately made after `lock.unlock()`, so an
+/// arbitrary callback never runs while the box is locked. What keeps the confinement true is
+/// that `lastReported` is private, `lock` is a `let`, and `report` is the only accessor.
 private final class ProgressBox: @unchecked Sendable {
     private let lock = NSLock()
     private var lastReported: Double = -1
@@ -805,6 +811,14 @@ private final class ProgressBox: @unchecked Sendable {
 // MARK: - Tool registry
 
 /// Maps a tool name emitted by a model to a live `ToolProvider`.
+///
+/// `@unchecked Sendable` because its one piece of mutable state, `tools`, is confined to
+/// `lock`: `register` writes the dictionary and `tool(named:)` reads it, each holding `lock`,
+/// and `tools` is private so no other code can reach it. `run` fetches the provider through
+/// `tool(named:)` and then awaits outside the lock, which is safe because `ToolProvider`
+/// refines `Sendable` — the value that escapes the lock carries its own synchronisation.
+/// What keeps the confinement true is that `lock` is a `let` and `register` and `tool(named:)`
+/// are the only accessors of the dictionary.
 public final class ToolRegistry: @unchecked Sendable {
     public static let shared = ToolRegistry()
 
