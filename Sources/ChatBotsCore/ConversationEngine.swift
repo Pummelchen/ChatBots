@@ -739,13 +739,19 @@ public final class ConversationEngine {
         )
         publishTranscript()
 
-        if !report.isLabelled {
+        if report.unlabelledStatements > 0 {
+            note(
+                "The report has \(report.unlabelledStatements) unlabelled claim(s); treat those as unverified."
+            )
+        } else if !report.isLabelled {
             note("The report came back without claim labels, so treat every statement as unverified.")
         }
         if !report.missingSections.isEmpty {
             note("The report did not cover: \(report.missingSections.joined(separator: ", ")).")
         }
-        note("Report ready — \(report.labelledStatements) labelled claims.")
+        note(
+            "Report ready — \(report.labelledStatements) labelled claims, \(report.unlabelledStatements) unlabelled."
+        )
     }
 
     private func runLoop(generation: Int) async {

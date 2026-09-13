@@ -137,15 +137,31 @@ public struct ResearchReport: Sendable, Hashable, Codable {
         "What Should Be Investigated Next",
     ]
 
-    /// Statements with no label, which is the failure mode worth checking for.
+    /// The sections the brief requires labels on.
+    ///
+    /// `reportRules` names them: "Every claim in Key Findings, Evidence, Assumptions and Risks
+    /// must begin with one of these labels". A line in any other section is prose, a task or a
+    /// narrative, and not labelling it is not the failure being counted. The parser keeps an
+    /// unrecognised heading as written, so both the required title and the short form a model
+    /// actually writes are included.
+    public static let claimSections: Set<String> = [
+        "Key Findings", "Evidence", "Assumptions", "Important Assumptions", "Risks",
+    ]
+
+    /// Claims with no label, which is the failure mode worth checking for.
     ///
     /// A report whose claims are unlabelled cannot be used to make a decision, because the
     /// reader cannot tell a verified fact from a hope. Rather than reject the report — the
     /// findings are still worth having — the count is reported so the interface can say the
-    /// labelling is incomplete.
+    /// labelling is incomplete, and `isLabelled` is false while any claim is unlabelled.
+    ///
+    /// Only lines in the sections the brief requires labels on are counted. A sentence of
+    /// executive summary is not a claim, and counting it made the number meaningless: a report
+    /// could carry fifty bare assertions in Key Findings and still read as labelled because the
+    /// prose outnumbered them (audit A72).
     public var unlabelledStatements: Int {
         sections.reduce(0) { total, section in
-            total + section.lines.count
+            total + (Self.claimSections.contains(section.title) ? section.lines.count : 0)
         }
     }
 
@@ -154,7 +170,11 @@ public struct ResearchReport: Sendable, Hashable, Codable {
     }
 
     /// Whether the report has the labels that make it usable.
-    public var isLabelled: Bool { labelledStatements > 0 }
+    ///
+    /// Every claim in a claim-bearing section is labelled, and there is at least one. A report
+    /// with one labelled claim and fifty bare assertions beside it is not labelled, which the
+    /// old `labelledStatements > 0` said it was.
+    public var isLabelled: Bool { labelledStatements > 0 && unlabelledStatements == 0 }
 
     /// Sections the brief requires that are missing entirely.
     public var missingSections: [String] {
@@ -195,8 +215,13 @@ public struct ResearchReport: Sendable, Hashable, Codable {
     }
 
     /// Whether every claim can be traced to an analyst who was actually there.
+    ///
+    /// Unlabelled claims count against this too. An unlabelled line is exactly the thing a
+    /// reader cannot trace: there is no author and no basis attached, so a report that declared
+    /// itself traceable while ignoring them was making the claim on the labelled minority
+    /// (audit A72).
     public var isTraceable: Bool {
-        labelledStatements > 0 && unattributedStatements == 0 && inventedAttributions.isEmpty
+        isLabelled && unattributedStatements == 0 && inventedAttributions.isEmpty
     }
 
     /// How a claim's author is shown beside it, if it has one worth showing.
@@ -229,6 +254,11 @@ public struct ResearchReport: Sendable, Hashable, Codable {
             // trusted a claim is not helped by learning at the bottom that it has no author.
             out += "**Traceability.** "
             var problems: [String] = []
+            if unlabelledStatements > 0 {
+                problems.append(
+                    "\(unlabelledStatements) claims carry no label, so a reader cannot tell a "
+                        + "fact from an assumption")
+            }
             if unattributedStatements > 0 {
                 problems.append(
                     "\(unattributedStatements) of \(labelledStatements) claims name no analyst, "
@@ -238,6 +268,9 @@ public struct ResearchReport: Sendable, Hashable, Codable {
                 problems.append(
                     "these claims name somebody who was not among the analysts: "
                         + inventedAttributions.joined(separator: ", "))
+            }
+            if problems.isEmpty {
+                problems.append("the report has no labelled claims to trace")
             }
             out += problems.joined(separator: "; ") + ".\n\n"
         }
