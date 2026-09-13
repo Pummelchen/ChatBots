@@ -636,7 +636,7 @@ audit's first S0.**
 | --- | --- | --- | --- | --- |
 | A29 | **S0** | `APIServer.swift:612 -> EngineService.swift:335` | The attachment filename is used verbatim as a filesystem path: unauthenticated arbitrary file write | DONE (`208540c`) |
 | A30 | **S1** | `HTTPServer.swift:184,191` | A negative Content-Length passes both guards and is used as a slice offset, trapping the process | DONE (`cbf39c7`) |
-| A31 | **S1** | `HTTPServer.swift:571` | SSE connections are never reaped, so streams and connections grow for the life of the process | START |
+| A31 | **S1** | `HTTPServer.swift:571` | SSE connections are never reaped, so streams and connections grow for the life of the process | DONE (`679551f`) |
 | A32 | **S1** | `WebTransportServer.swift:219 and WebTransportClient.swift:278` | A frame over the protocol cap is swallowed by try?, permanently desyncing the session | START |
 | A33 | **S1** | `ConversationEngine.swift:764` | Restarting a running conversation orphans the new turn loop, so Stop and Pause become no-ops | START |
 | A34 | **S1** | `ConversationStore.swift:122` | ConversationStore.save destroys the records it deliberately refuses to read | START |
@@ -807,3 +807,17 @@ when the tree is not clean, and `verify-done-commits.sh` reasons about what a co
 that is dirty for the wrong reason is one nobody reads. `__pycache__/` and `*.py[cod]` are now
 ignored, with the reason written in the file; both patterns were checked with `git check-ignore`
 against a real directory and a real `.pyc` rather than assumed.
+
+### A80, A81, A82 — three defects found while fixing the tools, and deliberately not absorbed
+
+The `tools/` lane reported these rather than folding them into the tasks it was given, which is the
+right call: **A80** is the same defect A23 fixed — a capture whose content is empty still only
+prints, so it is published on a green run — but A23's scope was the viewport mismatch, and widening
+a task to swallow an adjacent finding is how a task's scope quietly changes. So it is recorded as
+its own task.
+
+| id | sev | finding |
+| --- | --- | --- |
+| A80 | S2 | `tools/capture-devices.py:284-285` — "no messages rendered" prints and does not affect the exit code, while the docstring promises non-zero on any failed capture |
+| A81 | S3 | `tools/capture-devices.py:117-126` — the retry loop's `sleep 0.5` sits only in the `except` branch, so a reachable-but-not-ready health response spins with no delay, and the timeout counts iterations rather than wall-clock time |
+| A82 | S3 | `tools/cdp.py:258` — `Emulation.setDeviceMetricsOverride` always sets `screenOrientation` to `portraitPrimary`, so the landscape captures that swap width and height report the wrong orientation to the page |
