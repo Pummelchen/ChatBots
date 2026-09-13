@@ -58,13 +58,13 @@ struct ChatBotsApp: App {
 
         // The engine is a separate process that this app starts and owns. The supervisor
         // finds it, starts it, waits for it to answer over WebTransport, and stops it on quit.
-        let runDirectory: URL =
-            Bundle.main.executableURL?
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appending(path: ".run")
-            ?? URL(fileURLWithPath: NSTemporaryDirectory()).appending(path: "chatbots-run")
+        // Runtime state: the engine's log, kept beside the certificate the engine serves with.
+        //
+        // This used to be `<ChatBots.app>/.run`, which is inside the bundle — it invalidated the
+        // app's code signature the first time it launched, and an app installed somewhere it
+        // cannot write could not start its engine at all. `RunDirectory` decides once, for the app
+        // and the engine together.
+        let runDirectory = RunDirectory.current
         _supervisor = StateObject(
             wrappedValue: EngineSupervisor(logURL: runDirectory.appending(path: "app-engine.log")))
 

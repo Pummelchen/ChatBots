@@ -139,7 +139,32 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 PLIST
 
 echo "==> Ad-hoc signing"
-codesign --force --sign - "$APP" >/dev/null 2>&1 || echo "    (codesign skipped)"
+# Inside out, and `mlx.metallib` first.
+#
+# It sits in MacOS/ beside the executables, and `codesign` counts it as nested code for
+# everything in that folder: signing `ChatBots` while the metallib was unsigned failed with
+# "code object is not signed at all — in subcomponent: …/mlx.metallib". Signing the metallib
+# before the binaries is what makes the rest work. Leaving the failure unhandled, as this script
+# used to, produced an app whose signature did not match its contents.
+#
+# Each component is allowed to fail on its own — the bundle signature below is what is actually
+# checked, and it names the reason if something is still unsigned.
+for nested in mlx.metallib chatbots-cli chatbots-probe ChatBots; do
+  component="$APP/Contents/MacOS/$nested"
+  [ -e "$component" ] || continue
+  codesign --force --sign - "$component" >/dev/null 2>&1 || true
+done
+
+# Reported rather than swallowed. A failure does not stop the app running where it was built,
+# but a downloaded copy would be refused by Gatekeeper, and silently skipping it is how the
+# problem above stayed hidden.
+if ! sign_output="$(codesign --force --sign - "$APP" 2>&1)"; then
+  echo "    ! the app could not be signed; a downloaded copy would be refused" >&2
+  echo "$sign_output" | sed 's/^/      /' >&2
+elif ! verify_output="$(codesign --verify --strict "$APP" 2>&1)"; then
+  echo "    ! the app is signed but does not verify:" >&2
+  echo "$verify_output" | sed 's/^/      /' >&2
+fi
 
 echo
 echo "Built: $APP"

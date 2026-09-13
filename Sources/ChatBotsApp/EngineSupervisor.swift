@@ -211,7 +211,12 @@ public final class EngineSupervisor: ObservableObject {
         ]
         // Run it from the project directory when there is one, because that is where `.run/`
         // and the certificate live, and a second identity would be a second fingerprint.
-        process.currentDirectoryURL = projectDirectory() ?? executable.deletingLastPathComponent()
+        //
+        // Otherwise from the runtime directory, **not** from beside the executable: that is
+        // inside the bundle, and anything the engine writes relative to its working directory
+        // would land there and invalidate the app's signature. This is the same folder the engine
+        // resolves for itself through `RunDirectory`, so the two cannot disagree.
+        process.currentDirectoryURL = projectDirectory() ?? RunDirectory.current
 
         // The engine's output goes to a file rather than a pipe. A pipe would block the child
         // once its buffer filled, and an engine that blocks on logging is an engine that stops

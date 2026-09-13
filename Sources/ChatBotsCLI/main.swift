@@ -247,8 +247,7 @@ let options = Options.parse(Array(CommandLine.arguments.dropFirst()))
 // during setup, where a pause is expected, rather than in the app where it looks like a hang,
 // and the fingerprint is printed where someone installing can see it.
 if options.prepareIdentity {
-    let directory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-        .appending(path: ".run")
+    let directory = RunDirectory.current
     do {
         let identity = try CertificateStore.loadOrCreate(in: directory)
         print("engine certificate: \(identity.fingerprintDisplay)")
@@ -268,8 +267,7 @@ if options.prepareIdentity {
 // An in-process check can pass while a real client cannot connect at all — which is exactly
 // what happened here, and is the reason this exists.
 if options.checkClient {
-    let directory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-        .appending(path: ".run")
+    let directory = RunDirectory.current
     _ = try? CertificateStore.loadOrCreate(in: directory)
     var configuration = WebTransportEngineClient.Configuration()
     configuration.port = options.transportPort
@@ -300,8 +298,7 @@ if options.checkClient {
 }
 
 if options.checkTransport {
-    let directory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-        .appending(path: ".run")
+    let directory = RunDirectory.current
     let report = await TransportCheck.run(in: directory)
     print("WebTransport check")
     print(report.describe())
@@ -632,8 +629,10 @@ if !options.attachments.isEmpty {
     // links the same code, so the server can accept uploads too.
     DocumentIngestorProvider.install(SystemDocumentExtractor.ingestor)
 
-    let runDirectory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-        .appending(path: ".run")
+    // Runtime state — the certificate, and the conversations this engine keeps. Resolved by
+    // `RunDirectory` rather than from the working directory, so an engine started from inside
+    // `ChatBots.app` does not write its state into its own bundle.
+    let runDirectory = RunDirectory.current
     let server = APIServer(
         engine: engine, store: ConversationStore(directory: runDirectory),
         port: UInt16(options.port))
@@ -662,8 +661,7 @@ if !options.attachments.isEmpty {
     // browsers speak that, and it is what Caddy is for.
     var transportServer: WebTransportEngineServer?
     if options.transport == "webtransport" || options.transport == "both" {
-        let runDirectory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-            .appending(path: ".run")
+        let runDirectory = RunDirectory.current
         do {
             let identity = try CertificateStore.loadOrCreate(in: runDirectory)
             var configuration = WebTransportEngineServer.Configuration()
