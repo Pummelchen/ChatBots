@@ -469,6 +469,21 @@ care with evidence catches that, so the remedy is mechanical.
   narrow: a DONE task naming no source path — a CI file, a document, a decision — is reported as
   *skipped*, not as *passed*, so a clean run cannot be manufactured by naming nothing.
 
+**The guard had the same defect it was written to catch, and it was found by using it.** Its
+first version read its fields with `IFS=$'\t'`. A tab is *IFS whitespace*, so a run of tabs collapses
+and leading or trailing ones are dropped — which meant that when a task's `commit` was empty, the
+doubled tab vanished, every later field shifted one place left, `file_line` was read as `unit`, and
+the task was reported as *"names no source path"* and skipped. **It therefore skipped precisely the
+case it exists to catch.** Two tasks had empty commit fields, A04 and A20, and both were being
+skipped while it printed a clean run.
+
+Switching the separator to U+0001 — which is not IFS whitespace, so an empty field stays empty —
+turned `skip A20 names no source path` into `FAIL A20 status DONE but commit is 'empty'`, and both
+hashes are now recorded. That demonstration is kept here because it is the argument for the whole
+task: **a control that has never been shown to fire on the failure it targets is a control that may
+not be wired up.** The same standard was applied to A06's configs, to A03's gate and to A29's fix,
+each of which was made to fail on purpose before being trusted.
+
 **Verification.** `AUDIT/verify-done-commits.sh` exits 0 with every DONE task backed;
 `git show --stat` of the repair commit lists `Sources/ChatBotsCore/HTTPServer.swift`;
 `swift test` is 557 tests in 77 suites passing; `swift test --sanitize=thread` exits 0 with no

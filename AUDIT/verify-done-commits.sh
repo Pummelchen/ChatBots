@@ -30,16 +30,26 @@ fi
 # anything that looks like a file or directory under Sources/, Tests/ or tools/. A task that
 # names no such path — a CI YAML, a document, a decision — is out of scope here and is reported
 # as skipped rather than passed silently.
+# Fields are separated by U+0001, NOT by a tab, and that is the whole point of this comment.
+#
+# The first version of this guard used `@tsv` and `IFS=$'\t'`. A tab is *IFS whitespace*, so a
+# run of them collapses to a single delimiter and leading/trailing ones are dropped — which
+# means that when a task's `commit` was empty the doubled tab disappeared, every later field
+# shifted one place left, and `file_line` was read as `unit`. The task then "named no source
+# path" and was reported as skipped. In other words the guard silently skipped precisely the
+# tasks it exists to catch: a DONE claim with no commit behind it.
+#
+# U+0001 is not IFS whitespace, so an empty field stays an empty field.
 rows=$(jq -r '.tasks[]
     | select(.status == "DONE")
     | [.id, (.commit // ""), (.file_line // ""), (.unit // "")]
-    | @tsv' "$ledger")
+    | join("\u0001")' "$ledger")
 
 failures=0
 checked=0
 skipped=0
 
-while IFS=$'\t' read -r id commit file_line unit; do
+while IFS=$'\001' read -r id commit file_line unit; do
     [ -n "$id" ] || continue
 
     # The paths this task's own record points at.
