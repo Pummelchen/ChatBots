@@ -1417,6 +1417,23 @@
       "commit": "2dcf802",
       "notes": "Recorded as a finding rather than folded into A02 (coverage) because it is not about what is tested but about whether the suite can run twice; L6's scope names flakiness explicitly. The immediate consequence is practical as well as hygienic: with this in place two Swift fix lanes can run on one machine without fighting over ports, which is worth more than the fix itself for the remaining work.",
       "blocked_reason": null
+    },
+    {
+      "id": "A84",
+      "severity": "S2",
+      "unit": "audit process / git",
+      "file_line": "AUDIT/ (the coordinator's own commits)",
+      "title": "A commit made without a pathspec absorbed another lane's staged files, producing a mixed commit under a message that did not mention them",
+      "category": "process",
+      "status": "DONE",
+      "host_used": "this Mac",
+      "discovered_by": "the coordinator, from `git status --short` immediately before an unrelated commit: three `tools/` files showed as staged while the lanes were working",
+      "evidence_before": "Commit f6dc8c2 is titled 'audit(A28): document the baseline directory so its captures cannot mislead' and contains:\n  AUDIT/baseline/README.md\n  tools/make-app.sh\n  tools/start-app.sh\n  tools/start.sh\nThe three shell scripts are the tools/ lane's in-progress A10 work, which that lane had correctly staged by explicit path. The coordinator then staged its own AUDIT/ file and ran `git commit` WITHOUT a pathspec, which commits the ENTIRE index - so another lane's unfinished task landed inside a commit named after a different one.",
+      "fix_summary": "Commit with an explicit pathspec from now on: `git commit -F - -- <paths>` commits only the named paths and leaves everything else staged and untouched, whatever else is in the index. Demonstrated rather than assumed, in a throwaway repository: with files a and b both staged and modified, `git commit -- a` produced a commit containing only a and left b staged and uncommitted. The lanes' own explicit-path staging discipline was already correct; the failure was on the coordinator's side of it, in the one place it was not being applied. The incident is recorded rather than repaired because this audit forbids rewriting history - the mixed commit stays in the record with this entry explaining it.",
+      "evidence_after": "f6dc8c2 is left as it stands and annotated by this entry. The tools/ lane was told immediately what happened, asked NOT to re-commit those files, and asked to verify independently that its A10 changes are intact in the tree and that `shellcheck -S style tools/*.sh` reports 0 findings; shellcheck measured 0 at the time of writing. Subsequent coordinator commits use the pathspec form.",
+      "commit": null,
+      "notes": "This is the SECOND time a task's changes were carried by another task's commit (the first was A18's test edits riding in the A19 repair commit, recorded in A18's notes). Two occurrences of one failure mode is a process defect, not bad luck, and the shape is the same both times: staging was done correctly per task and then a commit was issued that did not name what it was committing. The guard for the *content* of a commit is verify-done-commits.sh; what was missing was a guard for the *scope* of a commit, and the answer here is procedural rather than a script - a commit should always name its paths.",
+      "blocked_reason": null
     }
   ]
 }

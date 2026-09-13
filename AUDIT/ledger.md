@@ -840,3 +840,39 @@ its own task.
 | A80 | S2 | `tools/capture-devices.py:284-285` — "no messages rendered" prints and does not affect the exit code, while the docstring promises non-zero on any failed capture |
 | A81 | S3 | `tools/capture-devices.py:117-126` — the retry loop's `sleep 0.5` sits only in the `except` branch, so a reachable-but-not-ready health response spins with no delay, and the timeout counts iterations rather than wall-clock time |
 | A82 | S3 | `tools/cdp.py:258` — `Emulation.setDeviceMetricsOverride` always sets `screenOrientation` to `portraitPrimary`, so the landscape captures that swap width and height report the wrong orientation to the page |
+
+---
+
+## A84 — a commit without a pathspec absorbs another lane's work — **DONE**
+
+**S2** · process · found by the coordinator while committing something unrelated
+
+Commit `f6dc8c2` is titled *"audit(A28): document the baseline directory so its captures cannot
+mislead"* and contains four files:
+
+```
+AUDIT/baseline/README.md
+tools/make-app.sh
+tools/start-app.sh
+tools/start.sh
+```
+
+The three shell scripts are the `tools/` lane's in-progress **A10** work, which that lane had
+correctly staged by explicit path. The coordinator then staged its own `AUDIT/` file and ran
+`git commit` **without a pathspec** — which commits the entire index, whatever else is in it. So
+another lane's unfinished task landed inside a commit named after a different one.
+
+**The fix is procedural and was demonstrated rather than assumed.** In a throwaway repository, with
+files `a` and `b` both staged and modified, `git commit -- a` produced a commit containing only `a`
+and left `b` staged and untouched. Commits now name their paths. The lanes' explicit-path staging
+was already right; the failure was on the coordinator's side, in the one place it was not applying
+the same rule.
+
+**This is the second time.** A18's test edits rode inside the A19 repair commit. Two occurrences of
+one failure mode is a process defect rather than bad luck, and the shape is identical both times:
+staging was correct per task, and then a commit was issued that did not name what it was
+committing. `verify-done-commits.sh` guards the *content* of a commit; nothing guarded its *scope*,
+and the answer is a habit rather than a script — a commit should always name its paths.
+
+The mixed commit stays in the record. This audit forbids rewriting history, so it is annotated
+rather than repaired, and the `tools/` lane was told immediately not to re-commit those files.
