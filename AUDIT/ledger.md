@@ -909,3 +909,36 @@ that collided) and A84 (a commit that absorbed another lane's staged files). The
 in all four: **the audit was confident about its controls and had not checked its own mechanism** —
 and each was found by looking at observed behaviour, a `git status`, a guard's output, a file mtime,
 rather than by reasoning about the design. That is also how the substantive findings were found.
+
+---
+
+## A89 — the ledger is written non-atomically, and the acceptance run passed on a ledger it could not parse
+
+**S2** · process · found because a lane reported seeing the file mid-write
+
+Two faults, and the second is the serious one.
+
+1. **The ledger was rewritten in place**, so a reader could observe a truncated file. A lane hit
+   exactly that and reported *"invalid JSON when I last read it"* — a race, not corruption, since the
+   file on disk was valid before and after. It now goes to a temporary file and is renamed over the
+   original, so a concurrent reader sees either the old file or the new one.
+2. **`AUDIT/phase-e.sh` section 11 passed on a ledger it could not read.** It piped `jq` into a file
+   and counted lines; on unparseable JSON `jq` writes nothing, so `total` and `open_count` were both
+   `0` and the gate printed `PASS — ledger: 0 tasks, none open, 0 blocked`. That is the one check
+   that says whether the audit is finished, and **it went green on a file it could not parse at
+   all.** The gate now parses first with `jq -e`, requires the count to be greater than zero, and
+   fails with the parse error written to a log.
+
+This is the same shape as A83's guard skipping the case it targeted and A28's counts taken from the
+size of a captured file rather than from the findings inside it: **a control that reports success on
+the broken input.**
+
+### The pattern, stated once
+
+This audit's own defects are now A19 (a DONE claim whose commit carried nothing), A83 (a guard that
+skipped its own target, and a port allocator that collided), A84 (a commit that absorbed another
+lane's files), A87 (parallel lanes sharing a module) and A89 (a gate that passed on unparseable
+input). They are all the same failure: **the audit was confident about its controls and had not
+checked its own mechanism.** Every one was found by looking at observed behaviour — a `git status`,
+a guard's output, a file mtime, a lane's complaint — rather than by reasoning about the design, and
+every fix has been to make the mechanism **fail loudly on the case it was silently tolerating.**

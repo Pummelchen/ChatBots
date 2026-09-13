@@ -327,23 +327,39 @@ fi
 # ---------------------------------------------------------------- the ledger's own state
 section "11/12  no task left open except DONE or BLOCKED-with-owner"
 if command -v jq >/dev/null 2>&1; then
-    jq -r '.tasks[] | "\(.id)\t\(.severity)\t\(.status)"' AUDIT/ledger.json > "$out/tasks.tsv" 2>/dev/null
-    total="$(wc -l < "$out/tasks.tsv" | tr -d '[:space:]')"
-    open_count="$(awk -F'\t' '$3=="START" || $3=="PROGRESS" || $3=="TEST" || $3=="AUDIT"' "$out/tasks.tsv" | wc -l | tr -d '[:space:]')"
-    blocked="$(awk -F'\t' '$3=="BLOCKED"' "$out/tasks.tsv" | wc -l | tr -d '[:space:]')"
-    printf 'tasks: %s   open: %s   blocked: %s\n' "$total" "$open_count" "$blocked" | tee -a "$out/ledger-state.txt"
-    if [ "$open_count" = "0" ]; then
-        pass "ledger: $total tasks, none open, $blocked blocked"
+    # Parse first, and refuse to draw any conclusion from a ledger that cannot be read.
+    #
+    # The first version of this section piped jq into a file and counted the lines. On invalid
+    # JSON jq writes nothing, so total and open_count were both 0 and the gate PASSED - "0
+    # tasks, none open" - which is the worst possible failure mode for the one check that says
+    # whether the audit is finished. It was found because a lane reported seeing the ledger
+    # mid-write, which is also why the ledger is written atomically (temp file, then rename).
+    if ! jq -e '.tasks | length' AUDIT/ledger.json > "$out/ledger-task-count.txt" 2>"$out/ledger-parse-error.txt"; then
+        fail "the ledger could not be parsed as JSON, so its state is unknown — see $out/ledger-parse-error.txt"
+        total=-1
     else
-        fail "ledger: $open_count task(s) still open"
-        awk -F'\t' '$3!="DONE" && $3!="BLOCKED" {printf "        %s %s %s\n", $1, $2, $3}' "$out/tasks.tsv" | head -20
+        total="$(tr -d '[:space:]' < "$out/ledger-task-count.txt")"
     fi
-    # A BLOCKED task without a written reason is not BLOCKED, it is abandoned.
-    missing_reason="$(jq -r '.tasks[] | select(.status=="BLOCKED" and ((.blocked_reason // "") | length == 0)) | .id' AUDIT/ledger.json 2>/dev/null)"
-    if [ -z "$missing_reason" ]; then
-        pass "every BLOCKED task carries a blocked_reason"
+    if [ "${total:--1}" -le 0 ] 2>/dev/null; then
+        fail "the ledger holds no tasks (count: ${total:-unknown}) — that is not a pass"
     else
-        fail "BLOCKED without a reason: $(printf '%s' "$missing_reason" | tr '\n' ' ')"
+        jq -r '.tasks[] | "\(.id)\t\(.severity)\t\(.status)"' AUDIT/ledger.json > "$out/tasks.tsv"
+        open_count="$(awk -F'\t' '$3=="START" || $3=="PROGRESS" || $3=="TEST" || $3=="AUDIT"' "$out/tasks.tsv" | wc -l | tr -d '[:space:]')"
+        blocked="$(awk -F'\t' '$3=="BLOCKED"' "$out/tasks.tsv" | wc -l | tr -d '[:space:]')"
+        printf 'tasks: %s   open: %s   blocked: %s\n' "$total" "$open_count" "$blocked" | tee -a "$out/ledger-state.txt"
+        if [ "$open_count" = "0" ]; then
+            pass "ledger: $total tasks, none open, $blocked blocked"
+        else
+            fail "ledger: $open_count task(s) still open"
+            awk -F'\t' '$3!="DONE" && $3!="BLOCKED" {printf "        %s %s %s\n", $1, $2, $3}' "$out/tasks.tsv" | head -20
+        fi
+        # A BLOCKED task without a written reason is not BLOCKED, it is abandoned.
+        missing_reason="$(jq -r '.tasks[] | select(.status=="BLOCKED" and ((.blocked_reason // "") | length == 0)) | .id' AUDIT/ledger.json)"
+        if [ -z "$missing_reason" ]; then
+            pass "every BLOCKED task carries a blocked_reason"
+        else
+            fail "BLOCKED without a reason: $(printf '%s' "$missing_reason" | tr '\n' ' ')"
+        fi
     fi
 else
     fail "jq is not installed, so the ledger state could not be read"
