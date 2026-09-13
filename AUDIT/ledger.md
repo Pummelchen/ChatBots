@@ -653,19 +653,19 @@ audit's first S0.**
 | A30 | **S1** | `HTTPServer.swift:184,191` | A negative Content-Length passes both guards and is used as a slice offset, trapping the process | DONE (`cbf39c7`) |
 | A31 | **S1** | `HTTPServer.swift:571` | SSE connections are never reaped, so streams and connections grow for the life of the process | DONE (`679551f`) |
 | A32 | **S1** | `WebTransportServer.swift:219 and WebTransportClient.swift:278` | A frame over the protocol cap is swallowed by try?, permanently desyncing the session | DONE (`c63b7b3`) |
-| A33 | **S1** | `ConversationEngine.swift:764` | Restarting a running conversation orphans the new turn loop, so Stop and Pause become no-ops | START |
-| A34 | **S1** | `ConversationStore.swift:122` | ConversationStore.save destroys the records it deliberately refuses to read | START |
+| A33 | **S1** | `ConversationEngine.swift:764` | Restarting a running conversation orphans the new turn loop, so Stop and Pause become no-ops | DONE (`b88eee1`) |
+| A34 | **S1** | `ConversationStore.swift:122` | ConversationStore.save destroys the records it deliberately refuses to read | DONE (`59555f0`) |
 | A35 | **S1** | `ChatController.swift:428-452` | A turn ending is never observed, so isGenerating sticks on forever: stuck UI, duplicated answer, disabled controls | START |
-| A36 | **S1** | `DocumentImport.swift:158-171` | The conversion timeout can never fire: the pipe reads block forever first, and the drain order can deadlock | START |
+| A36 | **S1** | `DocumentImport.swift:158-171` | The conversion timeout can never fire: the pipe reads block forever first, and the drain order can deadlock | DONE (`84fc613`) |
 | A37 | **S2** | `HTTPServer.swift:519` | The HTTP listener has no read or idle deadline and no connection cap | START |
 | A38 | **S2** | `WebTransportClient.swift:97-100` | A failed openBidirectionalStream leaks the session and leaves isConnected true | START |
 | A39 | **S2** | `WebTransportClient.swift:184-190, :286` | Replies are matched by queue order, and removeFirst() assumes in-order completion | START |
 | A40 | **S3** | `WebTransportServer.swift:128` | stop() leaves live WebTransport sessions serving and never closes them | START |
-| A41 | **S2** | `ConversationEngine.swift:230` | An orphaned unbounded event stream retains every event, including a full prompt per turn, for the process lifetime | START |
-| A42 | **S2** | `MLXEngine.swift:129` | MLXEngine.compact mutates a local spec that generate() never reads, so maxTokens and thinking-off are ignored | START |
-| A43 | **S2** | `MLXEngine.swift:503` | The reasoning ceiling truncates the turn instead of forcing an answer, and unlimited thinking gets less headroom than high | START |
-| A44 | **S2** | `ConversationEngine.swift:718` | Reopening a finished research conversation and pressing Start writes a second report with zero turns | START |
-| A45 | **S2** | `ConversationEngine.swift:1040` | Auto-compaction is measured against a static window instead of the engine's learned one | START |
+| A41 | **S2** | `ConversationEngine.swift:230` | An orphaned unbounded event stream retains every event, including a full prompt per turn, for the process lifetime | DONE (`d870f3d`) |
+| A42 | **S2** | `MLXEngine.swift:129` | MLXEngine.compact mutates a local spec that generate() never reads, so maxTokens and thinking-off are ignored | DONE (`978550d`) |
+| A43 | **S2** | `MLXEngine.swift:503` | The reasoning ceiling truncates the turn instead of forcing an answer, and unlimited thinking gets less headroom than high | DONE (`e5e2872`) |
+| A44 | **S2** | `ConversationEngine.swift:718` | Reopening a finished research conversation and pressing Start writes a second report with zero turns | DONE (`60e2f49`) |
+| A45 | **S2** | `ConversationEngine.swift:1040` | Auto-compaction is measured against a static window instead of the engine's learned one | DONE (`2ed98a8`) |
 | A46 | **S2** | `ChatController.swift:890-902` | Attachment chips print '0 words' / 'Zero bytes' because the engine's summary and token count are discarded | START |
 | A47 | **S2** | `ChatController.swift:1026-1033 + ChatBotsApp.swift:33-34` | Saved source material is silently discarded at launch and then erased from settings | START |
 | A48 | **S2** | `ChatController.swift:675-687` | ChatController issues overlapping requests against a client whose protocol is documented as one-request-at-a-time, so replies cross | START |

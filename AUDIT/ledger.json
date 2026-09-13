@@ -762,14 +762,14 @@
       "file_line": "ConversationEngine.swift:1040 (and :1118-1119)",
       "title": "Auto-compaction is measured against a static window instead of the engine's learned one",
       "category": "defect",
-      "status": "START",
+      "status": "DONE",
       "host_used": "this Mac",
       "discovered_by": "line-depth pass: engine core",
       "evidence_before": "contextUsage and compactIfNeeded both use spec.contextWindow, while currentSpec overrides only thinking, persona and displayName, so the engine's own contextWindow - read from the checkpoint config at load - never reaches the threshold, though AgentSpec documents it as 'the single number the auto-compaction threshold is measured against'. Where config.json is not found (loadedContextWindow stays 32 768) or a non-default checkpoint is used, spec stays 262 144, compaction never runs in time and the provider silently truncates the start of the discussion - the failure compactIfNeeded exists to prevent.",
-      "fix_summary": null,
-      "evidence_after": null,
-      "commit": null,
-      "notes": "Found by a read-only line-depth pass. Reported with file:line, impact and quoted evidence; the pass's own 'examined and clean' record is in the Phase D section of ledger.md.",
+      "fix_summary": "The auto-compaction threshold and the reported usage are now both measured against the context window the seat's ENGINE reports, refreshed once at the top of each turn and cached by seat id. The spec's `contextWindow` is demoted to a fallback used only when the engine reports nothing usable, and `AgentSpec.defaultContextWindow` is the last resort; `compactNow` refreshes on its own. The old behaviour measured against the spec's 262 144, so for a checkpoint whose real window is 32 768 compaction never fired in time and the provider silently truncated the start of the discussion - the failure compaction exists to prevent. Asking once and handing the same number to both the threshold and the snapshot is deliberate: a second round trip per turn was avoidable, and the displayed usage and the trigger now cannot disagree.",
+      "evidence_after": "Sources/ChatBotsCore/ConversationEngine.swift: `reportedContextWindows`, `refreshContextWindow`, and the window threaded into `compactIfNeeded` and `contextUsage`; Tests/ChatBotsCoreTests/AuditEngineStateTestsContextWindow.swift adds 123 lines. swift build --build-tests 0 warnings 0 errors; swift test => 'Test run with 597 tests in 87 suites passed'.",
+      "commit": "2ed98a8",
+      "notes": "No MLXEngine change was needed: its `contextWindow` already exposed the value read from the checkpoint config, which is what made this a one-file fix - the orchestrator simply was not asking.",
       "blocked_reason": null
     },
     {
@@ -1415,7 +1415,7 @@
       "fix_summary": "The allocator now probes each candidate before returning it: it binds loopback port N and closes again, advancing past anything held, up to a bounded number of candidates so a busy machine cannot turn it into a loop. Deliberately WITHOUT SO_REUSEADDR, because with it a port already in use would probe as free, which is the one answer this must not give. The probe is documented as a probe and not a reservation - something else can take the port between the check and the caller's bind - so `HTTPServer.waitUntilReady()` remains the authority. The fallback after the bounded search returns the next counter value rather than trapping or looping, so a port that could not be bound is reported by the caller's readiness check instead of crashing inside a fixture.",
       "evidence_after": "swift build --build-tests 0 warnings 0 errors under the A03 gate; swift test => 'Test run with 573 tests in 79 suites passed'. Demonstrated to fire rather than merely compile: with 127.0.0.1:7900 held by an unrelated Python listener (confirmed with lsof), `swift test --filter 'HTTPServer|AttachmentUpload|SavedConversationHTTP|SharedConversation'` => 'Test run with 24 tests in 5 suites passed', i.e. the tests skipped the held port. Before the fix the first server test would have started at 7 900 and collided. The listener was then stopped.",
       "commit": "2dcf802",
-      "notes": "Recorded as a finding rather than folded into A02 (coverage) because it is not about what is tested but about whether the suite can run twice; L6's scope names flakiness explicitly. The immediate consequence is practical as well as hygienic: with this in place two Swift fix lanes can run on one machine without fighting over ports, which is worth more than the fix itself for the remaining work.",
+      "notes": "Recorded as a finding rather than folded into A02 (coverage) because it is not about what is tested but about whether the suite can run twice; L6's scope names flakiness explicitly. The immediate consequence is practical as well as hygienic: with this in place two Swift fix lanes can run on one machine without fighting over ports, which is worth more than the fix itself for the remaining work. ONE OBSERVED FLAKE, recorded rather than explained away: during the engine-state lane's work, `WebTransportSessionTests.swift:123` ('A client is still served after sitting idle on its connection') failed once with `.cannotStart` (WebTransportNetworkRuntime error 2) after 15.5s where it normally takes 1.3s. It passed in isolation and on an immediate full re-run, while the machine was at load 57-92 with three lanes building; the contention is recorded in environment.md. Recorded here rather than as a task because one occurrence under measured extreme load is not evidence of a defect, and not dismissed either - if it recurs on node1 during Phase E, where the machine is quiet, that would make it a real flakiness finding rather than contention.",
       "blocked_reason": null
     },
     {
@@ -1493,14 +1493,14 @@
       "file_line": "tools/capture-devices.py:76-84 (server_is_up), :67-73 (profiles)",
       "title": "The same connection-leak shape A86 fixed exists twice more, and one of them is called in a 90-iteration loop",
       "category": "incomplete",
-      "status": "START",
+      "status": "DONE",
       "host_used": "this Mac",
       "discovered_by": "reported by the tools/ lane while fixing A86, and left unfixed because it falls outside that task's scope",
       "evidence_before": "`server_is_up()` (:76-84) puts `conn.close()` AFTER `getresponse()` inside the try, so a probe that raises before returning leaks the socket - and `wait_for_server()` calls it in a loop of up to 90 attempts, so a service that is slow to come up can leak dozens of sockets rather than one. `profiles()` (:67-73) has the related shape with no try at all, though it is called once and returns immediately. This is the same class A86 fixed in `caddy_process`, found by the same person in the same file while fixing it.",
-      "fix_summary": null,
-      "evidence_after": null,
-      "commit": null,
-      "notes": "Recorded rather than folded into A86 for the rule this audit has applied throughout: one task, one scope, and widening a task to absorb an adjacent finding is how a scope quietly changes. The 90-iteration loop is what makes this one worth more than the count of occurrences suggests - the leak is bounded by the retry count, and the retry count is 90.",
+      "fix_summary": "Both remaining probe connections are closed in a `finally`. `server_is_up()` is the one that mattered: `wait_for_server` calls it in a loop of up to 90 attempts, so every failed probe leaked a socket. `profiles()` had the same shape with no try at all; it is called once, but leaving it inconsistent would be a trap for the next reader. Each fix establishes the caller's contract before changing the code - the body is read in full before the close and only the parsed list is returned; only the boolean is returned - so closing at the probe is the whole of what is owed.",
+      "evidence_after": "The leak was demonstrated BEFORE it was fixed, which is what makes this trustworthy: against a loopback server whose status line is malformed (`BadStatusLine`, an HTTPException but not a ConnectionError, so CPython does not self-close), the pre-fix `server_is_up` left 7/7 sockets live with the peer still open, and through the real `wait_for_server` loop 8/8. After the fix: 0/7 and 0/8 live, one close each, return values and the propagated exception unchanged. ruff, ruff format, pyright all clean; no suppressions.",
+      "commit": "dc34211",
+      "notes": "The probe's detail is worth keeping: it subclasses HTTPConnection to keep instances alive after the function returns, and observes both the client-side fd and the server-side absence of EOF, so the leak is shown from two directions rather than inferred from a missing call.",
       "blocked_reason": null
     },
     {
@@ -1516,7 +1516,7 @@
       "evidence_before": "TWO faults, and the second is the serious one. (1) The ledger is rewritten in place with `json.dump`, so a reader can observe a truncated file: a lane hit exactly that and reported 'invalid JSON when I last read it', which is a race rather than corruption - the file on disk was valid before and after. (2) `AUDIT/phase-e.sh` section 11 piped `jq` into a file and counted lines. On unparseable JSON jq writes nothing, so `total` and `open_count` were both 0 and the gate printed PASS - 'ledger: 0 tasks, none open, 0 blocked'. That is the one check that says whether the audit is finished, and it went green on a ledger that could not be read at all. The same shape as A83's guard skipping the case it targets and A28's counts taken from file sizes: a control that reports success on the broken input.",
       "fix_summary": "The gate now parses first and refuses to draw any conclusion if it cannot: `jq -e '.tasks | length'` must succeed, and the count must be greater than zero, or the section FAILS with the parse error written to a log. Only then does it count statuses. And the ledger is now written atomically - to a temporary file, then renamed over the original - so a concurrent reader sees either the old file or the new one and never a truncated one.",
       "evidence_after": "`jq -e '.tasks | length' AUDIT/ledger.json` => 88, and the file on disk and at HEAD both parse to 88 tasks. `bash -n` and `shellcheck -S style` clean on phase-e.sh. The gate's failure path is exercised by the parse guard rather than assumed: with `.tasks` absent or the file unreadable, `jq -e` exits non-zero and the section fails instead of reporting zero open tasks.",
-      "commit": null,
+      "commit": "a2ce3b5",
       "notes": "The pattern across this audit's own defects is now unmistakable and worth stating once: A19 (a DONE claim whose commit carried nothing), A83 (a guard that skipped its own target, and a port allocator that collided), A84 (a commit that absorbed another lane's files), A87 (parallel lanes sharing a module) and now A89 (a gate that passed on unparseable input) are all the same failure - the audit was confident about its CONTROLS and had not checked its own MECHANISM. Every one was found by looking at observed behaviour rather than by reasoning about the design, and every fix has been to make the mechanism fail loudly on the case it was silently tolerating.",
       "blocked_reason": null
     },
@@ -1552,6 +1552,40 @@
       "evidence_after": null,
       "commit": null,
       "notes": "Low likelihood with the Qwen template that shapes these prompts, and recorded rather than fixed because A43 was committed under the one-task-one-commit rule. Worth having on the list because it is the one path where A43's guarantee - an abandoned stream ends the turn - does not hold.",
+      "blocked_reason": null
+    },
+    {
+      "id": "A92",
+      "severity": "S2",
+      "unit": "turn loop",
+      "file_line": "Sources/ChatBotsCore/ConversationEngine.swift:879-882 (with :955, :969, :973, :976)",
+      "title": "Every engine event is published twice, duplicating live text, tool-log entries and every subscriber's stream",
+      "category": "defect",
+      "status": "START",
+      "host_used": "this Mac",
+      "discovered_by": "reported by a fix lane while working on an adjacent task, and left unfixed because it falls outside that task's scope",
+      "evidence_before": "The `onEvent` closure calls `publishEvent(event)` at :880 and then `handle(event, from:)` at :881 - and `handle` calls `publishEvent(event)` again in every branch: turnFinished at :955, toolResult at :969, toolFailure at :973, default at :976. So `record(event)` runs twice, which doubles `liveState[...].text` and `.reasoning` and puts duplicate entries in `toolLog` - and `liveSeats` is what the interface draws. Every `observeEvents` subscriber and the `events` stream receive each token and tool event twice, so the HTTP API and WebTransport clients see duplicates, and the event volume feeding A41's buffer is doubled. The existing tests assert only `conversation.turns`, which `handle` appends exactly once, so nothing catches it.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "Found by the engine-state lane while fixing A41. It is adjacent to A41 - unboundedness versus duplication - but not the same defect, and folding it in would have changed A41's scope. The reason no test catches it is instructive: the tests assert the transcript, which is correct, while the duplication is in the live/streaming path, which none of them observe. That is the same shape as the dead branches A35 records.",
+      "blocked_reason": null
+    },
+    {
+      "id": "A93",
+      "severity": "S2",
+      "unit": "device capture tool",
+      "file_line": "tools/capture-devices.py:129 (call order at :293-294)",
+      "title": "The documented capture command fails on a fresh checkout because `.run/` does not exist yet",
+      "category": "defect",
+      "status": "START",
+      "host_used": "this Mac",
+      "discovered_by": "reported by a fix lane while working on an adjacent task, and left unfixed because it falls outside that task's scope",
+      "evidence_before": "`start_servers()` opens `ROOT/.run/capture-engine.log` at :129, but nothing has created `.run/` at that point: `caddy_process()` creates it (`config.parent.mkdir(exist_ok=True)`) and `main()` calls `start_servers()` at ~:293 BEFORE `caddy_process()` at ~:294. `.run/` is gitignored and is otherwise created by `tools/start-app.sh`, so on a fresh clone the documented `python3 tools/capture-devices.py` raises an unhandled FileNotFoundError at :129 instead of the tool's own message. Established from the call order and `git check-ignore -v .run`; not executed on a fresh checkout because that path reaches `swift build`, which the reporting lane was not permitted to run.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "A fresh-clone failure is exactly what A18 was about, one layer down: the test suite was made hermetic, and this is a tool that still assumes a developer's machine. It shares its shape with A53 and A59 - the documented path does not work from a clean start.",
       "blocked_reason": null
     }
   ]
