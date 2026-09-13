@@ -788,9 +788,15 @@ extension LLMEngine {
     ///
     /// Both shipped backends implement these, but an engine that cannot be reconfigured at
     /// runtime — a test double, or a future read-only proxy — should not have to write
-    /// empty methods to satisfy the protocol. The defaults are deliberately silent rather
-    /// than fatal: the worst case is that a control does nothing, which is exactly what an
-    /// engine that ignores it already means.
+    /// empty methods to satisfy the protocol.
+    ///
+    /// The defaults are silent, and that is a sharper edge than it looks. A synchronous method also
+    /// satisfies an `async` requirement, so an engine that declares these without `async` gets both
+    /// its own method *and* this default in scope at a concrete call site — and `await` picks this
+    /// one. The write then vanishes with nothing failing to compile. That is exactly what happened
+    /// to `MLXEngine` and `OpenAIResponsesEngine` (audit A115), which is why both now declare these
+    /// `async` and match the requirement by shape as well as by name. An engine that leans on these
+    /// defaults keeps doing so deliberately; `EngineSetterShadowingTests` pins both behaviours.
     public func setThinking(_ mode: ThinkingMode) async {}
     public func setPersona(_ personaID: String) async {}
     public func setDisplayName(_ name: String) async {}

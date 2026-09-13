@@ -228,15 +228,21 @@ public actor MLXEngine: LLMEngine {
 
     /// Change how much this seat may think. Read at the start of each turn, so it takes
     /// effect on the next turn and never mid-generation.
-    public func setThinking(_ mode: ThinkingMode) {
+    ///
+    /// `async` because the `LLMEngine` requirement is, and that is load-bearing rather than
+    /// cosmetic: a synchronous method satisfies an async requirement, which left two candidates in
+    /// scope at a call site naming this concrete type, and `await` chose the protocol extension's
+    /// async no-op over this method. Every shipped call site goes through `any LLMEngine`, so the
+    /// write was only ever discarded in a shape nobody was using yet (audit A115).
+    public func setThinking(_ mode: ThinkingMode) async {
         currentThinking = mode
     }
 
     /// The level this seat will use on its next turn.
     public var thinking: ThinkingMode { currentThinking }
 
-    /// Rename this seat. Takes effect on its next turn.
-    public func setDisplayName(_ name: String) {
+    /// Rename this seat. Takes effect on its next turn. `async` for the reason `setThinking` is.
+    public func setDisplayName(_ name: String) async {
         currentDisplayName = name
     }
 
@@ -257,8 +263,8 @@ public actor MLXEngine: LLMEngine {
         imageData = Self.usableImages(from: documents, specID: spec.id)
     }
 
-    /// The style this seat will use on its next turn.
-    public func setPersona(_ personaID: String) {
+    /// The style this seat will use on its next turn. `async` for the reason `setThinking` is.
+    public func setPersona(_ personaID: String) async {
         currentPersonaID = personaID
     }
 

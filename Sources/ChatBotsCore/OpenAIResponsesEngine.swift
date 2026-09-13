@@ -77,9 +77,14 @@ public actor OpenAIResponsesEngine: LLMEngine {
     private var currentThinking: ThinkingMode
     private var currentPersona: String
 
-    public func setDisplayName(_ name: String) { currentDisplayName = name }
-    public func setThinking(_ mode: ThinkingMode) { currentThinking = mode }
-    public func setPersona(_ personaID: String) { currentPersona = personaID }
+    // `async` because the `LLMEngine` requirement is, and that is load-bearing rather than
+    // cosmetic: a synchronous method satisfies an async requirement, which left two candidates in
+    // scope at a call site naming this concrete type, and `await` chose the protocol extension's
+    // async no-op over these methods. Every shipped call site goes through `any LLMEngine`, so the
+    // write was only ever discarded in a shape nobody was using yet (audit A115).
+    public func setDisplayName(_ name: String) async { currentDisplayName = name }
+    public func setThinking(_ mode: ThinkingMode) async { currentThinking = mode }
+    public func setPersona(_ personaID: String) async { currentPersona = personaID }
 
     public var persona: PersonaStyle {
         PersonaCatalog.style(id: currentPersona, mode: spec.mode)
