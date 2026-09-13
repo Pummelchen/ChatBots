@@ -26,17 +26,16 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 122 |
-| DONE | 120 |
-| START | 2 |
+| DONE | 121 |
+| START | 1 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 2
+### Open — 1
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
 | A77 | S2 | START | — | distribution / licensing | The shipped app redistributes ~14 third-party libraries with no licence notices or attribution |
-| A99 | S2 | START | — | web surface / routing | Kept-conversation share links 404 in the documented deployment, because Caddy proxies only /api/* and the engine serves /s/<id> |
 
 ### Every task — 122
 
@@ -163,7 +162,7 @@ been run.
 | A96 | S3 | DONE | 146969a | research quality | `affinity` still scores with bare substring matching, deciding which seat is asked about what |
 | A97 | S2 | DONE | d66386d | research quality | `hasBasis` matches bare substrings, and A67 made its looseness load-bearing |
 | A98 | S2 | DONE | f14fac2 | web surface / browser boundary | In the documented configuration Caddy serves the page, so the CSP, nosniff, frame denial and referrer policy A76 added never reach it |
-| A99 | S2 | START | — | web surface / routing | Kept-conversation share links 404 in the documented deployment, because Caddy proxies only /api/* and the engine serves /s/<id> |
+| A99 | S2 | DONE | e7243d4 | web surface / routing | Kept-conversation share links 404 in the documented deployment, because Caddy proxies only /api/* and the engine serves /s/<id> |
 
 <!-- END GENERATED -->
 
