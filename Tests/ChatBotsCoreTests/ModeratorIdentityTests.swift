@@ -72,7 +72,10 @@ struct ModeratorIdentityTests {
             specs: specs, topic: "A question",
             moderator: ModeratorIdentity(name: "Dana", personaID: "skeptic"))
         #expect(named.contains("Messages marked [Dana]"))
-        #expect(named.contains("The Skeptic"))
+        // The persona resolves in the room's own library — the analysts — not the entertainment
+        // one, so the name the brief uses is the analyst's (audit A70).
+        #expect(named.contains("Skeptic"))
+        #expect(named.contains("disconfirmation"), "the analyst's method is what makes it worth saying")
     }
 
     @Test("The opening brief introduces the moderator")

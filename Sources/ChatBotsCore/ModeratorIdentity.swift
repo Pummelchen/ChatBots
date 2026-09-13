@@ -46,15 +46,22 @@ public struct ModeratorIdentity: Sendable, Hashable, Codable {
     /// Returns nil when there is nothing worth saying, so the prompt does not grow a paragraph
     /// explaining that the moderator has no character. Two sentences of nothing is worse than
     /// silence: it is tokens spent to say that there is nothing to say.
+    ///
+    /// The persona is resolved **in this mode's own library and not substituted**. A seat may
+    /// fall back to its mode's default when it holds an identifier from the other library, but
+    /// the moderator must not: doing so described a research run's moderator as "The Alpha", a
+    /// reality-show character they never chose, in the opening brief every analyst reads (audit
+    /// A70). An identifier that is not in this mode's library means the moderator has no persona
+    /// here, which is the truth; the name alone is still introduced.
     public func briefing(mode: DiscussionMode) -> String? {
-        let style = PersonaCatalog.style(id: personaID, mode: mode, seatIndex: 0)
-        let hasStyle = !style.directive.isEmpty
+        let style = PersonaCatalog.styles(for: mode).first { $0.id == personaID }
+        let hasStyle = !(style?.directive.isEmpty ?? true)
         let named = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard hasStyle || (named != Self.defaultName && !named.isEmpty) else { return nil }
 
         let who = named.isEmpty ? Self.defaultName : named
         var text = "The moderator is \(who), a person rather than a participant."
-        if hasStyle {
+        if let style, hasStyle {
             text += " They approach the work as — \(style.name): \(style.directive)"
         }
         text += """

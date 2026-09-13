@@ -18,6 +18,11 @@ public enum PromptBuilder {
     // MARK: - Introduction
 
     /// The shared opening brief. Shown in both panes and sent to both models.
+    ///
+    /// The room's mode is taken from the seats, because the moderator's persona has to be
+    /// resolved in the library the room actually draws from: a research run's moderator is an
+    /// analyst, and asking the entertainment library for it found nothing and silently
+    /// substituted "The Alpha" into the opening brief every analyst reads (audit A70).
     public static func introduction(
         specs: [AgentSpec], topic: String, moderator: ModeratorIdentity = ModeratorIdentity()
     ) -> String {
@@ -40,7 +45,7 @@ public enum PromptBuilder {
         whatever was said last — and say what you actually think. Keep each contribution \
         focused rather than exhaustive.
 
-        \(moderatorParagraph(moderator, count: specs.count))
+        \(moderatorParagraph(moderator, count: specs.count, mode: specs.first?.mode ?? .entertainment))
         """
     }
 
@@ -50,7 +55,12 @@ public enum PromptBuilder {
     /// moderator is described, and saying it twice per prompt would cost twice as much to say
     /// the same thing. A moderator who has chosen no name and no persona gets exactly the
     /// sentence this has always been.
-    static func moderatorParagraph(_ moderator: ModeratorIdentity, count: Int) -> String {
+    ///
+    /// `mode` is the room's, not a fixed one: the moderator's persona comes from the mode's own
+    /// library, and the brief must describe the person the room is actually working for.
+    static func moderatorParagraph(
+        _ moderator: ModeratorIdentity, count: Int, mode: DiscussionMode
+    ) -> String {
         // The name is interpolated into the very convention the model is told marks
         // authoritative human turns, and it is settable through the unauthenticated API, so
         // the copy used here cannot carry brackets, newlines or control characters: a name
@@ -64,7 +74,7 @@ public enum PromptBuilder {
         text += "from the human and override everything else. "
         // Who is asking, and how they argue — the "human moderator" role is weaker to work for
         // than a person whose method is named.
-        if let style = safe.briefing(mode: .entertainment) {
+        if let style = safe.briefing(mode: mode) {
             text += style
         }
         text += "\(searchRule(count: count))"
