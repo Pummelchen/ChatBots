@@ -1,48 +1,47 @@
-Fetching https://github.com/huggingface/swift-transformers from cache
 Fetching https://github.com/mattt/EventSource.git from cache
-Fetching https://github.com/apple/swift-collections.git from cache
 Fetching https://github.com/swiftlang/swift-syntax.git from cache
-Fetching https://github.com/apple/swift-argument-parser from cache
-Fetching https://github.com/apple/swift-numerics from cache
-warning: 'swift-collections': skipping cache due to an error: The file “maintenance.lock” doesn’t exist.
-Fetched https://github.com/mattt/EventSource.git from cache (0.71s)
-Fetched https://github.com/apple/swift-numerics from cache (0.71s)
-Fetching https://github.com/Pummelchen/WebTransport.git from cache
 Fetching https://github.com/ibireme/yyjson.git from cache
-Fetched https://github.com/swiftlang/swift-syntax.git from cache (0.80s)
-Fetching https://github.com/huggingface/swift-huggingface from cache
-Fetched https://github.com/apple/swift-argument-parser from cache (0.81s)
-Fetching https://github.com/ml-explore/mlx-swift-lm.git from cache
-Fetched https://github.com/huggingface/swift-transformers from cache (0.82s)
-Fetching https://github.com/apple/swift-crypto.git from cache
-Fetched https://github.com/Pummelchen/WebTransport.git from cache (0.66s)
-Fetching https://github.com/huggingface/swift-jinja.git from cache
-warning: 'swift-huggingface': skipping cache due to an error: The file “maintenance.lock” doesn’t exist.
-Fetched https://github.com/apple/swift-crypto.git from cache (0.65s)
+Fetching https://github.com/apple/swift-argument-parser from cache
+Fetching https://github.com/apple/swift-collections.git from cache
 Fetching https://github.com/apple/swift-asn1.git from cache
-Fetched https://github.com/ml-explore/mlx-swift-lm.git from cache (0.67s)
+Fetched https://github.com/swiftlang/swift-syntax.git from cache (0.84s)
+Fetched https://github.com/apple/swift-argument-parser from cache (0.85s)
+Fetched https://github.com/mattt/EventSource.git from cache (0.85s)
+Fetched https://github.com/apple/swift-collections.git from cache (0.85s)
+Fetched https://github.com/ibireme/yyjson.git from cache (0.85s)
+Fetching https://github.com/Pummelchen/WebTransport.git from cache
+Fetched https://github.com/apple/swift-asn1.git from cache (0.86s)
+Fetching https://github.com/huggingface/swift-jinja.git from cache
+Fetching https://github.com/ml-explore/mlx-swift-lm.git from cache
+Fetching https://github.com/huggingface/swift-transformers from cache
+Fetching https://github.com/huggingface/swift-huggingface from cache
 Fetching https://github.com/ml-explore/mlx-swift from cache
-warning: 'yyjson': skipping cache due to an error: The file “maintenance.lock” doesn’t exist.
-[1/27167] Fetching swift-collections
-Fetched https://github.com/huggingface/swift-jinja.git from cache (0.68s)
-warning: 'swift-asn1': skipping cache due to an error: The file “maintenance.lock” doesn’t exist.
-Fetched https://github.com/ml-explore/mlx-swift from cache (0.63s)
-[4620/29766] Fetching swift-collections, swift-huggingface
-Fetched https://github.com/huggingface/swift-huggingface from cache (1.55s)
+Fetched https://github.com/Pummelchen/WebTransport.git from cache (0.69s)
+Fetched https://github.com/huggingface/swift-jinja.git from cache (0.67s)
+Fetching https://github.com/apple/swift-crypto.git from cache
+Fetching https://github.com/apple/swift-numerics from cache
+warning: 'mlx-swift-lm': skipping cache due to an error: The file “maintenance.lock” doesn’t exist.
+warning: 'swift-transformers': skipping cache due to an error: The file “maintenance.lock” doesn’t exist.
+Fetched https://github.com/huggingface/swift-huggingface from cache (0.72s)
+warning: 'mlx-swift': skipping cache due to an error: The file “maintenance.lock” doesn’t exist.
+Fetched https://github.com/apple/swift-crypto.git from cache (0.69s)
+warning: 'swift-numerics': skipping cache due to an error: The file “maintenance.lock” doesn’t exist.
+[1/7001] Fetching swift-transformers
+Fetched https://github.com/huggingface/swift-transformers from cache (2.24s)
+[1/20910] Fetching mlx-swift-lm
+[2/27543] Fetching mlx-swift-lm, swift-numerics
+[11653/44087] Fetching mlx-swift-lm, swift-numerics, mlx-swift
+Fetched https://github.com/apple/swift-numerics from cache (1.85s)
+[5438/37454] Fetching mlx-swift-lm, mlx-swift
+Fetched https://github.com/ml-explore/mlx-swift from cache (2.83s)
+[11501/20910] Fetching mlx-swift-lm
+Fetched https://github.com/ml-explore/mlx-swift-lm.git from cache (4.49s)
 Computing version for https://github.com/Pummelchen/WebTransport.git
-[4891/27167] Fetching swift-collections
-Computed https://github.com/Pummelchen/WebTransport.git at 1.3.7 (2.40s)
+Computed https://github.com/Pummelchen/WebTransport.git at 1.3.7 (5.41s)
 Computing version for https://github.com/huggingface/swift-transformers
-Computed https://github.com/huggingface/swift-transformers at 1.3.4 (0.03s)
-[17388/32066] Fetching swift-collections, yyjson
-[18085/34049] Fetching swift-collections, yyjson, swift-asn1
-Fetched https://github.com/apple/swift-asn1.git from cache (2.01s)
-[29176/32066] Fetching swift-collections, yyjson
-Fetched https://github.com/apple/swift-collections.git from cache (3.58s)
-[2842/4899] Fetching yyjson
-Fetched https://github.com/ibireme/yyjson.git from cache (3.16s)
+Computed https://github.com/huggingface/swift-transformers at 1.3.4 (0.05s)
 Computing version for https://github.com/huggingface/swift-huggingface
-Computed https://github.com/huggingface/swift-huggingface at 0.10.1 (1.48s)
+Computed https://github.com/huggingface/swift-huggingface at 0.10.1 (0.03s)
 Computing version for https://github.com/ml-explore/mlx-swift-lm.git
 Computed https://github.com/ml-explore/mlx-swift-lm.git at 3.31.4 (0.02s)
 Computing version for https://github.com/ibireme/yyjson.git
@@ -50,7 +49,7 @@ Computed https://github.com/ibireme/yyjson.git at 0.12.0 (0.02s)
 Computing version for https://github.com/apple/swift-crypto.git
 Computed https://github.com/apple/swift-crypto.git at 4.5.2 (0.02s)
 Computing version for https://github.com/apple/swift-collections.git
-Computed https://github.com/apple/swift-collections.git at 1.6.0 (0.03s)
+Computed https://github.com/apple/swift-collections.git at 1.6.0 (0.04s)
 Computing version for https://github.com/huggingface/swift-jinja.git
 Computed https://github.com/huggingface/swift-jinja.git at 2.5.0 (0.02s)
 Computing version for https://github.com/mattt/EventSource.git
@@ -65,39 +64,39 @@ Computing version for https://github.com/apple/swift-argument-parser
 Computed https://github.com/apple/swift-argument-parser at 1.8.2 (0.02s)
 Computing version for https://github.com/apple/swift-numerics
 Computed https://github.com/apple/swift-numerics at 1.1.1 (0.02s)
-Creating working copy for https://github.com/apple/swift-collections.git
-Working copy of https://github.com/apple/swift-collections.git resolved at 1.6.0
+Creating working copy for https://github.com/ml-explore/mlx-swift
+Working copy of https://github.com/ml-explore/mlx-swift resolved at 0.31.6
 Creating working copy for https://github.com/huggingface/swift-jinja.git
 Working copy of https://github.com/huggingface/swift-jinja.git resolved at 2.5.0
+Creating working copy for https://github.com/apple/swift-asn1.git
+Working copy of https://github.com/apple/swift-asn1.git resolved at 1.7.2
+Creating working copy for https://github.com/apple/swift-collections.git
+Working copy of https://github.com/apple/swift-collections.git resolved at 1.6.0
+Creating working copy for https://github.com/huggingface/swift-transformers
+Working copy of https://github.com/huggingface/swift-transformers resolved at 1.3.4
 Creating working copy for https://github.com/Pummelchen/WebTransport.git
 Working copy of https://github.com/Pummelchen/WebTransport.git resolved at 1.3.7
 Creating working copy for https://github.com/swiftlang/swift-syntax.git
 Working copy of https://github.com/swiftlang/swift-syntax.git resolved at 603.0.2
-Creating working copy for https://github.com/ml-explore/mlx-swift
-Working copy of https://github.com/ml-explore/mlx-swift resolved at 0.31.6
 Creating working copy for https://github.com/apple/swift-crypto.git
 Working copy of https://github.com/apple/swift-crypto.git resolved at 4.5.2
-Creating working copy for https://github.com/apple/swift-asn1.git
-Working copy of https://github.com/apple/swift-asn1.git resolved at 1.7.2
-Creating working copy for https://github.com/ibireme/yyjson.git
-Working copy of https://github.com/ibireme/yyjson.git resolved at 0.12.0
-Creating working copy for https://github.com/apple/swift-numerics
-Working copy of https://github.com/apple/swift-numerics resolved at 1.1.1
 Creating working copy for https://github.com/apple/swift-argument-parser
 Working copy of https://github.com/apple/swift-argument-parser resolved at 1.8.2
 Creating working copy for https://github.com/mattt/EventSource.git
 Working copy of https://github.com/mattt/EventSource.git resolved at 1.5.1
+Creating working copy for https://github.com/ibireme/yyjson.git
+Working copy of https://github.com/ibireme/yyjson.git resolved at 0.12.0
+Creating working copy for https://github.com/apple/swift-numerics
+Working copy of https://github.com/apple/swift-numerics resolved at 1.1.1
 Creating working copy for https://github.com/huggingface/swift-huggingface
 Working copy of https://github.com/huggingface/swift-huggingface resolved at 0.10.1
-Creating working copy for https://github.com/huggingface/swift-transformers
-Working copy of https://github.com/huggingface/swift-transformers resolved at 1.3.4
 Creating working copy for https://github.com/ml-explore/mlx-swift-lm.git
 Working copy of https://github.com/ml-explore/mlx-swift-lm.git resolved at 3.31.4
 [0/8] Write sources
 [3/8] Write encuda-tool-entitlement.plist
 [4/8] Write swift-version--58304C5D6DBC2206.txt
-[6/10] Compiling ArgumentParserToolInfo ToolInfo.swift
-[7/10] Emitting module ArgumentParserToolInfo
+[6/10] Emitting module ArgumentParserToolInfo
+[7/10] Compiling ArgumentParserToolInfo ToolInfo.swift
 [8/57] Compiling ArgumentParser ParentCommand.swift
 [9/57] Compiling ArgumentParser AsyncParsableCommand.swift
 [10/57] Compiling ArgumentParser CommandConfiguration.swift
@@ -105,58 +104,58 @@ Working copy of https://github.com/ml-explore/mlx-swift-lm.git resolved at 3.31.
 [12/57] Compiling ArgumentParser EnumerableFlag.swift
 [13/57] Compiling ArgumentParser ExpressibleByArgument.swift
 [14/57] Compiling ArgumentParser ParsableArguments.swift
-[15/57] Compiling ArgumentParser Mutex.swift
-[16/57] Compiling ArgumentParser Platform.swift
-[17/57] Compiling ArgumentParser SequenceExtensions.swift
-[18/57] Compiling ArgumentParser StringExtensions.swift
-[19/57] Compiling ArgumentParser SwiftExtensions.swift
-[20/57] Compiling ArgumentParser Tree.swift
-[21/63] Compiling ArgumentParser Name.swift
-[22/63] Compiling ArgumentParser Parsed.swift
-[23/63] Compiling ArgumentParser ParsedValues.swift
-[24/63] Compiling ArgumentParser ParserError.swift
-[25/63] Compiling ArgumentParser SplitArguments.swift
-[26/63] Compiling ArgumentParser DumpHelpGenerator.swift
-[27/63] Compiling ArgumentParser BashCompletionsGenerator.swift
-[28/63] Compiling ArgumentParser CompletionsGenerator.swift
-[29/63] Compiling ArgumentParser FishCompletionsGenerator.swift
-[30/63] Compiling ArgumentParser ZshCompletionsGenerator.swift
-[31/63] Compiling ArgumentParser Argument.swift
-[32/63] Compiling ArgumentParser ArgumentDiscussion.swift
-[33/63] Compiling ArgumentParser ArgumentHelp.swift
-[34/63] Compiling ArgumentParser AsyncCompletionsValidator.swift
-[35/63] Compiling ArgumentParser CodingKeyValidator.swift
-[36/63] Compiling ArgumentParser NonsenseFlagsValidator.swift
-[37/63] Compiling ArgumentParser ParsableArgumentsValidation.swift
-[38/63] Compiling ArgumentParser PositionalArgumentsValidator.swift
-[39/63] Compiling ArgumentParser UniqueNamesValidator.swift
-[40/63] Compiling ArgumentParser ArgumentVisibility.swift
-[41/63] Compiling ArgumentParser CompletionKind.swift
-[42/63] Compiling ArgumentParser Errors.swift
-[43/63] Compiling ArgumentParser Flag.swift
-[44/63] Compiling ArgumentParser NameSpecification.swift
-[45/63] Compiling ArgumentParser Option.swift
-[46/63] Compiling ArgumentParser OptionGroup.swift
-[47/63] Compiling ArgumentParser ParsableCommand.swift
-[48/63] Compiling ArgumentParser ArgumentDecoder.swift
-[49/63] Compiling ArgumentParser ArgumentDefinition.swift
-[50/63] Compiling ArgumentParser ArgumentSet.swift
-[51/63] Compiling ArgumentParser CommandParser.swift
-[52/63] Compiling ArgumentParser InputKey.swift
-[53/63] Compiling ArgumentParser InputOrigin.swift
-[54/63] Emitting module ArgumentParser
-[55/63] Compiling ArgumentParser HelpCommand.swift
-[56/63] Compiling ArgumentParser HelpGenerator.swift
-[57/63] Compiling ArgumentParser MessageInfo.swift
-[58/63] Compiling ArgumentParser UsageGenerator.swift
-[59/63] Compiling ArgumentParser CollectionExtensions.swift
-[60/63] Compiling ArgumentParser Foundation.swift
+[15/63] Compiling ArgumentParser Name.swift
+[16/63] Compiling ArgumentParser Parsed.swift
+[17/63] Compiling ArgumentParser ParsedValues.swift
+[18/63] Compiling ArgumentParser ParserError.swift
+[19/63] Compiling ArgumentParser SplitArguments.swift
+[20/63] Compiling ArgumentParser DumpHelpGenerator.swift
+[21/63] Compiling ArgumentParser AsyncCompletionsValidator.swift
+[22/63] Compiling ArgumentParser CodingKeyValidator.swift
+[23/63] Compiling ArgumentParser NonsenseFlagsValidator.swift
+[24/63] Compiling ArgumentParser ParsableArgumentsValidation.swift
+[25/63] Compiling ArgumentParser PositionalArgumentsValidator.swift
+[26/63] Compiling ArgumentParser UniqueNamesValidator.swift
+[27/63] Compiling ArgumentParser ArgumentVisibility.swift
+[28/63] Compiling ArgumentParser CompletionKind.swift
+[29/63] Compiling ArgumentParser Errors.swift
+[30/63] Compiling ArgumentParser Flag.swift
+[31/63] Compiling ArgumentParser NameSpecification.swift
+[32/63] Compiling ArgumentParser Option.swift
+[33/63] Compiling ArgumentParser OptionGroup.swift
+[34/63] Emitting module ArgumentParser
+[35/63] Compiling ArgumentParser Mutex.swift
+[36/63] Compiling ArgumentParser Platform.swift
+[37/63] Compiling ArgumentParser SequenceExtensions.swift
+[38/63] Compiling ArgumentParser StringExtensions.swift
+[39/63] Compiling ArgumentParser SwiftExtensions.swift
+[40/63] Compiling ArgumentParser Tree.swift
+[41/63] Compiling ArgumentParser ParsableCommand.swift
+[42/63] Compiling ArgumentParser ArgumentDecoder.swift
+[43/63] Compiling ArgumentParser ArgumentDefinition.swift
+[44/63] Compiling ArgumentParser ArgumentSet.swift
+[45/63] Compiling ArgumentParser CommandParser.swift
+[46/63] Compiling ArgumentParser InputKey.swift
+[47/63] Compiling ArgumentParser InputOrigin.swift
+[48/63] Compiling ArgumentParser HelpCommand.swift
+[49/63] Compiling ArgumentParser HelpGenerator.swift
+[50/63] Compiling ArgumentParser MessageInfo.swift
+[51/63] Compiling ArgumentParser UsageGenerator.swift
+[52/63] Compiling ArgumentParser CollectionExtensions.swift
+[53/63] Compiling ArgumentParser Foundation.swift
+[54/63] Compiling ArgumentParser BashCompletionsGenerator.swift
+[55/63] Compiling ArgumentParser CompletionsGenerator.swift
+[56/63] Compiling ArgumentParser FishCompletionsGenerator.swift
+[57/63] Compiling ArgumentParser ZshCompletionsGenerator.swift
+[58/63] Compiling ArgumentParser Argument.swift
+[59/63] Compiling ArgumentParser ArgumentDiscussion.swift
+[60/63] Compiling ArgumentParser ArgumentHelp.swift
 [61/69] Compiling encuda encuda-compile.swift
 [62/69] Compiling encuda encuda.swift
-[63/69] Compiling encuda encuda-utils.swift
+[63/69] Compiling encuda encuda-link.swift
 [64/69] Compiling encuda encuda-error.swift
 [65/69] Emitting module encuda
-[66/69] Compiling encuda encuda-link.swift
+[66/69] Compiling encuda encuda-utils.swift
 [66/69] Write Objects.LinkFileList
 [67/69] Linking encuda-tool
 [68/69] Applying encuda-tool
@@ -165,583 +164,578 @@ Working copy of https://github.com/ml-explore/mlx-swift-lm.git resolved at 3.31.
 [3/3] Compiling plugin GenerateDoccReference
 Building for debugging...
 [3/239] /Users/node1/chatbots-audit/.build/arm64-apple-macosx/debug/ChatBotsPackageTests.derived/runner.swift
-[4/239] Write sources
 [4/239] Write chatbots-cli-entitlement.plist
-[4/239] Write chatbots-probe-entitlement.plist
-[4/239] Write ChatBots-entitlement.plist
 [4/239] Write sources
-[19/239] Copying t5_tokenizer_config.json
-[20/239] Copying gpt2_tokenizer_config.json
-[20/239] Copying PrivacyInfo.xcprivacy
-[22/239] Compiling _NumericsShims _NumericsShims.c
-[22/239] Write sources
-[25/239] Write swift-version--58304C5D6DBC2206.txt
-[25/239] Write sources
-[29/241] Compiling yyjson.c
-[30/241] Compiling io_types.cpp
-[31/241] Compiling export.cpp
-[31/241] Write sources
-[31/241] Compiling io.cpp
-[31/241] Write sources
-[47/241] Compiling fft.cpp
-[48/241] Compiling WebTransportSecurityShim WebTransportSecurityShim.m
-[49/241] Compiling version.cpp
-[50/241] Compiling fast.cpp
-[52/285] Compiling RealModule RealFunctions.swift
-[53/286] Compiling RealModule RelaxedArithmetic.swift
-[54/286] Compiling InternalCollectionsUtilities UnsafeMutableRawBufferPointer+Extras.swift
-[55/286] Compiling InternalCollectionsUtilities UnsafeRawBufferPointer+Extras.swift
-[56/288] Compiling InternalCollectionsUtilities _SortedCollection.swift
-[57/288] Compiling InternalCollectionsUtilities _UniqueCollection.swift
-[58/288] Compiling MLXHuggingFaceMacros HuggingFaceIntegrationMacros.swift
-[59/288] Emitting module MLXHuggingFaceMacros
-[60/288] Compiling InternalCollectionsUtilities Span+Extras.swift
-[61/288] Compiling InternalCollectionsUtilities String+Padding.swift
-[62/288] Compiling RealModule Real.swift
-[63/288] Compiling RealModule Float80+Real.swift
-[64/288] Compiling RealModule Float16+Real.swift
-[65/288] Compiling InternalCollectionsUtilities LifetimeOverride.swift
-[66/288] Compiling InternalCollectionsUtilities RandomAccessCollection+Offsets.swift
-[69/288] Compiling InternalCollectionsUtilities _UnsafeBitSet+Index.swift
-[70/288] Compiling InternalCollectionsUtilities UnsafeBufferPointer+Extras.swift
-[71/288] Compiling InternalCollectionsUtilities UnsafeMutableBufferPointer+Extras.swift
-[72/370] Compiling Crypto HKDF.swift
-[73/370] Compiling Crypto AESWrap.swift
-[74/371] Compiling Crypto NISTCurvesKeys_boring.swift
-[75/371] Compiling Crypto X25519Keys_boring.swift
-[76/371] Emitting module RealModule
-[78/373] Compiling Crypto Curve25519.swift
-[79/373] Compiling Crypto Ed25519Keys.swift
-[79/373] Write Objects.LinkFileList
-[81/373] Emitting module Crypto
-[82/384] Emitting module InternalCollectionsUtilities
-[83/384] Compiling Crypto AES-GCM.swift
-[84/384] Compiling Crypto AES-GCM_boring.swift
-[85/384] Compiling Crypto ChaChaPoly_boring.swift
-[86/384] Compiling Crypto ChaChaPoly.swift
-[87/384] Compiling Crypto Cipher.swift
-[88/384] Compiling Crypto Nonces.swift
-[89/384] Compiling Crypto ASN1.swift
-[90/384] Compiling Crypto ASN1Any.swift
-[91/384] Compiling Crypto ASN1BitString.swift
-[92/384] Compiling Crypto ASN1Boolean.swift
-[93/384] Compiling Crypto ASN1Identifier.swift
-[94/384] Compiling Crypto ASN1Integer.swift
-[95/384] Compiling Crypto Insecure_HashFunctions.swift
-[96/384] Compiling Crypto MLKEM_boring.swift
-[97/384] Compiling Crypto MLKEM_wrapper.swift
-[98/384] Compiling Crypto XWing_boring.swift
-[99/384] Compiling Crypto KEM-Errors.swift
-[100/384] Compiling Crypto KEM.swift
-[101/384] Compiling Crypto MLKEM.swift
-[102/384] Compiling Crypto XWing.swift
-[103/384] Compiling Crypto ECDH_boring.swift
-[104/384] Compiling Crypto DH.swift
-[105/384] Compiling Crypto ECDH.swift
-[106/384] Compiling Crypto ANSIx963.swift
-[107/384] Compiling Crypto CryptoKitErrors.swift
-[108/384] Compiling Crypto Digest_boring.swift
-[109/384] Compiling Crypto Digest.swift
-[110/384] Compiling Crypto Digests.swift
-[111/384] Compiling Crypto HashFunctions.swift
-[112/384] Compiling Crypto HashFunctions_SHA2.swift
-[113/384] Compiling Crypto HashFunctions_SHA3.swift
-[114/384] Compiling Crypto Digest_xkcp.swift
-[115/384] Compiling Crypto HPKE-AEAD.swift
-[116/384] Compiling Crypto HPKE-Ciphersuite.swift
-[117/384] Compiling Crypto HPKE-KDF.swift
-[118/384] Compiling Crypto HPKE-KexKeyDerivation.swift
-[121/384] Compiling Crypto AESWrap_boring.swift
-[122/384] Compiling Crypto Ed25519_boring.swift
-[127/384] Compiling Crypto NISTCurvesKeys.swift
-[128/384] Compiling Crypto X25519Keys.swift
-[129/384] Compiling Crypto SymmetricKeys.swift
-[130/384] Compiling Crypto HMAC.swift
-[131/384] Compiling Crypto HPKE-LabeledExtract.swift
-[132/384] Compiling Crypto HPKE-Utils.swift
-[133/384] Compiling Crypto DHKEM.swift
-[134/384] Compiling Crypto HPKE-KEM-Curve25519.swift
-[135/384] Compiling Crypto HPKE-NIST-EC-KEMs.swift
-[136/384] Compiling Crypto HPKE-KEM.swift
-[137/384] Compiling Crypto HPKE-Errors.swift
-[138/384] Compiling Crypto HPKE.swift
-[139/384] Compiling Crypto HPKE-Context.swift
-[140/384] Compiling Crypto HPKE-KeySchedule.swift
-[141/384] Compiling Crypto HPKE-Modes.swift
-[142/384] Compiling Crypto Insecure.swift
-[143/384] Compiling Crypto MACFunctions.swift
-[144/384] Compiling Crypto MessageAuthenticationCode.swift
-[145/384] Compiling Crypto AES.swift
-[146/384] Compiling Crypto ECDSASignature_boring.swift
-[147/384] Compiling Crypto ECDSA_boring.swift
-[148/384] Compiling Crypto EdDSA_boring.swift
-[149/384] Compiling Crypto MLDSA_boring.swift
-[150/384] Compiling Crypto MLDSA_wrapper.swift
-[151/384] Compiling Crypto ECDSA.swift
-[152/384] Compiling Crypto Ed25519.swift
-[153/384] Compiling Crypto MLDSA.swift
-[154/384] Compiling Crypto Signature.swift
-[155/384] Compiling Crypto ASN1Null.swift
-[156/384] Compiling Crypto ASN1OctetString.swift
-[157/384] Compiling Crypto ASN1Strings.swift
-[158/384] Compiling Crypto ArraySliceBigint.swift
-[159/384] Compiling Crypto GeneralizedTime.swift
-[160/384] Compiling Crypto ObjectIdentifier.swift
-[161/384] Compiling Crypto ECDSASignature.swift
-[162/384] Compiling Crypto PEMDocument.swift
-[163/384] Compiling Crypto PKCS8PrivateKey.swift
-[164/384] Compiling Crypto SEC1PrivateKey.swift
-[165/384] Compiling Crypto SubjectPublicKeyInfo.swift
-[166/384] Compiling Crypto CryptoError_boring.swift
-[172/384] Compiling Crypto CryptoKitErrors_boring.swift
-[173/384] Compiling Crypto Optional+withUnsafeBytes_boring.swift
-[174/384] Compiling Crypto RNG_boring.swift
-[175/384] Compiling Crypto SafeCompare_boring.swift
-[176/384] Compiling Crypto Zeroization_boring.swift
-[177/384] Compiling Crypto _CryptoModuleAnchor.swift
-[178/384] Compiling Crypto PrettyBytes.swift
-[179/384] Compiling Crypto SafeCompare.swift
-[180/384] Compiling Crypto SecureBytes.swift
-[181/384] Compiling Crypto Zeroization.swift
-[182/384] Compiling Crypto resource_bundle_accessor.swift
-[183/441] Emitting module WebTransportQUICCore
-[183/441] Linking MLXHuggingFaceMacros-tool
-[184/452] Compiling utils.cpp
-[186/452] Compiling ComplexModule Polar.swift
-[187/453] Compiling ComplexModule Scale.swift
-[188/453] Compiling OrderedCollections OrderedSet+Partial SetAlgebra formSymmetricDifference.swift
-[189/453] Compiling OrderedCollections OrderedSet+Partial SetAlgebra formUnion.swift
-[190/453] Compiling OrderedCollections OrderedSet+Partial SetAlgebra intersection.swift
-[191/453] Compiling OrderedCollections OrderedSet+Partial SetAlgebra isDisjoint.swift
-[192/453] Compiling OrderedCollections OrderedSet+Partial SetAlgebra isEqualSet.swift
-[193/453] Compiling OrderedCollections OrderedSet+Partial SetAlgebra isStrictSubset.swift
-[194/453] Compiling OrderedCollections OrderedSet+Partial SetAlgebra isStrictSuperset.swift
-[195/453] Compiling OrderedCollections OrderedSet+Partial SetAlgebra isSubset.swift
-[196/453] Compiling WebTransportQUICCore QUICTransportParameters.swift
-[197/453] Compiling WebTransportQUICCore QUICPacketNumber.swift
-[198/460] Compiling WebTransportQUICCore QUICByteCursor.swift
-[199/460] Compiling ComplexModule Complex+Hashable.swift
-[200/460] Compiling ComplexModule Complex+IntegerLiteral.swift
-[201/460] Compiling ComplexModule Complex.swift
-[202/460] Compiling ComplexModule Complex+Numeric.swift
-[203/460] Compiling ComplexModule Complex+StringConvertible.swift
-[204/460] Compiling ComplexModule Complex+AdditiveArithmetic.swift
-[205/460] Compiling ComplexModule Complex+AlgebraicField.swift
-[206/460] Emitting module ComplexModule
-[207/460] Compiling ComplexModule Complex+Codable.swift
-[208/460] Compiling ComplexModule Complex+ElementaryFunctions.swift
-[209/460] Compiling OrderedCollections OrderedDictionary+Hashable.swift
-[210/460] Compiling OrderedCollections OrderedDictionary+Initializers.swift
-[211/460] Compiling OrderedCollections OrderedDictionary+Invariants.swift
-[212/460] Compiling OrderedCollections OrderedDictionary+Move.swift
-[213/460] Compiling OrderedCollections OrderedDictionary+Partial MutableCollection.swift
-[214/460] Compiling OrderedCollections OrderedDictionary+Partial RangeReplaceableCollection.swift
-[215/460] Compiling OrderedCollections OrderedDictionary+Sendable.swift
-[216/460] Compiling OrderedCollections OrderedDictionary+Sequence.swift
-[217/460] Compiling WebTransportUDPApple QUICUDPPort.swift
-[218/460] Emitting module WebTransportUDPApple
-[219/460] Compiling OrderedCollections OrderedDictionary+Codable.swift
-[220/460] Compiling OrderedCollections OrderedDictionary+CustomReflectable.swift
-[221/460] Compiling OrderedCollections OrderedDictionary+Deprecations.swift
-[222/460] Compiling OrderedCollections OrderedDictionary+Descriptions.swift
-[223/460] Compiling OrderedCollections OrderedDictionary+Elements.SubSequence.swift
-[224/460] Compiling OrderedCollections OrderedDictionary+Elements.swift
-[225/460] Compiling OrderedCollections OrderedDictionary+Equatable.swift
-[226/460] Compiling OrderedCollections OrderedDictionary+ExpressibleByDictionaryLiteral.swift
-[227/460] Compiling WebTransportQUICCore QUICVarInt.swift
-[228/462] Emitting module Numerics
-[229/462] Compiling Numerics Numerics.swift
-[229/462] Compiling scheduler.cpp
-[231/462] Compiling WebTransportQUICCore QUICPacket.swift
-[232/462] Compiling WebTransportQUICCore QUICFrame.swift
-[233/462] Compiling OrderedCollections OrderedSet+Hashable.swift
-[234/462] Compiling OrderedCollections OrderedSet+Initializers.swift
-[235/462] Compiling OrderedCollections OrderedSet+Insertions.swift
-[236/462] Compiling OrderedCollections OrderedSet+Invariants.swift
-[237/462] Compiling OrderedCollections OrderedSet+Move.swift
-[238/462] Compiling OrderedCollections OrderedSet+Partial MutableCollection.swift
-[239/462] Compiling OrderedCollections OrderedSet+Partial RangeReplaceableCollection.swift
-[240/462] Compiling OrderedCollections OrderedSet+Partial SetAlgebra formIntersection.swift
-[241/462] Compiling WebTransportQUICCore QUICCoreState.swift
-[248/462] Compiling OrderedCollections OrderedSet+Equatable.swift
-[249/462] Compiling OrderedCollections OrderedSet+ExpressibleByArrayLiteral.swift
-[250/462] Compiling OrderedCollections _HashTable+Bucket.swift
-[251/462] Compiling OrderedCollections _HashTable+BucketIterator.swift
-[252/462] Compiling OrderedCollections _HashTable+Constants.swift
-[253/462] Compiling OrderedCollections _HashTable+CustomStringConvertible.swift
-[254/462] Compiling OrderedCollections _HashTable+Testing.swift
-[255/462] Compiling OrderedCollections _HashTable+UnsafeHandle.swift
-[256/462] Compiling OrderedCollections _HashTable.swift
-[257/462] Compiling OrderedCollections _Hashtable+Header.swift
-[258/462] Compiling EventSource EventSource+AsyncHTTPClient.swift
-[259/462] Compiling EventSource AsyncSequence+Events.swift
-[260/462] Compiling OrderedCollections OrderedSet+Sendable.swift
-[261/462] Compiling OrderedCollections OrderedSet+SubSequence.swift
-[262/462] Compiling OrderedCollections OrderedSet+Testing.swift
-[263/462] Compiling OrderedCollections OrderedSet+UnorderedView.swift
-[264/462] Compiling OrderedCollections OrderedSet+UnstableInternals.swift
-[265/462] Compiling OrderedCollections OrderedSet.swift
-[266/462] Compiling OrderedCollections _UnsafeBitset.swift
-[267/462] Compiling EventSource AsyncEventsSequence.swift
-[268/462] Emitting module EventSource
-[269/462] Compiling OrderedCollections OrderedSet+Partial SetAlgebra isSuperset.swift
-[270/462] Compiling OrderedCollections OrderedSet+Partial SetAlgebra subtract.swift
-[271/462] Compiling OrderedCollections OrderedSet+Partial SetAlgebra subtracting.swift
-[272/462] Compiling OrderedCollections OrderedSet+Partial SetAlgebra symmetricDifference.swift
-[273/462] Compiling OrderedCollections OrderedSet+Partial SetAlgebra union.swift
-[274/462] Compiling OrderedCollections OrderedSet+Partial SetAlgebra+Basics.swift
-[275/462] Compiling OrderedCollections OrderedSet+RandomAccessCollection.swift
-[276/462] Compiling OrderedCollections OrderedSet+ReserveCapacity.swift
-[277/462] Emitting module OrderedCollections
-[278/462] Compiling EventSource EventSource.swift
-[279/488] Compiling WebTransportTLSCore TLS13KeyAgreement.swift
-[280/488] Compiling WebTransportTLSCore TLS13KeySchedule.swift
-[280/490] Compiling transforms.cpp
-[282/490] Compiling WebTransportTLSCore TLSHandshakeMessage.swift
-[283/494] Emitting module WebTransportTLSCore
-[284/494] Compiling WebTransportTLSCore TLSHandshakeBodies.swift
-[285/494] Compiling WebTransportTLSCore TLSHandshakeFlight.swift
-[285/494] Compiling random.cpp
-[287/494] Compiling WebTransportHTTP3Core WebTransportLibrarySmoke.swift
-[288/494] Compiling WebTransportHTTP3Core WebTransportSecurityPolicy.swift
-[289/494] Compiling WebTransportTLSCore TLSIdentityTrust.swift
-[290/509] Compiling Jinja AST.swift
-[291/509] Compiling Jinja Error.swift
-[292/509] Compiling WebTransportTLSCore TLSExtension.swift
-[293/509] Compiling Jinja Filters.swift
-[294/509] Compiling Jinja Globals.swift
-[295/509] Compiling WebTransportTLSCore TLSQUICConnectionState.swift
-[296/509] Compiling Jinja Macro.swift
-[297/509] Compiling Jinja Parser.swift
-[298/509] Compiling Jinja PropertyMembers.swift
-[299/509] Compiling Jinja Interpreter.swift
-[300/509] Compiling Jinja JSON.swift
-[301/509] Compiling Jinja Token.swift
-[302/509] Emitting module WebTransportHTTP3Core
-[305/509] Compiling Jinja Template.swift
-[305/509] Compiling linalg.cpp
-[307/559] Compiling WebTransportCryptoApple QUICInitialKeyDerivation.swift
-[308/559] Emitting module WebTransportCryptoApple
-[309/559] Compiling WebTransportCryptoApple QUICPacketProtection.swift
-[310/559] Compiling HuggingFace HubClient+Datasets.swift
-[311/559] Compiling HuggingFace HubClient+Discussions.swift
-[312/559] Compiling HuggingFace FeatureExtraction.swift
-[313/559] Compiling HuggingFace InferenceClient.swift
-[313/559] Compiling no_gguf.cpp
-[314/564] Compiling primitives.cpp
-[315/564] Compiling safetensors.cpp
-[317/564] Compiling WebTransportNetworkRuntime WebTransportServerPolicy.swift
-[317/564] Compiling load.cpp
-[319/564] Compiling WebTransportNetworkRuntime WebTransportServerIdentity.swift
-[320/564] Compiling WebTransportNetworkRuntime WebTransportNetworkTypes.swift
-[320/564] Compiling graph_utils.cpp
-[322/564] Compiling HuggingFace Data+Extensions.swift
-[323/564] Compiling HuggingFace JSONDecoder+Extensions.swift
-[325/565] Compiling HuggingFace TextToVideo.swift
-[326/565] Compiling HuggingFace HubClient+Collections.swift
-[328/565] Compiling HuggingFace HuggingFaceAuthenticationManager.swift
-[329/565] Compiling HuggingFace OAuthClient.swift
-[330/565] Compiling HuggingFace TokenStorage.swift
-[331/565] Compiling HuggingFace CacheLocationProvider.swift
-[331/565] Compiling fft.cpp
-[332/565] Compiling ops.cpp
-[334/565] Compiling Jinja Value.swift
-[334/565] Compiling fast.cpp
-[336/565] Compiling HuggingFace File.swift
-[337/565] Compiling HuggingFace Git.swift
-[338/565] Emitting module Jinja
-[339/565] Compiling HuggingFace HubCache.swift
-[340/565] Compiling HuggingFace HubClient+Buckets.swift
-[340/565] Compiling dtype_utils.cpp
-[342/565] Emitting module WebTransportNetworkRuntime
-[343/565] Compiling WebTransportNetworkRuntime WebTransportInteroperableNetworkRuntime.swift
-[343/565] Compiling dtype.cpp
-[344/567] Compiling einsum.cpp
-[346/567] Compiling WebTransport WebTransport.swift
-[347/567] Emitting module WebTransport
-[347/567] Compiling utils.cpp
-[348/567] Compiling no_ring.cpp
-[349/567] Compiling primitives.cpp
-[350/567] Compiling no_nccl.cpp
-[351/567] Compiling ops.cpp
-[353/567] Compiling HuggingFace HubClient+Repos.swift
-[354/567] Compiling HuggingFace HubClient+Spaces.swift
-[355/567] Compiling HuggingFace HubClient+User.swift
-[356/567] Compiling HuggingFace HubClient.swift
-[357/567] Compiling HuggingFace Model.swift
-[358/567] Compiling HuggingFace OAuth.swift
-[359/567] Compiling HuggingFace Organization.swift
-[359/574] Compiling no_mpi.cpp
-[360/574] Compiling no_jaccl.cpp
-[361/574] Compiling distributed.cpp
-[362/574] Compiling device.cpp
-[364/574] Compiling HuggingFace AccessRequest.swift
-[365/574] Compiling HuggingFace Billing.swift
-[366/574] Compiling HuggingFace Bucket.swift
-[367/574] Compiling HuggingFace Collection.swift
-[368/574] Compiling HuggingFace CommaSeparatedList.swift
-[369/574] Compiling HuggingFace Dataset.swift
-[370/574] Compiling HuggingFace Discussion.swift
-[371/574] Compiling HuggingFace ChatCompletion.swift
-[374/574] Compiling HuggingFace Message.swift
-[375/574] Compiling HuggingFace Provider.swift
-[376/574] Compiling HuggingFace SpeechToText.swift
-[377/574] Compiling HuggingFace TextToImage.swift
-[385/574] Emitting module HuggingFace
-[386/574] Compiling HuggingFace URL+Extensions.swift
-[387/574] Compiling HuggingFace URLSession+Linux.swift
-[388/574] Compiling HuggingFace FileLock.swift
-[389/574] Compiling HuggingFace HTTPClient.swift
-[390/574] Compiling HuggingFace MultipartBuilder.swift
-[391/574] Compiling HuggingFace TokenProvider.swift
-[392/574] Compiling HuggingFace Value.swift
-[392/574] Compiling utils.cpp
-[393/574] Compiling unary.cpp
-[394/574] Compiling ternary.cpp
-[395/574] Compiling softmax.cpp
-[396/574] Compiling sort.cpp
-[398/574] Compiling HuggingFace HubClient+Files.swift
-[399/574] Compiling HuggingFace HubClient+Git.swift
-[400/574] Compiling HuggingFace HubClient+Models.swift
-[401/574] Compiling HuggingFace HubClient+OAuth.swift
-[402/574] Compiling HuggingFace HubClient+Organizations.swift
-[403/574] Compiling HuggingFace HubClient+Pagination.swift
-[404/574] Compiling HuggingFace HubClient+Papers.swift
-[405/574] Compiling HuggingFace Pagination.swift
-[406/574] Compiling HuggingFace Paper.swift
-[407/574] Compiling HuggingFace Repo.swift
-[408/574] Compiling HuggingFace ResourceGroup.swift
-[409/574] Compiling HuggingFace Space.swift
-[410/574] Compiling HuggingFace Tags.swift
-[411/574] Compiling HuggingFace User.swift
-[411/574] Compiling compile.cpp
-[412/574] Compiling export.cpp
-[413/574] Compiling slicing.cpp
-[421/574] Compiling resident.cpp
-[422/581] Compiling scan.cpp
-[423/581] Compiling rope.cpp
-[424/581] Compiling scaled_dot_product_attention.cpp
-[425/581] Compiling reduce.cpp
-[426/581] Compiling primitives.cpp
-[427/581] Compiling normalization.cpp
-[428/581] Compiling metal.cpp
-[429/581] Compiling quantized.cpp
-[430/581] Compiling logsumexp.cpp
-[431/581] Compiling jit_kernels.cpp
-[432/581] Compiling matmul.cpp
-[433/581] Compiling fence.cpp
-[434/581] Compiling hadamard.cpp
-[435/581] Compiling indexing.cpp
-[436/581] Compiling event.cpp
-[437/581] Compiling distributed.cpp
-[438/581] Compiling eval.cpp
-[439/581] Compiling fft.cpp
-[440/581] Compiling device_info.cpp
-[442/581] Emitting module Hub
-[443/581] Compiling Hub resource_bundle_accessor.swift
-[443/581] Compiling copy.cpp
-[445/581] Compiling Hub YYJSONParser.swift
-[445/581] Compiling device.cpp
-[446/581] Compiling conv.cpp
-[447/581] Compiling compiled.cpp
-[448/581] Compiling allocator.cpp
-[449/581] Compiling slicing.cpp
-[451/581] Compiling Hub Hub.swift
-[452/581] Compiling Hub Config.swift
-[453/581] Compiling Hub BinaryDistinct.swift
-[454/581] Compiling Hub HubApi.swift
-[454/581] Compiling threefry.cpp
-[455/581] Compiling binary.cpp
-[456/581] Compiling custom_kernel.cpp
-[457/593] Compiling no_cuda.cpp
-[459/593] Compiling Tokenizers Trie.swift
-[460/594] Compiling Tokenizers TokenLattice.swift
+[4/239] Write chatbots-probe-entitlement.plist
+[5/239] Write sources
+[15/239] Copying gpt2_tokenizer_config.json
+[16/239] Copying t5_tokenizer_config.json
+[17/239] Write sources
+[17/239] Copying PrivacyInfo.xcprivacy
+[18/239] Write sources
+[35/239] Compiling _NumericsShims _NumericsShims.c
+[36/239] Compiling binary.cpp
+[37/239] Compiling version.cpp
+[38/239] Write swift-version--58304C5D6DBC2206.txt
+[39/239] Compiling WebTransportSecurityShim WebTransportSecurityShim.m
+[40/239] Compiling scheduler.cpp
+[41/239] Compiling utils.cpp
+[43/260] Compiling RealModule RealFunctions.swift
+[44/261] Compiling RealModule RelaxedArithmetic.swift
+[45/261] Compiling RealModule Float80+Real.swift
+[46/261] Compiling RealModule Real.swift
+[47/261] Compiling RealModule ElementaryFunctions.swift
+[48/261] Compiling RealModule Float+Real.swift
+[48/261] Compiling yyjson.c
+[50/261] Compiling RealModule Float16+Real.swift
+[51/261] Compiling RealModule AlgebraicField.swift
+[52/261] Compiling RealModule ApproximateEquality.swift
+[53/261] Emitting module RealModule
+[54/261] Compiling RealModule AugmentedArithmetic.swift
+[55/261] Compiling RealModule Double+Real.swift
+[55/281] Compiling random.cpp
+[57/286] Emitting module MLXHuggingFaceMacros
+[58/286] Compiling MLXHuggingFaceMacros HuggingFaceIntegrationMacros.swift
+[59/286] Compiling InternalCollectionsUtilities Debugging.swift
+[60/286] Compiling InternalCollectionsUtilities Descriptions.swift
+[61/286] Compiling InternalCollectionsUtilities FixedWidthInteger+roundUpToPowerOfTwo.swift
+[62/288] Compiling InternalCollectionsUtilities LifetimeOverride.swift
+[63/288] Compiling InternalCollectionsUtilities RandomAccessCollection+Offsets.swift
+[64/288] Compiling InternalCollectionsUtilities Span+Extras.swift
+[65/288] Compiling InternalCollectionsUtilities _SortedCollection.swift
+[66/288] Compiling InternalCollectionsUtilities _UniqueCollection.swift
+[67/373] Compiling Crypto ASN1.swift
+[68/373] Compiling Crypto ASN1Any.swift
+[69/373] Compiling Crypto Ed25519_boring.swift
+[70/373] Compiling Crypto NISTCurvesKeys_boring.swift
+[71/373] Compiling Crypto ASN1BitString.swift
+[72/373] Compiling Crypto ASN1Boolean.swift
+[73/373] Compiling Crypto ASN1Identifier.swift
+[74/373] Compiling Crypto AES-GCM.swift
+[75/373] Compiling Crypto AES-GCM_boring.swift
+[76/373] Compiling Crypto ChaChaPoly_boring.swift
+[77/373] Compiling Crypto ChaChaPoly.swift
+[78/373] Compiling Crypto Cipher.swift
+[79/373] Compiling Crypto Nonces.swift
+[85/373] Compiling Crypto ASN1Integer.swift
+[86/373] Emitting module Crypto
+[87/384] Compiling Crypto ASN1Null.swift
+[88/384] Compiling Crypto ASN1OctetString.swift
+[89/384] Compiling Crypto ASN1Strings.swift
+[90/384] Compiling Crypto ArraySliceBigint.swift
+[91/384] Compiling Crypto GeneralizedTime.swift
+[92/384] Compiling Crypto ObjectIdentifier.swift
+[93/384] Compiling Crypto ECDSASignature.swift
+[94/384] Compiling Crypto PEMDocument.swift
+[95/384] Compiling Crypto PKCS8PrivateKey.swift
+[96/384] Compiling Crypto SEC1PrivateKey.swift
+[97/384] Compiling Crypto SubjectPublicKeyInfo.swift
+[98/384] Compiling Crypto CryptoError_boring.swift
+[99/384] Compiling Crypto HPKE-LabeledExtract.swift
+[100/384] Compiling Crypto HPKE-Utils.swift
+[101/384] Compiling Crypto DHKEM.swift
+[102/384] Compiling Crypto HPKE-KEM-Curve25519.swift
+[103/384] Compiling Crypto HPKE-NIST-EC-KEMs.swift
+[104/384] Compiling Crypto HPKE-KEM.swift
+[105/384] Compiling Crypto HPKE-Errors.swift
+[106/384] Compiling Crypto HPKE.swift
+[107/384] Compiling Crypto HPKE-Context.swift
+[108/384] Compiling Crypto HPKE-KeySchedule.swift
+[109/384] Compiling Crypto HPKE-Modes.swift
+[110/384] Compiling Crypto Insecure.swift
+[111/384] Compiling Crypto Insecure_HashFunctions.swift
+[112/384] Compiling Crypto MLKEM_boring.swift
+[113/384] Compiling Crypto MLKEM_wrapper.swift
+[114/384] Compiling Crypto XWing_boring.swift
+[115/384] Compiling Crypto KEM-Errors.swift
+[116/384] Compiling Crypto KEM.swift
+[117/384] Compiling Crypto MLKEM.swift
+[118/384] Compiling Crypto XWing.swift
+[119/384] Compiling Crypto ECDH_boring.swift
+[120/384] Compiling Crypto DH.swift
+[121/384] Compiling Crypto ECDH.swift
+[122/384] Compiling Crypto ANSIx963.swift
+[123/384] Compiling Crypto MACFunctions.swift
+[124/384] Compiling Crypto MessageAuthenticationCode.swift
+[125/384] Compiling Crypto AES.swift
+[126/384] Compiling Crypto ECDSASignature_boring.swift
+[127/384] Compiling Crypto ECDSA_boring.swift
+[128/384] Compiling Crypto EdDSA_boring.swift
+[129/384] Compiling Crypto MLDSA_boring.swift
+[130/384] Compiling Crypto MLDSA_wrapper.swift
+[131/384] Compiling Crypto ECDSA.swift
+[132/384] Compiling Crypto Ed25519.swift
+[133/384] Compiling Crypto MLDSA.swift
+[134/384] Compiling Crypto Signature.swift
+[135/384] Compiling Crypto HKDF.swift
+[136/384] Compiling Crypto AESWrap.swift
+[137/384] Compiling Crypto AESWrap_boring.swift
+[140/384] Compiling Crypto X25519Keys_boring.swift
+[141/384] Compiling Crypto Curve25519.swift
+[142/384] Compiling Crypto Ed25519Keys.swift
+[143/384] Compiling Crypto NISTCurvesKeys.swift
+[144/384] Compiling Crypto X25519Keys.swift
+[145/384] Compiling Crypto SymmetricKeys.swift
+[146/384] Compiling Crypto HMAC.swift
+[147/384] Compiling Crypto CryptoKitErrors.swift
+[148/384] Compiling Crypto Digest_boring.swift
+[149/384] Compiling Crypto Digest.swift
+[150/384] Compiling Crypto Digests.swift
+[151/384] Compiling Crypto HashFunctions.swift
+[152/384] Compiling Crypto HashFunctions_SHA2.swift
+[153/384] Compiling Crypto HashFunctions_SHA3.swift
+[154/384] Compiling Crypto Digest_xkcp.swift
+[155/384] Compiling Crypto HPKE-AEAD.swift
+[156/384] Compiling Crypto HPKE-Ciphersuite.swift
+[157/384] Compiling Crypto HPKE-KDF.swift
+[158/384] Compiling Crypto HPKE-KexKeyDerivation.swift
+[159/384] Emitting module InternalCollectionsUtilities
+[164/395] Compiling Crypto CryptoKitErrors_boring.swift
+[165/395] Compiling Crypto Optional+withUnsafeBytes_boring.swift
+[166/395] Compiling Crypto RNG_boring.swift
+[167/395] Compiling Crypto SafeCompare_boring.swift
+[168/395] Compiling Crypto Zeroization_boring.swift
+[169/395] Compiling Crypto _CryptoModuleAnchor.swift
+[170/395] Compiling Crypto PrettyBytes.swift
+[171/395] Compiling Crypto SafeCompare.swift
+[172/395] Compiling Crypto SecureBytes.swift
+[173/395] Compiling Crypto Zeroization.swift
+[174/395] Compiling Crypto resource_bundle_accessor.swift
+[175/395] Compiling ComplexModule Polar.swift
+[176/396] Compiling ComplexModule Complex+StringConvertible.swift
+[177/396] Compiling ComplexModule Complex+Hashable.swift
+[178/396] Compiling ComplexModule Complex+IntegerLiteral.swift
+[179/396] Compiling ComplexModule Complex+Numeric.swift
+[180/396] Compiling ComplexModule Scale.swift
+[181/422] Compiling ComplexModule Complex.swift
+[182/453] Compiling OrderedCollections OrderedDictionary+Codable.swift
+[183/453] Compiling OrderedCollections OrderedDictionary+CustomReflectable.swift
+[184/453] Emitting module ComplexModule
+[185/453] Compiling OrderedCollections OrderedDictionary+Deprecations.swift
+[186/453] Compiling OrderedCollections OrderedDictionary+Descriptions.swift
+[186/453] Write Objects.LinkFileList
+[187/453] Compiling transforms.cpp
+[189/455] Emitting module Numerics
+[190/455] Compiling Numerics Numerics.swift
+[191/455] Compiling OrderedCollections OrderedSet+Partial SetAlgebra formSymmetricDifference.swift
+[192/455] Compiling OrderedCollections OrderedSet+Partial SetAlgebra formUnion.swift
+[193/455] Compiling OrderedCollections OrderedSet+Partial SetAlgebra intersection.swift
+[194/455] Compiling OrderedCollections OrderedSet+Partial SetAlgebra isDisjoint.swift
+[195/455] Compiling OrderedCollections OrderedSet+Partial SetAlgebra isEqualSet.swift
+[196/455] Compiling OrderedCollections OrderedSet+Partial SetAlgebra isStrictSubset.swift
+[197/455] Compiling OrderedCollections OrderedSet+Partial SetAlgebra isStrictSuperset.swift
+[198/455] Compiling OrderedCollections OrderedSet+Partial SetAlgebra isSubset.swift
+[199/462] Compiling OrderedCollections OrderedSet+Partial SetAlgebra isSuperset.swift
+[200/462] Compiling OrderedCollections OrderedSet+Partial SetAlgebra subtract.swift
+[201/462] Compiling OrderedCollections OrderedSet+Partial SetAlgebra subtracting.swift
+[202/462] Compiling OrderedCollections OrderedSet+Partial SetAlgebra symmetricDifference.swift
+[203/462] Compiling OrderedCollections OrderedSet+Partial SetAlgebra union.swift
+[204/462] Compiling OrderedCollections OrderedSet+Partial SetAlgebra+Basics.swift
+[205/462] Compiling OrderedCollections OrderedSet+RandomAccessCollection.swift
+[206/462] Compiling OrderedCollections OrderedSet+ReserveCapacity.swift
+[207/462] Compiling OrderedCollections OrderedDictionary+Values.swift
+[208/462] Compiling OrderedCollections OrderedDictionary.swift
+[209/462] Compiling OrderedCollections OrderedSet+Codable.swift
+[210/462] Compiling OrderedCollections OrderedSet+CustomReflectable.swift
+[211/462] Compiling OrderedCollections OrderedSet+Descriptions.swift
+[212/462] Compiling OrderedCollections OrderedSet+Diffing.swift
+[213/462] Compiling OrderedCollections OrderedSet+Equatable.swift
+[214/462] Compiling OrderedCollections OrderedSet+ExpressibleByArrayLiteral.swift
+[215/462] Compiling OrderedCollections OrderedDictionary+Hashable.swift
+[216/462] Compiling OrderedCollections OrderedDictionary+Initializers.swift
+[217/462] Compiling OrderedCollections OrderedDictionary+Invariants.swift
+[218/462] Compiling OrderedCollections OrderedDictionary+Move.swift
+[219/462] Compiling OrderedCollections OrderedDictionary+Partial MutableCollection.swift
+[220/462] Compiling OrderedCollections OrderedDictionary+Partial RangeReplaceableCollection.swift
+[221/462] Compiling OrderedCollections OrderedDictionary+Sendable.swift
+[222/462] Compiling OrderedCollections OrderedDictionary+Sequence.swift
+[222/462] Linking MLXHuggingFaceMacros-tool
+[228/462] Compiling OrderedCollections OrderedDictionary+Elements.SubSequence.swift
+[229/462] Compiling OrderedCollections OrderedDictionary+Elements.swift
+[230/462] Compiling OrderedCollections OrderedDictionary+Equatable.swift
+[231/462] Compiling OrderedCollections OrderedDictionary+ExpressibleByDictionaryLiteral.swift
+[231/462] Compiling primitives.cpp
+[233/462] Compiling OrderedCollections _HashTable+Bucket.swift
+[234/462] Compiling OrderedCollections _HashTable+BucketIterator.swift
+[235/462] Compiling OrderedCollections _HashTable+Constants.swift
+[236/462] Compiling OrderedCollections _HashTable+CustomStringConvertible.swift
+[237/462] Compiling OrderedCollections _HashTable+Testing.swift
+[238/462] Compiling OrderedCollections _HashTable+UnsafeHandle.swift
+[239/462] Compiling OrderedCollections _HashTable.swift
+[240/462] Compiling OrderedCollections _Hashtable+Header.swift
+[241/462] Compiling OrderedCollections OrderedSet+Hashable.swift
+[242/462] Compiling OrderedCollections OrderedSet+Initializers.swift
+[243/462] Compiling OrderedCollections OrderedSet+Insertions.swift
+[244/462] Compiling OrderedCollections OrderedSet+Invariants.swift
+[245/462] Compiling OrderedCollections OrderedSet+Move.swift
+[246/462] Compiling OrderedCollections OrderedSet+Partial MutableCollection.swift
+[247/462] Compiling OrderedCollections OrderedSet+Partial RangeReplaceableCollection.swift
+[248/462] Compiling OrderedCollections OrderedSet+Partial SetAlgebra formIntersection.swift
+[249/462] Compiling OrderedCollections OrderedSet+Sendable.swift
+[250/462] Compiling OrderedCollections OrderedSet+SubSequence.swift
+[251/462] Compiling OrderedCollections OrderedSet+Testing.swift
+[252/462] Compiling OrderedCollections OrderedSet+UnorderedView.swift
+[253/462] Compiling OrderedCollections OrderedSet+UnstableInternals.swift
+[254/462] Compiling OrderedCollections OrderedSet.swift
+[255/462] Compiling OrderedCollections _UnsafeBitset.swift
+[256/462] Compiling WebTransportQUICCore QUICByteCursor.swift
+[257/462] Emitting module WebTransportQUICCore
+[258/462] Compiling WebTransportQUICCore QUICFrame.swift
+[259/462] Emitting module WebTransportUDPApple
+[260/462] Compiling WebTransportUDPApple QUICUDPPort.swift
+[261/462] Compiling WebTransportQUICCore QUICTransportParameters.swift
+[262/462] Compiling WebTransportQUICCore QUICPacketNumber.swift
+[263/462] Compiling WebTransportQUICCore QUICVarInt.swift
+[264/462] Compiling WebTransportQUICCore QUICPacket.swift
+[265/462] Emitting module OrderedCollections
+[266/462] Compiling WebTransportQUICCore QUICCoreState.swift
+[267/462] Emitting module EventSource
+[268/462] Compiling EventSource EventSource.swift
+[269/462] Compiling EventSource EventSource+AsyncHTTPClient.swift
+[270/462] Compiling EventSource AsyncSequence+Events.swift
+[271/462] Compiling EventSource AsyncEventsSequence.swift
+[271/487] Compiling no_gguf.cpp
+[273/503] Compiling WebTransportTLSCore TLSHandshakeMessage.swift
+[274/503] Compiling WebTransportTLSCore TLSHandshakeBodies.swift
+[275/504] Compiling WebTransportHTTP3Core HTTP3Settings.swift
+[276/504] Compiling WebTransportHTTP3Core HTTP3Stream.swift
+[277/506] Compiling WebTransportTLSCore TLSHandshakeFlight.swift
+[278/506] Compiling WebTransportHTTP3Core HTTP3Connection.swift
+[279/506] Compiling WebTransportHTTP3Core HTTP3Constants.swift
+[280/506] Compiling WebTransportTLSCore TLSIdentityTrust.swift
+[281/506] Compiling WebTransportHTTP3Core HTTP3Frame.swift
+[282/506] Compiling WebTransportHTTP3Core WebTransportLibrarySmoke.swift
+[283/506] Emitting module WebTransportTLSCore
+[284/506] Compiling WebTransportTLSCore TLSExtension.swift
+[285/506] Compiling WebTransportHTTP3Core WebTransportErrors.swift
+[286/506] Compiling WebTransportHTTP3Core WebTransportExporter.swift
+[286/506] Compiling linalg.cpp
+[288/509] Compiling WebTransportTLSCore TLSQUICConnectionState.swift
+[289/559] Emitting module WebTransportHTTP3Core
+[290/559] Compiling HuggingFace Message.swift
+[291/559] Compiling HuggingFace Provider.swift
+[292/559] Compiling HuggingFace SpeechToText.swift
+[293/559] Compiling HuggingFace TextToImage.swift
+[294/559] Compiling HuggingFace ChatCompletion.swift
+[295/559] Compiling HuggingFace FeatureExtraction.swift
+[296/559] Compiling HuggingFace InferenceClient.swift
+[297/559] Compiling WebTransportCryptoApple QUICPacketProtection.swift
+[298/559] Emitting module WebTransportCryptoApple
+[299/559] Compiling WebTransportCryptoApple QUICInitialKeyDerivation.swift
+[299/559] Compiling graph_utils.cpp
+[300/559] Compiling load.cpp
+[301/559] Compiling ops.cpp
+[303/559] Compiling HuggingFace HubClient+Collections.swift
+[304/559] Compiling HuggingFace HubClient+Datasets.swift
+[305/559] Compiling HuggingFace HubClient+Discussions.swift
+[306/559] Compiling HuggingFace AccessRequest.swift
+[310/559] Compiling HuggingFace File.swift
+[311/559] Compiling HuggingFace HubClient+Buckets.swift
+[313/559] Compiling HuggingFace Git.swift
+[314/559] Compiling HuggingFace HubCache.swift
+[315/560] Compiling HuggingFace Billing.swift
+[316/560] Compiling HuggingFace Bucket.swift
+[316/560] Compiling safetensors.cpp
+[317/565] Compiling fft.cpp
+[323/565] Compiling Jinja Value.swift
+[323/565] Compiling dtype_utils.cpp
+[327/565] Emitting module Jinja
+[327/565] Compiling dtype.cpp
+[328/565] Compiling einsum.cpp
+[329/565] Compiling fast.cpp
+[330/565] Compiling utils.cpp
+[331/565] Compiling no_ring.cpp
+[332/565] Compiling no_nccl.cpp
+[333/565] Compiling primitives.cpp
+[334/565] Compiling no_mpi.cpp
+[335/565] Compiling no_jaccl.cpp
+[337/565] Compiling WebTransportNetworkRuntime WebTransportNetworkTypes.swift
+[338/565] Compiling WebTransportNetworkRuntime WebTransportServerPolicy.swift
+[339/565] Compiling WebTransportNetworkRuntime WebTransportServerIdentity.swift
+[340/565] Compiling WebTransportNetworkRuntime WebTransportInteroperableNetworkRuntime.swift
+[341/565] Emitting module WebTransportNetworkRuntime
+[345/565] Compiling HuggingFace Collection.swift
+[346/565] Compiling HuggingFace CommaSeparatedList.swift
+[347/565] Compiling HuggingFace Dataset.swift
+[348/565] Compiling HuggingFace Discussion.swift
+[348/572] Compiling ops.cpp
+[356/574] Compiling device.cpp
+[365/574] Emitting module HuggingFace
+[366/574] Compiling WebTransport WebTransport.swift
+[367/574] Emitting module WebTransport
+[367/574] Compiling distributed.cpp
+[369/574] Compiling HuggingFace URL+Extensions.swift
+[370/574] Compiling HuggingFace URLSession+Linux.swift
+[371/574] Compiling HuggingFace FileLock.swift
+[372/574] Compiling HuggingFace HTTPClient.swift
+[373/574] Compiling HuggingFace MultipartBuilder.swift
+[374/574] Compiling HuggingFace TokenProvider.swift
+[375/574] Compiling HuggingFace Value.swift
+[376/574] Compiling HuggingFace HubClient+Files.swift
+[377/574] Compiling HuggingFace HubClient+Git.swift
+[378/574] Compiling HuggingFace HubClient+Models.swift
+[379/574] Compiling HuggingFace HubClient+OAuth.swift
+[380/574] Compiling HuggingFace HubClient+Organizations.swift
+[381/574] Compiling HuggingFace HubClient+Pagination.swift
+[382/574] Compiling HuggingFace HubClient+Papers.swift
+[383/574] Compiling HuggingFace HubClient+Repos.swift
+[384/574] Compiling HuggingFace HubClient+Spaces.swift
+[385/574] Compiling HuggingFace HubClient+User.swift
+[386/574] Compiling HuggingFace HubClient.swift
+[387/574] Compiling HuggingFace Model.swift
+[388/574] Compiling HuggingFace OAuth.swift
+[389/574] Compiling HuggingFace Organization.swift
+[390/574] Compiling HuggingFace Pagination.swift
+[391/574] Compiling HuggingFace Paper.swift
+[392/574] Compiling HuggingFace Repo.swift
+[393/574] Compiling HuggingFace ResourceGroup.swift
+[394/574] Compiling HuggingFace Space.swift
+[395/574] Compiling HuggingFace Tags.swift
+[396/574] Compiling HuggingFace User.swift
+[396/574] Compiling utils.cpp
+[397/574] Compiling unary.cpp
+[398/574] Compiling ternary.cpp
+[399/574] Compiling compile.cpp
+[400/574] Compiling sort.cpp
+[402/574] Compiling HuggingFace TextToVideo.swift
+[403/574] Compiling HuggingFace HuggingFaceAuthenticationManager.swift
+[404/574] Compiling HuggingFace OAuthClient.swift
+[405/574] Compiling HuggingFace TokenStorage.swift
+[406/574] Compiling HuggingFace CacheLocationProvider.swift
+[407/574] Compiling HuggingFace Data+Extensions.swift
+[408/574] Compiling HuggingFace JSONDecoder+Extensions.swift
+[408/574] Compiling softmax.cpp
+[409/574] Compiling slicing.cpp
+[410/581] Compiling resident.cpp
+[411/581] Compiling scan.cpp
+[412/581] Compiling export.cpp
+[413/581] Compiling rope.cpp
+[414/581] Compiling scaled_dot_product_attention.cpp
+[415/581] Compiling reduce.cpp
+[416/581] Compiling quantized.cpp
+[417/581] Compiling metal.cpp
+[418/581] Compiling primitives.cpp
+[419/581] Compiling normalization.cpp
+[420/581] Compiling logsumexp.cpp
+[421/581] Compiling matmul.cpp
+[422/581] Compiling jit_kernels.cpp
+[423/581] Compiling indexing.cpp
+[424/581] Compiling fence.cpp
+[425/581] Compiling hadamard.cpp
+[427/581] Compiling Hub Config.swift
+[428/581] Compiling Hub BinaryDistinct.swift
+[429/581] Compiling Hub resource_bundle_accessor.swift
+[430/581] Compiling Hub YYJSONParser.swift
+[430/581] Compiling event.cpp
+[431/581] Compiling distributed.cpp
+[433/581] Emitting module Hub
+[434/581] Compiling Hub Hub.swift
+[435/581] Compiling Hub HubApi.swift
+[435/581] Compiling eval.cpp
+[436/581] Compiling device_info.cpp
+[437/581] Compiling fft.cpp
+[439/593] Compiling Tokenizers Trie.swift
+[440/594] Compiling Tokenizers UnigramTokenizer.swift
+[441/594] Compiling Tokenizers Normalizer.swift
+[442/594] Compiling Tokenizers PostProcessor.swift
+[443/594] Emitting module Tokenizers
+[444/594] Compiling Tokenizers BPETokenizer.swift
+[445/594] Compiling Tokenizers BertTokenizer.swift
+[446/594] Compiling Tokenizers ByteEncoder.swift
+[447/594] Compiling Tokenizers Decoder.swift
+[448/594] Compiling Tokenizers PreTokenizer.swift
+[449/594] Compiling Tokenizers String+PreTokenization.swift
+[450/594] Compiling Tokenizers TokenLattice.swift
+[451/594] Compiling Tokenizers Tokenizer.swift
+[451/594] Compiling copy.cpp
+[452/594] Compiling device.cpp
+[453/594] Compiling slicing.cpp
+[454/594] Compiling custom_kernel.cpp
+[455/594] Compiling allocator.cpp
+[456/594] Compiling threefry.cpp
+[457/594] Compiling binary.cpp
+[458/594] Compiling conv.cpp
+[459/594] Compiling compiled.cpp
 [460/594] Compiling primitives.cpp
-[462/594] Compiling Tokenizers UnigramTokenizer.swift
-[462/594] Compiling copy.cpp
-[464/594] Compiling Tokenizers PreTokenizer.swift
-[465/594] Compiling Tokenizers String+PreTokenization.swift
-[466/594] Compiling Tokenizers Tokenizer.swift
-[467/594] Compiling Tokenizers ByteEncoder.swift
-[468/594] Compiling Tokenizers Decoder.swift
-[469/594] Compiling Tokenizers Normalizer.swift
-[470/594] Compiling Tokenizers PostProcessor.swift
-[471/594] Emitting module Tokenizers
-[472/594] Compiling Tokenizers BPETokenizer.swift
-[473/594] Compiling Tokenizers BertTokenizer.swift
-[473/594] Compiling softmax.cpp
-[474/594] Compiling select.cpp
-[475/594] Compiling svd.cpp
-[476/594] Compiling scan.cpp
-[477/594] Compiling unary.cpp
-[478/594] Compiling quantized.cpp
-[479/594] Compiling sort.cpp
-[480/594] Compiling reduce.cpp
-[481/594] Compiling primitives.cpp
-[482/594] Compiling jit_compiler.cpp
-[483/594] Compiling qrf.cpp
-[484/594] Compiling matmul.cpp
-[485/594] Compiling logsumexp.cpp
-[486/594] Compiling masked_mm.cpp
-[487/594] Compiling luf.cpp
-[488/594] Compiling hadamard.cpp
-[489/594] Compiling bnns.cpp
-[489/594] Compiling inverse.cpp
-[491/594] Compiling cblas.cpp
-[492/594] Compiling eval.cpp
-[493/594] Compiling encoder.cpp
-[494/594] Compiling device_info.cpp
-[495/594] Compiling fft.cpp
-[496/594] Compiling distributed.cpp
-[497/594] Compiling indexing.cpp
-[498/594] Compiling eigh.cpp
-[499/594] Compiling eig.cpp
-[500/594] Compiling arg_reduce.cpp
-[500/594] Compiling utils.cpp
-[502/594] Compiling cholesky.cpp
-[503/594] Compiling slicing.cpp
-[504/594] Compiling conv.cpp
-[505/594] Compiling reduce.cpp
-[506/594] Compiling utils.cpp
-[507/594] Compiling unary_ops.cpp
-[508/594] Compiling unary.cpp
-[509/594] Compiling ternary_ops.cpp
-[510/594] Compiling ternary.cpp
-[511/594] Compiling steel_gemm_splitk_nax.cpp
-[512/594] Compiling steel_gemm_splitk.cpp
-[513/594] Compiling steel_gemm_segmented.cpp
-[514/594] Compiling steel_gemm_masked.cpp
-[515/594] Compiling steel_gemm_gather_nax.cpp
-[516/594] Compiling steel_gemm_gather.cpp
-[517/594] Compiling broadcasting.cpp
-[518/594] Compiling steel_gemm_fused_nax.cpp
-[519/594] Compiling steel_gemm_fused.cpp
-[520/594] Compiling steel_conv_general.cpp
-[521/594] Compiling steel_conv_3d.cpp
-[522/594] Compiling steel_conv.cpp
-[523/594] Compiling steel_attention_nax.cpp
-[524/594] Compiling steel_attention.cpp
-[525/594] Compiling sort.cpp
-[526/594] Compiling softmax.cpp
-[527/594] Compiling scatter_axis.cpp
-[528/594] Compiling common.cpp
-[529/594] Compiling scatter.cpp
-[530/594] Compiling scan.cpp
-[531/594] Compiling reduce_utils.cpp
-[532/594] Compiling load.cpp
-[532/594] Compiling reduce.cpp
-[534/594] Compiling quantized_utils.cpp
-[535/594] Compiling quantized_nax.cpp
-[536/594] Compiling quantized.cpp
-[537/594] Compiling masked_scatter.cpp
-[538/594] Compiling logsumexp.cpp
+[461/594] Compiling copy.cpp
+[462/594] Compiling no_cuda.cpp
+[463/594] Compiling softmax.cpp
+[464/594] Compiling svd.cpp
+[465/594] Compiling select.cpp
+[466/594] Compiling scan.cpp
+[467/594] Compiling quantized.cpp
+[468/594] Compiling sort.cpp
+[469/594] Compiling unary.cpp
+[470/594] Compiling reduce.cpp
+[471/594] Compiling jit_compiler.cpp
+[472/594] Compiling primitives.cpp
+[473/594] Compiling qrf.cpp
+[474/594] Compiling matmul.cpp
+[475/594] Compiling logsumexp.cpp
+[476/594] Compiling luf.cpp
+[477/594] Compiling masked_mm.cpp
+[478/594] Compiling hadamard.cpp
+[479/594] Compiling cblas.cpp
+[480/594] Compiling encoder.cpp
+[481/594] Compiling inverse.cpp
+[482/594] Compiling bnns.cpp
+[483/594] Compiling eval.cpp
+[484/594] Compiling device_info.cpp
+[485/594] Compiling fft.cpp
+[486/594] Compiling distributed.cpp
+[487/594] Compiling indexing.cpp
+[488/594] Compiling eigh.cpp
+[489/594] Compiling eig.cpp
+[490/594] Compiling arg_reduce.cpp
+[491/594] Compiling utils.cpp
+[492/594] Compiling cholesky.cpp
+[493/594] Compiling slicing.cpp
+[494/594] Compiling conv.cpp
+[495/594] Compiling reduce.cpp
+[496/594] Compiling utils.cpp
+[497/594] Compiling unary_ops.cpp
+[498/594] Compiling unary.cpp
+[499/594] Compiling ternary_ops.cpp
+[500/594] Compiling ternary.cpp
+[501/594] Compiling steel_gemm_splitk_nax.cpp
+[502/594] Compiling steel_gemm_splitk.cpp
+[503/594] Compiling steel_gemm_segmented.cpp
+[504/594] Compiling steel_gemm_masked.cpp
+[505/594] Compiling steel_gemm_gather_nax.cpp
+[506/594] Compiling steel_gemm_gather.cpp
+[507/594] Compiling steel_gemm_fused_nax.cpp
+[508/594] Compiling compiled.cpp
+[509/594] Compiling load.cpp
+[510/594] Compiling steel_gemm_fused.cpp
+[511/594] Compiling steel_conv_general.cpp
+[512/594] Compiling steel_conv_3d.cpp
+[513/594] Compiling broadcasting.cpp
+[514/594] Compiling steel_attention_nax.cpp
+[515/594] Compiling steel_conv.cpp
+[515/594] Compiling steel_attention.cpp
+[517/594] Compiling sort.cpp
+[518/594] Compiling softmax.cpp
+[519/594] Compiling scatter_axis.cpp
+[520/594] Compiling scatter.cpp
+[521/594] Compiling scan.cpp
+[522/594] Compiling reduce_utils.cpp
+[523/594] Compiling reduce.cpp
+[524/594] Compiling quantized_utils.cpp
+[525/594] Compiling quantized_nax.cpp
+[526/594] Compiling quantized.cpp
+[527/594] Compiling masked_scatter.cpp
+[528/594] Compiling logsumexp.cpp
+[529/594] Compiling gemv_masked.cpp
+[530/594] Compiling hadamard.cpp
+[531/594] Compiling gemm.cpp
+[531/594] Compiling gemm_nax.cpp
+[533/594] Compiling gather_front.cpp
+[534/594] Compiling gather_axis.cpp
+[535/594] Compiling fp_quantized.cpp
+[535/594] Compiling fp_quantized_nax.cpp
+[537/594] Compiling gather.cpp
+[538/594] Compiling fft.cpp
 [539/594] Compiling copy.cpp
-[540/594] Compiling hadamard.cpp
-[541/594] Compiling gemv_masked.cpp
-[541/594] Compiling gemm_nax.cpp
-[543/594] Compiling gather_front.cpp
-[544/594] Compiling gemm.cpp
-[545/594] Compiling gather_axis.cpp
-[545/594] Compiling fp_quantized_nax.cpp
-[547/594] Compiling gather.cpp
-[548/594] Compiling fp_quantized.cpp
-[549/594] Compiling compiled.cpp
-[550/594] Compiling fft.cpp
-[551/594] Compiling compiled_preamble.cpp
-[552/594] Compiling copy.cpp
-[552/594] Compiling conv.cpp
-[554/594] Compiling binary_two.cpp
-[555/594] Compiling binary_ops.cpp
-[556/594] Compiling binary.cpp
-[557/594] Compiling arange.cpp
-[558/594] Compiling array.cpp
-[559/594] Compiling string.cpp
-[560/594] Compiling transforms_impl.cpp
-[561/594] Compiling version.cpp
-[562/594] Compiling transforms.cpp
-[563/594] Compiling vector.cpp
-[564/594] Compiling compiled_conditional.cpp
-[565/594] Compiling stream.cpp
-[566/594] Compiling error.cpp
-[567/594] Compiling metal.cpp
-[568/594] Compiling random.cpp
-[569/594] Compiling ops.cpp
-[570/594] Compiling memory.cpp
-[571/594] Compiling map.cpp
-[572/594] Compiling linalg.cpp
-[573/594] Compiling cuda.cpp
-[574/594] Copying AppIcon-1024.png
-[574/594] Write sources
-[576/594] Compiling device.cpp
+[541/594] Compiling compiled_preamble.cpp
+[542/594] Compiling conv.cpp
+[543/594] Compiling binary_ops.cpp
+[544/594] Compiling binary_two.cpp
+[544/594] Compiling common.cpp
+[546/594] Compiling arange.cpp
+[547/594] Compiling array.cpp
+[548/594] Compiling version.cpp
+[549/594] Compiling transforms.cpp
+[550/594] Compiling string.cpp
+[551/594] Compiling transforms_impl.cpp
+[552/594] Compiling vector.cpp
+[553/594] Compiling stream.cpp
+[554/594] Compiling compiled_conditional.cpp
+[555/594] Compiling metal.cpp
+[556/594] Compiling random.cpp
+[557/594] Compiling memory.cpp
+[558/594] Compiling ops.cpp
+[559/594] Compiling map.cpp
+[560/594] Compiling linalg.cpp
+[561/594] Compiling io_types.cpp
+[562/594] Compiling error.cpp
+[563/594] Compiling io.cpp
+[564/594] Compiling fft.cpp
+[565/594] Compiling fast.cpp
+[566/594] Compiling export.cpp
+[567/594] Compiling device.cpp
+[567/594] Copying AppIcon-1024.png
+[567/594] Write sources
+[567/594] Write ChatBots-entitlement.plist
+[576/594] Compiling cuda.cpp
 [577/594] Compiling compile.cpp
-[578/594] Compiling closure.cpp
-[579/594] Compiling Cmlx.m
-[580/594] Compiling format.cc
-[581/594] Compiling binary.cpp
+[578/594] Compiling binary.cpp
+[579/594] Compiling format.cc
+[580/594] Compiling closure.cpp
+[581/594] Compiling Cmlx.m
 [582/594] Compiling array.cpp
-[584/630] Compiling MLX State.swift
-[585/630] Compiling MLX Stream.swift
-[586/630] Compiling MLX Transforms+Compile.swift
-[587/630] Compiling MLX Transforms+CompileOverloads.swift
-[588/630] Compiling MLX Transforms+Eval.swift
-[589/635] Compiling MLX MLXCustomFunction.swift
-[590/635] Compiling MLX MLXFast.swift
-[591/635] Compiling MLX MLXFastKernel.swift
-[592/635] Compiling MLX Memory.swift
-[593/635] Compiling MLX Nested.swift
-[594/635] Compiling MLX Ops+Array.swift
-[595/635] Compiling MLX Ops.swift
-[596/635] Compiling MLX ParameterTypes.swift
-[597/635] Compiling MLX Protocols.swift
-[598/635] Compiling MLX Random.swift
-[599/635] Compiling MLX Export.swift
-[600/635] Compiling MLX FFT.swift
-[601/635] Compiling MLX Factory.swift
-[602/635] Compiling MLX Foundation+Util.swift
-[603/635] Compiling MLX GPU+Metal.swift
-[604/635] Compiling MLX ArrayAt.swift
-[605/635] Compiling MLX Cmlx+Util.swift
-[606/635] Compiling MLX DType.swift
-[607/635] Compiling MLX Device.swift
-[608/635] Compiling MLX ErrorHandler.swift
-[609/635] Compiling MLX MLXArray+Metal.swift
-[610/635] Compiling MLX MLXArray+Normalizer.swift
-[611/635] Compiling MLX MLXArray+Ops.swift
-[612/635] Compiling MLX MLXArray+maskFill.swift
-[613/635] Compiling MLX MLXArray.swift
-[614/635] Compiling MLX Transforms+Grad.swift
-[615/635] Compiling MLX Transforms+Internal.swift
-[616/635] Compiling MLX Transforms+Vmap.swift
-[617/635] Compiling MLX Transforms.swift
-[618/635] Compiling MLX WiredMemory.swift
-[619/635] Emitting module MLX
+[584/630] Emitting module MLX
+[585/630] Compiling MLX ArrayAt.swift
+[586/630] Compiling MLX Cmlx+Util.swift
+[587/630] Compiling MLX DType.swift
+[588/630] Compiling MLX Device.swift
+[589/630] Compiling MLX ErrorHandler.swift
+[590/635] Compiling MLX MLXCustomFunction.swift
+[591/635] Compiling MLX MLXFast.swift
+[592/635] Compiling MLX MLXFastKernel.swift
+[593/635] Compiling MLX Memory.swift
+[594/635] Compiling MLX Nested.swift
+[595/635] Compiling MLX State.swift
+[596/635] Compiling MLX Stream.swift
+[597/635] Compiling MLX Transforms+Compile.swift
+[598/635] Compiling MLX Transforms+CompileOverloads.swift
+[599/635] Compiling MLX Transforms+Eval.swift
+[600/635] Compiling MLX Ops+Array.swift
+[601/635] Compiling MLX Ops.swift
+[602/635] Compiling MLX ParameterTypes.swift
+[603/635] Compiling MLX Protocols.swift
+[604/635] Compiling MLX Random.swift
+[605/635] Compiling MLX Export.swift
+[606/635] Compiling MLX FFT.swift
+[607/635] Compiling MLX Factory.swift
+[608/635] Compiling MLX Foundation+Util.swift
+[609/635] Compiling MLX GPU+Metal.swift
+[610/635] Compiling MLX MLXArray+Metal.swift
+[611/635] Compiling MLX MLXArray+Normalizer.swift
+[612/635] Compiling MLX MLXArray+Ops.swift
+[613/635] Compiling MLX MLXArray+maskFill.swift
+[614/635] Compiling MLX MLXArray.swift
+[615/635] Compiling MLX Transforms+Grad.swift
+[616/635] Compiling MLX Transforms+Internal.swift
+[617/635] Compiling MLX Transforms+Vmap.swift
+[618/635] Compiling MLX Transforms.swift
+[619/635] Compiling MLX WiredMemory.swift
 [620/635] Compiling MLX IO.swift
 [621/635] Compiling MLX Linalg.swift
 [622/635] Compiling MLX MLXArray+Bytes.swift
 [623/635] Compiling MLX MLXArray+Indexing.swift
 [624/635] Compiling MLX MLXArray+Init.swift
-[625/652] Compiling MLXNN PositionalEncoding.swift
-[626/652] Compiling MLXNN Quantized.swift
-[627/652] Compiling MLXNN Recurrent.swift
-[628/652] Compiling MLXNN Transformer.swift
-[629/652] Compiling MLXNN Losses.swift
-[630/652] Compiling MLXNN Module.swift
-[631/652] Compiling MLXNN Embedding.swift
-[632/652] Compiling MLXNN Linear.swift
-[633/652] Compiling MLXNN Convolution.swift
-[634/652] Compiling MLXNN ConvolutionTransposed.swift
-[635/652] Compiling MLXNN Dropout.swift
-[636/652] Compiling MLXNN Normalization.swift
-[637/652] Compiling MLXNN Pooling.swift
+[625/652] Compiling MLXNN Normalization.swift
+[626/652] Compiling MLXNN Pooling.swift
+[627/654] Compiling MLXNN PositionalEncoding.swift
+[628/654] Compiling MLXNN Quantized.swift
+[629/654] Compiling MLXNN Convolution.swift
+[630/654] Compiling MLXNN ConvolutionTransposed.swift
+[631/654] Compiling MLXNN Dropout.swift
+[632/654] Compiling MLXNN Recurrent.swift
+[633/654] Compiling MLXNN Transformer.swift
+[634/654] Compiling MLXNN Losses.swift
+[635/654] Compiling MLXNN Module.swift
+[636/654] Compiling MLXNN Embedding.swift
+[637/654] Compiling MLXNN Linear.swift
 [638/654] Compiling MLXNN Activations.swift
 [639/654] Compiling MLXNN Cache.swift
 [640/654] Compiling MLXNN Containers.swift
 [641/654] Emitting module MLXNN
 [642/654] Compiling MLXNN Upsample.swift
 [643/654] Compiling MLXNN ValueAndGrad.swift
-[644/657] Compiling MLXOptimizers Schedulers.swift
-[645/657] Emitting module MLXOptimizers
-[646/657] Compiling MLXOptimizers Optimizers.swift
+[644/657] Compiling MLXOptimizers Optimizers.swift
+[645/657] Compiling MLXOptimizers Schedulers.swift
+[646/657] Emitting module MLXOptimizers
 [647/717] Emitting module MLXLMCommon
 [648/725] Compiling MLXLMCommon MiniMaxM2ToolCallParser.swift
 [649/725] Compiling MLXLMCommon MistralToolCallParser.swift
@@ -759,40 +753,40 @@ Building for debugging...
 [661/725] Compiling MLXLMCommon JSONToolCallParser.swift
 [662/725] Compiling MLXLMCommon KimiK2ToolCallParser.swift
 [663/725] Compiling MLXLMCommon Llama3ToolCallParser.swift
-[664/725] Compiling MLXLMCommon DoRA+Layers.swift
-[665/725] Compiling MLXLMCommon LoRA+Layers.swift
-[666/725] Compiling MLXLMCommon LoRAContainer.swift
-[667/725] Compiling MLXLMCommon LoRAModel.swift
-[668/725] Compiling MLXLMCommon PEFTAdapter.swift
-[669/725] Compiling MLXLMCommon ModelAdapter.swift
-[670/725] Compiling MLXLMCommon ModelAdapterFactory.swift
-[671/725] Compiling MLXLMCommon ModelAdapterTypeRegistry.swift
-[672/725] Compiling MLXLMCommon AttentionUtils.swift
-[673/725] Compiling MLXLMCommon RotateQuantizedLinear.swift
-[674/725] Compiling MLXLMCommon AbstractModelRegistry.swift
-[675/725] Compiling MLXLMCommon ModelTypeRegistry.swift
-[676/725] Compiling MLXLMCommon ProcessorTypeRegistry.swift
-[677/725] Compiling MLXLMCommon RoPEApplication.swift
-[678/725] Compiling MLXLMCommon RoPEUtils.swift
-[679/725] Compiling MLXLMCommon SpeculativeDecoding.swift
-[680/725] Compiling MLXLMCommon SuScaledRoPE.swift
-[681/725] Compiling MLXLMCommon BaseConfiguration.swift
-[682/725] Compiling MLXLMCommon BidirectionalMasks.swift
-[683/725] Compiling MLXLMCommon Chat.swift
-[684/725] Compiling MLXLMCommon ChatSession.swift
-[685/725] Compiling MLXLMCommon Downloader.swift
-[686/725] Compiling MLXLMCommon Evaluate.swift
-[687/725] Compiling MLXLMCommon Encodable+toolResult.swift
-[688/725] Compiling MLXLMCommon JSONDecoder+JSON5.swift
-[689/725] Compiling MLXLMCommon GatedDelta.swift
-[690/725] Compiling MLXLMCommon ModelConfiguration.swift
-[691/725] Compiling MLXLMCommon ModelContainer.swift
-[692/725] Compiling MLXLMCommon ModelConversion.swift
-[693/725] Compiling MLXLMCommon ModelFactory.swift
-[694/725] Compiling MLXLMCommon Gemma.swift
-[695/725] Compiling MLXLMCommon Gemma4.swift
-[696/725] Compiling MLXLMCommon Module+Extensions.swift
-[697/725] Compiling MLXLMCommon ParoQuantLoader.swift
+[664/725] Compiling MLXLMCommon RotateQuantizedLinear.swift
+[665/725] Compiling MLXLMCommon AbstractModelRegistry.swift
+[666/725] Compiling MLXLMCommon ModelTypeRegistry.swift
+[667/725] Compiling MLXLMCommon ProcessorTypeRegistry.swift
+[668/725] Compiling MLXLMCommon RoPEApplication.swift
+[669/725] Compiling MLXLMCommon RoPEUtils.swift
+[670/725] Compiling MLXLMCommon SpeculativeDecoding.swift
+[671/725] Compiling MLXLMCommon SuScaledRoPE.swift
+[672/725] Compiling MLXLMCommon ModelConfiguration.swift
+[673/725] Compiling MLXLMCommon ModelContainer.swift
+[674/725] Compiling MLXLMCommon ModelConversion.swift
+[675/725] Compiling MLXLMCommon ModelFactory.swift
+[676/725] Compiling MLXLMCommon Gemma.swift
+[677/725] Compiling MLXLMCommon Gemma4.swift
+[678/725] Compiling MLXLMCommon Module+Extensions.swift
+[679/725] Compiling MLXLMCommon ParoQuantLoader.swift
+[680/725] Compiling MLXLMCommon DoRA+Layers.swift
+[681/725] Compiling MLXLMCommon LoRA+Layers.swift
+[682/725] Compiling MLXLMCommon LoRAContainer.swift
+[683/725] Compiling MLXLMCommon LoRAModel.swift
+[684/725] Compiling MLXLMCommon PEFTAdapter.swift
+[685/725] Compiling MLXLMCommon ModelAdapter.swift
+[686/725] Compiling MLXLMCommon ModelAdapterFactory.swift
+[687/725] Compiling MLXLMCommon ModelAdapterTypeRegistry.swift
+[688/725] Compiling MLXLMCommon AttentionUtils.swift
+[689/725] Compiling MLXLMCommon BaseConfiguration.swift
+[690/725] Compiling MLXLMCommon BidirectionalMasks.swift
+[691/725] Compiling MLXLMCommon Chat.swift
+[692/725] Compiling MLXLMCommon ChatSession.swift
+[693/725] Compiling MLXLMCommon Downloader.swift
+[694/725] Compiling MLXLMCommon Evaluate.swift
+[695/725] Compiling MLXLMCommon Encodable+toolResult.swift
+[696/725] Compiling MLXLMCommon JSONDecoder+JSON5.swift
+[697/725] Compiling MLXLMCommon GatedDelta.swift
 [698/725] Compiling MLXLMCommon GenerationConfigFile.swift
 [699/725] Compiling MLXLMCommon InterpolationUtils.swift
 [700/725] Compiling MLXLMCommon JSONDecodingTypes.swift
@@ -810,62 +804,62 @@ Building for debugging...
 [712/725] Compiling MLXLMCommon SerialAccessContainer.swift
 [713/725] Compiling MLXLMCommon WiredMemoryPolicies.swift
 [714/725] Compiling MLXLMCommon WiredMemoryUtils.swift
-[715/800] Compiling MLXHuggingFace Macros.swift
-[716/800] Emitting module MLXHuggingFace
-[717/800] Compiling MLXLLM FalconH1.swift
-[718/800] Compiling MLXLLM GLM4.swift
-[719/802] Emitting module MLXVLM
-[720/802] Compiling MLXVLM VLMModel.swift
-[721/802] Compiling MLXVLM VLMModelFactory.swift
-[722/802] Compiling MLXLLM LLMModel.swift
-[723/802] Compiling MLXLLM LLMModelFactory.swift
-[724/802] Compiling MLXLLM Lora+Data.swift
-[725/802] Compiling MLXLLM Bitnet.swift
-[726/802] Compiling MLXLLM Cohere.swift
-[727/802] Compiling MLXLLM OlmoE.swift
-[728/802] Compiling MLXLLM OpenELM.swift
-[729/802] Compiling MLXLLM Phi.swift
-[730/802] Compiling MLXLLM Phi3.swift
-[731/802] Compiling MLXLLM PhiMoE.swift
-[732/802] Compiling MLXLLM Qwen2.swift
-[733/802] Compiling MLXLLM Qwen3.swift
-[737/809] Compiling MLXLLM LoraTrain.swift
-[738/809] Compiling MLXLLM ModelConversion.swift
-[739/809] Compiling MLXLLM AfMoE.swift
-[740/809] Compiling MLXLLM Apertus.swift
-[741/809] Compiling MLXLLM BaichuanM1.swift
-[742/809] Emitting module MLXLLM
-[743/809] Compiling MLXLLM Lille130m.swift
-[744/809] Compiling MLXLLM Llama.swift
-[745/809] Compiling MLXLLM Mamba2.swift
-[746/809] Compiling MLXLLM MiMo.swift
-[747/809] Compiling MLXLLM MiMoV2Flash.swift
-[748/809] Compiling MLXLLM MiniCPM.swift
-[749/809] Compiling MLXLLM MiniMax.swift
-[753/809] Compiling MLXLLM BailingMoe.swift
-[756/809] Compiling MLXLLM DeepseekV3.swift
-[757/809] Compiling MLXLLM Ernie4_5.swift
-[758/809] Compiling MLXLLM Exaone4.swift
-[761/809] Compiling MLXLLM Gemma4Text.swift
-[762/809] Compiling MLXLLM Granite.swift
-[763/809] Compiling MLXLLM GraniteMoeHybrid.swift
-[764/809] Compiling MLXLLM Internlm2.swift
-[765/809] Compiling MLXLLM Jamba.swift
-[766/809] Compiling MLXLLM LFM2.swift
-[767/809] Compiling MLXLLM LFM2MoE.swift
-[768/809] Compiling MLXLLM GLM4MOE.swift
-[769/809] Compiling MLXLLM GLM4MOELite.swift
-[770/809] Compiling MLXLLM GPTOSS.swift
-[771/809] Compiling MLXLLM Mistral3Text.swift
-[772/809] Compiling MLXLLM Mixtral.swift
-[773/809] Compiling MLXLLM NanoChat.swift
-[774/809] Compiling MLXLLM NemotronH.swift
-[775/809] Compiling MLXLLM NemotronLabsDiffusion.swift
-[776/809] Compiling MLXLLM Olmo2.swift
-[777/809] Compiling MLXLLM Olmo3.swift
-[783/809] Compiling MLXLLM Gemma3Text.swift
-[784/809] Compiling MLXLLM Gemma3nText.swift
-[785/809] Compiling MLXLLM Gemma4.swift
+[715/800] Emitting module MLXHuggingFace
+[716/800] Compiling MLXHuggingFace Macros.swift
+[717/800] Emitting module MLXVLM
+[718/802] Compiling MLXLLM Ernie4_5.swift
+[719/802] Compiling MLXLLM Exaone4.swift
+[720/802] Compiling MLXLLM Bitnet.swift
+[721/802] Compiling MLXLLM Cohere.swift
+[722/802] Compiling MLXLLM DeepseekV3.swift
+[723/802] Compiling MLXLLM FalconH1.swift
+[724/802] Compiling MLXLLM GLM4.swift
+[725/802] Emitting module MLXLLM
+[726/809] Compiling MLXVLM VLMModel.swift
+[727/809] Compiling MLXVLM VLMModelFactory.swift
+[728/809] Compiling MLXLLM OlmoE.swift
+[729/809] Compiling MLXLLM OpenELM.swift
+[730/809] Compiling MLXLLM Phi.swift
+[731/809] Compiling MLXLLM Phi3.swift
+[732/809] Compiling MLXLLM PhiMoE.swift
+[733/809] Compiling MLXLLM Qwen2.swift
+[734/809] Compiling MLXLLM Qwen3.swift
+[735/809] Compiling MLXLLM LLMModel.swift
+[736/809] Compiling MLXLLM LLMModelFactory.swift
+[737/809] Compiling MLXLLM Lora+Data.swift
+[738/809] Compiling MLXLLM LoraTrain.swift
+[739/809] Compiling MLXLLM ModelConversion.swift
+[740/809] Compiling MLXLLM AfMoE.swift
+[741/809] Compiling MLXLLM Apertus.swift
+[742/809] Compiling MLXLLM BaichuanM1.swift
+[743/809] Compiling MLXLLM BailingMoe.swift
+[751/809] Compiling MLXLLM Gemma4Text.swift
+[752/809] Compiling MLXLLM Granite.swift
+[753/809] Compiling MLXLLM GraniteMoeHybrid.swift
+[754/809] Compiling MLXLLM Internlm2.swift
+[755/809] Compiling MLXLLM Jamba.swift
+[756/809] Compiling MLXLLM LFM2.swift
+[757/809] Compiling MLXLLM LFM2MoE.swift
+[758/809] Compiling MLXLLM Lille130m.swift
+[759/809] Compiling MLXLLM Llama.swift
+[760/809] Compiling MLXLLM Mamba2.swift
+[761/809] Compiling MLXLLM MiMo.swift
+[762/809] Compiling MLXLLM MiMoV2Flash.swift
+[763/809] Compiling MLXLLM MiniCPM.swift
+[764/809] Compiling MLXLLM MiniMax.swift
+[765/809] Compiling MLXLLM Mistral3Text.swift
+[766/809] Compiling MLXLLM Mixtral.swift
+[767/809] Compiling MLXLLM NanoChat.swift
+[768/809] Compiling MLXLLM NemotronH.swift
+[769/809] Compiling MLXLLM NemotronLabsDiffusion.swift
+[770/809] Compiling MLXLLM Olmo2.swift
+[771/809] Compiling MLXLLM Olmo3.swift
+[775/809] Compiling MLXLLM GLM4MOE.swift
+[776/809] Compiling MLXLLM GLM4MOELite.swift
+[777/809] Compiling MLXLLM GPTOSS.swift
+[780/809] Compiling MLXLLM Gemma3Text.swift
+[781/809] Compiling MLXLLM Gemma3nText.swift
+[782/809] Compiling MLXLLM Gemma4.swift
 [792/809] Compiling MLXLLM Qwen35.swift
 [793/809] Compiling MLXLLM Qwen35MoE.swift
 [794/809] Compiling MLXLLM Qwen3MoE.swift
@@ -879,127 +873,127 @@ Building for debugging...
 [802/851] Compiling ChatBotsCore StreamPacer.swift
 [803/851] Compiling ChatBotsCore TavilyClient.swift
 [804/851] Compiling ChatBotsCore ThinkingStripper.swift
-[805/856] Compiling ChatBotsCore ResearchDirector.swift
-[806/856] Compiling ChatBotsCore ResearchReport.swift
-[807/856] Compiling ChatBotsCore ResearchSession.swift
-[808/856] Compiling ChatBotsCore Roster.swift
-[809/856] Compiling ChatBotsCore RunDirectory.swift
-[810/856] Compiling ChatBotsCore SampleConversation.swift
+[805/851] Compiling ChatBotsCore ThreadGrouping.swift
+[806/851] Compiling ChatBotsCore TranscriptWriter.swift
+[807/851] Compiling ChatBotsCore TransportCheck.swift
+[808/851] Compiling ChatBotsCore TurnLoop.swift
+[809/851] Compiling ChatBotsCore UTF8Text.swift
+[810/856] Emitting module ChatBotsCore
 [811/856] Compiling ChatBotsCore ModeratorIdentity.swift
 [812/856] Compiling ChatBotsCore NameLists.swift
 [813/856] Compiling ChatBotsCore OpenAIResponsesClient.swift
 [814/856] Compiling ChatBotsCore OpenAIResponsesEngine.swift
 [815/856] Compiling ChatBotsCore PersonaLibrary.swift
 [816/856] Compiling ChatBotsCore PromptBuilder.swift
-[817/856] Compiling ChatBotsCore ConflictReader.swift
-[818/856] Compiling ChatBotsCore ConflictState.swift
-[819/856] Compiling ChatBotsCore ConversationEngine.swift
-[820/856] Compiling ChatBotsCore ConversationStore.swift
-[821/856] Compiling ChatBotsCore DeviceProfiles.swift
-[822/856] Compiling ChatBotsCore DiscussionMode.swift
-[823/856] Compiling ChatBotsCore UserSettings.swift
-[824/856] Compiling ChatBotsCore WebAssets.swift
-[825/856] Compiling ChatBotsCore WebTools.swift
-[826/856] Compiling ChatBotsCore WebTransportClient.swift
-[827/856] Compiling ChatBotsCore WebTransportServer.swift
+[817/856] Compiling ChatBotsCore UserSettings.swift
+[818/856] Compiling ChatBotsCore WebAssets.swift
+[819/856] Compiling ChatBotsCore WebTools.swift
+[820/856] Compiling ChatBotsCore WebTransportClient.swift
+[821/856] Compiling ChatBotsCore WebTransportServer.swift
+[822/856] Compiling ChatBotsCore ConflictReader.swift
+[823/856] Compiling ChatBotsCore ConflictState.swift
+[824/856] Compiling ChatBotsCore ConversationEngine.swift
+[825/856] Compiling ChatBotsCore ConversationStore.swift
+[826/856] Compiling ChatBotsCore DeviceProfiles.swift
+[827/856] Compiling ChatBotsCore DiscussionMode.swift
 [828/856] Compiling ChatBotsCore APIServer.swift
 [829/856] Compiling ChatBotsCore AnalystRoles.swift
 [830/856] Compiling ChatBotsCore Attachments.swift
 [831/856] Compiling ChatBotsCore AudienceVote.swift
 [832/856] Compiling ChatBotsCore CertificateStore.swift
 [833/856] Compiling ChatBotsCore ChatModels.swift
-[834/856] Emitting module ChatBotsCore
-[835/856] Compiling ChatBotsCore DocumentImport.swift
-[836/856] Compiling ChatBotsCore EngineProtocol.swift
-[837/856] Compiling ChatBotsCore EngineService.swift
-[838/856] Compiling ChatBotsCore HTTPServer.swift
-[839/856] Compiling ChatBotsCore MLXEngine.swift
-[840/856] Compiling ChatBotsCore ModelStore.swift
-[841/856] Compiling ChatBotsCore ThreadGrouping.swift
-[842/856] Compiling ChatBotsCore TranscriptWriter.swift
-[843/856] Compiling ChatBotsCore TransportCheck.swift
-[844/856] Compiling ChatBotsCore TurnLoop.swift
-[845/856] Compiling ChatBotsCore UTF8Text.swift
+[834/856] Compiling ChatBotsCore ResearchDirector.swift
+[835/856] Compiling ChatBotsCore ResearchReport.swift
+[836/856] Compiling ChatBotsCore ResearchSession.swift
+[837/856] Compiling ChatBotsCore Roster.swift
+[838/856] Compiling ChatBotsCore RunDirectory.swift
+[839/856] Compiling ChatBotsCore SampleConversation.swift
+[840/856] Compiling ChatBotsCore DocumentImport.swift
+[841/856] Compiling ChatBotsCore EngineProtocol.swift
+[842/856] Compiling ChatBotsCore EngineService.swift
+[843/856] Compiling ChatBotsCore HTTPServer.swift
+[844/856] Compiling ChatBotsCore MLXEngine.swift
+[845/856] Compiling ChatBotsCore ModelStore.swift
 [846/973] Emitting module ChatBotsProbe
 [847/973] Compiling ChatBotsProbe main.swift
 [847/973] Write Objects.LinkFileList
-[849/973] Compiling ChatBotsCoreTests AuditApp2AttachmentSummaryTests.swift
-[850/973] Compiling ChatBotsCoreTests AuditApp2StreamPacerSeedingTests.swift
-[851/973] Compiling ChatBotsCoreTests AuditAttachmentMediaTests.swift
-[852/975] Compiling ChatBotsCoreTests AuditClientsImageTests.swift
-[853/975] Compiling ChatBotsCoreTests AuditClientsKeyTests.swift
-[854/975] Compiling ChatBotsCoreTests AuditClientsProbeTests.swift
+[849/973] Emitting module ChatBots
+[850/975] Compiling ChatBots ZoomStore.swift
+[851/975] Compiling ChatBots resource_bundle_accessor.swift
+[852/975] Compiling ChatBotsCoreTests AttachmentTests.swift
+[853/975] Compiling ChatBotsCoreTests AttachmentUploadTests.swift
+[854/975] Compiling ChatBotsCoreTests AudienceVoteTests.swift
 [855/975] Compiling ChatBotsCoreTests AuditClientsSearchTests.swift
 [856/975] Compiling ChatBotsCoreTests AuditClientsStreamTests.swift
 [857/975] Compiling ChatBotsCoreTests AuditClientsSupport.swift
 [858/975] Compiling ChatBotsCoreTests AuditCLIClientKeyTests.swift
 [859/975] Compiling ChatBotsCoreTests AuditCLIStreamTerminationTests.swift
 [860/975] Compiling ChatBotsCoreTests AuditClientsDocumentTests.swift
-[861/975] Emitting module ChatBots
-[862/975] Compiling ChatBotsCoreTests AuditClientsToolDispatchTests.swift
-[863/975] Compiling ChatBotsCoreTests AuditDocumentConversionTests.swift
-[864/975] Compiling ChatBotsCoreTests AuditEngineSetterShadowingTests.swift
-[865/975] Compiling ChatBots ZoomStore.swift
-[866/975] Compiling ChatBots resource_bundle_accessor.swift
+[861/975] Compiling ChatBotsCoreTests AuditClientsToolDispatchTests.swift
+[862/975] Compiling ChatBotsCoreTests AuditDocumentConversionTests.swift
+[863/975] Compiling ChatBotsCoreTests AuditEngineSetterShadowingTests.swift
+[864/975] Compiling ChatBotsCoreTests AuditClientsImageTests.swift
+[865/975] Compiling ChatBotsCoreTests AuditClientsKeyTests.swift
+[866/975] Compiling ChatBotsCoreTests AuditClientsProbeTests.swift
 [867/975] Compiling ChatBotsCoreTests AuditEngineStateTests.swift
 [868/975] Compiling ChatBotsCoreTests AuditEngineStateTestsContextWindow.swift
 [869/975] Compiling ChatBotsCoreTests AuditEngineStateTestsEventStream.swift
-[870/975] Compiling ChatBotsCoreTests AttachmentTests.swift
-[871/975] Compiling ChatBotsCoreTests AttachmentUploadTests.swift
-[872/975] Compiling ChatBotsCoreTests AudienceVoteTests.swift
+[870/975] Compiling ChatBotsCoreTests AuditApp2AttachmentSummaryTests.swift
+[871/975] Compiling ChatBotsCoreTests AuditApp2StreamPacerSeedingTests.swift
+[872/975] Compiling ChatBotsCoreTests AuditAttachmentMediaTests.swift
 [872/975] Write Objects.LinkFileList
 [873/975] Linking chatbots-probe
 [874/975] Applying chatbots-probe
 [875/975] Linking ChatBots
 [876/975] Applying ChatBots
-[878/975] Compiling ChatBotsCLI main.swift
-[879/975] Emitting module ChatBotsCLI
+[878/975] Emitting module ChatBotsCLI
+[879/975] Compiling ChatBotsCLI main.swift
 [879/975] Write Objects.LinkFileList
-[881/975] Compiling ChatBotsCoreTests AuditResearchPromptTrustTests.swift
-[882/975] Compiling ChatBotsCoreTests AuditResearchReportLabelTests.swift
-[883/975] Compiling ChatBotsCoreTests AuditResearchSearchBudgetTests.swift
-[884/975] Compiling ChatBotsCoreTests AuditS1CORSTests.swift
-[885/975] Compiling ChatBotsCoreTests AuditS1ResearchCoverageTests.swift
-[886/975] Compiling ChatBotsCoreTests AuditS1SecurityHeaderTests.swift
-[887/975] Compiling ChatBotsCoreTests AuditS1TurnLifecycleTests.swift
-[888/975] Compiling ChatBotsCoreTests AuditShareLinkTests.swift
-[889/975] Compiling ChatBotsCoreTests AuditTransportCheckTimeoutTests.swift
-[890/975] Compiling ChatBotsCoreTests AuditTransportLifecycleTests.swift
-[891/975] Compiling ChatBotsCoreTests AuditTransportServerTests.swift
-[892/975] Compiling ChatBotsCoreTests AuditWave2EventDuplicationTests.swift
-[893/975] Compiling ChatBotsCoreTests AuditWave2GenerationCapTests.swift
-[904/987] Compiling ChatBotsCoreTests AuditFinalDirectedAssignmentTests.swift
-[905/987] Compiling ChatBotsCoreTests AuditFinalSnapshotRevisionTests.swift
-[906/987] Compiling ChatBotsCoreTests AuditFinalTransportCheckTests.swift
+[891/975] Compiling ChatBotsCoreTests AuditFinalDirectedAssignmentTests.swift
+[892/975] Compiling ChatBotsCoreTests AuditFinalSnapshotRevisionTests.swift
+[893/975] Compiling ChatBotsCoreTests AuditFinalTransportCheckTests.swift
+[894/987] Compiling ChatBotsCoreTests AuditResearchPromptTrustTests.swift
+[895/987] Compiling ChatBotsCoreTests AuditResearchReportLabelTests.swift
+[896/987] Compiling ChatBotsCoreTests AuditResearchSearchBudgetTests.swift
+[897/987] Compiling ChatBotsCoreTests AuditS1CORSTests.swift
+[898/987] Compiling ChatBotsCoreTests AuditS1ResearchCoverageTests.swift
+[899/987] Compiling ChatBotsCoreTests AuditS1SecurityHeaderTests.swift
+[900/987] Compiling ChatBotsCoreTests AuditS1TurnLifecycleTests.swift
+[901/987] Compiling ChatBotsCoreTests AuditShareLinkTests.swift
+[902/987] Compiling ChatBotsCoreTests AuditTransportCheckTimeoutTests.swift
+[903/987] Compiling ChatBotsCoreTests AuditTransportLifecycleTests.swift
+[904/987] Compiling ChatBotsCoreTests AuditTransportServerTests.swift
+[905/987] Compiling ChatBotsCoreTests AuditWave2EventDuplicationTests.swift
+[906/987] Compiling ChatBotsCoreTests AuditWave2GenerationCapTests.swift
 [907/987] Emitting module ChatBotsCoreTests
-[908/987] Compiling ChatBotsCoreTests AuditFinalTurnLoopTests.swift
-[909/987] Compiling ChatBotsCoreTests AuditHTTPLimitTests.swift
-[910/987] Compiling ChatBotsCoreTests AuditInferenceTests.swift
-[911/987] Compiling ChatBotsCoreTests AuditInferenceTestsCompact.swift
-[912/987] Compiling ChatBotsCoreTests AuditInferenceTestsReasoning.swift
-[913/987] Compiling ChatBotsCoreTests AuditModelStoreTests.swift
-[914/987] Compiling ChatBotsCoreTests AuditReplyMatchingTests.swift
-[915/987] Compiling ChatBotsCoreTests AuditResearchAffinityTests.swift
-[916/987] Compiling ChatBotsCoreTests AuditResearchBasisTests.swift
-[917/987] Compiling ChatBotsCoreTests AuditResearchCoverageTests.swift
-[918/987] Compiling ChatBotsCoreTests AuditResearchDeterminismTests.swift
-[919/987] Compiling ChatBotsCoreTests AuditResearchModeratorBriefTests.swift
-[920/987] Compiling ChatBotsCoreTests AuditResearchPositionChangeTests.swift
-[921/987] Compiling ChatBotsCoreTests AuditWave2IdleTimeoutTests.swift
-[922/987] Compiling ChatBotsCoreTests AuditWave2PromptTrustBoundaryTests.swift
-[923/987] Compiling ChatBotsCoreTests AuditWave2RoundAdvanceTests.swift
-[924/987] Compiling ChatBotsCoreTests AuditWave2SynthesisBoundaryTests.swift
-[925/987] Compiling ChatBotsCoreTests BuiltInKeyTests.swift
-[926/987] Compiling ChatBotsCoreTests CertificateStoreTests.swift
-[927/987] Compiling ChatBotsCoreTests CompactionTests.swift
-[928/987] Compiling ChatBotsCoreTests ConflictTests.swift
-[929/987] Compiling ChatBotsCoreTests ConversationEngineTests.swift
-[930/987] Compiling ChatBotsCoreTests ConversationStoreTests.swift
-[931/987] Compiling ChatBotsCoreTests DeviceProfileTests.swift
-[932/987] Compiling ChatBotsCoreTests EmbeddedWebAssetTests.swift
-[933/987] Compiling ChatBotsCoreTests EngineServiceTests.swift
-[946/987] Linking chatbots-cli
-[947/987] Applying chatbots-cli
+[920/987] Linking chatbots-cli
+[922/987] Compiling ChatBotsCoreTests AuditFinalTurnLoopTests.swift
+[923/987] Compiling ChatBotsCoreTests AuditHTTPLimitTests.swift
+[924/987] Compiling ChatBotsCoreTests AuditInferenceTests.swift
+[925/987] Compiling ChatBotsCoreTests AuditInferenceTestsCompact.swift
+[926/987] Compiling ChatBotsCoreTests AuditInferenceTestsReasoning.swift
+[927/987] Compiling ChatBotsCoreTests AuditModelStoreTests.swift
+[928/987] Compiling ChatBotsCoreTests AuditReplyMatchingTests.swift
+[929/987] Compiling ChatBotsCoreTests AuditResearchAffinityTests.swift
+[930/987] Compiling ChatBotsCoreTests AuditResearchBasisTests.swift
+[931/987] Compiling ChatBotsCoreTests AuditResearchCoverageTests.swift
+[932/987] Compiling ChatBotsCoreTests AuditResearchDeterminismTests.swift
+[933/987] Compiling ChatBotsCoreTests AuditResearchModeratorBriefTests.swift
+[934/987] Compiling ChatBotsCoreTests AuditResearchPositionChangeTests.swift
+[934/987] Applying chatbots-cli
+[936/987] Compiling ChatBotsCoreTests AuditWave2IdleTimeoutTests.swift
+[937/987] Compiling ChatBotsCoreTests AuditWave2PromptTrustBoundaryTests.swift
+[938/987] Compiling ChatBotsCoreTests AuditWave2RoundAdvanceTests.swift
+[939/987] Compiling ChatBotsCoreTests AuditWave2SynthesisBoundaryTests.swift
+[940/987] Compiling ChatBotsCoreTests BuiltInKeyTests.swift
+[941/987] Compiling ChatBotsCoreTests CertificateStoreTests.swift
+[942/987] Compiling ChatBotsCoreTests CompactionTests.swift
+[943/987] Compiling ChatBotsCoreTests ConflictTests.swift
+[944/987] Compiling ChatBotsCoreTests ConversationEngineTests.swift
+[945/987] Compiling ChatBotsCoreTests ConversationStoreTests.swift
+[946/987] Compiling ChatBotsCoreTests DeviceProfileTests.swift
+[947/987] Compiling ChatBotsCoreTests EmbeddedWebAssetTests.swift
+[948/987] Compiling ChatBotsCoreTests EngineServiceTests.swift
 [949/987] Compiling ChatBotsCoreTests FourSeatTests.swift
 [950/987] Compiling ChatBotsCoreTests HTTPServerTests.swift
 [951/987] Compiling ChatBotsCoreTests HTTPTests.swift
@@ -1041,4 +1035,4 @@ Building for debugging...
 [987/989] Compiling ChatBotsPackageTests runner.swift
 [987/989] Write Objects.LinkFileList
 [988/989] Linking ChatBotsPackageTests
-Build complete! (125.11s)
+Build complete! (134.48s)

@@ -1,16 +1,16 @@
 Phase E acceptance run
-branch: audit/2026-09-13
-commit: 90e9f7b6f75956be387097b0d8e47ded6ea21e66
+branch: main
+commit: 73eac3bd9a4a2cdfa9867b3ad786392c3ff9d392
 
-  PASS|the tree is clean, so the evidence describes commit 90e9f7b6
-  PASS|on the audit branch
+  PASS|the tree is clean, so the evidence describes commit 73eac3bd
+  PASS|on main, which the audit was landed on
   PASS|no try!, as!, -Wno-, or inline lint suppression in tracked Swift
   PASS|0 placeholder markers in tracked source
   PASS|swift build --build-tests: 0 compiler errors, 0 compiler warnings (4 SwiftPM notice(s) not counted)
-  PASS|tests: ✔ Test run with 824 tests in 139 suites passed after 18.481 seconds.
+  PASS|tests: ✔ Test run with 824 tests in 139 suites passed after 18.410 seconds.
   PASS|AddressSanitizer: exit 0, no report
   PASS|ThreadSanitizer: exit 0, no report
-  PASS|coverage: TOTAL                               4227               971    77.03%        1471               287    80.49%       10856              1810    83.33%           0                 0         -
+  PASS|coverage: TOTAL                               4227               969    77.08%        1471               287    80.49%       10856              1807    83.35%           0                 0         -
   PASS|gitleaks over the full history: 0 findings
   PASS|osv-scanner: no issues found
   PASS|semgrep: 3 finding(s), all covered by a recorded waiver
@@ -19,11 +19,11 @@ commit: 90e9f7b6f75956be387097b0d8e47ded6ea21e66
   PASS|pyright: clean
   PASS|swiftlint: 255 finding(s), within the recorded waiver of 255
   PASS|swift-format: 744 diagnostic(s), within the recorded waiver of 744
-  PASS|verify-done-commits.sh: backed 115 · skipped 13 · unbacked 0
-  PASS|ledger: 128 tasks, none open, 0 blocked
+  PASS|verify-done-commits.sh: backed 116 · skipped 14 · unbacked 0
+  PASS|ledger: 130 tasks, none open, 0 blocked
   PASS|every BLOCKED task carries a blocked_reason
   PASS|the embedded web interface matches web/
   PASS|the embedded name lists match names/
-  PASS|ledger.md status region is in step with ledger.json (128 tasks)
+  PASS|ledger.md status region is in step with ledger.json (130 tasks)
 
 23 passed, 0 failed

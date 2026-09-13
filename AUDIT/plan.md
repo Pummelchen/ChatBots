@@ -183,24 +183,24 @@ clone of the final head.
 
 | | |
 | --- | --- |
-| Commit tested | `90e9f7b6f75956be387097b0d8e47ded6ea21e66` (`audit/2026-09-13`) |
-| Host | `node1`, a Mac that did not develop the fixes, from a fresh clone of the pushed branch |
+| Commit tested | `73eac3bd9a4a2cdfa9867b3ad786392c3ff9d392` (`main`) |
+| Host | `node1`, a Mac that did not develop the fixes, from a fresh clone of the pushed repository |
 | Result | **23 passed, 0 failed** — `AUDIT/baseline/phaseE/summary.txt` |
 | Evidence | `AUDIT/baseline/phaseE/` — the run's own logs, the identity of what was tested, and the summary. The instrumented build trees are `.gitignore`d; the logs are committed. |
 
+The run was made on `main`, after the branch was landed on it, and it is the acceptance statement for
+what ships. Two earlier runs against `audit/2026-09-13` were green as well (`90e9f7b6`, 23/0); this
+one supersedes them because it names the branch the code is on, and because the acceptance script was
+corrected in between to accept it (A132).
+
 The figures it produced: 824 tests in 139 suites; 0 compiler errors and 0 compiler warnings; ASan and
-TSan clean; coverage `Sources/` 77.03 % lines, 80.49 % functions; `gitleaks` 0 findings over the full
+TSan clean; coverage `Sources/` 77.08 % lines, 80.49 % functions; `gitleaks` 0 findings over the full
 history; `osv-scanner` no issues; `semgrep` 3 findings, all covered by a written waiver; `shellcheck`,
 `ruff` and `pyright` clean; `swiftlint` 255 and authored `swift-format` 744, both exactly at their
-recorded waivers; `verify-done-commits.sh` backed 115 · skipped 13 · unbacked 0; the ledger at 128
+recorded waivers; `verify-done-commits.sh` backed 116 · skipped 14 · unbacked 0; the ledger at 130
 tasks with none open; and the generated files — the web interface, the name lists and the ledger's own
 status tables — all in step.
-
-
-
-**The run is scripted: `AUDIT/phase-e.sh`.** It performs all twelve checks in one pass and writes
-its logs and a `summary.txt` into `AUDIT/baseline/phaseE/` (or a directory you name), so Phase E's
-evidence is *produced* rather than assembled by hand. That distinction is the whole reason it
+inction is the whole reason it
 exists: every number in this audit that was wrong was wrong because it was derived by hand from
 formatted output — A19 recorded a task DONE whose commit contained no source change, and A28 found
 three counts that were the line counts of captured files rather than finding counts. Each check

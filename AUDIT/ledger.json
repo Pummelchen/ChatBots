@@ -2215,6 +2215,40 @@
       "commit": "cf589e9",
       "notes": "Recorded separately from A124 rather than folded in, because it is a different file and a different copy of the defect — and because A124's fix would have been described as complete while a second instance remained. It is the same lesson as A129: a fix applied where the problem was found, rather than everywhere it exists, leaves the next surface wrong.",
       "blocked_reason": null
+    },
+    {
+      "id": "A131",
+      "severity": "S2",
+      "unit": "CI / audit tooling",
+      "file_line": ".github/workflows/checks.yml (the `Install the pinned analysis tools` step)",
+      "title": "The CI install step verified its own installs before GITHUB_PATH applied, so the job died with exit 127 on its first real run",
+      "category": "process",
+      "status": "DONE",
+      "host_used": "node1",
+      "discovered_by": "the first push to main, from the CI run the landing triggered — the same question as A129 and A130, one level further down",
+      "evidence_before": "The `static-analysis` job failed in its *install* step, not in any gate: `ShellCheck - shell script analysis tool / version: 0.9.0` — the runner image's version, not the pinned 0.11.0 — then `line 25: gitleaks: command not found`, `##[error]Process completed with exit code 127`. `GITHUB_PATH` takes effect for the next step, not the one that writes it, so the version lines at the bottom of the step resolved against the image: they found the image's shellcheck and could not find `gitleaks` at all, though the step had downloaded it a few lines earlier into a directory not yet on `PATH`. Every download, the venv and the npm install had succeeded; the step failed while proving its own work. GitHub run `checks` #11 on `5398362`, job `Lint, type-check and scan`, step 3.",
+      "fix_summary": "`export PATH=\"$tools/bin:$tools/venv/bin:$PATH\"` beside the `GITHUB_PATH` lines, so the step uses the tools it just installed. That is also what those lines are for: they are meant to prove the pinned version is the one that runs, and against the image they proved nothing.",
+      "evidence_after": "`.github/workflows/checks.yml`; rehearsed locally against the same shell semantics (with the export the pinned script resolves). Verified on GitHub: `checks` #12 on `8c4174f` — **completed success**, with the install step and all seven analysis steps green — and `checks` #13 on `73eac3b` after the next landing, also success.",
+      "commit": "8c4174f",
+      "notes": "The third defect found by asking one question: **has this ever actually run?** A129 and A130 were in the gates, this one was in the machinery that installs them, and it could only fail on the first execution — which is exactly what a workflow that does not trigger on the development branch guarantees. The generalisation recorded with A129 stands, and this is its sharpest instance: the failure was in the step whose entire job is to make the others trustworthy.",
+      "blocked_reason": null
+    },
+    {
+      "id": "A132",
+      "severity": "S3",
+      "unit": "audit tooling / acceptance",
+      "file_line": "AUDIT/phase-e.sh:72-76 (the branch identity check)",
+      "title": "The acceptance script refused to run on main, the branch the audit had just been landed on",
+      "category": "process",
+      "status": "DONE",
+      "host_used": "node1",
+      "discovered_by": "the first acceptance run made after the landing",
+      "evidence_before": "Phase E on `main` at `5398362` reported 22 passed, 1 failed, and the one failure was the script's own identity check: `FAIL|on branch 'main', not audit/2026-09-13`. Everything the run measures passed — 824 tests in 139 suites, both sanitizers clean, coverage 77.03 %, gitleaks 0 over the full history, osv clean, semgrep's three findings all waived, shellcheck/ruff/pyright clean, swiftlint 255 and authored swift-format 744 at their waivers, the guard at backed 116 · skipped 14 · unbacked 0, and 130 tasks with none open. The check's intent was \"not on some arbitrary branch\", and after the landing `main` is the branch that matters — a gate that refuses to run where the code ships is a gate that stops being run.",
+      "fix_summary": "The check accepts `audit/2026-09-13` or `main` and says which it found; any other branch still fails. The §0 comment beside it now explains why the `origin/main` figure it records means something different either side of the landing — before, it is the branch's distance from the base commit; after, it is the whole history.",
+      "evidence_after": "AUDIT/phase-e.sh. The acceptance run on `main` at `73eac3bd` then reported **23 passed, 0 failed**, with `PASS|on main, which the audit was landed on` — `AUDIT/baseline/phaseE/summary.txt`. `bash -n AUDIT/phase-e.sh` parses.",
+      "commit": "73eac3b",
+      "notes": "A small thing with a pointed lesson: the audit's own instruments encoded the *circumstances* of the audit — which branch it ran on — rather than its invariant, which is that the run describes a commit. `90e9f7b6` was accepted on the audit branch and `73eac3bd` is accepted on `main`; both are the same tree, and the identity file in each run names the commit rather than the branch label.",
+      "blocked_reason": null
     }
   ]
 }

@@ -26,8 +26,8 @@ been run.
 <!-- BEGIN GENERATED: ledger status — rendered from ledger.json by AUDIT/render-ledger.sh -->
 | Metric | Count |
 | --- | --- |
-| Tasks enumerated | 130 |
-| DONE | 130 |
+| Tasks enumerated | 132 |
+| DONE | 132 |
 | START | 0 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
@@ -36,7 +36,7 @@ been run.
 
 Nothing is open.
 
-### Every task — 130
+### Every task — 132
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -84,6 +84,8 @@ Nothing is open.
 | A129 | S2 | DONE | cf589e9 | CI / audit tooling | The CI semgrep step ran with `--error` and would have failed on the very findings the audit waived in writing, and it had never executed because the workflow does not run on the audit branch |
 | A13 | — | DONE | — | tests | ThreadSanitizer over the whole suite: one data race found |
 | A130 | S3 | DONE | cf589e9 | CI / audit tooling | The CI dependency step scanned the whole tree with `-r .` — the same defect A124 fixed in phase-e.sh, in the second copy of the same check |
+| A131 | S2 | DONE | 8c4174f | CI / audit tooling | The CI install step verified its own installs before GITHUB_PATH applied, so the job died with exit 127 on its first real run |
+| A132 | S3 | DONE | 73eac3b | audit tooling / acceptance | The acceptance script refused to run on main, the branch the audit had just been landed on |
 | A14 | S1 | DONE | 0de3123 | HTTPServer | isRunning/lastError are raced between the listener callback and waitUntilReady |
 | A15 | S1 | DONE | 8ece1d3 | EngineService/DocumentImport | Attaching a document blocks the engine main actor for the whole conversion, subprocess wait included |
 | A16 | S3 | DONE | 9c53771 | ChatBotsCLI | --serve has no signal handling, so the listener is never shut down and nothing is flushed on exit |
@@ -1254,3 +1256,35 @@ taken from.** A28 found figures that were the line counts of captured files; A83
 guards that skipped their own targets; A123 and A124 found gates reading SwiftPM's chatter and other
 people's example projects; A125 found a waiver quoted from a state the tree had left behind. Each was
 found by reading what the mechanism actually did rather than what it was written to do.
+
+---
+
+## The landing — and three more defects, found by asking whether the CI had ever run
+
+The audit was complete and green when the question was asked that produced A129–A131: **has this
+check ever actually executed in the place it will execute?** The `static-analysis` job triggers on
+`push: [main]` and on pull requests, and every commit of the audit was on `audit/2026-09-13`, so the
+job had never run — and it would have failed on `main`, on the first push, for three separate reasons.
+
+| | |
+| --- | --- |
+| A129 | Its semgrep step ran with `--error` over `Sources tools web`, which fails on the three findings in `tools/cdp.py` that A09 waived *in writing* and deliberately left visible rather than suppressing. Reproduced on a clean export: `Ran 461 rules on 87 files: 3 findings`, exit 1. The allowlist is now one implementation, `tools/semgrep-waivers.py`, called by CI **and** by `phase-e.sh`, so the hosted gate and the Mac gate cannot disagree about what has been justified. |
+| A130 | Its dependency step ran `osv-scanner -r .` — the defect A124 had already fixed in `phase-e.sh`, still present in the CI copy. Harmless there by luck (a clean checkout finds only `Package.resolved`), which is exactly why it needed recording rather than leaving. |
+| A131 | Its *install* step verified its own installs before `GITHUB_PATH` applied. On the first real run it printed the runner's ShellCheck 0.9.0 instead of the pinned 0.11.0 and then died on `gitleaks: command not found`, exit 127. Every download had succeeded; the step failed proving its own work. |
+
+A132 came from the landing itself: after the fast-forward, Phase E on `main` failed its own branch
+check (`on branch 'main', not audit/2026-09-13`) while every measurement passed. The check had encoded
+the audit's circumstances rather than its invariant — that the run describes a **commit**.
+
+**The landing.** `main` was fast-forwarded from `a6d6999`, gaining 218 commits and losing none. A
+fast-forward was chosen over a squash because `verify-done-commits.sh` resolves every DONE task
+against the commit that carries its fix, so a squash would delete the evidence and the audit's own
+gate would fail on the branch it was landed on; and over `--no-ff` because the 200-odd audit commits
+each carry their own measured message, which a synthetic merge commit would only summarise.
+
+The final acceptance run was made on `main` from a fresh clone: **23 passed, 0 failed** on
+`73eac3bd`, and GitHub's own `checks` workflow reported success on that commit (#13) and on the one
+before it (#12). The figures: 824 tests in 139 suites, both sanitizers clean, coverage `Sources/`
+77.08 % lines, gitleaks 0 over the full history, `osv-scanner` clean, `semgrep` 3 findings all waived
+in writing, `shellcheck`/`ruff`/`pyright` clean, `swiftlint` 255 and authored `swift-format` 744 at
+their recorded waivers, and 130 tasks with none open.
