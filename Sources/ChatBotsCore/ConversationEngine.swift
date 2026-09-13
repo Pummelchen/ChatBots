@@ -877,7 +877,13 @@ public final class ConversationEngine {
                         .toolCall(agentID: agentID, name: name, query: argument))
                 },
                 onEvent: { [weak self] event in
-                    await self?.publishEvent(event)
+                    // `handle` is the one that publishes: every branch below ends in
+                    // `publishEvent(event)`, and it also folds the event into the transcript.
+                    // Publishing here as well ran `record(event)` twice, so live text and
+                    // reasoning were doubled, `toolLog` got duplicate entries, and every
+                    // `observeEvents` subscriber and the `events` stream saw each token
+                    // twice. `conversation.turns` is appended once either way, which is why
+                    // no transcript-level test caught it (audit A92).
                     await self?.handle(event, from: agentID)
                 }
             )
