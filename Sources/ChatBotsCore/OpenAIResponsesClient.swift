@@ -489,7 +489,15 @@ public struct OpenAIResponsesClient: Sendable {
             throw OpenAIResponsesError.http(status: http.statusCode, body: detail)
         }
 
-        var sawText = false
+        // A completed response is the only thing that counts as success (see the header). The
+        // loop can end at EOF or at `data: [DONE]`, and either can happen mid-stream when a
+        // connection drops, a proxy truncates, or a server is killed — so "the bytes stopped"
+        // is not evidence that the turn finished. `sawCompleted` is what separates the two.
+        var sawCompleted = false
+        // An explicit failure is already the answer; it is reported as `.failed` and the caller
+        // turns it into the thrown error. It must not also produce the truncation error below,
+        // which would replace the server's own reason with a less useful one.
+        var sawFailure = false
         var utf8 = UTF8StreamBuffer()
         for try await line in bytes.lines {
             try Task.checkCancellation()
@@ -506,7 +514,6 @@ public struct OpenAIResponsesClient: Sendable {
                     // Through the buffer: a chunk may end mid-character.
                     let safe = utf8.append(delta)
                     if !safe.isEmpty {
-                        sawText = true
                         continuation.yield(.text(safe))
                     }
                 }
@@ -519,14 +526,16 @@ public struct OpenAIResponsesClient: Sendable {
             case "response.completed", "response.done":
                 // A response can complete having produced no text at all when the model
                 // only reasoned or only called a tool; the caller decides what that means.
-                _ = sawText
+                sawCompleted = true
                 continuation.yield(.completed(Self.usage(from: event)))
 
             case "response.failed", "response.incomplete":
                 let message = Self.failureMessage(from: event)
+                sawFailure = true
                 continuation.yield(.failed(message))
 
             case "error":
+                sawFailure = true
                 continuation.yield(.failed(Self.failureMessage(from: event)))
 
             default:
@@ -536,6 +545,16 @@ public struct OpenAIResponsesClient: Sendable {
 
         let tail = utf8.flush()
         if !tail.isEmpty { continuation.yield(.text(tail)) }
+
+        // Truncated: the stream ended without the server ever saying it completed. Whatever
+        // text arrived is a fragment, and reporting it as a finished turn would record a
+        // `stop` with zero usage — the token statistics silently become 0, and a half answer is
+        // indistinguishable from a whole one. Throwing is what makes the caller's normal
+        // error handling report the turn as failed instead.
+        if !sawCompleted, !sawFailure {
+            throw OpenAIResponsesError.streamFailed(
+                "the connection ended before the response completed, so the reply is incomplete")
+        }
     }
 
     /// `data: {...}` → `{...}`, or nil for comments, blank lines and other SSE fields.
