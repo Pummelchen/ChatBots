@@ -1485,6 +1485,23 @@
       "commit": null,
       "notes": "This is the fourth defect this audit has found in its own process, after A19 (a DONE claim whose commit carried nothing), A83 (a guard that skipped the case it targeted, and a test port allocator that collided) and A84 (a commit that absorbed another lane's staged files). The pattern across all four is the same and worth stating plainly: the audit was confident about its CONTROLS and had not checked its own MECHANISM. Each was found by looking at observed behaviour - a git status, a guard output, a file mtime - rather than by reasoning about the design, which is also how the substantive findings were found. The concrete instance is worth keeping because it names the cost precisely: a lane that had done nothing wrong lost its build for the duration, and its own target compiled clean throughout. Isolation has to be at the level of the unit the compiler actually sees, which for SwiftPM is the module and the test target - not the file.",
       "blocked_reason": null
+    },
+    {
+      "id": "A88",
+      "severity": "S3",
+      "unit": "device capture tool",
+      "file_line": "tools/capture-devices.py:76-84 (server_is_up), :67-73 (profiles)",
+      "title": "The same connection-leak shape A86 fixed exists twice more, and one of them is called in a 90-iteration loop",
+      "category": "incomplete",
+      "status": "START",
+      "host_used": "this Mac",
+      "discovered_by": "reported by the tools/ lane while fixing A86, and left unfixed because it falls outside that task's scope",
+      "evidence_before": "`server_is_up()` (:76-84) puts `conn.close()` AFTER `getresponse()` inside the try, so a probe that raises before returning leaks the socket - and `wait_for_server()` calls it in a loop of up to 90 attempts, so a service that is slow to come up can leak dozens of sockets rather than one. `profiles()` (:67-73) has the related shape with no try at all, though it is called once and returns immediately. This is the same class A86 fixed in `caddy_process`, found by the same person in the same file while fixing it.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "Recorded rather than folded into A86 for the rule this audit has applied throughout: one task, one scope, and widening a task to absorb an adjacent finding is how a scope quietly changes. The 90-iteration loop is what makes this one worth more than the count of occurrences suggests - the leak is bounded by the retry count, and the retry count is 90.",
+      "blocked_reason": null
     }
   ]
 }
