@@ -12,6 +12,17 @@
 
 import Foundation
 
+/// The result of reading a staged upload, in a form that can cross back from the conversion
+/// task without carrying a non-`Sendable` error across the actor boundary.
+///
+/// `DocumentError` is a public enum with `String` payloads and is not declared `Sendable`, and
+/// `any Error` is not either, so the failure is turned into the sentence the caller would have
+/// been given anyway, off the actor, where the thrown type is known.
+private enum StagedConversion: Sendable {
+    case document(AttachedDocument)
+    case refused(String)
+}
+
 @MainActor
 public final class EngineService {
 
@@ -31,9 +42,24 @@ public final class EngineService {
     /// Where conversations are kept between runs.
     public let store: ConversationStore
 
-    public init(engine: ConversationEngine, store: ConversationStore) {
+    /// Where a staged upload is read.
+    ///
+    /// A closure rather than a direct call to `DocumentIngestorProvider`, so a test can supply
+    /// its own ingestor without installing one process-wide, and so the conversion can be
+    /// exercised as the off-actor step it now is. The default is the provider the app installs
+    /// at launch.
+    private let attachmentIngestor: @Sendable () throws -> DocumentIngestor
+
+    public init(
+        engine: ConversationEngine,
+        store: ConversationStore,
+        attachmentIngestor: @escaping @Sendable () throws -> DocumentIngestor = {
+            try DocumentIngestorProvider.ingestor
+        }
+    ) {
         self.engine = engine
         self.store = store
+        self.attachmentIngestor = attachmentIngestor
         // The engine writes on every change, so the app does not have to remember to.
         engine.conversationStore = store
     }
@@ -133,7 +159,7 @@ public final class EngineService {
 
         // ── Attachments ──────────────────────────────────────────────────────────────
         case .addAttachment(let filename, let contents):
-            return addAttachment(filename: filename, contents: contents)
+            return await addAttachment(filename: filename, contents: contents)
 
         case .removeAttachment(let id):
             engine.setAttachments(engine.attachments.filter { $0.id.uuidString != id })
@@ -331,7 +357,18 @@ public final class EngineService {
     /// inside that directory, whatever the caller sends — without this, a name like
     /// `../../../../Users/<user>/Library/LaunchAgents/x.plist` wrote attacker-controlled bytes
     /// outside it, and the file outlived the `defer` that removes the staging directory.
-    private func addAttachment(filename: String, contents: Data) -> EngineReply {
+    /// **The conversion runs off this actor.** `EngineService` is `@MainActor` and every front
+    /// end and the transport share it, so converting here — a PDF extraction or a `textutil`
+    /// subprocess that may run to its 30-second timeout — froze the one-second state poll, the
+    /// website and the push loop for as long as it took. The staging, the name checks and the
+    /// engine mutation stay on the actor; only `DocumentIngestor.add` moves to a detached task.
+    /// `DocumentIngestor` is `Sendable` and the bytes cross as the file the extractors already
+    /// take, so the public API is unchanged.
+    ///
+    /// The `defer` still removes the staging directory, and it is still correct across the
+    /// move: `Task.value` is awaited before it runs, so the file outlives the read and not the
+    /// request. A conversion that throws is reported as the same refusal it was before.
+    private func addAttachment(filename: String, contents: Data) async -> EngineReply {
         guard engine.canAttachFiles else {
             return .refused("source material must be added before the conversation starts")
         }
@@ -369,17 +406,31 @@ public final class EngineService {
             return .refused("could not stage the upload: \(error.localizedDescription)")
         }
 
-        do {
-            let document = try DocumentIngestorProvider.ingestor.add(url: temporary)
+        // Detached rather than a structured child, so the read is not cancelled by a caller
+        // that goes away — the staged file is removed when this method returns, and returning
+        // while the conversion still held the path would delete it under the extractor.
+        let conversion = await Task.detached(
+            priority: .userInitiated
+        ) { [attachmentIngestor] () -> StagedConversion in
+            do {
+                let ingestor = try attachmentIngestor()
+                return .document(try ingestor.add(url: temporary))
+            } catch let error as DocumentError {
+                return .refused(error.errorDescription ?? "the file could not be read")
+            } catch {
+                return .refused(error.localizedDescription)
+            }
+        }.value
+
+        switch conversion {
+        case .refused(let reason):
+            return .refused(reason)
+        case .document(let document):
             guard !document.kind.isImage || engine.allSeatsSupportVision else {
                 return .refused("images need every seat to support vision")
             }
             engine.setAttachments(engine.attachments + [document])
             return .state(snapshot())
-        } catch let error as DocumentError {
-            return .refused(error.errorDescription ?? "the file could not be read")
-        } catch {
-            return .refused(error.localizedDescription)
         }
     }
 
