@@ -54,11 +54,31 @@ http://:7788 {
 	}
 
 	# The interface itself.
+	#
+	# The headers below are A76's browser-boundary set, repeated here because in this
+	# configuration Caddy is what serves the document. A76 emits them from the engine, but
+	# this block serves ./web without going near the engine, so without these the page the
+	# browser actually loads would carry no CSP, no nosniff, no frame denial and no referrer
+	# policy — the API behind it would, and only the API. `header` inside this `handle`
+	# applies to this block's responses only, so the engine's own headers on /api/* are left
+	# to the engine rather than overwritten from here.
+	#
+	# The policy is identical to HTTPResponse.interfacePolicy. It is safe for what this block
+	# serves — web/index.html, web/app.js and web/style.css — because the page loads its
+	# script and stylesheet as separate same-origin files, reaches the engine only through
+	# relative /api paths, and contains no inline script, inline event handler, inline style,
+	# external origin, frame, form or <base>; style.css has no url() or @import. That is what
+	# lets `script-src 'self'` stand without `'unsafe-inline'`, which is the directive that
+	# matters for rendered model and document text.
 	handle {
 		root * ./web
 		file_server
 		# A reload during development must not serve a stale page.
 		header Cache-Control "no-store"
+		header X-Content-Type-Options "nosniff"
+		header Referrer-Policy "no-referrer"
+		header X-Frame-Options "DENY"
+		header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'"
 	}
 
 	# Anything not found is a mistake rather than a client route, so Caddy's default 404 is
