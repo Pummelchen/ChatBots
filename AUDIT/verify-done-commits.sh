@@ -12,7 +12,8 @@
 #
 #   usage: AUDIT/verify-done-commits.sh [ledger.json]
 #
-# Exit 0 when every claim is backed, 1 otherwise, listing each unbacked claim.
+# Exit 0 when every claim is backed, 1 when a claim is unbacked, 2 when the ledger cannot be
+# read well enough to make the claim either way.
 
 set -uo pipefail
 
@@ -24,33 +25,58 @@ if [ ! -f "$ledger" ]; then
     exit 2
 fi
 
-# Task fields, tab separated so the shell can read them without a JSON parser per task.
+# Task fields, one row per DONE task, separated by U+001F so the shell can read them without a
+# JSON parser per task.
 #
 # `file_line` is free prose, so it is scanned for plausible repository paths rather than parsed:
 # anything that looks like a file or directory under Sources/, Tests/ or tools/. A task that
 # names no such path — a CI YAML, a document, a decision — is out of scope here and is reported
 # as skipped rather than passed silently.
-# Fields are separated by U+0001, NOT by a tab, and that is the whole point of this comment.
+# The separator has now been wrong twice, in the same direction both times: the guard read its
+# own fields wrongly, therefore *skipped* the claims it exists to check, and still exited 0.
 #
-# The first version of this guard used `@tsv` and `IFS=$'\t'`. A tab is *IFS whitespace*, so a
-# run of them collapses to a single delimiter and leading/trailing ones are dropped — which
-# means that when a task's `commit` was empty the doubled tab disappeared, every later field
-# shifted one place left, and `file_line` was read as `unit`. The task then "named no source
-# path" and was reported as skipped. In other words the guard silently skipped precisely the
-# tasks it exists to catch: a DONE claim with no commit behind it.
+#   * `@tsv` with `IFS=$'\t'` (A83). A tab is *IFS whitespace*, so a run of them collapses to a
+#     single delimiter and leading/trailing ones are dropped. When a task's `commit` was empty
+#     the doubled tab disappeared, every later field shifted one place left, and `file_line` was
+#     read as `unit`. The task then "named no source path" — so the guard silently skipped
+#     precisely the DONE claim with no commit behind it.
+#   * `U+0001` with `IFS=$'\001'` (A117). `U+0001` is bash's own internal `CTLESC` escape
+#     character — `U+007F` is `CTLNUL` — so a literal one cannot survive in a shell variable.
+#     `read` never saw a delimiter, the whole row landed in `$id`, every task was skipped, and on
+#     macOS's bash 3.2 the guard reported "backed 0 · skipped 109 · unbacked 0" and exited 0.
 #
-# U+0001 is not IFS whitespace, so an empty field stays an empty field.
-rows=$(jq -r '.tasks[]
+# U+001F is neither IFS whitespace (so an empty field stays an empty field) nor one of bash's
+# internal markers, so it is read as a delimiter on bash 3.2 and on bash 5 alike.
+#
+# The parse is then *checked* rather than trusted, because on both occasions the failure was
+# invisible from the exit status: a row that does not begin with a task id aborts the run with
+# exit 2 instead of being skipped. Section 10 of phase-e.sh reads that status, so an unreadable
+# ledger is reported as a failure rather than passing as a clean run.
+separator=$'\037'
+rows=$(jq -r --arg sep "$separator" '.tasks[]
     | select(.status == "DONE")
     | [.id, (.commit // ""), (.file_line // ""), (.unit // "")]
-    | join("\u0001")' "$ledger")
+    | join($sep)' "$ledger")
+done_tasks=$(jq -r '[.tasks[] | select(.status == "DONE")] | length' "$ledger")
 
 failures=0
 checked=0
 skipped=0
+read_rows=0
 
-while IFS=$'\001' read -r id commit file_line unit; do
+while IFS="$separator" read -r id commit file_line unit; do
     [ -n "$id" ] || continue
+
+    # A row whose first field is not a task id means the separator did not survive into the
+    # loop, and every task would be skipped while this script reported success. Refuse to
+    # report a result at all rather than reporting a vacuous one.
+    if [[ ! "$id" =~ ^A[0-9]+$ ]]; then
+        echo "FATAL  could not parse a ledger row: the first field is not a task id:" >&2
+        printf '       %s\n' "$id" >&2
+        echo "       the U+001F separator did not survive; the ledger was not read" >&2
+        exit 2
+    fi
+    read_rows=$((read_rows + 1))
 
     # The paths this task's own record points at.
     paths=$(printf '%s %s\n' "$file_line" "$unit" \
@@ -111,6 +137,12 @@ while IFS=$'\001' read -r id commit file_line unit; do
         failures=$((failures + 1))
     fi
 done <<< "$rows"
+
+if [ "$read_rows" -ne "$done_tasks" ]; then
+    echo
+    echo "FATAL  read $read_rows row(s) for $done_tasks DONE task(s) — the ledger was not read in full" >&2
+    exit 2
+fi
 
 echo
 echo "backed $checked · skipped $skipped · unbacked $failures"
