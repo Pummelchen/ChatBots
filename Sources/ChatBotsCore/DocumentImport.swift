@@ -8,6 +8,7 @@
 // has read Word, RTF, ODT and HTML for years, and a hand-rolled `.docx` unzipper would be a
 // fraction as capable and a great deal more code to get wrong.
 
+import Darwin
 import Foundation
 import PDFKit
 
@@ -137,7 +138,20 @@ public enum SystemProcess {
     /// freeze the interface.
     public static let timeout: TimeInterval = 30
 
+    /// How long a killed child gets to exit on SIGTERM before it is SIGKILLed.
+    private static let killGrace: TimeInterval = 2
+
     public static func run(_ executable: String, _ arguments: [String]) throws -> Result {
+        try run(executable, arguments, timeout: timeout)
+    }
+
+    /// Run with an explicit deadline.
+    ///
+    /// The default `run` uses the conversion timeout; this exists so a caller that knows
+    /// the command is short — and the tests — can bound it without waiting out 30 seconds.
+    public static func run(
+        _ executable: String, _ arguments: [String], timeout: TimeInterval
+    ) throws -> Result {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
@@ -155,19 +169,78 @@ public enum SystemProcess {
             throw DocumentError.unreadable(error.localizedDescription)
         }
 
-        // Read before waiting: a tool that fills the pipe buffer would otherwise block
-        // forever, and the wait below would never return.
-        let outputData = out.fileHandleForReading.readDataToEndOfFile()
-        let errorData = err.fileHandleForReading.readDataToEndOfFile()
+        // The read ends are non-blocking so the deadline is enforced by this thread rather
+        // than by the child. `readDataToEndOfFile` has no timeout: a `textutil` that hangs on
+        // a crafted document, or blocks opening a FIFO staged as an attachment, would hold
+        // this thread forever, and draining stdout to EOF before even looking at stderr would
+        // deadlock both once either pipe passed its 64 KB buffer.
+        let outDescriptor = out.fileHandleForReading.fileDescriptor
+        let errDescriptor = err.fileHandleForReading.fileDescriptor
+        Self.makeNonBlocking(outDescriptor)
+        Self.makeNonBlocking(errDescriptor)
 
+        var outputData = Data()
+        var errorData = Data()
+        var outOpen = true
+        var errOpen = true
         let deadline = Date.now.addingTimeInterval(timeout)
+        var timedOut = false
+
+        // Both pipes are drained by this one thread and polled together, so filling either
+        // past its buffer can no longer block the child and neither pipe's EOF is a
+        // precondition for reading the other.
+        while outOpen || errOpen {
+            let remaining = deadline.timeIntervalSinceNow
+            if remaining <= 0 {
+                timedOut = true
+                break
+            }
+            var descriptors: [pollfd] = []
+            if outOpen {
+                descriptors.append(pollfd(fd: outDescriptor, events: Int16(POLLIN), revents: 0))
+            }
+            if errOpen {
+                descriptors.append(pollfd(fd: errDescriptor, events: Int16(POLLIN), revents: 0))
+            }
+            // Short poll slices, so a process that closes its pipes and then exits is
+            // noticed promptly and the deadline is checked on every pass.
+            let waitMilliseconds = Int32(min(max(remaining, 0.001), 0.25) * 1_000)
+            let ready = descriptors.withUnsafeMutableBufferPointer { buffer in
+                poll(buffer.baseAddress, nfds_t(buffer.count), waitMilliseconds)
+            }
+            if ready < 0 {
+                if errno == EINTR { continue }
+                break
+            }
+            for index in descriptors.indices {
+                let revents = descriptors[index].revents
+                guard revents & Int16(POLLIN | POLLHUP | POLLERR | POLLNVAL) != 0 else { continue }
+                if descriptors[index].fd == outDescriptor {
+                    outOpen = Self.drain(outDescriptor, into: &outputData)
+                } else {
+                    errOpen = Self.drain(errDescriptor, into: &errorData)
+                }
+            }
+        }
+
+        // A child that closes its output pipes but keeps running — or one whose pipes ended
+        // before it did — still has to obey the deadline.
         while process.isRunning, Date.now < deadline {
             usleep(20_000)
         }
         if process.isRunning {
-            process.terminate()
-            throw DocumentError.unreadable("the conversion took longer than \(Int(timeout)) seconds")
+            timedOut = true
         }
+
+        if timedOut {
+            // Kill *and reap*. Without `waitUntilExit` the child would linger as a zombie,
+            // one process-table entry per hung conversion, and a later PID could be reused.
+            Self.stop(process)
+            process.waitUntilExit()
+            throw DocumentError.unreadable(
+                "the conversion took longer than \(Int(timeout)) seconds")
+        }
+
         process.waitUntilExit()
 
         return Result(
@@ -175,6 +248,56 @@ public enum SystemProcess {
             output: outputData,
             error: String(data: errorData, encoding: .utf8) ?? ""
         )
+    }
+
+    /// Put a descriptor in non-blocking mode so `drain` returns on EAGAIN instead of
+    /// waiting for the child.
+    private static func makeNonBlocking(_ descriptor: Int32) {
+        let flags = fcntl(descriptor, F_GETFL, 0)
+        guard flags >= 0 else { return }
+        _ = fcntl(descriptor, F_SETFL, flags | O_NONBLOCK)
+    }
+
+    /// Read everything currently available on `descriptor`, appending it to `data`.
+    ///
+    /// Returns `true` while the writer is still open, `false` once it has closed the pipe.
+    private static func drain(_ descriptor: Int32, into data: inout Data) -> Bool {
+        var buffer = [UInt8](repeating: 0, count: 64 * 1024)
+        while true {
+            let count = buffer.withUnsafeMutableBytes { raw in
+                read(descriptor, raw.baseAddress, raw.count)
+            }
+            if count > 0 {
+                data.append(contentsOf: buffer[0..<count])
+            } else if count == 0 {
+                return false
+            } else if errno == EINTR {
+                continue
+            } else if errno == EAGAIN || errno == EWOULDBLOCK {
+                return true
+            } else {
+                return false
+            }
+        }
+    }
+
+    /// Terminate and, if it will not go, kill `process`.
+    ///
+    /// Guarded by `isRunning` because the child may have exited on its own between the
+    /// caller's check and here, and the PID could have been handed to something else. The
+    /// caller must still call `waitUntilExit()` afterwards to reap whichever way this ends.
+    private static func stop(_ process: Process) {
+        guard process.isRunning else { return }
+        process.terminate()
+        let graceDeadline = Date.now.addingTimeInterval(killGrace)
+        while process.isRunning, Date.now < graceDeadline {
+            usleep(20_000)
+        }
+        if process.isRunning {
+            // Not another `terminate()`: a child that ignores SIGTERM must not be allowed
+            // to outlive the conversion.
+            _ = kill(process.processIdentifier, SIGKILL)
+        }
     }
 }
 
