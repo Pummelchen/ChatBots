@@ -214,16 +214,18 @@ class Chrome:
                 print(f"  refusing to terminate pid {pid}: not the headless instance", file=sys.stderr)
             self.process = None
 
-    @staticmethod
-    def _is_our_headless_instance(pid: int) -> bool:
-        """True only for a headless Chrome carrying this run's private profile."""
+    def _is_our_headless_instance(self, pid: int) -> bool:
+        """True only for a headless Chrome carrying this instance's private profile."""
         import subprocess
         try:
             out = subprocess.run(["ps", "-p", str(pid), "-o", "command="],
                                  capture_output=True, text=True, timeout=5).stdout
         except Exception:
             return False
-        return "--headless" in out and "chatbots-cdp" in out
+        # The configured profile, not a hard-coded default: a caller that passes its own
+        # --user-data-dir must still be able to stop the Chrome it started, or the next
+        # start() rmtree's the profile directory and races for the debugging port.
+        return "--headless" in out and self.profile in out
 
     def call(self, method: str, params: dict | None = None) -> dict:
         """Send a command and wait for its reply, ignoring events."""

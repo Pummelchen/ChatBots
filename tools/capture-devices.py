@@ -38,7 +38,6 @@ OUT = ROOT / "captures"
 PORT = 7791                      # the interface
 ENGINE_PORT = 7792               # the engine behind it
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-TMP_PROFILE = "/tmp/chatbots-capture-chrome"
 CHROME_PORT = 9223
 
 # A phone profile is the strictest test, so landscape is worth checking too: it is where a
