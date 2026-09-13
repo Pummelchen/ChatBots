@@ -941,9 +941,15 @@
       link.textContent = "Link";
       link.title = "Copy a read-only link to this conversation";
       link.onclick = async () => {
-        // The engine tells us where it is listening; falling back to this page's own origin
-        // covers the case of a browser reaching the app through a proxy or another host.
-        const base = (state.snapshot && state.snapshot.shareBase) || window.location.origin;
+        // This page's own origin, not the engine's. The engine reports its loopback address, which
+        // is right for a browser on the Mac running it and unreachable from a phone (A99); the
+        // origin is the address this page is actually being read at, which is what the person
+        // receiving the link needs. The snapshot's value is the fallback for an origin that is not
+        // a usable base (`file:` pages report "null").
+        const origin = window.location.origin;
+        const base = origin && origin !== "null"
+          ? origin
+          : (state.snapshot && state.snapshot.shareBase);
         const url = `${base}/s/${item.id}`;
         try {
           await navigator.clipboard.writeText(url);

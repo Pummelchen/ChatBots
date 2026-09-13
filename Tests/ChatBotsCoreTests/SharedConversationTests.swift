@@ -271,6 +271,48 @@ struct SharedConversationHTTPTests {
         let snapshot = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         #expect(snapshot?["shareBase"] as? String == base)
     }
+
+    @Test("A page reached through a proxy builds its links on the host it was reached on")
+    func sharePageUsesTheRequestHost() async throws {
+        let (server, engine, session, base) = try await shareServer()
+        defer { server.stop() }
+        engine.start()
+        await engine.waitUntilFinished()
+
+        let listData = try await fetch(session, "\(base)/api/conversations")
+        let list = try JSONSerialization.jsonObject(with: listData) as? [[String: Any]]
+        let id = try #require(list?.first?["id"] as? String)
+
+        // The engine's own base is its loopback port, which is what a phone cannot reach. Reaching
+        // the page through a proxy has to produce a link back to the address the proxy is on (A99).
+        // The island carries JSONSerialization's escapes (`\/` for a slash, `\u003c` for `<`), so
+        // the page is unescaped the way the replay script does before its value is read.
+        func decoded(_ page: String) -> String {
+            page
+                .replacingOccurrences(of: "\\u003c", with: "<")
+                .replacingOccurrences(of: "\\/", with: "/")
+        }
+
+        var proxied = URLRequest(url: URL(string: "\(base)/s/\(id)")!)
+        proxied.setValue("192.168.1.5:7788", forHTTPHeaderField: "Host")
+        let (data, response) = try await session.data(for: proxied)
+        // The port in `base` is not 7788, so a reflected host is distinguishable from the fallback.
+        #expect((response as? HTTPURLResponse)?.statusCode == 200)
+        #expect(
+            decoded(String(decoding: data, as: UTF8.self))
+                .contains("\"shareBase\":\"http://192.168.1.5:7788\""),
+            "the page did not build its links on the host it was reached on")
+
+        // A Host that is not a host is refused rather than interpolated into a URL, and the page
+        // falls back to the engine's own base.
+        var hostile = URLRequest(url: URL(string: "\(base)/s/\(id)")!)
+        hostile.setValue("evil.example/../admin", forHTTPHeaderField: "Host")
+        let (fallbackData, _) = try await session.data(for: hostile)
+        #expect(
+            decoded(String(decoding: fallbackData, as: UTF8.self))
+                .contains("\"shareBase\":\"\(base)\""),
+            "a Host that is not a host was reflected into the page")
+    }
 }
 
 /// Fetch a body, so the tests read as assertions rather than as URL plumbing.

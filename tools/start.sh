@@ -100,6 +100,27 @@ port_busy() {
   lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1
 }
 
+# Where a share link should point.
+#
+# The engine can only work out its own loopback address, and a link to that is useless on the phone
+# the share feature exists for. This script is what publishes the website, so it is the layer that
+# knows the address a phone would use (A99); with `--local-only` nothing is published beyond this
+# Mac, so loopback is the honest answer there. Prints nothing when no LAN address can be read, and
+# the engine then keeps its own default rather than being handed a bad base.
+share_base() {
+  if [ "$LOCAL_ONLY" -eq 1 ]; then
+    printf 'http://127.0.0.1:%s' "$PORT"
+    return 0
+  fi
+  local address=""
+  address="$(ipconfig getifaddr en0 2>/dev/null || true)"
+  [ -n "$address" ] || address="$(ipconfig getifaddr en1 2>/dev/null || true)"
+  if [ -n "$address" ]; then
+    printf 'http://%s:%s' "$address" "$PORT"
+  fi
+  return 0
+}
+
 is_our_process() {
   # Ownership is decided from the whole command line, never from the bare name. A pid file
   # outlives the process it named and the OS can hand that number to an unrelated program, so
@@ -259,7 +280,15 @@ fi
 
 step "Starting the engine"
 dim "engine log: $ENGINE_LOG"
-"$BINARY" --serve --port "$ENGINE_PORT" >"$ENGINE_LOG" 2>&1 &
+# Share links are built by the engine, so it is told the address the website is published on rather
+# than being left to report its own loopback port (A99).
+SHARE_BASE="$(share_base)"
+ENGINE_ARGS=(--serve --port "$ENGINE_PORT")
+if [ -n "$SHARE_BASE" ]; then
+  ENGINE_ARGS+=(--share-base "$SHARE_BASE")
+  dim "share links: $SHARE_BASE/s/<id>"
+fi
+"$BINARY" "${ENGINE_ARGS[@]}" >"$ENGINE_LOG" 2>&1 &
 ENGINE_PID_VALUE=$!
 echo "$ENGINE_PID_VALUE" > "$ENGINE_PID"
 

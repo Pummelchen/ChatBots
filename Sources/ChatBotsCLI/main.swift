@@ -51,6 +51,9 @@ struct Options {
     /// The HTTP port. `UInt16` rather than `Int`, so an out-of-range value cannot reach the
     /// listener through a second, trapping conversion (A62).
     var port: UInt16 = 7788
+    /// Where a share link should point, when this engine is published behind a proxy. Nil keeps
+    /// the engine's own loopback address.
+    var shareBase: String?
     var contextWindow: Int?
     var keepRecent: Int?
     /// Cap on answer tokens per turn; `nil` keeps the seat's own budget.
@@ -213,6 +216,21 @@ struct Options {
                     exit(2)
                 }
                 options.port = value
+            case "--share-base":
+                // Where a share link should point. The engine can only know its own loopback port,
+                // and the phone the share feature exists for needs the address the website is
+                // published on — which only the deployment knows (A99). Validated rather than
+                // accepted blindly, because a base that is not a URL produces links that go
+                // nowhere.
+                let baseRaw = next() ?? ""
+                guard let url = URL(string: baseRaw), url.scheme != nil, url.host != nil else {
+                    FileHandle.standardError.write(
+                        Data(
+                            "invalid share base: \(baseRaw.isEmpty ? "(nothing)" : baseRaw) — expected a URL like http://192.168.1.5:7788\n"
+                                .utf8))
+                    exit(2)
+                }
+                options.shareBase = baseRaw
             case "--compact-threshold":
                 // A nil here left the engine's own 0.7 in place, silently (A114). The value is a
                 // fraction of the context window, so anything outside (0, 1] is not a threshold.
@@ -842,7 +860,7 @@ if !options.attachments.isEmpty {
     // always built. Only its HTTP listener is optional.
     let server = APIServer(
         engine: engine, store: ConversationStore(directory: runDirectory),
-        port: options.port)
+        port: options.port, shareBase: options.shareBase)
 
     // The HTTP listener is opened only when the requested transport includes it.
     //
