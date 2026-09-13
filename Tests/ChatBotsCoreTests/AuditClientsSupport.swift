@@ -38,7 +38,7 @@ final class ScriptedOpenAIServer {
     static let defaultModelsBody = Data(
         #"{"object":"list","data":[{"id":"test-model","object":"model"}]}"#.utf8)
 
-    private let state = State()
+    private let state: State
     private let server: HTTPServer
     let port: UInt16
 
@@ -46,12 +46,21 @@ final class ScriptedOpenAIServer {
     var modelsRequests: Int { state.modelsRequests }
     var responsesRequests: Int { state.responsesRequests }
 
+    /// Change what `/v1/models` answers, so a test can make a later probe fail after a first
+    /// turn has already succeeded.
+    func respondToModels(with body: Data, status: Int) {
+        state.modelsBody = body
+        state.modelsStatus = status
+    }
+
     init(
         modelsBody: Data = ScriptedOpenAIServer.defaultModelsBody,
         modelsStatus: Int = 200,
         responsesBody: Data,
         responsesStatus: Int = 200
     ) async throws {
+        // The handler captures this instance, so it must be the one the accessors read: a
+        // separate default-valued property would leave the counts permanently at zero.
         let state = State()
         state.modelsBody = modelsBody
         state.modelsStatus = modelsStatus
@@ -87,6 +96,7 @@ final class ScriptedOpenAIServer {
             server.stop()
         }
         guard let started else { throw ScriptedServerError.noPort }
+        self.state = state
         self.server = started
         self.port = chosenPort
     }

@@ -151,8 +151,33 @@ public actor OpenAIResponsesEngine: LLMEngine {
                 status: status,
                 body: UTF8Text.decodeTruncated(UTF8Text.bytePrefix(data, 300)) ?? "")
         }
-        let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        let entries = root?["data"] as? [[String: Any]] ?? []
+        return try Self.modelIDs(fromModelsBody: data)
+    }
+
+    /// The model ids in a `/v1/models` body.
+    ///
+    /// A body that is not JSON, or not the shape the endpoint documents, is an **error**, not an
+    /// empty list. `try? JSONSerialization…` used to swallow the decode failure into `[]`, which
+    /// `load` then reported as "the server has no model loaded — load one in LM Studio" (audit
+    /// A57): a server that answered was described as a server with no model, and the moderator
+    /// was told to do something that would not help.
+    static func modelIDs(fromModelsBody data: Data) throws -> [String] {
+        let object: Any
+        do {
+            object = try JSONSerialization.jsonObject(with: data)
+        } catch {
+            throw OpenAIResponsesError.streamFailed(
+                "the server's /v1/models response could not be read as JSON: "
+                    + error.localizedDescription)
+        }
+        guard let root = object as? [String: Any] else {
+            throw OpenAIResponsesError.streamFailed(
+                "the server's /v1/models response was not a JSON object")
+        }
+        guard let entries = root["data"] as? [[String: Any]] else {
+            throw OpenAIResponsesError.streamFailed(
+                "the server's /v1/models response did not contain a model list")
+        }
         return entries.compactMap { $0["id"] as? String }
     }
 
@@ -201,7 +226,15 @@ public actor OpenAIResponsesEngine: LLMEngine {
         onToolCall: @escaping @Sendable (String, String) async -> Void,
         onEvent: @escaping @Sendable (TurnEvent) async -> Void
     ) async throws -> String {
-        try await load()
+        // Probe only when this engine has not yet reached the server. `generate` used to call
+        // `load()` unconditionally, so every turn paid a `/v1/models` round trip — and a
+        // transient probe failure, or a server that does not serve `/v1/models` at all, failed
+        // an otherwise good turn even though the model request itself would have worked. `ready`
+        // is cleared by `unload()`, so a deliberate unload still re-probes on the next turn
+        // (audit A57).
+        if !ready {
+            try await load()
+        }
         let agentID = spec.id
         let started = Date.now
 
