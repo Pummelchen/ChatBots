@@ -1633,10 +1633,17 @@ body[data-view="phone"] {
     el.dataset.seatId = seatID;
     if (seatIndex >= 0) el.dataset.seat = String(seatIndex);
     el.dataset.kind = "chat";
+    // The scaffolding below is fixed markup, so it can be built as a string. The seat's name
+    // cannot: it is whatever the moderator typed into the rename field, and every client
+    // renders it, so a name like `<img src=x onerror=…>` would run in each open browser. It
+    // is set as text. `.toUpperCase()` is presentation, not sanitisation — tag and attribute
+    // names are case-insensitive. Every other render path in this file already escapes; this
+    // was the one that did not.
     el.innerHTML =
-      `<div class="msg-head"><span class="msg-who">${name.toUpperCase()}</span>` +
+      `<div class="msg-head"><span class="msg-who"></span>` +
       `<span class="msg-time">writing…</span></div>` +
       `<div class="msg-body caret"></div>`;
+    el.querySelector(".msg-who").textContent = name.toUpperCase();
     return el;
   }
 

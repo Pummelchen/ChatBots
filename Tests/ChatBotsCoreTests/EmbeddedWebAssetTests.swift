@@ -60,6 +60,34 @@ struct EmbeddedWebAssetTests {
         }
     }
 
+    @Test("The live header renders the seat's name as text, never as markup")
+    func liveHeaderSetsTheNameAsText() throws {
+        // The seat's name is moderator-supplied and is rendered by every attached client, so
+        // it is the one string in this file that must never reach `innerHTML`. It did reach it
+        // — `createLiveElement` interpolated `${name.toUpperCase()}` into the header, which
+        // made a stored XSS: rename a seat to `<img src=x onerror=…>` and it ran everywhere.
+        //
+        // This is a guard against that returning, not a substitute for the escaping itself. It
+        // reads the bytes the server actually serves, like the drift check above, so it cannot
+        // pass against a stale generated file.
+        let served = try #require(WebAssets.asset(for: "/app.js")?.body)
+        let js = try #require(String(data: served, encoding: .utf8))
+        let start = try #require(js.range(of: "function createLiveElement"))
+        // To the function's own closing brace rather than a character count: a fixed window
+        // silently stops covering the body the moment anyone adds a comment to it, which is
+        // how the first version of this guard passed a body it had truncated.
+        let rest = js[start.lowerBound...]
+        let end = try #require(rest.range(of: "\n  }"))
+        let body = String(rest[..<end.lowerBound])
+
+        #expect(
+            body.contains("msg-who") && body.contains("textContent"),
+            "the live header must set the seat's name with textContent, not inside the markup")
+        #expect(
+            !body.contains("${name"),
+            "the seat's name is moderator-supplied and must not be interpolated into markup")
+    }
+
     @Test("The checkout this test reads is the one it was compiled in")
     func repositoryRootIsTheCheckout() throws {
         // A guard on the guard: if the path ever resolves somewhere unexpected, the comparison
