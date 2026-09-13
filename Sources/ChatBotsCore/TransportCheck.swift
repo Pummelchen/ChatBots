@@ -91,15 +91,36 @@ public struct TransportCheckReport: Sendable {
 
 public enum TransportCheck {
 
+    /// The client's per-request budget, in the milliseconds the transport takes.
+    ///
+    /// Extracted rather than inlined so the mapping from `run`'s `timeout` to the client can be
+    /// tested without a socket. The parameter used to be declared and never read, so the check the
+    /// installer's smoke test runs had no deadline of its own (A122).
+    static func clientTimeoutMilliseconds(_ timeout: Duration) -> Int32 {
+        let components = timeout.components
+        let seconds = Double(components.seconds) + Double(components.attoseconds) / 1e18
+        let milliseconds = seconds * 1000
+        // Clamped rather than converted straight to `Int32`, which traps on a value that does not
+        // fit; and floored at 1, because a zero deadline reads as "the engine never answers"
+        // rather than as "the budget was absurd".
+        if !milliseconds.isFinite || milliseconds >= Double(Int32.max) { return Int32.max }
+        return max(1, Int32(milliseconds))
+    }
+
     /// Run the whole channel end to end.
     ///
     /// - Parameter directory: where the certificate lives, so the check uses the same identity
     ///   a real run would rather than creating another.
+    /// - Parameter timeout: the whole check's budget — the client's request deadline and the
+    ///   connect retries are both taken from it.
     @MainActor
     public static func run(
         in directory: URL, port: UInt16 = 7795, timeout: Duration = .seconds(30)
     ) async -> TransportCheckReport {
         var report = TransportCheckReport(fingerprint: "not generated")
+        // One deadline for the run, so `timeout` bounds the check rather than decorating the
+        // signature (A122).
+        let deadline = ContinuousClock.now.advanced(by: timeout)
 
         let identity: EngineIdentity
         do {
@@ -139,8 +160,13 @@ public enum TransportCheck {
             // A port that is not in use, so the HTTP listener cannot collide with a real run.
             "--port", String(port - 1),
         ]
-        engineProcess.standardOutput = Pipe()
-        engineProcess.standardError = Pipe()
+        // The child's output goes to the null device rather than into pipes.
+        //
+        // Pipes with no reader are not "output that is ignored": the child blocks on write as soon
+        // as one fills, and it is then waited on forever. Nothing here reads them and nothing needs
+        // to — the report carries every failure the check observes for itself (A122).
+        engineProcess.standardOutput = FileHandle.nullDevice
+        engineProcess.standardError = FileHandle.nullDevice
         do {
             try engineProcess.run()
         } catch {
@@ -154,11 +180,15 @@ public enum TransportCheck {
 
         var clientConfiguration = WebTransportEngineClient.Configuration()
         clientConfiguration.port = port
+        clientConfiguration.timeoutMilliseconds = Self.clientTimeoutMilliseconds(timeout)
         let client = WebTransportEngineClient(configuration: clientConfiguration)
 
         // Retry briefly. Binding a QUIC listener is asynchronous on the library's side, and a
         // check that gave up on the first attempt reported "cannot connect" for what was
         // really "not listening yet".
+        //
+        // Bounded by the same deadline as the rest of the run, so six attempts cannot outlive the
+        // budget the caller set (A122).
         var lastError: String?
         for attempt in 0..<6 {
             do {
@@ -168,6 +198,11 @@ public enum TransportCheck {
                 break
             } catch {
                 lastError = error.localizedDescription
+                if ContinuousClock.now >= deadline {
+                    report.recordFailure(
+                        "connect across processes: gave up after \(timeout) — \(lastError ?? "unknown")")
+                    return report
+                }
                 try? await Task.sleep(for: .milliseconds(400 * (attempt + 1)))
             }
         }
