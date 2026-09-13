@@ -1368,8 +1368,15 @@
    * screen" is otherwise answered by reading a screenshot. It names the elements that are
    * wider than the viewport, which is the actual cause of a sideways-scrolling page; the
    * number alone would only say that something is wrong.
+   *
+   * It reports to the console rather than to the server. It used to POST to `/api/client-report`, a
+   * route no version of the engine has ever had, so `?diag=1` measured the page and then threw the
+   * measurement away into a 404 that its `catch` was written to hide (A119). Whoever passes
+   * `?diag=1` is already in the console, which is where the answer belongs; the alternative —
+   * adding an unauthenticated write endpoint to serve a developer flag — is the surface A75 and A76
+   * spent their effort closing.
    */
-  async function reportLayout() {
+  function reportLayout() {
     if (!isDiagnostic) return;
     const root = document.documentElement;
     const viewport = Math.round(window.visualViewport?.width ?? window.innerWidth);
@@ -1389,18 +1396,22 @@
       const num = (s) => Number(s.match(/\((\d+)\)$/)?.[1] ?? 0);
       return num(b) - num(a);
     });
-    try {
-      await api.post("/api/client-report", {
-        width: viewport,
-        height: Math.round(window.visualViewport?.height ?? window.innerHeight),
-        pixelRatio: window.devicePixelRatio,
-        device: document.body.dataset.device,
-        layout: document.body.dataset.layout,
-        scrollWidth: root.scrollWidth,
-        profile: screenInfo.matched ? screenInfo.matched.name : null,
-        overflowing: overflowing.slice(0, 6),
-      });
-    } catch { /* a diagnostic that fails must not break the page */ }
+    console.info("layout diagnostic", {
+      width: viewport,
+      height: Math.round(window.visualViewport?.height ?? window.innerHeight),
+      pixelRatio: window.devicePixelRatio,
+      device: document.body.dataset.device,
+      layout: document.body.dataset.layout,
+      scrollWidth: root.scrollWidth,
+      profile: screenInfo.matched ? screenInfo.matched.name : null,
+    });
+    if (overflowing.length === 0) {
+      console.info("no element is wider than the viewport");
+    } else {
+      console.info(
+        `${overflowing.length} element(s) wider than the viewport, worst first:`,
+        overflowing.slice(0, 6));
+    }
   }
 
   function listen() {
@@ -1421,6 +1432,6 @@
   measureViewport();
   wire();
   api.get("/api/state").then(apply).catch((error) => toast(error.message));
-  identifyDevice().then(reportLayout);
+  identifyDevice().then(() => reportLayout());
   listen();
 })();

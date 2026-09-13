@@ -227,33 +227,6 @@ public struct PersonaOption: Codable, Sendable {
     public var personas: [APIPersona]
 }
 
-/// What the client measured about its own layout.
-public struct ClientReport: Codable, Sendable {
-    public var width: Int
-    public var height: Int
-    public var pixelRatio: Double
-    public var device: String
-    public var layout: String
-    public var scrollWidth: Int
-    public var profile: String?
-    /// Selectors of elements wider than the viewport, worst first.
-    public var overflowing: [String]
-
-    public init(
-        width: Int, height: Int, pixelRatio: Double, device: String, layout: String,
-        scrollWidth: Int, profile: String?, overflowing: [String]
-    ) {
-        self.width = width
-        self.height = height
-        self.pixelRatio = pixelRatio
-        self.device = device
-        self.layout = layout
-        self.scrollWidth = scrollWidth
-        self.profile = profile
-        self.overflowing = overflowing
-    }
-}
-
 /// The profile list, flattened for the wire.
 public struct DeviceList: Codable, Sendable {
     public struct Entry: Codable, Sendable {
