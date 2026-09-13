@@ -13,7 +13,8 @@ report.
     python3 tools/capture-devices.py --common         # one per distinct shape
 
 Output goes to `captures/`, with an index page that tiles them so the results can be
-compared side by side. Exits non-zero if any capture fails, so it can be wired into a check.
+compared side by side. Exits non-zero if any capture fails or renders no messages, so it can
+be wired into a check.
 
 The server is started and stopped by this script, on its own ports, and it seeds the
 conversation so there is realistic content to lay out.
@@ -298,6 +299,7 @@ def main() -> int:
         failures = 0
         overflows: list[tuple[Any, str, Any]] = []
         viewport_mismatches: list[tuple[Any, str, Any, Any]] = []
+        empty_captures: list[tuple[Any, str]] = []
 
         with Chrome(CHROME, port=CHROME_PORT) as browser:
             for profile in selected:
@@ -358,6 +360,10 @@ def main() -> int:
                             (profile["name"], orientation, metrics["overflowing"])
                         )
                     if not metrics["messages"]:
+                        # An empty capture proves nothing about the layout and would otherwise
+                        # be published under this profile's name on a green run — the same
+                        # defect the viewport mismatch above is collected for.
+                        empty_captures.append((profile["name"], orientation))
                         print("    ! no messages rendered — the capture has no content")
 
         # The three start scripts depend on the forced views behaving, so they are checked
@@ -410,6 +416,10 @@ def main() -> int:
                 print(
                     f"  {name} ({orientation}): rendered at {actual}, requested {requested}"
                 )
+        if empty_captures:
+            print("\nNo messages rendered — a capture with no content proves nothing:")
+            for name, orientation in empty_captures:
+                print(f"  {name} ({orientation})")
         if overflows:
             print("\nHorizontal overflow — these are layout bugs:")
             for name, orientation, items in overflows:
@@ -419,7 +429,13 @@ def main() -> int:
         print(f"\nOpen: {OUT / 'index.html'}")
         return (
             1
-            if (failures or overflows or forced_failures or viewport_mismatches)
+            if (
+                failures
+                or overflows
+                or forced_failures
+                or viewport_mismatches
+                or empty_captures
+            )
             else 0
         )
     finally:
