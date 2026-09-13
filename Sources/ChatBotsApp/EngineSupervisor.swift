@@ -126,36 +126,29 @@ public final class EngineSupervisor: ObservableObject {
             try? await Task.sleep(for: .milliseconds(400))
         }
 
+        // Stop the child, then report the failure — in that order.
+        //
+        // This used to set `.failed` and then call `stop()`, whose last act was `state = .idle`,
+        // so the reason the app exists to show was overwritten before `ChatBotsApp` could read
+        // it and no banner ever appeared (audit A50). The teardown here does not touch `state`,
+        // and the failure is assigned after it, so nothing can overwrite it.
+        //
+        // The child is still running — it is the answering that timed out, not the process — so
+        // it is stopped rather than left behind. The wait is short: the startup budget has
+        // already been spent, and a child that has not answered in 90 seconds does not deserve
+        // another five before the moderator is told.
+        await terminateChild(timeout: .seconds(2))
         state = .failed("The engine did not answer within \(configuration.startupTimeout).")
-        stop()
     }
 
-    /// Stop the engine, if this app started it.
+    /// Terminate the child and return once this app is done with it, without touching `state`.
     ///
-    /// An adopted engine is left alone. Terminating a process this app did not start would be
-    /// taking away something the user is using.
-    public func stop() {
-        guard let process, process.isRunning else {
-            self.process = nil
-            return
-        }
-        process.terminate()
-        self.process = nil
-        try? logHandle?.close()
-        logHandle = nil
-        state = .idle
-    }
-
-    /// Wait for the process to exit, and kill it if it will not, so quitting does not leave an
-    /// orphan.
-    ///
-    /// SIGTERM first, then SIGKILL after `timeout`: a child that ignores or outlives the signal
-    /// would otherwise keep holding the GPU and the WebTransport port after the app is gone.
-    /// This is the teardown the termination path uses. It takes the process reference before
-    /// its first suspension point, so the two things that can run on the way out — the window
-    /// disappearing and the app terminating — cannot both run the wait and the escalation; the
-    /// second caller finds nothing left to stop.
-    public func shutdown(timeout: Duration = .seconds(5)) async {
+    /// Shared by quitting, which then reports `.idle`, and by a startup timeout, which must keep
+    /// the failure it is about to report. SIGTERM first, then SIGKILL after `timeout`: a child
+    /// that ignores or outlives the signal would otherwise keep holding the GPU and the
+    /// WebTransport port after the app is gone. The process reference is taken before the first
+    /// suspension point, so two callers cannot both run the wait and the escalation.
+    private func terminateChild(timeout: Duration) async {
         guard let process else { return }
         self.process = nil
         if process.isRunning { process.terminate() }
@@ -164,12 +157,20 @@ public final class EngineSupervisor: ObservableObject {
             try? await Task.sleep(for: .milliseconds(100))
         }
         if process.isRunning {
-            // It did not take the hint. SIGKILL, so quitting the app does not leave a process
-            // holding the GPU and the port.
+            // It did not take the hint. SIGKILL, so nothing is left holding the GPU and the port.
             kill(process.processIdentifier, SIGKILL)
         }
         try? logHandle?.close()
         logHandle = nil
+    }
+
+    /// Wait for the process to exit, and kill it if it will not, so quitting does not leave an
+    /// orphan.
+    ///
+    /// This is the teardown the termination path uses. `terminateChild` does the work; this adds
+    /// the state a stopped engine reports.
+    public func shutdown(timeout: Duration = .seconds(5)) async {
+        await terminateChild(timeout: timeout)
         state = .idle
     }
 
