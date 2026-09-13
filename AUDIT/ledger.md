@@ -49,7 +49,7 @@ enumerated before they are fixed.
 | A14 | **S1** | `HTTPServer` | `HTTPServer.swift:356` write vs `:380` read | `isRunning`/`lastError` are written from a Network.framework callback and read from `waitUntilReady` with no synchronisation | unsafe | DONE (`0de3123`) | this Mac | A13 (ThreadSanitizer) |
 | A17 | **S1** | `HTTPServer` | `HTTPServer.swift:555` append vs `:588-596` `finish()` | `streams` was appended on the main actor without the lock that every other access takes — a concurrent mutation of a Swift array | unsafe | DONE (`0de3123`) | this Mac | found while fixing A14 |
 | A18 | **S1** | tests | `BuiltInKeyTests.swift:20`, `ImageUploadTests.swift:136`, `AttachmentTests.swift:308` | Three tests need the developer's private `models/` and `.secrets.env`, so a fresh clone cannot pass | test | DONE (`0de3123`) | node1 | early independent check on node1 |
-| A15 | **S1** | `EngineService` / `DocumentImport` | `DocumentImport.swift:160-168`, `EngineService.swift:325-357` | Attaching a document blocks the engine's `@MainActor` for the whole conversion, subprocess wait included | perf | START | this Mac | L5 pass |
+| A15 | **S1** | `EngineService` / `DocumentImport` | `DocumentImport.swift:160-168`, `EngineService.swift:325-357` | Attaching a document blocks the engine's `@MainActor` for the whole conversion, subprocess wait included | perf | DONE (`8ece1d3`) | this Mac | L5 pass |
 | A16 | S3 | `ChatBotsCLI` | `Sources/ChatBotsCLI/main.swift:689` | `--serve` has no signal handling, so the listener is never shut down and nothing is flushed on exit | incomplete | START | this Mac | L7 pass |
 
 ---
@@ -655,36 +655,36 @@ audit's first S0.**
 | A32 | **S1** | `WebTransportServer.swift:219 and WebTransportClient.swift:278` | A frame over the protocol cap is swallowed by try?, permanently desyncing the session | DONE (`c63b7b3`) |
 | A33 | **S1** | `ConversationEngine.swift:764` | Restarting a running conversation orphans the new turn loop, so Stop and Pause become no-ops | DONE (`b88eee1`) |
 | A34 | **S1** | `ConversationStore.swift:122` | ConversationStore.save destroys the records it deliberately refuses to read | DONE (`59555f0`) |
-| A35 | **S1** | `ChatController.swift:428-452` | A turn ending is never observed, so isGenerating sticks on forever: stuck UI, duplicated answer, disabled controls | START |
+| A35 | **S1** | `ChatController.swift:428-452` | A turn ending is never observed, so isGenerating sticks on forever: stuck UI, duplicated answer, disabled controls | DONE (`3752067`) |
 | A36 | **S1** | `DocumentImport.swift:158-171` | The conversion timeout can never fire: the pipe reads block forever first, and the drain order can deadlock | DONE (`84fc613`) |
-| A37 | **S2** | `HTTPServer.swift:519` | The HTTP listener has no read or idle deadline and no connection cap | START |
-| A38 | **S2** | `WebTransportClient.swift:97-100` | A failed openBidirectionalStream leaks the session and leaves isConnected true | START |
-| A39 | **S2** | `WebTransportClient.swift:184-190, :286` | Replies are matched by queue order, and removeFirst() assumes in-order completion | START |
-| A40 | **S3** | `WebTransportServer.swift:128` | stop() leaves live WebTransport sessions serving and never closes them | START |
+| A37 | **S2** | `HTTPServer.swift:519` | The HTTP listener has no read or idle deadline and no connection cap | DONE (`f1dd7a7`) |
+| A38 | **S2** | `WebTransportClient.swift:97-100` | A failed openBidirectionalStream leaks the session and leaves isConnected true | DONE (`6229d1f`) |
+| A39 | **S2** | `WebTransportClient.swift:184-190, :286` | Replies are matched by queue order, and removeFirst() assumes in-order completion | DONE (`219e3ce`) |
+| A40 | **S3** | `WebTransportServer.swift:128` | stop() leaves live WebTransport sessions serving and never closes them | DONE (`9a4dc18`) |
 | A41 | **S2** | `ConversationEngine.swift:230` | An orphaned unbounded event stream retains every event, including a full prompt per turn, for the process lifetime | DONE (`d870f3d`) |
 | A42 | **S2** | `MLXEngine.swift:129` | MLXEngine.compact mutates a local spec that generate() never reads, so maxTokens and thinking-off are ignored | DONE (`978550d`) |
 | A43 | **S2** | `MLXEngine.swift:503` | The reasoning ceiling truncates the turn instead of forcing an answer, and unlimited thinking gets less headroom than high | DONE (`e5e2872`) |
 | A44 | **S2** | `ConversationEngine.swift:718` | Reopening a finished research conversation and pressing Start writes a second report with zero turns | DONE (`60e2f49`) |
 | A45 | **S2** | `ConversationEngine.swift:1040` | Auto-compaction is measured against a static window instead of the engine's learned one | DONE (`2ed98a8`) |
-| A46 | **S2** | `ChatController.swift:890-902` | Attachment chips print '0 words' / 'Zero bytes' because the engine's summary and token count are discarded | START |
-| A47 | **S2** | `ChatController.swift:1026-1033 + ChatBotsApp.swift:33-34` | Saved source material is silently discarded at launch and then erased from settings | START |
-| A48 | **S2** | `ChatController.swift:675-687` | ChatController issues overlapping requests against a client whose protocol is documented as one-request-at-a-time, so replies cross | START |
-| A49 | **S2** | `EngineSupervisor.swift:149-166 + ChatBotsApp.swift:120` | The wait-then-SIGKILL engine teardown is dead code, so an owned engine can outlive the app | START |
-| A50 | **S3** | `EngineSupervisor.swift:129-131` | A startup timeout reports .idle, discarding the failure reason the app exists to show | START |
-| A51 | **S3** | `Views/ControlBar.swift:266-279 + ChatController.swift:839-843` | 'Models > Load ...' is a no-op placeholder presented as a working control | START |
-| A52 | **S2** | `Attachments.swift:160-176 + OpenAIResponsesEngine.swift:171-177, :215` | An accepted image with unrecognized magic bytes, notably HEIC, is silently never sent | START |
-| A53 | **S2** | `ModelStore.swift:129-142` | A partial sharded download is reported as a complete checkpoint | START |
-| A54 | **S2** | `OpenAIResponsesClient.swift:492-538` | A truncated SSE stream is accepted as a finished turn: the terminal event is never required | START |
-| A55 | **S3** | `OpenAIResponsesClient.swift:165-184` | A CRLF .secrets.env yields a key that cannot authenticate, and the app does not report it missing | START |
-| A56 | **S3** | `TavilyClient.swift:128-134` | The 'empty results' retry is decided before the blank-result filter runs | START |
-| A57 | **S3** | `OpenAIResponsesEngine.swift:187, :99-157` | The engine re-probes /v1/models every turn and misreports an unparseable body as 'no model loaded' | START |
-| A58 | **S3** | `DocumentImport.swift:68-82` | A PDF reports truncation one character early and the joined text exceeds the declared ceiling | START |
+| A46 | **S2** | `ChatController.swift:890-902` | Attachment chips print '0 words' / 'Zero bytes' because the engine's summary and token count are discarded | DONE (`4242b40`) |
+| A47 | **S2** | `ChatController.swift:1026-1033 + ChatBotsApp.swift:33-34` | Saved source material is silently discarded at launch and then erased from settings | DONE (`cb94c56`) |
+| A48 | **S2** | `ChatController.swift:675-687` | ChatController issues overlapping requests against a client whose protocol is documented as one-request-at-a-time, so replies cross | DONE (`6371ed5`) |
+| A49 | **S2** | `EngineSupervisor.swift:149-166 + ChatBotsApp.swift:120` | The wait-then-SIGKILL engine teardown is dead code, so an owned engine can outlive the app | DONE (`265b309`) |
+| A50 | **S3** | `EngineSupervisor.swift:129-131` | A startup timeout reports .idle, discarding the failure reason the app exists to show | DONE (`30f930c`) |
+| A51 | **S3** | `Views/ControlBar.swift:266-279 + ChatController.swift:839-843` | 'Models > Load ...' is a no-op placeholder presented as a working control | DONE (`b9bcebb`) |
+| A52 | **S2** | `Attachments.swift:160-176 + OpenAIResponsesEngine.swift:171-177, :215` | An accepted image with unrecognized magic bytes, notably HEIC, is silently never sent | DONE (`4e49a37`) |
+| A53 | **S2** | `ModelStore.swift:129-142` | A partial sharded download is reported as a complete checkpoint | DONE (`54800d4`) |
+| A54 | **S2** | `OpenAIResponsesClient.swift:492-538` | A truncated SSE stream is accepted as a finished turn: the terminal event is never required | DONE (`c7c062c`) |
+| A55 | **S3** | `OpenAIResponsesClient.swift:165-184` | A CRLF .secrets.env yields a key that cannot authenticate, and the app does not report it missing | DONE (`34a7f1f`) |
+| A56 | **S3** | `TavilyClient.swift:128-134` | The 'empty results' retry is decided before the blank-result filter runs | DONE (`251c8de`) |
+| A57 | **S3** | `OpenAIResponsesEngine.swift:187, :99-157` | The engine re-probes /v1/models every turn and misreports an unparseable body as 'no model loaded' | DONE (`2ed35d2`) |
+| A58 | **S3** | `DocumentImport.swift:68-82` | A PDF reports truncation one character early and the joined text exceeds the declared ceiling | DONE (`00b7186`) |
 | A59 | **S2** | `ChatBotsProbe/main.swift:41, :68, :126` | chatbots-probe reports 'all cycles succeeded' and exits 0 when --cycles 0 probes nothing, and aborts on a negative count | START |
 | A60 | **S2** | `Sources/ChatBotsCLI/main.swift:461-491` | --benchmark and --session-probe exit 0 when a seat fails to load, reporting success for a checkpoint that never loaded | START |
 | A61 | **S2** | `Sources/ChatBotsCLI/main.swift:349, :468, :550, :557` | A legal single-seat roster crashes the flag paths that hard-index seat 2 | START |
 | A62 | **S2** | `Sources/ChatBotsCLI/main.swift:133, :638` | An out-of-range --port traps the process, --port 0 announces an unusable URL, and an invalid --transport-port is silently swallowed | START |
-| A63 | **S3** | `StreamPacer.swift:146-147, :161-163 + ChatController.swift:486` | StreamPacerPool.generationRates is written but never read, so the learned rate never seeds a new pacer | START |
-| A64 | **S3** | `StreamPacer.swift:134-135` | StreamPacerPool.minimumRate is dead API and its comment contradicts the pacer's actual floor | START |
+| A63 | **S3** | `StreamPacer.swift:146-147, :161-163 + ChatController.swift:486` | StreamPacerPool.generationRates is written but never read, so the learned rate never seeds a new pacer | DONE (`ef47f52`) |
+| A64 | **S3** | `StreamPacer.swift:134-135` | StreamPacerPool.minimumRate is dead API and its comment contradicts the pacer's actual floor | DONE (`e328e82`) |
 | A65 | **S3** | `Sources/ChatBotsCLI/main.swift:538-544` | --memory-probe prints memoryLimit under both 'gpuLimit' and 'memLimit' | START |
 | A66 | **S3** | `Sources/ChatBotsCLI/main.swift:626` | Flags are accepted in modes where they do nothing, without warning | START |
 
@@ -707,14 +707,14 @@ the passes were asked to report what they read rather than only what they found.
 
 | id | sev | file:line | what | status |
 | --- | --- | --- | --- | --- |
-| A67 | **S1** | `ResearchDirector.swift:328-333` | `.answered` is decided by keyword substring presence and then reported as a complete, undisputed investigation | START |
-| A68 | **S2** | `ResearchReport.swift:282-329` | The report synthesis prompt concatenates the untrusted transcript with its own rules, with no boundary | START |
-| A69 | **S2** | `PromptBuilder.swift:251-276, :404-406, :55` | Peer-model and API-supplied text is promoted into another seat's system message unescaped | START |
-| A70 | **S2** | `PromptBuilder.swift:59` | Research sessions get an entertainment persona in the shared opening brief | START |
-| A71 | **S2** | `ConflictState.swift:144, :370-371 vs ConflictReader.swift` | Position changes are counted as 'added nothing', so research sessions converge early | START |
-| A72 | **S2** | `ResearchReport.swift:146-150, :157, :198-200` | A mostly-unlabelled report is still declared labelled and traceable | START |
-| A73 | **S2** | `ResearchSession.swift:173-179` | The web-search ceiling is not reliably enforced and can also fire early | START |
-| A74 | **S3** | `ResearchDirector.swift:411` | The director picks a conflict by Dictionary iteration order, contradicting its own determinism contract | START |
+| A67 | **S1** | `ResearchDirector.swift:328-333` | `.answered` is decided by keyword substring presence and then reported as a complete, undisputed investigation | DONE (`efddc6d`) |
+| A68 | **S2** | `ResearchReport.swift:282-329` | The report synthesis prompt concatenates the untrusted transcript with its own rules, with no boundary | DONE (`f099d87`) |
+| A69 | **S2** | `PromptBuilder.swift:251-276, :404-406, :55` | Peer-model and API-supplied text is promoted into another seat's system message unescaped | DONE (`83bf5f6`) |
+| A70 | **S2** | `PromptBuilder.swift:59` | Research sessions get an entertainment persona in the shared opening brief | DONE (`2ab2157`) |
+| A71 | **S2** | `ConflictState.swift:144, :370-371 vs ConflictReader.swift` | Position changes are counted as 'added nothing', so research sessions converge early | DONE (`88cbede`) |
+| A72 | **S2** | `ResearchReport.swift:146-150, :157, :198-200` | A mostly-unlabelled report is still declared labelled and traceable | DONE (`4181af7`) |
+| A73 | **S2** | `ResearchSession.swift:173-179` | The web-search ceiling is not reliably enforced and can also fire early | DONE (`c7e3079`) |
+| A74 | **S3** | `ResearchDirector.swift:411` | The director picks a conflict by Dictionary iteration order, contradicting its own determinism contract | DONE (`489ef41`) |
 
 **Counts are deliberately not written here.** They were, three times, and they were wrong or
 stale each time — the last version of this line said 74 tasks and 9 DONE while the file beside it
