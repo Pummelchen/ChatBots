@@ -529,6 +529,25 @@ public final class HTTPServer: @unchecked Sendable {
         for stream in open { stream.close() }
     }
 
+    /// How many event streams the server is still holding open.
+    ///
+    /// An accessor rather than a comment because there was no way to observe the leak this
+    /// describes: a stream whose client has gone but whose `open` is still true is exactly what
+    /// `finish` prunes, and counting it is what the reaping test asserts. Read under
+    /// `stateLock`, like every other access to `streams`.
+    public var openStreamCount: Int {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return streams.filter(\.isOpen).count
+    }
+
+    /// How many connections the server is still holding. Guarded like `openStreamCount`.
+    public var connectionCount: Int {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return connections.count
+    }
+
     private func accept(_ connection: NWConnection) {
         stateLock.lock()
         connections[ObjectIdentifier(connection)] = connection
@@ -615,6 +634,15 @@ public final class HTTPServer: @unchecked Sendable {
                         + "\r\n"
                     connection.send(content: Data(head.utf8), completion: .contentProcessed { _ in })
                     for payload in initial { stream.send(payload, event: "snapshot") }
+                    // The connection stays open, so it still has to be watched: this is the
+                    // only place that learns the client has gone, and `finish` is the only code
+                    // that prunes the stream and the connection. This used to return here, so
+                    // `finish` could never run for a streaming connection, `isOpen` stayed true,
+                    // `removeAll { !$0.isOpen }` never removed anything, and every page reload
+                    // or dropped client left an `EventStream` and an `NWConnection` retained for
+                    // the life of the process while the server kept broadcasting to a dead
+                    // socket.
+                    self.awaitClose(on: connection)
                     return
                 }
             }
@@ -632,6 +660,25 @@ public final class HTTPServer: @unchecked Sendable {
                 guard let self else { return }
                 if thenClose { self.finish(connection, error: nil) }
             })
+    }
+
+    /// Wait for a client the server is streaming to, to go away.
+    ///
+    /// The request has already been answered, so anything the client sends is ignored: this
+    /// exists only so the closure is observed and `finish` — the sole pruning path — can run.
+    /// `finish` cancels the connection, which ends this read too, so it is not re-armed after
+    /// it fires; a keep-alive byte from a client that has nothing to say re-arms the wait rather
+    /// than ending the stream.
+    private func awaitClose(on connection: NWConnection) {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 4 * 1024) {
+            [weak self] _, _, isComplete, error in
+            guard let self else { return }
+            if isComplete || error != nil {
+                self.finish(connection, error: error)
+            } else {
+                self.awaitClose(on: connection)
+            }
+        }
     }
 
     private func finish(_ connection: NWConnection, error: NWError?) {
