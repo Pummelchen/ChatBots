@@ -384,6 +384,14 @@ if python3 tools/embed-names.py --check > "$out/embed-names.txt" 2>&1; then
 else
     fail "names/ and the embedded lists have drifted; see $out/embed-names.txt"
 fi
+# The ledger's own status tables are generated from the JSON the other gates read (A118). Before that
+# they were hand-maintained and had drifted to 28 of 116 tasks while the handover called the page the
+# source of truth, so this is checked like any other generated file.
+if bash AUDIT/render-ledger.sh --check > "$out/render-ledger.txt" 2>&1; then
+    pass "$(cat "$out/render-ledger.txt")"
+else
+    fail "ledger.md has drifted from ledger.json; run AUDIT/render-ledger.sh — see $out/render-ledger.txt"
+fi
 
 # ---------------------------------------------------------------- summary
 printf '\n=== summary ===\n'

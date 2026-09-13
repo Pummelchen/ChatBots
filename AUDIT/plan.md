@@ -116,7 +116,9 @@ and marked L1, L2, L4 and L6 "in progress". The table was the stale artifact, no
 > **Session paused 2026-09-13 — start with [`HANDOVER.md`](HANDOVER.md).** It carries the
 > current counts, what was done, the seven open tasks and the two waves they were planned into, the
 > exact next steps (fix → Phase E on `node1` → wiki), and the environment facts a fresh session
-> needs. `ledger.md` remains the source of truth and wins on any conflict with it.
+> needs. **`ledger.json` is the source of truth** — every gate reads it — and `ledger.md` renders its
+> status tables from it with `AUDIT/render-ledger.sh`, which `--check`s the two against each other in
+> Phase E. The prose in `ledger.md` is the record of each fix; on status, the JSON wins (A118).
 
 ## Phase C — fix → test → audit
 

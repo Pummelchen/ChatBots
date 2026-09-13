@@ -1,8 +1,11 @@
 # AUDIT — handover: where this stands and what to do next
 
 **Session paused 2026-09-13** to move to another computer. All work is committed and pushed. This
-file is the entry point for whoever continues; `ledger.md` is still the source of truth and wins
-on any conflict with this page.
+file is the entry point for whoever continues. **`ledger.json` carries the authoritative enumeration
+and status — it is what every gate reads** — and `ledger.md` renders its status tables from it
+(`AUDIT/render-ledger.sh --check`) while carrying the prose record of each fix. The earlier claim
+that `ledger.md` "is the source of truth and wins on any conflict" was wrong: it enumerated 28 of
+the then-116 tasks and stopped at A89, which is recorded as A118.
 
 ## Where it stands, in one table
 
@@ -16,8 +19,9 @@ on any conflict with this page.
 | Phases | A ✅ · B ✅ (two waves) · C **in progress** · D continuous · **E not started** |
 | Nothing is pushed by the fix lanes; the coordinator has pushed every wave | |
 
-Full detail: `ledger.md` (prose, wins on conflict) · `ledger.json` (machine-readable twin, what the
-tools read) · `plan.md` (phases, baselines with their methods, gates) · `inventory.md` (scope) ·
+Full detail: `ledger.json` (the authoritative enumeration and status, what the gates read) ·
+`ledger.md` (the prose record, its status tables generated from the JSON) · `plan.md` (phases,
+baselines with their methods, gates) · `inventory.md` (scope) ·
 `environment.md` (hosts, toolchain, contention) · `baseline/README.md` (which baseline numbers were
 wrong and why).
 
@@ -106,8 +110,9 @@ own mechanism.*
 
 ## What to do next, in order
 
-1. **Read `AUDIT/ledger.md` first**, then this page. The ledger carries each task's evidence and the
-   `notes` field carries what the fixer learned that the title does not.
+1. **Read `AUDIT/ledger.json` first** (it is the authoritative enumeration and status; `ledger.md`
+   renders its status tables from it and carries the prose), then this page. The ledger carries each
+   task's evidence and the `notes` field carries what the fixer learned that the title does not.
 2. **Run `AUDIT/verify-done-commits.sh`** — it must exit 0 before anything is called DONE. It backs
    each DONE task against its own commit and *skips* the ones that name no source path (A06, A12,
    A13, A79 …) rather than passing them silently.

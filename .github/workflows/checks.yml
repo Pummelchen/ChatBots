@@ -53,8 +53,13 @@ jobs:
         run: python3 tools/embed-web.py --check
       - name: The embedded name lists match names/
         run: python3 tools/embed-names.py --check
+      # The ledger's status tables are generated from `ledger.json`, which every gate reads (A118).
+      # They were hand-maintained until they drifted to 28 of the then-116 tasks while HANDOVER.md
+      # called the page the source of truth. Phase E checks the same invariant on the Mac.
+      - name: The ledger's status tables match ledger.json
+        run: bash AUDIT/render-ledger.sh --check
       - name: The shell scripts parse
-        run: for script in tools/*.sh; do bash -n "$script"; done
+        run: for script in tools/*.sh AUDIT/*.sh; do bash -n "$script"; done
       - name: The helper scripts parse
         run: for script in tools/*.py; do python3 -m py_compile "$script"; done
       # The bundle said 14.0 while the package needs macOS 26, so the app would launch on

@@ -13,44 +13,169 @@ does not advance without its artifact.
 > **Session entry point.** Re-read this file and `environment.md` first, then resume from the
 > highest-severity task that is not DONE or BLOCKED. Do not restart from scratch.
 
-## Summary
+## Status
 
+The tables in this section are **generated from [`ledger.json`](ledger.json)** by
+`AUDIT/render-ledger.sh`; `--check` fails when they drift, and Phase E runs it. **`ledger.json` is
+the authoritative enumeration** — it is what every gate reads (`phase-e.sh` section 11,
+`verify-done-commits.sh`) — and the prose sections below are the record of each fix and the
+reasoning behind it. If this file and the JSON disagree, the JSON is right and the renderer has not
+been run.
+
+<!-- BEGIN GENERATED: ledger status — rendered from ledger.json by AUDIT/render-ledger.sh -->
 | Metric | Count |
 | --- | --- |
-| Tasks enumerated | 28 |
-| DONE | 9 (A05, A08 — concurrency and dependency pinning; A20 — the stored XSS; A12, A13 — sanitizer baselines; A14, A17 — the two HTTPServer races; A18 — hermetic suite; A19 — the commit that claimed A14/A17) |
-| START (proven / reproduced, expected behaviour written) | 19 (A21-A28 added by the line-depth passes, plus the five slices' findings) |
+| Tasks enumerated | 122 |
+| DONE | 110 |
+| START | 12 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-Phase B's remaining depth is now being run as line-depth passes over every file (see
-[Phase D](#phase-d--the-line-depth-passes) below), which produced A20-A28. Per §11, findings are
-enumerated before they are fixed.
+### Open — 12
 
----
+| id | sev | status | commit | unit | title |
+| --- | --- | --- | --- | --- | --- |
+| A102 | S2 | START | — | test infrastructure | One full-suite run aborted with a Network.framework fatal error, reduced but not fixed by A40's single-close |
+| A108 | S2 | START | — | test infrastructure | Two pre-existing sources of full-suite flakiness, both reproducing with the newest suites excluded |
+| A113 | S3 | START | — | probe and CLI arguments | The probe's own arguments have the two defects A59 and A62 just fixed in the CLI's |
+| A114 | S3 | START | — | CLI arguments | Five more CLI flags silently keep their defaults or are silently ignored when they cannot take effect |
+| A115 | S2 | START | — | engine protocol conformance | Three MLXEngine methods are synchronous while the protocol requirement is async, so a call on the concrete type silently resolves to the protocol's no-op default |
+| A118 | S2 | START | — | audit documentation / source of truth | ledger.md is declared the audit's source of truth and the entry point for the next session, but it enumerates 28 tasks and stops at A89; A90-A116 appear nowhere in it |
+| A119 | S3 | START | — | web front end / engine API | The page POSTs a layout diagnostic to /api/client-report, a route that has never existed in any commit, and the 404 is swallowed by design |
+| A120 | S3 | START | — | app lifecycle / engine API | The engine the app spawns opens an HTTP listener on 7788 that the app does not use, so it cannot start at all while Caddy holds that port |
+| A121 | S2 | START | — | installer | The installer accepts macOS 14 while the package and the bundle require macOS 26, so a Sonoma user downloads ~3 GB and builds before the app refuses to launch |
+| A122 | S3 | START | — | transport smoke test | TransportCheck declares a timeout it never uses and creates both child pipes without ever draining them |
+| A77 | S2 | START | — | distribution / licensing | The shipped app redistributes ~14 third-party libraries with no licence notices or attribution |
+| A99 | S2 | START | — | web surface / routing | Kept-conversation share links 404 in the documented deployment, because Caddy proxies only /api/* and the engine serves /s/<id> |
 
-## Open tasks
+### Every task — 122
 
-| id | sev | unit | file:line | title | category | status | host | discovered-by |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| A01 | **S1** | deploy / `APIServer` | `Caddyfile:27`, `web/app.js` | The website binds every interface and the whole API is unauthenticated | unsafe | DONE (`c91a310`) | this Mac | L4 pass |
-| A02 | S1 | tests | `Sources/ChatBotsCore/MLXEngine.swift` (19/863 lines), `TransportCheck.swift` (0/216) | The core inference path and the installer's own smoke test are effectively uncovered | test | START | this Mac | L6 pass (coverage) |
-| A03 | S2 | build | `Package.swift`, `.github/workflows/checks.yml` | No warnings-as-errors gate, though the baseline is already 0 warnings | test | DONE (`8673488`) | this Mac | L0 pass |
-| A04 | S2 | CI | `.github/workflows/checks.yml` | CI runs no build, test, lint, type-check, scanner or coverage step | test | DONE (`31dc2e3`) | this Mac | L0 pass |
-| A05 | S2 | concurrency | `Attachments.swift:269`, `HTTPServer.swift:233,251`, `MLXEngine.swift:791` | Five `@unchecked Sendable` declarations, none with a written justification | unsafe | DONE (`3ef1cc6`) | this Mac | L2 pass |
-| A06 | S2 | style | `Sources/**`, `Tests/**` | `swiftlint` 401 findings and `swift-format` 29 900 diagnostics with no repository config | style | DONE (`4c96beb`) | this Mac | baseline |
-| A07 | S2 | typing | `tools/*.py` (5 files) | Python is 3.14 but unannotated and unchecked: ruff 11, format 5, pyright 2 | style | DONE (`b85fc8b`) | this Mac | baseline |
-| A08 | S2 | deps | `Package.swift:32` | `WebTransport` is pinned by range while the project has twice depended on an exact transport behaviour | deps | DONE (`6c1ef31`) | this Mac | L0 pass |
-| A09 | S3 | tooling | `tools/cdp.py:42,44,180` | SAST: insecure-websocket and dynamic-urllib findings in the dev-only DevTools client | unsafe | DONE (`53183e6`) | this Mac | baseline (semgrep) |
-| A10 | S3 | tooling | `tools/*.sh` (24 notes) | `shellcheck -S style` reports 24 notes, mostly SC2001 | style | DONE (`f6dc8c2`) | this Mac | baseline |
-| A11 | S3 | docs/ops | `README.md`, wiki | Neither the README nor the wiki states that running the website exposes the API to the LAN | docs | DONE (`067d953`) | this Mac | L4 pass (same evidence as A01) |
-| A12 | — | tests | `AUDIT/baseline/swift-test-asan.log` | AddressSanitizer over the whole suite: **clean** | test | DONE (`f9a359b`) | this Mac | §1 tooling requirement |
-| A13 | — | tests | `AUDIT/baseline/swift-test-tsan.log` | ThreadSanitizer over the whole suite: **one data race found** | test | DONE | this Mac | §1 tooling requirement |
-| A14 | **S1** | `HTTPServer` | `HTTPServer.swift:356` write vs `:380` read | `isRunning`/`lastError` are written from a Network.framework callback and read from `waitUntilReady` with no synchronisation | unsafe | DONE (`0de3123`) | this Mac | A13 (ThreadSanitizer) |
-| A17 | **S1** | `HTTPServer` | `HTTPServer.swift:555` append vs `:588-596` `finish()` | `streams` was appended on the main actor without the lock that every other access takes — a concurrent mutation of a Swift array | unsafe | DONE (`0de3123`) | this Mac | found while fixing A14 |
-| A18 | **S1** | tests | `BuiltInKeyTests.swift:20`, `ImageUploadTests.swift:136`, `AttachmentTests.swift:308` | Three tests need the developer's private `models/` and `.secrets.env`, so a fresh clone cannot pass | test | DONE (`0de3123`) | node1 | early independent check on node1 |
-| A15 | **S1** | `EngineService` / `DocumentImport` | `DocumentImport.swift:160-168`, `EngineService.swift:325-357` | Attaching a document blocks the engine's `@MainActor` for the whole conversion, subprocess wait included | perf | DONE (`8ece1d3`) | this Mac | L5 pass |
-| A16 | S3 | `ChatBotsCLI` | `Sources/ChatBotsCLI/main.swift:689` | `--serve` has no signal handling, so the listener is never shut down and nothing is flushed on exit | incomplete | START | this Mac | L7 pass |
+| id | sev | status | commit | unit | title |
+| --- | --- | --- | --- | --- | --- |
+| A01 | S1 | DONE | c91a310 | deploy/APIServer | The website binds every interface and the whole API is unauthenticated |
+| A02 | S1 | DONE | 7b28844 | tests | The core inference path and the installer's smoke test are effectively uncovered |
+| A03 | S2 | DONE | 8673488 | build | No warnings-as-errors gate, though the baseline is already 0 warnings |
+| A04 | S2 | DONE | 31dc2e3 | CI | CI runs no build, test, lint, type-check, scanner or coverage step |
+| A05 | S2 | DONE | 3ef1cc6 | concurrency | Five @unchecked Sendable declarations, none with a written justification |
+| A06 | S2 | DONE | 4c96beb | style | swiftlint 401 findings and swift-format 29900 diagnostics with no repository config |
+| A07 | S2 | DONE | b85fc8b | typing | Python is 3.14 but unannotated and unchecked |
+| A08 | S2 | DONE | 6c1ef31 | deps | WebTransport is pinned by range while the project has twice depended on an exact transport behaviour |
+| A09 | S3 | DONE | 53183e6 | tooling | SAST: insecure-websocket and dynamic-urllib findings in the dev-only DevTools client |
+| A10 | S3 | DONE | f6dc8c2 | tooling | shellcheck -S style reports 4 findings, and the recorded count was wrong twice before it was right |
+| A100 | S2 | DONE | 9cb2007 | transport client | The reader uses the REQUEST timeout as its idle receive timeout, so a stream quiet for longer than that fails the connection |
+| A101 | S2 | DONE | de2762d | attachments | BMP and TIFF are accepted and sent as media types the Responses API does not document, the mirror of A52 |
+| A102 | S2 | START | — | test infrastructure | One full-suite run aborted with a Network.framework fatal error, reduced but not fixed by A40's single-close |
+| A103 | S2 | DONE | 482e036 | prompt trust boundary | Attachment document text is still promoted into the system role, so a crafted document can inject instruction into every seat's prompt |
+| A104 | S2 | DONE | f2ca64d | tool dispatch | Tool dispatch runs the injected registry rather than the tool set the caller passed, so disabling a tool does not prevent it running |
+| A105 | S3 | DONE | 791d2ee | research quality | A95's directed-engagement path identifies the moderator's assignment by an exact phrase, so rewording the assignment silently disables it |
+| A106 | S3 | DONE | 37a7849 | key handling | A user-typed key is still taken verbatim, so a pasted key with a trailing newline suppresses the missing-key warning |
+| A107 | S3 | DONE | 597f30d | inference client | A failed or incomplete response does not end the read loop, so the turn waits out the request timeout |
+| A108 | S2 | START | — | test infrastructure | Two pre-existing sources of full-suite flakiness, both reproducing with the newest suites excluded |
+| A109 | S2 | DONE | 767aef3 | audit environment / repository integrity | Dropbox renames .git/index to a conflicted copy, which git reads as an empty index and shows the whole tree as deleted |
+| A11 | S3 | DONE | 067d953 | docs | Neither the README nor the wiki states that running the website exposes the API to the LAN |
+| A110 | S2 | DONE | 81a4f4a | engine API | APISnapshot carries no revision and its only ordering field is whole-second, so a reply racing a push within one second can still regress the interface's state |
+| A111 | S3 | DONE | 4590a21 | settings | The stored-attachment doc claims the saved record carries the extracted text, which it does not |
+| A112 | S3 | DONE | f200e05 | app attachments | Restored-but-not-loaded files appear as ordinary attachment chips, distinguished only by a notice the user can dismiss |
+| A113 | S3 | START | — | probe and CLI arguments | The probe's own arguments have the two defects A59 and A62 just fixed in the CLI's |
+| A114 | S3 | START | — | CLI arguments | Five more CLI flags silently keep their defaults or are silently ignored when they cannot take effect |
+| A115 | S2 | START | — | engine protocol conformance | Three MLXEngine methods are synchronous while the protocol requirement is async, so a call on the concrete type silently resolves to the protocol's no-op default |
+| A116 | S2 | DONE | — | audit environment / build integrity | Dropbox corrupted the build directory: 5 334 conflicted copies inside .build and a module cache compiled at a checkout path that no longer exists |
+| A117 | S2 | DONE | 078efd0 | audit tooling / process | The done-commit guard separated its fields with U+0001, which bash consumes as its own CTLESC marker, so it skipped all 109 DONE tasks and exited 0 |
+| A118 | S2 | START | — | audit documentation / source of truth | ledger.md is declared the audit's source of truth and the entry point for the next session, but it enumerates 28 tasks and stops at A89; A90-A116 appear nowhere in it |
+| A119 | S3 | START | — | web front end / engine API | The page POSTs a layout diagnostic to /api/client-report, a route that has never existed in any commit, and the 404 is swallowed by design |
+| A12 | — | DONE | f9a359b | tests | AddressSanitizer over the whole suite: clean |
+| A120 | S3 | START | — | app lifecycle / engine API | The engine the app spawns opens an HTTP listener on 7788 that the app does not use, so it cannot start at all while Caddy holds that port |
+| A121 | S2 | START | — | installer | The installer accepts macOS 14 while the package and the bundle require macOS 26, so a Sonoma user downloads ~3 GB and builds before the app refuses to launch |
+| A122 | S3 | START | — | transport smoke test | TransportCheck declares a timeout it never uses and creates both child pipes without ever draining them |
+| A13 | — | DONE | — | tests | ThreadSanitizer over the whole suite: one data race found |
+| A14 | S1 | DONE | 0de3123 | HTTPServer | isRunning/lastError are raced between the listener callback and waitUntilReady |
+| A15 | S1 | DONE | 8ece1d3 | EngineService/DocumentImport | Attaching a document blocks the engine main actor for the whole conversion, subprocess wait included |
+| A16 | S3 | DONE | 9c53771 | ChatBotsCLI | --serve has no signal handling, so the listener is never shut down and nothing is flushed on exit |
+| A17 | S1 | DONE | 0de3123 | HTTPServer | streams is appended on the main actor without the lock that every other access takes |
+| A18 | S1 | DONE | 0de3123 | tests | The suite is not hermetic: three tests need the developer's private models/ and .secrets.env and fail on a fresh clone |
+| A19 | S2 | DONE | 0de3123 | process / git history | A DONE task was committed with its evidence and its ledger entry but without its fix: 948ea29 claims A14 and A17 and contains no source change |
+| A20 | S1 | DONE | e9d45ef | web front end | Stored DOM XSS: the live-pane header interpolates the moderator-supplied seat name into innerHTML |
+| A21 | S2 | DONE | 8111b1a | installer | The model-download integrity check silently degrades to 'accept any size' when the HEAD request yields nothing |
+| A22 | S2 | DONE | 18100dd | start script | stop_all kills a stale PID from a pid file without checking the process is ours |
+| A23 | S2 | DONE | 38fbe08 | device capture tool | capture-devices.py prints a viewport mismatch but cannot fail the run |
+| A24 | S2 | DONE | b803b3c | installer | A native binary artifact is downloaded with no integrity check and embedded in the signed app |
+| A25 | S3 | DONE | ba18733 | installer | install.sh interpolates the project path into `bash -c`, so an apostrophe in the path is command injection |
+| A26 | S3 | DONE | ae957c0 | installer | run_with_timeout kills the wrapper but not the process tree it timed out on |
+| A27 | S3 | DONE | ca1af81 | devtools client | cdp.py stop() refuses to terminate any Chrome started with a non-default profile |
+| A28 | S2 | DONE | fbe94c1 | audit baseline | Three recorded counts are wrong and the rest are not reproducible from the commands that produced them |
+| A29 | S0 | DONE | 208540c | engine intake | The attachment filename is used verbatim as a filesystem path: unauthenticated arbitrary file write |
+| A30 | S1 | DONE | cbf39c7 | HTTP server | A negative Content-Length passes both guards and is used as a slice offset, trapping the process |
+| A31 | S1 | DONE | 679551f | HTTP server | SSE connections are never reaped, so streams and connections grow for the life of the process |
+| A32 | S1 | DONE | c63b7b3 | WebTransport | A frame over the protocol cap is swallowed by try?, permanently desyncing the session |
+| A33 | S1 | DONE | b88eee1 | turn loop | Restarting a running conversation orphans the new turn loop, so Stop and Pause become no-ops |
+| A34 | S1 | DONE | 59555f0 | persistence | ConversationStore.save destroys the records it deliberately refuses to read |
+| A35 | S1 | DONE | 3752067 | app state | A turn ending is never observed, so isGenerating sticks on forever: stuck UI, duplicated answer, disabled controls |
+| A36 | S1 | DONE | 84fc613 | document import | The conversion timeout can never fire: the pipe reads block forever first, and the drain order can deadlock |
+| A37 | S2 | DONE | f1dd7a7 | HTTP server | The HTTP listener has no read or idle deadline and no connection cap |
+| A38 | S2 | DONE | 6229d1f | WebTransport client | A failed openBidirectionalStream leaks the session and leaves isConnected true |
+| A39 | S2 | DONE | 219e3ce | WebTransport client | Replies are matched by queue order, and removeFirst() assumes in-order completion |
+| A40 | S3 | DONE | 9a4dc18 | WebTransport server | stop() leaves live WebTransport sessions serving and never closes them |
+| A41 | S2 | DONE | d870f3d | memory | An orphaned unbounded event stream retains every event, including a full prompt per turn, for the process lifetime |
+| A42 | S2 | DONE | 978550d | compaction | MLXEngine.compact mutates a local spec that generate() never reads, so maxTokens and thinking-off are ignored |
+| A43 | S2 | DONE | e5e2872 | inference | The reasoning ceiling truncates the turn instead of forcing an answer, and unlimited thinking gets less headroom than high |
+| A44 | S2 | DONE | 60e2f49 | research mode | Reopening a finished research conversation and pressing Start writes a second report with zero turns |
+| A45 | S2 | DONE | 2ed98a8 | context accounting | Auto-compaction is measured against a static window instead of the engine's learned one |
+| A46 | S2 | DONE | 4242b40 | app attachments | Attachment chips print '0 words' / 'Zero bytes' because the engine's summary and token count are discarded |
+| A47 | S2 | DONE | cb94c56 | app attachments | Saved source material is silently discarded at launch and then erased from settings |
+| A48 | S2 | DONE | 6371ed5 | app requests | ChatController issues overlapping requests against a client whose protocol is documented as one-request-at-a-time, so replies cross |
+| A49 | S2 | DONE | 265b309 | app lifecycle | The wait-then-SIGKILL engine teardown is dead code, so an owned engine can outlive the app |
+| A50 | S3 | DONE | 30f930c | app lifecycle | A startup timeout reports .idle, discarding the failure reason the app exists to show |
+| A51 | S3 | DONE | b9bcebb | app UI | 'Models > Load ...' is a no-op placeholder presented as a working control |
+| A52 | S2 | DONE | 4e49a37 | attachments | An accepted image with unrecognized magic bytes, notably HEIC, is silently never sent |
+| A53 | S2 | DONE | 54800d4 | model store | A partial sharded download is reported as a complete checkpoint |
+| A54 | S2 | DONE | c7c062c | inference client | A truncated SSE stream is accepted as a finished turn: the terminal event is never required |
+| A55 | S3 | DONE | 34a7f1f | key handling | A CRLF .secrets.env yields a key that cannot authenticate, and the app does not report it missing |
+| A56 | S3 | DONE | 251c8de | web search | The 'empty results' retry is decided before the blank-result filter runs |
+| A57 | S3 | DONE | 2ed35d2 | inference client | The engine re-probes /v1/models every turn and misreports an unparseable body as 'no model loaded' |
+| A58 | S3 | DONE | 00b7186 | document import | A PDF reports truncation one character early and the joined text exceeds the declared ceiling |
+| A59 | S2 | DONE | 8d1d646 | probe | chatbots-probe reports 'all cycles succeeded' and exits 0 when --cycles 0 probes nothing, and aborts on a negative count |
+| A60 | S2 | DONE | c8dccf8 | CLI smoke tests | --benchmark and --session-probe exit 0 when a seat fails to load, reporting success for a checkpoint that never loaded |
+| A61 | S2 | DONE | 66349a9 | CLI | A legal single-seat roster crashes the flag paths that hard-index seat 2 |
+| A62 | S2 | DONE | 53a9bba | CLI | An out-of-range --port traps the process, --port 0 announces an unusable URL, and an invalid --transport-port is silently swallowed |
+| A63 | S3 | DONE | ef47f52 | stream pacing | StreamPacerPool.generationRates is written but never read, so the learned rate never seeds a new pacer |
+| A64 | S3 | DONE | e328e82 | stream pacing | StreamPacerPool.minimumRate is dead API and its comment contradicts the pacer's actual floor |
+| A65 | S3 | DONE | 07a3cb8 | CLI diagnostics | --memory-probe prints memoryLimit under both 'gpuLimit' and 'memLimit' |
+| A66 | S3 | DONE | 6790b53 | CLI | Flags are accepted in modes where they do nothing, without warning |
+| A67 | S1 | DONE | efddc6d | research quality | `.answered` is decided by keyword substring presence and then reported as a complete, undisputed investigation |
+| A68 | S2 | DONE | f099d87 | prompt injection | The report synthesis prompt concatenates the untrusted transcript with its own rules, with no boundary |
+| A69 | S2 | DONE | 83bf5f6 | trust boundary | Peer-model and API-supplied text is promoted into another seat's system message unescaped |
+| A70 | S2 | DONE | 2ab2157 | prompt correctness | Research sessions get an entertainment persona in the shared opening brief |
+| A71 | S2 | DONE | 88cbede | research quality | Position changes are counted as 'added nothing', so research sessions converge early |
+| A72 | S2 | DONE | 4181af7 | report integrity | A mostly-unlabelled report is still declared labelled and traceable |
+| A73 | S2 | DONE | c7e3079 | cost ceiling | The web-search ceiling is not reliably enforced and can also fire early |
+| A74 | S3 | DONE | 489ef41 | determinism | The director picks a conflict by Dictionary iteration order, contradicting its own determinism contract |
+| A75 | S1 | DONE | 127d3d3 | web surface / browser boundary | CORS is `Access-Control-Allow-Origin: *` and every preflight is answered, so any website the user visits can read every kept conversation and drive the engine |
+| A76 | S3 | DONE | caed9f5 | web surface / browser boundary | No CSP, no X-Frame-Options or frame-ancestors, no X-Content-Type-Options, no Referrer-Policy |
+| A77 | S2 | START | — | distribution / licensing | The shipped app redistributes ~14 third-party libraries with no licence notices or attribution |
+| A78 | S3 | DONE | d33c6e4 | distribution / bundle metadata | `NSHumanReadableCopyright` carries a description instead of a copyright, and the bundle identifier and version are single-sourced in one script only |
+| A79 | S3 | DONE | 5928f64 | repository hygiene | Python bytecode is not ignored, so running any helper script or the CI byte-compile step leaves untracked noise |
+| A80 | S2 | DONE | 6113702 | device capture tool | A capture that renders no messages still only prints, so an empty capture is published on a green run |
+| A81 | S3 | DONE | 5010700 | device capture tool | A reachable-but-not-ready health response spins the retry loop with no delay |
+| A82 | S3 | DONE | 191563b | devtools client | Every landscape capture records `screen.orientation` as portrait |
+| A83 | S3 | DONE | 2dcf802 | test infrastructure | The test port allocator is an in-process counter with no probe, so two runs of the suite on one machine collide from 7 900 upward |
+| A84 | S2 | DONE | — | audit process / git | A commit made without a pathspec absorbed another lane's staged files, producing a mixed commit under a message that did not mention them |
+| A85 | S3 | DONE | 38a9745 | device capture tool | The run summary counts only hard capture failures, so a failing run can print '3 captured, 0 failed.' |
+| A86 | S3 | DONE | a56d16c | device capture tool | A failed health probe leaks its HTTPConnection until garbage collection |
+| A87 | S2 | DONE | — | audit process / parallelism | Parallel Swift fix lanes cannot be isolated by scratch path or port: they compile the same module, so one lane's half-finished edit fails every other lane's build |
+| A88 | S3 | DONE | dc34211 | device capture tool | The same connection-leak shape A86 fixed exists twice more, and one of them is called in a 90-iteration loop |
+| A89 | S2 | DONE | a2ce3b5 | audit tooling | The ledger is written non-atomically, and the acceptance run's most important gate passed on a ledger it could not parse |
+| A90 | S2 | DONE | ac80867 | context accounting | Public API still computes the incoherent unlimited-thinking cap, and a test pins that value |
+| A91 | S3 | DONE | 8d82c41 | inference | A round abandoned at the reasoning ceiling can still fall through to tool dispatch |
+| A92 | S2 | DONE | 8d48560 | turn loop | Every engine event is published twice, duplicating live text, tool-log entries and every subscriber's stream |
+| A93 | S2 | DONE | 6ca2dbf | device capture tool | The documented capture command fails on a fresh checkout because `.run/` does not exist yet |
+| A94 | S3 | DONE | c04a044 | device capture tool | The capture output directory is created only by main(), so any other caller of capture() or build_index() hits the same fresh-directory failure A93 fixed |
+| A95 | S2 | DONE | 9468385 | research quality | Coverage is still keyword-presence based, so one SOURCED sentence naming all ten subjects still closes a session as fully answered |
+| A96 | S3 | DONE | 146969a | research quality | `affinity` still scores with bare substring matching, deciding which seat is asked about what |
+| A97 | S2 | DONE | d66386d | research quality | `hasBasis` matches bare substrings, and A67 made its looseness load-bearing |
+| A98 | S2 | DONE | f14fac2 | web surface / browser boundary | In the documented configuration Caddy serves the page, so the CSP, nosniff, frame denial and referrer policy A76 added never reach it |
+| A99 | S2 | START | — | web surface / routing | Kept-conversation share links 404 in the documented deployment, because Caddy proxies only /api/* and the engine serves /s/<id> |
+
+<!-- END GENERATED -->
 
 ---
 
@@ -942,3 +1067,162 @@ input). They are all the same failure: **the audit was confident about its contr
 checked its own mechanism.** Every one was found by looking at observed behaviour — a `git status`,
 a guard's output, a file mtime, a lane's complaint — rather than by reasoning about the design, and
 every fix has been to make the mechanism **fail loudly on the case it was silently tolerating.**
+
+---
+
+## A117 — the done-commit guard separated its fields with a delimiter bash consumes — **DONE**
+
+**S2** · process · found by verifying the handover instead of trusting it
+
+`AUDIT/verify-done-commits.sh` exited 0 and printed `backed 0 · skipped 109 · unbacked 0`. Every DONE
+task was skipped as "names no source path", including A29 and A30, which plainly do name source
+paths — so the skip was not a property of the tasks.
+
+The rows were correct. `jq ... | join("\u0001")` emits U+0001, confirmed with `xxd`. The split was
+not: `while IFS=$'\001' read -r id commit file_line unit` never split anything, and `$id` held the
+whole row. Reproduced in isolation on macOS bash 3.2.57, the shell the verification host ships:
+`IFS=$'\001'` over `a\001b\001c` yields `[abc][][]`, while IFS `:`, tab, U+0002, U+001C, U+001E and
+U+001F all split correctly.
+
+**U+0001 is bash's own internal `CTLESC` escape character and U+007F is `CTLNUL`**, so a literal one
+cannot survive in a shell variable. The delimiter was consumed by the shell that was meant to read
+it. This is A83 exactly inverted — that guard skipped the tasks it existed to catch, this one skipped
+every task — and it was invisible for the same reason: **a skip is reported, not failed, and the exit
+status was 0 either way.**
+
+The consequence is the serious part. Phase C's rule is "`verify-done-commits.sh` must exit 0 before a
+fix task is called DONE", and that rule was being satisfied by checking nothing. Phase E section
+10/12 passes on this exit status, so the acceptance run would have printed the vacuous count as a
+pass — A89's shape again, one gate further on.
+
+The separator is now U+001F: not IFS whitespace, so an empty field stays an empty field (the
+property A83 needed), and not one of bash's internal markers. The parse is checked rather than
+trusted as well — a row whose first field is not a task id aborts with exit 2, and the rows read must
+equal the DONE tasks in the ledger.
+
+`backed 97 · skipped 12 · unbacked 0`, exit 0, which is the figure the handover claimed. Four
+mutations, each required to fail: an empty `commit` → `FAIL`, exit 1; a commit touching none of the
+named paths → `FAIL`, exit 1; a commit not in the repository → `FAIL`, exit 1; a row that is not a
+task id → `FATAL`, exit 2.
+
+---
+
+## A118 — ledger.md is called the source of truth and stops at A89 — **DONE**
+
+**S2** · audit documentation · found while looking for the ledger in order to add a finding
+
+`HANDOVER.md:4` and `:19` call `ledger.md` "the source of truth", `:109` tells the next session to
+read it first, and `plan.md:119` agrees. The file did not match: its Summary said "Tasks enumerated |
+28" and "DONE | 9", its `## Open tasks` table listed A01–A05, and it carried 26 task headings against
+116 tasks in `ledger.json`. A90–A116 appeared **nowhere** in it. A reader following the handover
+would have concluded the audit enumerated 28 tasks and closed 9.
+
+The cause is the one this project has already fixed twice for `web/` and `names/`: a hand-maintained
+summary of generated facts drifts, silently, one wave at a time. So the status content is now
+generated. `AUDIT/render-ledger.sh` rewrites the region between two markers in `ledger.md` from
+`ledger.json`, and `--check` turns drift into a failure. The prose sections — this one included —
+are outside the markers and are never touched.
+
+Two smaller corrections went with it, because the old claim was wrong in both directions: the file
+now states that **`ledger.json` is the authoritative enumeration** and is what every gate reads, and
+the same claim was corrected in `HANDOVER.md` and `plan.md`. The renderer refuses to write anything
+if the ledger will not parse, rather than emitting an empty status — A89's lesson applied to the tool
+that renders the ledger about A89.
+
+`--check` exits 0 in step and 1 on drift; wiring it into `phase-e.sh` section 12 and the CI
+`generated-files` job means a status table that is edited by hand fails the gate rather than being
+discovered later.
+
+---
+
+## A119 — the page posts a layout diagnostic to a route that has never existed
+
+**S3** · defect · `web/app.js:1393`, `Sources/ChatBotsCore/APIServer.swift:231` · **START**
+
+The page measures its own layout on every load and POSTs it to `/api/client-report`, inside a `try`
+whose `catch` is deliberately empty — "a diagnostic that fails must not break the page".
+
+The route has never existed. `grep -rn 'client-report'` finds only the two generated copies of the
+page; `APIServer.translate`'s `default:` returns nil for it; and `git log -S 'client-report' --all --
+Sources/ChatBotsCore/APIServer.swift` returns nothing, so the receiving end was never written rather
+than removed. `ClientReport`, documented as "What the client measured about its own layout" and
+carrying `overflowing` — "Selectors of elements wider than the viewport, worst first" — is referenced
+nowhere else in `Sources/` or `Tests/`.
+
+So the measurement is real work that is thrown away, and the failure is designed to be invisible.
+
+---
+
+## A120 — the engine the app spawns opens an HTTP port the app does not use
+
+**S3** · defect · `EngineSupervisor.swift:212-220`, `ChatBotsCLI/main.swift:50, :754-770` · **START**
+
+`EngineSupervisor` starts the engine with `--serve --transport webtransport --transport-port 7790`
+and no `--port`, and its own comment says the app "does not use the engine's HTTP server, and asking
+for it was actively harmful". But `--serve` builds `APIServer(port: options.port)` and calls
+`server.start()` unconditionally, before the transport branch, and `options.port` defaults to 7788. A
+bind failure is fatal to the child.
+
+7788 is the port the documented website deployment publishes: `Caddyfile:27` is `http://:7788`, on
+every interface, started by `tools/start.sh`. So in the configuration the README documents, opening
+the desktop app while Caddy is running and nothing is answering on 7790 makes the spawned engine exit
+on a collision that has nothing to do with the transport, and the app reports an engine that failed
+to start.
+
+That the collision is real is shown by the code's own workaround elsewhere: `TransportCheck` passes
+`--port String(port - 1)` with the comment "A port that is not in use, so the HTTP listener cannot
+collide with a real run".
+
+---
+
+## A121 — the installer accepts macOS 14 where the package and the bundle require macOS 26
+
+**S2** · incomplete · `tools/install.sh:97-102` · **START**
+
+The installer gates on `OS_MAJOR -lt 14` and proceeds on macOS 14 and 15. `Package.swift` requires
+`.macOS(.v26)`, `make-app.sh` writes `LSMinimumSystemVersion 26.0`, and the README says "macOS 26 or
+newer". On Sonoma the installer therefore downloads the checkpoint (~3 GB), installs a toolchain if
+one is missing, and builds the app — and the app then cannot launch, because the bundle declares a
+minimum the host does not meet.
+
+The project already treats two of those three declarations as one fact: `checks.yml` fails the push
+when `make-app.sh`'s version and `Package.swift`'s disagree. The installer's copy was the one left
+unguarded, and it drifted. Its disk-space text is stale in the same place: "the models alone are
+~6 GB" against a single ~3 GB download.
+
+---
+
+## A122 — TransportCheck declares a timeout it never uses, and never drains its child
+
+**S3** · defect · `Sources/ChatBotsCore/TransportCheck.swift:99-101, :142-143` · **START**
+
+`TransportCheck.run(in:port:timeout:)` declares `timeout: Duration = .seconds(30)`, and `grep -n
+timeout` over the file finds that line and nothing else: the parameter is dead, so the check the
+installer's smoke test runs has no deadline of its own. The same function creates both child pipes
+and never reads either — no `readabilityHandler`, no `availableData`, no drain — so a child that
+writes more than the pipe buffer holds blocks on the write and is waited on forever.
+
+Both are shapes this audit has already recorded elsewhere: a timeout that cannot fire is A36, a
+control presented as working that does nothing is A51, and a child that can block on an undrained
+pipe is A36's family. `install.sh` wraps the invocation in a portable 180-second timeout, so the
+installer is bounded from outside; `chatbots-cli --check-transport` run directly is not.
+
+---
+
+## Verified and not recorded as defects
+
+Two candidate findings were checked against the code and the toolchain before being written down, and
+both were wrong. They are recorded here so that they are not re-opened as if they were new.
+
+* **The certificate's subject alternative names are not malformed.** `CertificateStore` prefixes every
+  host but `localhost` with `IP:`, so `::1` is written as `IP:::1`, which reads like an invalid entry.
+  It is not: `openssl` parses it as `IP:` + `::1` and normalises it to `IP Address:0:0:0:0:0:0:0:1`,
+  which is the correct IPv6 loopback — demonstrated with `openssl req -addext
+  subjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1` and read back with `openssl x509 -ext`. The
+  default host list is `localhost`, `127.0.0.1`, `::1` and no caller passes anything else, so the
+  general shape (a DNS name would be labelled `IP:`) has no caller to affect.
+* **`docs/webtransport-plan.md` describes an unimplemented design and is not a defect.** It records a
+  two-stream event channel, fingerprint pinning and app tests that the implementation does not have,
+  and cites a stale test count — but it says so itself, in its first paragraph: "this file is kept as
+  the record of what was planned and why, so it describes the intent at the time rather than the
+  current state. The test count below (372) is the figure when the plan was written, not today's."
