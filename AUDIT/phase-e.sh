@@ -106,11 +106,19 @@ fi
 section "3/12  build — products and tests, warnings are errors"
 # Warnings-as-errors is set in Package.swift, so this is not a flag this script can forget.
 if swift build --build-tests > "$out/build.log" 2>&1; then
-    warnings="$(grep -cE 'warning:' "$out/build.log" || true)"
+    # Compiler diagnostics only. SwiftPM also prints its own `warning:` lines about the dependency
+    # cache ("skipping cache due to an error: The file "maintenance.lock" doesn't exist"), which are
+    # not statements about this code, are not governed by warnings-as-errors, and made an otherwise
+    # clean tree fail this gate (A123). The count that matters is the one warnings-as-errors
+    # controls: a compiler warning cannot appear here without failing the build, which is exactly
+    # what makes this line a guard against the setting being removed rather than a duplicated check.
+    warnings="$(grep -cE '\.swift:[0-9]+:[0-9]+: warning:' "$out/build.log" || true)"
+    notices="$(grep -cE '^warning: ' "$out/build.log" || true)"
     if [ "$warnings" = "0" ]; then
-        pass "swift build --build-tests: $(grep -cE 'error:' "$out/build.log" || true) errors, 0 warnings"
+        pass "swift build --build-tests: $(grep -cE 'error:' "$out/build.log" || true) errors, 0 compiler warnings (${notices} SwiftPM notice(s) not counted)"
     else
-        fail "build produced $warnings warning line(s) despite warnings-as-errors"
+        fail "build produced $warnings compiler warning line(s) despite warnings-as-errors"
+        grep -E '\.swift:[0-9]+:[0-9]+: warning:' "$out/build.log" | head -5 | sed 's/^/        /'
     fi
 else
     fail "build failed; see $out/build.log"
@@ -189,7 +197,12 @@ fi
 
 section "8/12  dependency vulnerabilities"
 if command -v osv-scanner >/dev/null 2>&1; then
-    if osv-scanner scan source -r . > "$out/osv.txt" 2>&1; then
+    # The resolved dependency set, not the whole tree. `-r .` also walked the sanitizer scratch
+    # directories, which hold every dependency's own checkout — including its example projects and
+    # their requirements.txt files — so this gate reported vulnerabilities in code this repository
+    # does not ship and never declares (A124). The object that matters is the same one the lockfile
+    # gate is about: what `Package.resolved` pins.
+    if osv-scanner scan source --lockfile Package.resolved > "$out/osv.txt" 2>&1; then
         pass "osv-scanner: no issues found"
     else
         fail "osv-scanner reported issues; see $out/osv.txt"
@@ -302,7 +315,12 @@ else
 fi
 
 if command -v swift-format >/dev/null 2>&1; then
-    swift-format lint --recursive Sources Tests > "$out/swift-format.txt" 2>&1
+    # Authored Swift only. The generated `WebAssets.swift` embeds `web/` at column 0 and carries
+    # ~2,300 indentation diagnostics of its own, so including it made this count a function of the
+    # web interface rather than of this repository's code — and any edit to `web/` moved the waiver
+    # (A125). swiftlint already excludes the same two generated files in `.swiftlint.yml`.
+    find Sources Tests -name '*.swift' ! -name 'WebAssets.swift' ! -name 'NameLists.swift' -print0 \
+        | xargs -0 swift-format lint > "$out/swift-format.txt" 2>&1
     # Counted from diagnostic lines, never from the length of the file: 29 900 was once the
     # line count of this output rather than a finding count (A28).
     diagnostics="$(grep -cE 'warning:|error:' "$out/swift-format.txt" || true)"
@@ -322,7 +340,10 @@ fi
 section "10/12  every DONE task is backed by its own commit"
 if [ -x AUDIT/verify-done-commits.sh ]; then
     if AUDIT/verify-done-commits.sh > "$out/done-commits.txt" 2>&1; then
-        pass "verify-done-commits.sh: $(tail -2 "$out/done-commits.txt" | head -1)"
+        # `tail -1`, not `tail -2 | head -1`: the script ends with a blank line before its
+        # summary, so the two-line form read the blank and the acceptance statement reported an
+        # empty count (A127).
+        pass "verify-done-commits.sh: $(tail -1 "$out/done-commits.txt")"
     else
         fail "verify-done-commits.sh found an unbacked DONE claim; see $out/done-commits.txt"
         grep -E '^FAIL' "$out/done-commits.txt" | sed 's/^/        /'

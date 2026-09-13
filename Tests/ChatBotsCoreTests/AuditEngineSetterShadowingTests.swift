@@ -17,8 +17,9 @@
 //
 // These tests name the concrete type, which is the shape that breaks.
 
-@testable import ChatBotsCore
 import Testing
+
+@testable import ChatBotsCore
 
 @Suite("Setters awaited on the concrete engine type")
 struct EngineSetterShadowingTests {

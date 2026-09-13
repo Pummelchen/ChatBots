@@ -113,4 +113,5 @@ Around 8 GB of free disk space; 16 GB of memory is comfortable.
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). The app embeds third-party packages, and their notices travel with
+every build: see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

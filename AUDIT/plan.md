@@ -63,9 +63,26 @@ if either count is above its waiver, so raising one is a deliberate edit rather 
 drift. A06 explains what the residual is, by rule, in `.swiftlint.yml` and `.swift-format`.
 
 ```
-swiftlint waiver: 222
-swift-format waiver: 3003
+swiftlint waiver: 255
+swift-format waiver: 744
 ```
+
+**Both numbers were re-measured when Phase E was first run (A125), and both had been wrong:**
+
+* **`swift-format` was measuring generated code.** The recorded 3 003 included ~2 300 indentation
+  diagnostics from `Sources/ChatBotsCore/WebAssets.swift`, which embeds `web/` at column 0 — so the
+  figure was a function of the web interface rather than of this repository's code, and editing a
+  line of `web/app.js` moved the waiver. The gate now lints authored Swift only, the same two
+  generated files that `.swiftlint.yml` already excludes, which makes the honest number **744**.
+  Measured at the handover head `9eafa54` and after this session's work, it is **744 both times**:
+  the changes added none.
+* **`swiftlint` 222 was stale.** The tree at `9eafa54` already measured **256** — later audit waves
+  added findings without re-measuring the waiver — so the gate could not have passed on the branch
+  it governs. It is now **255**, one below that, because A114's flag validation added findings and
+  replacing ten duplicated error messages with one `reject()` helper removed more than it added.
+
+Neither number is a target to grow into: they are the measured residual, and a change that raises
+either one has to edit these lines and say why.
 
 **Semgrep waivers.** A09's findings in `tools/cdp.py` are waived in writing - three findings
 across two rules: `insecure-websocket` fires twice (at `:108` and `:110`) and `dynamic-urllib`

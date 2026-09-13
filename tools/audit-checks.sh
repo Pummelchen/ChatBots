@@ -137,7 +137,11 @@ case "${findings:-}" in
 esac
 
 printf '\n=== 5/5  swift-format lint: Sources, Tests ===\n'
-swift-format lint --recursive Sources Tests > "$logs/swift-format.txt" 2>&1
+# Authored Swift only: the generated `WebAssets.swift` and `NameLists.swift` carry thousands
+# of diagnostics of their own, which makes the count a function of `web/` and `names/` rather than
+# of this repository's code (A125). swiftlint excludes the same two in `.swiftlint.yml`.
+find Sources Tests -name '*.swift' ! -name 'WebAssets.swift' ! -name 'NameLists.swift' -print0 \
+    | xargs -0 swift-format lint > "$logs/swift-format.txt" 2>&1
 # Counted from the diagnostic lines, NOT with `wc -l` on the output. This gate reported `wc -l`
 # first, which is exactly the mistake A28 records: a 3,003-diagnostic run produces about 30,000
 # lines, so the number it printed was the size of the file rather than the size of the problem.

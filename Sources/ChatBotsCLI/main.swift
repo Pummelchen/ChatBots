@@ -77,17 +77,22 @@ struct Options {
                 index += 1
                 return index < arguments.count ? arguments[index] : nil
             }
+            // One shape for every bad-argument message. It used to be built inline at each site,
+            // which meant ten copies of the same sentence — six of them long enough to trip the
+            // line-length gate (Phase E, A125). The lead is passed in because two sites
+            // ("unknown …") are not "invalid …".
+            func reject(_ lead: String, _ value: String, expected: String) -> Never {
+                let shown = value.isEmpty ? "(nothing)" : value
+                FileHandle.standardError.write(Data("\(lead): \(shown) — expected \(expected)\n".utf8))
+                exit(2)
+            }
             // Shared so the two backend flags cannot drift apart, and so the accepted values are
             // read from the enum rather than repeated in the message (A114).
             func backend(_ raw: String?, flag: String) -> AgentSpec.Backend {
                 let value = raw ?? ""
                 guard let parsed = AgentSpec.Backend(rawValue: value) else {
                     let accepted = AgentSpec.Backend.allCases.map(\.rawValue).joined(separator: " or ")
-                    FileHandle.standardError.write(
-                        Data(
-                            "unknown backend for \(flag): \(value.isEmpty ? "(nothing)" : value) — expected \(accepted)\n"
-                                .utf8))
-                    exit(2)
+                    reject("unknown backend for \(flag)", value, expected: accepted)
                 }
                 return parsed
             }
@@ -98,11 +103,7 @@ struct Options {
                 // the default of 4, so the run was not the one that had been asked for (A114).
                 let turnsRaw = next() ?? ""
                 guard let value = Int(turnsRaw), value >= 1 else {
-                    FileHandle.standardError.write(
-                        Data(
-                            "invalid turn count: \(turnsRaw.isEmpty ? "(nothing)" : turnsRaw) — expected 1 or more\n"
-                                .utf8))
-                    exit(2)
+                    reject("invalid turn count", turnsRaw, expected: "1 or more")
                 }
                 options.turns = value
                 options.turnsSpecified = true
@@ -114,11 +115,7 @@ struct Options {
                 // place without saying so (A114).
                 let tokensRaw = next() ?? ""
                 guard let value = Int(tokensRaw), value >= 1 else {
-                    FileHandle.standardError.write(
-                        Data(
-                            "invalid max tokens: \(tokensRaw.isEmpty ? "(nothing)" : tokensRaw) — expected 1 or more\n"
-                                .utf8))
-                    exit(2)
+                    reject("invalid max tokens", tokensRaw, expected: "1 or more")
                 }
                 options.maxTokens = value
             case "--backend-a": options.backendA = backend(next(), flag: "--backend-a")
@@ -156,11 +153,7 @@ struct Options {
                 // never mentioned again, and the app then could not connect (A114).
                 let transportRaw = next() ?? ""
                 guard ["webtransport", "http", "both"].contains(transportRaw) else {
-                    FileHandle.standardError.write(
-                        Data(
-                            "unknown transport: \(transportRaw.isEmpty ? "(nothing)" : transportRaw) — expected webtransport, http or both\n"
-                                .utf8))
-                    exit(2)
+                    reject("unknown transport", transportRaw, expected: "webtransport, http or both")
                 }
                 options.transport = transportRaw
                 options.transportSpecified = true
@@ -170,11 +163,7 @@ struct Options {
                 // user's number was never mentioned again (A62).
                 let transportRaw = next() ?? ""
                 guard let value = UInt16(transportRaw), value != 0 else {
-                    FileHandle.standardError.write(
-                        Data(
-                            "invalid transport port: \(transportRaw.isEmpty ? "(nothing)" : transportRaw) — expected 1–65535\n"
-                                .utf8))
-                    exit(2)
+                    reject("invalid transport port", transportRaw, expected: "1–65535")
                 }
                 options.transportPort = value
             case "--serve": options.serve = true
@@ -209,11 +198,7 @@ struct Options {
                 // (A62).
                 let portRaw = next() ?? ""
                 guard let value = UInt16(portRaw), value != 0 else {
-                    FileHandle.standardError.write(
-                        Data(
-                            "invalid port: \(portRaw.isEmpty ? "(nothing)" : portRaw) — expected 1–65535\n"
-                                .utf8))
-                    exit(2)
+                    reject("invalid port", portRaw, expected: "1–65535")
                 }
                 options.port = value
             case "--share-base":
@@ -224,11 +209,7 @@ struct Options {
                 // nowhere.
                 let baseRaw = next() ?? ""
                 guard let url = URL(string: baseRaw), url.scheme != nil, url.host != nil else {
-                    FileHandle.standardError.write(
-                        Data(
-                            "invalid share base: \(baseRaw.isEmpty ? "(nothing)" : baseRaw) — expected a URL like http://192.168.1.5:7788\n"
-                                .utf8))
-                    exit(2)
+                    reject("invalid share base", baseRaw, expected: "a URL like http://192.168.1.5:7788")
                 }
                 options.shareBase = baseRaw
             case "--compact-threshold":
@@ -236,11 +217,9 @@ struct Options {
                 // fraction of the context window, so anything outside (0, 1] is not a threshold.
                 let thresholdRaw = next() ?? ""
                 guard let value = Double(thresholdRaw), value > 0, value <= 1 else {
-                    FileHandle.standardError.write(
-                        Data(
-                            "invalid compact threshold: \(thresholdRaw.isEmpty ? "(nothing)" : thresholdRaw) — expected a fraction above 0 and at most 1\n"
-                                .utf8))
-                    exit(2)
+                    reject(
+                        "invalid compact threshold", thresholdRaw,
+                        expected: "a fraction above 0 and at most 1")
                 }
                 options.compactThreshold = value
             case "--context-window":
@@ -248,11 +227,7 @@ struct Options {
                 // set and silently ignored by the engine (A114).
                 let windowRaw = next() ?? ""
                 guard let value = Int(windowRaw), value >= 1 else {
-                    FileHandle.standardError.write(
-                        Data(
-                            "invalid context window: \(windowRaw.isEmpty ? "(nothing)" : windowRaw) — expected 1 or more tokens\n"
-                                .utf8))
-                    exit(2)
+                    reject("invalid context window", windowRaw, expected: "1 or more tokens")
                 }
                 options.contextWindow = value
             case "--compact-keep":
@@ -260,11 +235,7 @@ struct Options {
                 // it; zero is meaningful — keep no recent turns — so it is allowed (A114).
                 let keepRaw = next() ?? ""
                 guard let value = Int(keepRaw), value >= 0 else {
-                    FileHandle.standardError.write(
-                        Data(
-                            "invalid compact keep: \(keepRaw.isEmpty ? "(nothing)" : keepRaw) — expected 0 or more turns\n"
-                                .utf8))
-                    exit(2)
+                    reject("invalid compact keep", keepRaw, expected: "0 or more turns")
                 }
                 options.keepRecent = value
             case "--solo": options.solo = true

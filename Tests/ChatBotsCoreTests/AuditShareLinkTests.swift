@@ -9,8 +9,9 @@
 // check is pure, and this is where it is pinned: the wiring around it needs a socket, but the
 // decision about what may be reflected does not.
 
-@testable import ChatBotsCore
 import Testing
+
+@testable import ChatBotsCore
 
 @Suite("A share link is built from a host that may be reflected (A99)")
 struct AuditShareLinkTests {

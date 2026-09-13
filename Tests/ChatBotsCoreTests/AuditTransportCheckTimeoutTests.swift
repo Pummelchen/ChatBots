@@ -5,8 +5,9 @@
 // directly was unbounded. The mapping from that parameter to the client's request budget is the
 // part that needs no socket, so it is the part pinned here.
 
-@testable import ChatBotsCore
 import Testing
+
+@testable import ChatBotsCore
 
 @Suite("The transport check obeys its timeout (A122)")
 struct AuditTransportCheckTimeoutTests {

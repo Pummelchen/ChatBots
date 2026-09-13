@@ -299,7 +299,7 @@ struct SharedConversationHTTPTests {
         // The port in `base` is not 7788, so a reflected host is distinguishable from the fallback.
         #expect((response as? HTTPURLResponse)?.statusCode == 200)
         #expect(
-            decoded(String(decoding: data, as: UTF8.self))
+            decoded(try #require(String(bytes: data, encoding: .utf8)))
                 .contains("\"shareBase\":\"http://192.168.1.5:7788\""),
             "the page did not build its links on the host it was reached on")
 
@@ -309,7 +309,7 @@ struct SharedConversationHTTPTests {
         hostile.setValue("evil.example/../admin", forHTTPHeaderField: "Host")
         let (fallbackData, _) = try await session.data(for: hostile)
         #expect(
-            decoded(String(decoding: fallbackData, as: UTF8.self))
+            decoded(try #require(String(bytes: fallbackData, encoding: .utf8)))
                 .contains("\"shareBase\":\"\(base)\""),
             "a Host that is not a host was reflected into the page")
     }

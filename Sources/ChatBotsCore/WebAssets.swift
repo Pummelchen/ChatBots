@@ -2549,7 +2549,8 @@ body[data-view="phone"] {
       console.info("no element is wider than the viewport");
     } else {
       console.info(
-        `${overflowing.length} element(s) wider than the viewport, worst first:`,
+        "elements wider than the viewport, worst first:",
+        overflowing.length,
         overflowing.slice(0, 6));
     }
   }
