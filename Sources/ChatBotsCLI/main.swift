@@ -37,6 +37,9 @@ struct Options {
     /// webtransport, http, or both. Both by default, so the website and the app can each be
     /// run against the same engine while the app is being moved onto the new channel.
     var transport = "both"
+    /// Whether `--transport` was actually given, so a value that cannot take effect is refused
+    /// rather than silently accepted (A114).
+    var transportSpecified = false
     var transportPort: UInt16 = 7790
     var serve = false
     var mode = DiscussionMode.entertainment
@@ -71,21 +74,52 @@ struct Options {
                 index += 1
                 return index < arguments.count ? arguments[index] : nil
             }
+            // Shared so the two backend flags cannot drift apart, and so the accepted values are
+            // read from the enum rather than repeated in the message (A114).
+            func backend(_ raw: String?, flag: String) -> AgentSpec.Backend {
+                let value = raw ?? ""
+                guard let parsed = AgentSpec.Backend(rawValue: value) else {
+                    let accepted = AgentSpec.Backend.allCases.map(\.rawValue).joined(separator: " or ")
+                    FileHandle.standardError.write(
+                        Data(
+                            "unknown backend for \(flag): \(value.isEmpty ? "(nothing)" : value) — expected \(accepted)\n"
+                                .utf8))
+                    exit(2)
+                }
+                return parsed
+            }
             switch argument {
             case "--topic", "-t": options.topic = next() ?? options.topic
             case "--turns", "-n":
-                if let value = Int(next() ?? "") {
-                    options.turns = value
-                    options.turnsSpecified = true
+                // `if let Int(...)` with no else meant `--turns abc` and `--turns 0` quietly kept
+                // the default of 4, so the run was not the one that had been asked for (A114).
+                let turnsRaw = next() ?? ""
+                guard let value = Int(turnsRaw), value >= 1 else {
+                    FileHandle.standardError.write(
+                        Data(
+                            "invalid turn count: \(turnsRaw.isEmpty ? "(nothing)" : turnsRaw) — expected 1 or more\n"
+                                .utf8))
+                    exit(2)
                 }
+                options.turns = value
+                options.turnsSpecified = true
             case "--model-a": options.modelA = next() ?? options.modelA
             case "--model-b": options.modelB = next() ?? options.modelB
             case "--key": options.tavilyKey = next()
-            case "--max-tokens": options.maxTokens = Int(next() ?? "")
-            case "--backend-a":
-                options.backendA = AgentSpec.Backend(rawValue: next() ?? "") ?? .mlx
-            case "--backend-b":
-                options.backendB = AgentSpec.Backend(rawValue: next() ?? "") ?? .mlx
+            case "--max-tokens":
+                // The same silent-default class: a nil from `Int(...)` left the seat's own budget in
+                // place without saying so (A114).
+                let tokensRaw = next() ?? ""
+                guard let value = Int(tokensRaw), value >= 1 else {
+                    FileHandle.standardError.write(
+                        Data(
+                            "invalid max tokens: \(tokensRaw.isEmpty ? "(nothing)" : tokensRaw) — expected 1 or more\n"
+                                .utf8))
+                    exit(2)
+                }
+                options.maxTokens = value
+            case "--backend-a": options.backendA = backend(next(), flag: "--backend-a")
+            case "--backend-b": options.backendB = backend(next(), flag: "--backend-b")
             case "--base-url": options.baseURL = next() ?? options.baseURL
             case "--api-model": options.apiModel = next() ?? options.apiModel
             case "--api-key": options.apiKey = next()
@@ -114,7 +148,19 @@ struct Options {
             case "--check-transport": options.checkTransport = true
             case "--check-client": options.checkClient = true
             case "--prepare-identity": options.prepareIdentity = true
-            case "--transport": options.transport = next() ?? "both"
+            case "--transport":
+                // Unvalidated, so `--transport webtransprot` served HTTP only while the value was
+                // never mentioned again, and the app then could not connect (A114).
+                let transportRaw = next() ?? ""
+                guard ["webtransport", "http", "both"].contains(transportRaw) else {
+                    FileHandle.standardError.write(
+                        Data(
+                            "unknown transport: \(transportRaw.isEmpty ? "(nothing)" : transportRaw) — expected webtransport, http or both\n"
+                                .utf8))
+                    exit(2)
+                }
+                options.transport = transportRaw
+                options.transportSpecified = true
             case "--transport-port":
                 // Validated rather than swallowed: `UInt16(String)` returns nil for an
                 // out-of-range value, so this used to fall back silently to 7790 and the
@@ -167,9 +213,42 @@ struct Options {
                     exit(2)
                 }
                 options.port = value
-            case "--compact-threshold": options.compactThreshold = Double(next() ?? "")
-            case "--context-window": options.contextWindow = Int(next() ?? "")
-            case "--compact-keep": options.keepRecent = Int(next() ?? "")
+            case "--compact-threshold":
+                // A nil here left the engine's own 0.7 in place, silently (A114). The value is a
+                // fraction of the context window, so anything outside (0, 1] is not a threshold.
+                let thresholdRaw = next() ?? ""
+                guard let value = Double(thresholdRaw), value > 0, value <= 1 else {
+                    FileHandle.standardError.write(
+                        Data(
+                            "invalid compact threshold: \(thresholdRaw.isEmpty ? "(nothing)" : thresholdRaw) — expected a fraction above 0 and at most 1\n"
+                                .utf8))
+                    exit(2)
+                }
+                options.compactThreshold = value
+            case "--context-window":
+                // Zero and negatives already meant "unset" to `generationCap`, so a window could be
+                // set and silently ignored by the engine (A114).
+                let windowRaw = next() ?? ""
+                guard let value = Int(windowRaw), value >= 1 else {
+                    FileHandle.standardError.write(
+                        Data(
+                            "invalid context window: \(windowRaw.isEmpty ? "(nothing)" : windowRaw) — expected 1 or more tokens\n"
+                                .utf8))
+                    exit(2)
+                }
+                options.contextWindow = value
+            case "--compact-keep":
+                // A negative value traps inside `dropLast`, which is the worst way to learn about
+                // it; zero is meaningful — keep no recent turns — so it is allowed (A114).
+                let keepRaw = next() ?? ""
+                guard let value = Int(keepRaw), value >= 0 else {
+                    FileHandle.standardError.write(
+                        Data(
+                            "invalid compact keep: \(keepRaw.isEmpty ? "(nothing)" : keepRaw) — expected 0 or more turns\n"
+                                .utf8))
+                    exit(2)
+                }
+                options.keepRecent = value
             case "--solo": options.solo = true
             case "--help", "-h":
                 print(Self.usage)
@@ -180,6 +259,14 @@ struct Options {
                 exit(2)
             }
             index += 1
+        }
+        // `--transport` only means something to `--serve`. Every other mode builds its own engine
+        // and opens no listener, so the flag was accepted and ignored (A114) — refused here rather
+        // than left to look as though it had been applied.
+        if options.transportSpecified, !options.serve {
+            FileHandle.standardError.write(
+                Data("--transport only applies with --serve; without it the flag does nothing\n".utf8))
+            exit(2)
         }
         return options
     }
