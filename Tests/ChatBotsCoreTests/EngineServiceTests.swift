@@ -107,7 +107,7 @@ struct EngineServiceTests {
     @Test("A topic is refused once the conversation has started, as a refusal not an error")
     func topicLocked() async {
         let (service, _) = makeService()
-        await service.handle(.start)
+        _ = await service.handle(.start)
         let reply = await service.handle(.setTopic("changed"))
         guard case .refused(let reason) = reply else {
             Issue.record("expected a refusal, not \(reply)")
@@ -202,7 +202,7 @@ struct EngineServiceTests {
     @Test("The mode is refused once the conversation has started")
     func modeLocked() async {
         let (service, _) = makeService()
-        await service.handle(.start)
+        _ = await service.handle(.start)
         let reply = await service.handle(.setMode(.research))
         guard case .refused(let reason) = reply else {
             Issue.record("expected a refusal")
@@ -213,7 +213,7 @@ struct EngineServiceTests {
 
     @Test("The research budget is set from the service")
     func researchBudget() async {
-        let (service, engine) = makeService()
+        let (service, _) = makeService()
         _ = await service.handle(.setMode(.research))
         _ = await service.handle(.setResearchBudget(.deep))
         // The budget surfaces through the snapshot, which is what a front end reads.

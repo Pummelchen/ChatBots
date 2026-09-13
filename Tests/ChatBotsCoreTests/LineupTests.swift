@@ -138,9 +138,11 @@ struct LineupTests {
     }
 
     @Test("Applying a line-up sets the seats and says what it did")
-    func applyingALineup() async {
+    func applyingALineup() async throws {
         let (service, engine) = lineupService()
-        let roster = try? #require(RosterLibrary.roster(id: "methods-panel", mode: .research))
+        // `try #require` rather than `try?`: swallowing the failure into an empty list made the
+        // seat comparison below pass vacuously on a missing line-up.
+        let roster = try #require(RosterLibrary.roster(id: "methods-panel", mode: .research))
 
         // The engine is in entertainment by default, so switch it first — a line-up is offered
         // per mode and only resolves in its own.
@@ -148,7 +150,7 @@ struct LineupTests {
         let reply = await service.handle(.applyRoster(id: "methods-panel", seed: 1))
 
         #expect(reply.snapshot != nil)
-        let expected = roster?.personaIDs ?? []
+        let expected = roster.personaIDs
         #expect(Array(engine.specs.prefix(expected.count)).map(\.personaID) == expected)
         #expect(engine.notices.contains { $0.contains("Line-up") })
     }
@@ -230,21 +232,23 @@ struct ScenarioTests {
     }
 
     @Test("Applying a scenario sets the question, the mode and the panel together")
-    func applyingAScenario() async {
+    func applyingAScenario() async throws {
         let (service, engine) = lineupService()
-        let scenario = try? #require(ScenarioLibrary.scenario(id: "four-day-week"))
+        // `try #require` rather than `try?`: the scenario is what the assertions below compare
+        // against, so failing to find it must fail the test rather than skip every check.
+        let scenario = try #require(ScenarioLibrary.scenario(id: "four-day-week"))
 
         let reply = await service.handle(.applyScenario(id: "four-day-week"))
         #expect(reply.snapshot != nil)
-        #expect(engine.topic == scenario?.topic)
+        #expect(engine.topic == scenario.topic)
         #expect(engine.specs.first?.mode == .research)
-        if let rosterID = scenario?.rosterID,
+        if let rosterID = scenario.rosterID,
             let roster = RosterLibrary.roster(id: rosterID, mode: .research)
         {
             #expect(Array(engine.specs.prefix(roster.count)).map(\.personaID) == roster.personaIDs)
         }
         // The budget travels with the scenario, or a "deep" question runs on a quick budget.
-        if let depth = scenario?.depth {
+        if let depth = scenario.depth {
             #expect(engine.researchStatus()?.depth == depth.label)
         }
     }

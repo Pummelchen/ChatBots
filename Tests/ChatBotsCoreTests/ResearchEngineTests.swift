@@ -177,12 +177,14 @@ struct ResearchEngineTests {
         engine.start(topic: "A question")
         await engine.waitUntilFinished()
 
-        let moderator = await stubs.first { $0.spec.personaID == AnalystLibrary.moderatorID }
+        // `spec` is `nonisolated let`, so finding the stub is synchronous; only reading its
+        // recorded `prompts` crosses into the actor.
+        let moderator = stubs.first { $0.spec.personaID == AnalystLibrary.moderatorID }
         let prompts = await moderator?.prompts ?? []
         #expect(prompts.contains { $0.contains("your job now is to write the report") })
         #expect(prompts.contains { $0.contains("not adding to it") })
         // And the analysts were never asked to write it.
-        let analyst = await stubs.first { $0.spec.personaID == "economist" }
+        let analyst = stubs.first { $0.spec.personaID == "economist" }
         let analystPrompts = await analyst?.prompts ?? []
         #expect(!analystPrompts.contains { $0.contains("your job now is to write the report") })
     }

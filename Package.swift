@@ -8,6 +8,28 @@
 
 import PackageDescription
 
+// The build settings every target this package owns is compiled with.
+//
+// * Swift 6 language mode, stated rather than inferred from the tools version. The engine is
+//   actor-isolated throughout, so this describes the code rather than aspiring to it — and it
+//   is what makes the compiler check that claim.
+// * Warnings are errors. The baseline is zero compiler warnings in both the products and the
+//   test target, so a new warning is a regression and the build should say so. This is the
+//   gate AUDIT task A03 was opened to add: without it a fresh warning is invisible.
+//
+// `treatAllWarnings(as: .error)` rather than `.unsafeFlags(["-warnings-as-errors"])`. Both
+// reach swiftc with the same flag, but this is the documented SwiftPM setting, it applies to
+// exactly the targets it is attached to — so a warning inside a dependency cannot fail this
+// build — and it does not mark the package with `unsafeFlags`. `unsafeFlags` is legal for a
+// root application package that is never consumed as a dependency (which is the caveat the
+// SwiftPM manual attaches to it), but it is unnecessary here. Either way the flag lives in the
+// manifest, so no build command can bypass it: `swift build`, `swift build --build-tests`,
+// `swift test` and Xcode all get it.
+let ownedTargetSettings: [SwiftSetting] = [
+    .swiftLanguageMode(.v6),
+    .treatAllWarnings(as: .error),
+]
+
 let package = Package(
     name: "ChatBots",
     platforms: [
@@ -63,10 +85,7 @@ let package = Package(
                 .product(name: "WebTransport", package: "WebTransport"),
             ],
             path: "Sources/ChatBotsCore",
-            // Swift 6 language mode, stated rather than inferred from the tools version. The
-            // engine is actor-isolated throughout, so this describes the code rather than
-            // aspiring to it — and it is what makes the compiler check that claim.
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            swiftSettings: ownedTargetSettings
         ),
 
         // MARK: - GUI
@@ -79,10 +98,7 @@ let package = Package(
             // panel). The bundle's actual icon is the .icns, installed by
             // tools/make-app.sh as CFBundleIconFile.
             resources: [.copy("Resources/AppIcon-1024.png")],
-            // Swift 6 language mode, stated rather than inferred from the tools version. The
-            // engine is actor-isolated throughout, so this describes the code rather than
-            // aspiring to it — and it is what makes the compiler check that claim.
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            swiftSettings: ownedTargetSettings
         ),
 
         // MARK: - Headless verification
@@ -91,10 +107,7 @@ let package = Package(
             name: "ChatBotsCLI",
             dependencies: ["ChatBotsCore"],
             path: "Sources/ChatBotsCLI",
-            // Swift 6 language mode, stated rather than inferred from the tools version. The
-            // engine is actor-isolated throughout, so this describes the code rather than
-            // aspiring to it — and it is what makes the compiler check that claim.
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            swiftSettings: ownedTargetSettings
         ),
 
         // The app's own client, runnable from a terminal. The desktop app is a poor instrument
@@ -104,7 +117,7 @@ let package = Package(
             name: "ChatBotsProbe",
             dependencies: ["ChatBotsCore"],
             path: "Sources/ChatBotsProbe",
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            swiftSettings: ownedTargetSettings
         ),
 
         // MARK: - Tests
@@ -113,10 +126,7 @@ let package = Package(
             name: "ChatBotsCoreTests",
             dependencies: ["ChatBotsCore"],
             path: "Tests/ChatBotsCoreTests",
-            // Swift 6 language mode, stated rather than inferred from the tools version. The
-            // engine is actor-isolated throughout, so this describes the code rather than
-            // aspiring to it — and it is what makes the compiler check that claim.
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            swiftSettings: ownedTargetSettings
         ),
     ]
 )

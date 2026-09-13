@@ -17,9 +17,8 @@ struct ResponsesRequestTests {
         var spec = AgentSpec.seat(index: 0)
         spec.thinking = thinking
         spec.maxTokens = maxTokens
-        let endpoint = OpenAIEndpoint(
-            baseURL: "https://api.deepseek.com/v1", model: "deepseek-v4-pro")
-        let client = OpenAIResponsesClient(endpoint: endpoint)
+        // The endpoint and client are the caller's: this helper only builds the request body,
+        // so constructing a client here would be dead work (it was, and warned about it).
         return OpenAIResponsesClient.Request(
             instructions: "You are Agent 1.",
             input: "Say ready",
