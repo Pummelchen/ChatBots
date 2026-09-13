@@ -107,6 +107,22 @@ def wait_for_server(timeout: float = 90) -> bool:
     return False
 
 
+def run_directory() -> pathlib.Path:
+    """This tool's runtime directory, created if it is not there yet.
+
+    `.run/` is gitignored, so it does not exist on a fresh checkout, and this tool writes its
+    engine log into it before Caddy writes its config. `RunDirectory.swift` decides the same
+    question for the app and the engine — one answer, shared — and this mirrors the invariant
+    that matters here rather than its whole policy: one place decides where runtime state
+    lives. The application-support fallback is deliberately not mirrored, because unlike the
+    installed app this tool builds and serves the checkout it lives in, so its log belongs
+    beside that checkout's other state. The start scripts spell this `mkdir -p "$ROOT/.run"`.
+    """
+    directory = ROOT / ".run"
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
 def start_servers() -> subprocess.Popen[bytes] | None:
     """Start the engine, and Caddy if it is present. Returns the engine process."""
     if server_is_up():
@@ -126,7 +142,7 @@ def start_servers() -> subprocess.Popen[bytes] | None:
 
     # The engine's stderr is kept: the client reports what it measured about its own layout,
     # and that report is how alignment is actually verified rather than eyeballed.
-    log = (ROOT / ".run" / "capture-engine.log").open("w")
+    log = (run_directory() / "capture-engine.log").open("w")
     engine = subprocess.Popen(
         [
             str(binary),
@@ -151,8 +167,7 @@ def start_servers() -> subprocess.Popen[bytes] | None:
 def caddy_process() -> subprocess.Popen[bytes] | None:
     if not shutil.which("caddy"):
         return None
-    config = ROOT / ".run" / "Caddyfile.capture"
-    config.parent.mkdir(exist_ok=True)
+    config = run_directory() / "Caddyfile.capture"
     config.write_text(
         (ROOT / "Caddyfile")
         .read_text()
