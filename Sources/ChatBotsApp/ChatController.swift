@@ -61,6 +61,11 @@ public final class AgentPaneState: ObservableObject, Identifiable {
 
     func beginTurn() {
         isGenerating = true
+        // A new turn replaces the previous one's display, so any "wait for the tail to finish
+        // appearing" state from that turn is over. Without this, a turn that started before the
+        // previous turn's pacer had drained would be ended by `reveal` on its first tick, which
+        // is reachable now that a turn's end is observed rather than never reported at all.
+        isAwaitingDisplayClear = false
         liveText = ""
         liveBlocks = []
         liveReasoning = ""
@@ -408,12 +413,31 @@ public final class ChatController: ObservableObject {
             if let backend = AgentSpec.Backend(rawValue: seat.backend) {
                 pane.spec.backend = backend
             }
-            // Statistics arrive with the live view, and are kept until the next turn starts.
-            if let stats = snapshot.live.first(where: { $0.seatID == seat.id })?.stats {
-                pane.lastStats = stats
-                if let activity = snapshot.live.first(where: { $0.seatID == seat.id })?.activity {
-                    pane.activity = activity
+            // The live view is the authority for whether this seat is still producing.
+            //
+            // The event feed carries only four fragment kinds — token, reasoning, tool and
+            // started — and none of them says a turn has ended. `live[].isGenerating` does, and
+            // it is the engine's own record of the same events (`record(_:)` in
+            // `ConversationEngine`), so it is read here rather than inferred from a fragment
+            // that never arrives. That is what clears the stuck "generating…" state after the
+            // last turn, what tells a client that connects mid-turn that the seat is busy, and
+            // what covers a failed turn, which no fragment expresses either.
+            //
+            // Edge-triggered deliberately: `beginTurn` clears the visible answer, so it must
+            // fire once per turn rather than once per snapshot, and a snapshot that agrees with
+            // the pane must change nothing.
+            if let live = snapshot.live.first(where: { $0.seatID == seat.id }) {
+                if live.isGenerating, !pane.isGenerating {
+                    pane.beginTurn()
+                } else if !live.isGenerating, pane.isGenerating {
+                    pane.finishGenerating()
                 }
+                // The tool log and the statistics arrive by the same route. Reading them only
+                // when `stats` was present is what left the tool log permanently empty, since
+                // the `.toolResult` branch in `apply(_:)` is unreachable from this transport.
+                pane.toolLog = live.toolLog
+                if let stats = live.stats { pane.lastStats = stats }
+                if let activity = live.activity { pane.activity = activity }
             }
             // The client cannot see whether weights are loaded, only whether anything is
             // being produced. `ready` is the honest description of "the engine is answering".
@@ -472,13 +496,6 @@ public final class ChatController: ObservableObject {
             // CJK is shortened without being cut mid-character.
             pending[agentID, default: Delta()].activity = "\(name)(\(UTF8Text.prefix(query, 48)))"
 
-        case .toolResult(let agentID, let name, let summary, _):
-            pending[agentID, default: Delta()].activity = "reading results…"
-            pane(agentID)?.toolLog.append("\(name) → \(summary)")
-
-        case .toolFailure(let agentID, let name, let message):
-            pane(agentID)?.toolLog.append("\(name) failed: \(message)")
-
         case .turnStarted(let agentID, _):
             flush()  // the previous turn's tail must land before its row is cleared
             threadScrollSignal += 1
@@ -493,19 +510,18 @@ public final class ChatController: ObservableObject {
                 }
             }
 
-        case .turnFinished(let agentID, _, let stats):
-            flush()
-            threadScrollSignal += 1
-            if let pane = pane(agentID) {
-                pane.lastStats = stats
-                // Keep the live text on screen until the pacer has revealed all of it.
-                pane.finishGenerating()
-                if !isDisplaying(agentID: pane.id) { pane.endTurn() }
-            }
-
-        case .turnFailed(_, let message):
-            flush()
-            errorBanner = message
+        // A turn's end, its tool results and its failure are deliberately *not* handled here.
+        //
+        // The protocol forwards four fragment kinds — `token`, `reasoning`, `tool` and
+        // `started` — so these cases are unreachable from `apply(_ delta:)`. They are read
+        // instead from the snapshot's `live` view in `apply(_ snapshot)`: `isGenerating` ends
+        // the turn, `toolLog` carries the tool results and failures, and `activity` carries the
+        // engine's own note of a failed turn. Spelled out rather than left to `default: break`
+        // so the decision is visible and so a future fragment added to the protocol has to be
+        // considered here. A dedicated per-turn error banner is not available over this
+        // transport; the failure is still shown, in `notices`, which the snapshot carries.
+        case .turnFinished, .toolResult, .toolFailure, .turnFailed:
+            break
         }
     }
 
