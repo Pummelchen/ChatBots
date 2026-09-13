@@ -232,6 +232,10 @@ public final class ConversationEngine {
     private var reportedContextWindows: [String: Int] = [:]
     /// Turns that have begun generating (unlike `turnsCompleted`, counts the current one).
     public private(set) var startedTurns = 0
+    /// Billed web calls made during the turn currently in flight, counted at the tool-call
+    /// callback. Reset at the start of each turn and read when the turn finishes, so the search
+    /// budget is charged for what was spent rather than inferred from the transcript (A73).
+    private var toolCallsThisTurn = 0
     private var generationTask: Task<Void, Never>?
     /// Which loop `generationTask` belongs to.
     ///
@@ -870,7 +874,20 @@ public final class ConversationEngine {
         startedTurns += 1
         publishEvent(.turnStarted(agentID: seat.spec.id, prompt: prompt))
 
-        let tools: [any ToolProvider] = seat.spec.webSearchEnabled ? WebToolbox.tools : []
+        // Web tools are offered only while the session has search budget left, so once the
+        // ceiling is reached a turn cannot start another billed call. The count of what a turn
+        // actually spent is taken from the tool-call callback below, not guessed from the
+        // transcript: the old sequence-window heuristic counted a multi-call turn as one (so
+        // the budget could be run past arbitrarily) and credited a seat a search it had not
+        // made from its own previous turn (so `.searchesReached` could fire early and change
+        // the report's stop reason) — audit A73.
+        toolCallsThisTurn = 0
+        let budgetRemaining = conversation.research.map {
+            max(0, $0.budget.maxSearches - $0.searches)
+        }
+        let tools: [any ToolProvider] =
+            seat.spec.webSearchEnabled && (budgetRemaining == nil || budgetRemaining! > 0)
+            ? WebToolbox.tools : []
         let engine = seat.engine
         let agentID = seat.spec.id
 
@@ -879,8 +896,7 @@ public final class ConversationEngine {
                 messages: prompt,
                 tools: tools,
                 onToolCall: { [weak self] name, argument in
-                    await self?.publishEvent(
-                        .toolCall(agentID: agentID, name: name, query: argument))
+                    await self?.noteToolCall(agentID: agentID, name: name, argument: argument)
                 },
                 onEvent: { [weak self] event in
                     // `handle` is the one that publishes: every branch below ends in
@@ -901,6 +917,17 @@ public final class ConversationEngine {
             note("\(agentID) error: \(error.localizedDescription)")
             publishEvent(.turnFailed(agentID: agentID, message: error.localizedDescription))
         }
+    }
+
+    /// Record one web tool call, for the budget and the live pane.
+    ///
+    /// The engine calls this once per tool call it is about to dispatch, which is the only place
+    /// the real number is available: the transcript has a `.tool` turn per result, but a turn's
+    /// results are not all in it until the turn ends, and inferring a count from sequences
+    /// credited calls that were never made (A73).
+    private func noteToolCall(agentID: String, name: String, argument: String) {
+        toolCallsThisTurn += 1
+        publishEvent(.toolCall(agentID: agentID, name: name, query: argument))
     }
 
     /// Fold an engine event into the shared log, then forward it to the UI.
@@ -939,11 +966,11 @@ public final class ConversationEngine {
                     let added = ConflictReader.signals(
                         in: clean, from: id, others: seats.map(\.spec.id), addressing: nil
                     ).contains { $0.kind == .newEvidence || $0.kind == .positionChange }
-                    let searchesThisTurn = conversation.turns.last {
-                        $0.kind == .tool && $0.speakerID == id && $0.sequence > sequence - 4
-                    } != nil ? 1 : 0
+                    // What this turn actually spent, counted at the tool call. The old
+                    // sequence-window guess counted a multi-call turn as one and could charge a
+                    // seat for its own previous turn's search (A73).
                     conversation.research?.record(
-                        searchCount: searchesThisTurn, addedSomething: added)
+                        searchCount: toolCallsThisTurn, addedSomething: added)
                 }
                 if speakerMode == .entertainment {
                     let everyone = seats.map(\.spec.id)
