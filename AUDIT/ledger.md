@@ -26,17 +26,15 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 122 |
-| DONE | 117 |
-| START | 5 |
+| DONE | 119 |
+| START | 3 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 5
+### Open — 3
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
-| A102 | S2 | START | — | test infrastructure | One full-suite run aborted with a Network.framework fatal error, reduced but not fixed by A40's single-close |
-| A108 | S2 | START | — | test infrastructure | Two pre-existing sources of full-suite flakiness, both reproducing with the newest suites excluded |
 | A119 | S3 | START | — | web front end / engine API | The page POSTs a layout diagnostic to /api/client-report, a route that has never existed in any commit, and the 404 is swallowed by design |
 | A77 | S2 | START | — | distribution / licensing | The shipped app redistributes ~14 third-party libraries with no licence notices or attribution |
 | A99 | S2 | START | — | web surface / routing | Kept-conversation share links 404 in the documented deployment, because Caddy proxies only /api/* and the engine serves /s/<id> |
@@ -57,13 +55,13 @@ been run.
 | A10 | S3 | DONE | f6dc8c2 | tooling | shellcheck -S style reports 4 findings, and the recorded count was wrong twice before it was right |
 | A100 | S2 | DONE | 9cb2007 | transport client | The reader uses the REQUEST timeout as its idle receive timeout, so a stream quiet for longer than that fails the connection |
 | A101 | S2 | DONE | de2762d | attachments | BMP and TIFF are accepted and sent as media types the Responses API does not document, the mirror of A52 |
-| A102 | S2 | START | — | test infrastructure | One full-suite run aborted with a Network.framework fatal error, reduced but not fixed by A40's single-close |
+| A102 | S2 | DONE | 1c22615 | test infrastructure | One full-suite run aborted with a Network.framework fatal error, reduced but not fixed by A40's single-close |
 | A103 | S2 | DONE | 482e036 | prompt trust boundary | Attachment document text is still promoted into the system role, so a crafted document can inject instruction into every seat's prompt |
 | A104 | S2 | DONE | f2ca64d | tool dispatch | Tool dispatch runs the injected registry rather than the tool set the caller passed, so disabling a tool does not prevent it running |
 | A105 | S3 | DONE | 791d2ee | research quality | A95's directed-engagement path identifies the moderator's assignment by an exact phrase, so rewording the assignment silently disables it |
 | A106 | S3 | DONE | 37a7849 | key handling | A user-typed key is still taken verbatim, so a pasted key with a trailing newline suppresses the missing-key warning |
 | A107 | S3 | DONE | 597f30d | inference client | A failed or incomplete response does not end the read loop, so the turn waits out the request timeout |
-| A108 | S2 | START | — | test infrastructure | Two pre-existing sources of full-suite flakiness, both reproducing with the newest suites excluded |
+| A108 | S2 | DONE | 836fe7e | test infrastructure | Two pre-existing sources of full-suite flakiness, both reproducing with the newest suites excluded |
 | A109 | S2 | DONE | 767aef3 | audit environment / repository integrity | Dropbox renames .git/index to a conflicted copy, which git reads as an empty index and shows the whole tree as deleted |
 | A11 | S3 | DONE | 067d953 | docs | Neither the README nor the wiki states that running the website exposes the API to the LAN |
 | A110 | S2 | DONE | 81a4f4a | engine API | APISnapshot carries no revision and its only ordering field is whole-second, so a reply racing a push within one second can still regress the interface's state |
