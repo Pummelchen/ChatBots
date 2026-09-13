@@ -635,7 +635,7 @@ audit's first S0.**
 | id | sev | file:line | what | status |
 | --- | --- | --- | --- | --- |
 | A29 | **S0** | `APIServer.swift:612 -> EngineService.swift:335` | The attachment filename is used verbatim as a filesystem path: unauthenticated arbitrary file write | DONE (`208540c`) |
-| A30 | **S1** | `HTTPServer.swift:184,191` | A negative Content-Length passes both guards and is used as a slice offset, trapping the process | START |
+| A30 | **S1** | `HTTPServer.swift:184,191` | A negative Content-Length passes both guards and is used as a slice offset, trapping the process | DONE (`cbf39c7`) |
 | A31 | **S1** | `HTTPServer.swift:571` | SSE connections are never reaped, so streams and connections grow for the life of the process | START |
 | A32 | **S1** | `WebTransportServer.swift:219 and WebTransportClient.swift:278` | A frame over the protocol cap is swallowed by try?, permanently desyncing the session | START |
 | A33 | **S1** | `ConversationEngine.swift:764` | Restarting a running conversation orphans the new turn loop, so Stop and Pause become no-ops | START |
