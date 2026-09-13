@@ -1,0 +1,22 @@
+[0/2] Write swift-version--58304C5D6DBC2206.txt
+[0/1] Planning build
+[1/1] Compiling plugin CudaBuild
+[2/2] Compiling plugin GenerateManual
+[3/3] Compiling plugin GenerateDoccReference
+Building for production...
+[3/10] Write sources
+[11/17] Write swift-version--58304C5D6DBC2206.txt
+[12/16] Compiling WebTransportSecurityShim WebTransportSecurityShim.m
+[14/18] Compiling WebTransportUDPApple QUICUDPPort.swift
+[15/18] Compiling WebTransportQUICCore QUICByteCursor.swift
+[16/21] Compiling WebTransportCryptoApple QUICInitialKeyDerivation.swift
+[17/21] Compiling WebTransportTLSCore TLS13KeyAgreement.swift
+[18/21] Compiling WebTransportHTTP3Core HTTP3Connection.swift
+[19/22] Compiling WebTransportNetworkRuntime WebTransportInteroperableNetworkRuntime.swift
+[20/23] Compiling WebTransport WebTransport.swift
+[21/24] Compiling ChatBotsCore APIServer.swift
+[21/27] Write Objects.LinkFileList
+[24/27] Linking ChatBots
+[25/27] Linking chatbots-probe
+[26/27] Linking chatbots-cli
+Build complete! (39.44s)

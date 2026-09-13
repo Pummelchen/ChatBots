@@ -1,0 +1,10 @@
+
+    ○
+    │╲
+    │ ○
+    ○ ░
+    ░    gitleaks
+
+9:48AM INF 95 commits scanned.
+9:48AM INF scanned ~1960791 bytes (1.96 MB) in 856ms
+9:48AM INF no leaks found

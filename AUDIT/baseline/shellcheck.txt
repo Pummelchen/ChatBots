@@ -1,0 +1,24 @@
+
+In tools/make-app.sh line 167:
+  echo "$sign_output" | sed 's/^/      /' >&2
+  ^-- SC2001 (style): See if you can use ${variable//search/replace} instead.
+
+
+In tools/make-app.sh line 170:
+  echo "$verify_output" | sed 's/^/      /' >&2
+  ^-- SC2001 (style): See if you can use ${variable//search/replace} instead.
+
+
+In tools/start-app.sh line 29:
+PYTHON=python3
+^----^ SC2034 (warning): PYTHON appears unused. Verify use (or export if used externally).
+
+
+In tools/start.sh line 123:
+  [ "$stopped" -eq 1 ] && ok "Stopped." || dim "Nothing was running."
+                       ^-- SC2015 (info): Note that A && B || C is not if-then-else. C may run when A is true.
+
+For more information:
+  https://www.shellcheck.net/wiki/SC2034 -- PYTHON appears unused. Verify use...
+  https://www.shellcheck.net/wiki/SC2015 -- Note that A && B || C is not if-t...
+  https://www.shellcheck.net/wiki/SC2001 -- See if you can use ${variable//se...
