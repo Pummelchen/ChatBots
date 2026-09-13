@@ -26,16 +26,14 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 122 |
-| DONE | 121 |
-| START | 1 |
+| DONE | 122 |
+| START | 0 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 1
+### Open — 0
 
-| id | sev | status | commit | unit | title |
-| --- | --- | --- | --- | --- | --- |
-| A77 | S2 | START | — | distribution / licensing | The shipped app redistributes ~14 third-party libraries with no licence notices or attribution |
+Nothing is open.
 
 ### Every task — 122
 
@@ -140,7 +138,7 @@ been run.
 | A74 | S3 | DONE | 489ef41 | determinism | The director picks a conflict by Dictionary iteration order, contradicting its own determinism contract |
 | A75 | S1 | DONE | 127d3d3 | web surface / browser boundary | CORS is `Access-Control-Allow-Origin: *` and every preflight is answered, so any website the user visits can read every kept conversation and drive the engine |
 | A76 | S3 | DONE | caed9f5 | web surface / browser boundary | No CSP, no X-Frame-Options or frame-ancestors, no X-Content-Type-Options, no Referrer-Policy |
-| A77 | S2 | START | — | distribution / licensing | The shipped app redistributes ~14 third-party libraries with no licence notices or attribution |
+| A77 | S2 | DONE | 77f2d67 | distribution / licensing | The shipped app redistributes ~14 third-party libraries with no licence notices or attribution |
 | A78 | S3 | DONE | d33c6e4 | distribution / bundle metadata | `NSHumanReadableCopyright` carries a description instead of a copyright, and the bundle identifier and version are single-sourced in one script only |
 | A79 | S3 | DONE | 5928f64 | repository hygiene | Python bytecode is not ignored, so running any helper script or the CI byte-compile step leaves untracked noise |
 | A80 | S2 | DONE | 6113702 | device capture tool | A capture that renders no messages still only prints, so an empty capture is published on a green run |
