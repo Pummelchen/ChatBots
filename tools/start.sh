@@ -91,13 +91,32 @@ port_busy() {
   lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1
 }
 
+is_our_process() {
+  # Ownership is decided from the whole command line, never from the bare name. A pid file
+  # outlives the process it named and the OS can hand that number to an unrelated program, so
+  # a live pid is not on its own evidence that the process belongs to ChatBots.
+  local command
+  command="$(ps -p "$1" -o command= 2>/dev/null)" || true
+  case "$command" in
+    *chatbots*|*caddy*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 stop_all() {
   local stopped=0
   for file in "$CADDY_PID" "$ENGINE_PID"; do
     local pid
     if pid="$(pid_from "$file")"; then
-      kill -TERM "$pid" 2>/dev/null && stopped=1
-      dim "stopped pid $pid ($(basename "$file" .pid))"
+      if is_our_process "$pid"; then
+        kill -TERM "$pid" 2>/dev/null && stopped=1
+        dim "stopped pid $pid ($(basename "$file" .pid))"
+      else
+        # The pid exists but is not ours: the file is stale and the OS has reused the
+        # number. Leave the unrelated process alone and only clear the file, so the next
+        # start is not misled by it.
+        warn "pid $pid in $(basename "$file") is not a ChatBots process — not signalling it"
+      fi
       rm -f "$file"
     fi
   done
@@ -112,7 +131,7 @@ stop_all() {
       for pid in $pids; do
         # Only ever our own processes: never kill an unrelated service that happens to hold
         # the port.
-        if ps -p "$pid" -o command= 2>/dev/null | grep -qE "chatbots|caddy"; then
+        if is_our_process "$pid"; then
           kill -TERM "$pid" 2>/dev/null && stopped=1
           dim "stopped pid $pid on port $port"
         fi
