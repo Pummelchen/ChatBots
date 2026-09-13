@@ -99,5 +99,4 @@ Around 8 GB of free disk space; 16 GB of memory is comfortable.
 
 ## Licence
 
-No licence has been granted: this repository has no `LICENSE` file, so the default applies —
-all rights reserved. Ask the author if you want to reuse it.
+MIT — see [LICENSE](LICENSE).
