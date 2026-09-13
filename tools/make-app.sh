@@ -108,6 +108,19 @@ shopt -u nullglob
 #
 # The flood fill rather than a global "remove white" matters: the robots have white eyes, and
 # replacing every white pixel would hollow them out.
+# The third-party notices, which have to travel with a distributed binary: the app ships the
+# packages pinned in `Package.resolved`, so their licence terms travel with it, and Apache-2.0
+# §4(a) requires a copy of the License to accompany the work (A77). `tools/third-party-notices.py`
+# keeps the inventory in that file in step with the lockfile; this is the copy that ships.
+NOTICES="$ROOT/THIRD-PARTY-NOTICES.md"
+if [[ ! -f "$NOTICES" ]]; then
+  echo "==> THIRD-PARTY-NOTICES.md is missing" >&2
+  echo "    The app ships third-party code, so a bundle without its attribution is not shippable." >&2
+  exit 1
+fi
+cp "$NOTICES" "$APP/Contents/Resources/THIRD-PARTY-NOTICES.md"
+echo "==> Third-party notices in the bundle"
+
 ICON_MASTER="$ROOT/Sources/ChatBotsApp/Resources/AppIcon-1024.png"
 if [[ -f "$ROOT/Resources/AppIcon.icns" ]]; then
   cp "$ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"

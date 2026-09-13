@@ -58,6 +58,10 @@ jobs:
       # called the page the source of truth. Phase E checks the same invariant on the Mac.
       - name: The ledger's status tables match ledger.json
         run: bash AUDIT/render-ledger.sh --check
+      # The app ships the packages pinned in Package.resolved, so their attribution has to travel
+      # with it. Adding a dependency is a one-line manifest edit that nothing else notices (A77).
+      - name: The third-party notices cover the resolved dependencies
+        run: python3 tools/third-party-notices.py
       - name: The shell scripts parse
         run: for script in tools/*.sh AUDIT/*.sh; do bash -n "$script"; done
       - name: The helper scripts parse
