@@ -71,10 +71,26 @@ while IFS=$'\t' read -r id commit file_line unit; do
     for path in $paths; do
         # The task may name a line (`HTTPServer.swift:356`) and the commit records the file.
         base=${path%%:*}
-        if printf '%s\n' "$touched" | grep -qxF "$base"; then
-            backed="$base"
-            break
-        fi
+        case "$base" in
+            */*)
+                # A path that names a directory is matched in full, so a claim about
+                # `Sources/A.swift` cannot be satisfied by a different `Sources/B/A.swift`.
+                if printf '%s\n' "$touched" | grep -qxF "$base"; then
+                    backed="$base"
+                    break
+                fi
+                ;;
+            *)
+                # A bare basename — A14 and A17 record `HTTPServer.swift:356` — is matched
+                # against the last path component. That is looser, and it is the loosest this
+                # check should be: a task that wants to be believed should name a path.
+                pattern="^(.*/)?$(printf '%s' "$base" | sed 's/[.[\*^$]/\\&/g')$"
+                if printf '%s\n' "$touched" | grep -qE "$pattern"; then
+                    backed="…/$base"
+                    break
+                fi
+                ;;
+        esac
     done
 
     if [ -n "$backed" ]; then

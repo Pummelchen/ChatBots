@@ -64,8 +64,16 @@ passes will be appended before any fix begins, as §11 requires.
 
 ## Phase C — fix → test → audit
 
-Not started. Work order: S0, then S1, then S2, then S3. One task = one commit,
+In progress. Work order: S0, then S1, then S2, then S3. One task = one commit,
 `audit(<id>): <title>`, on `audit/2026-09-13`.
+
+A DONE status is a claim about the tree, so it is checked against the tree and not against the
+ledger: **`AUDIT/verify-done-commits.sh` must exit 0** before a fix task is called DONE. It takes
+each DONE task's own recorded source paths and fails unless that task's commit touches one of
+them — the check A19 was opened to add, after `948ea29` recorded A14 and A17 as DONE while the
+fix was still uncommitted. A DONE task naming no source path (a sanitizer baseline, a decision, a
+document) is reported as *skipped*, not as *passed*, so the gate cannot be satisfied by naming
+nothing.
 
 ## Phase D — new findings
 
@@ -75,7 +83,8 @@ Continuous; every new finding gets a ledger id the moment it is found.
 
 Not started. Requires a fresh clone on a Mac that did **not** develop the fix, clean build with
 zero warnings, full suite green, coverage report, scanners clean or waived in writing, zero
-placeholders, no non-BLOCKED open task, and the wiki tracker synced.
+placeholders, no non-BLOCKED open task, `AUDIT/verify-done-commits.sh` exit 0, and the wiki
+tracker synced.
 
 ## Git operations performed, with rollback (§0)
 

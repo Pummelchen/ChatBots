@@ -448,3 +448,11 @@ care with evidence catches that, so the remedy is mechanical.
 `git show --stat` of the repair commit lists `Sources/ChatBotsCore/HTTPServer.swift`;
 `swift test` is 557 tests in 77 suites passing; `swift test --sanitize=thread` exits 0 with no
 report.
+
+**Second pass, recorded because the first one was wrong.** The guard as first written matched a
+recorded path only in full, so it failed A14 and A17, whose records say `HTTPServer.swift:356`
+rather than the full path the commit stores. That is the guard doing its job on its own author:
+it was fixed to match a bare basename against the last path component (a path containing a
+directory is still matched in full, so `Sources/A.swift` cannot be satisfied by
+`Sources/B/A.swift`). It now exits 0 — `backed 3 · skipped 2 · unbacked 0` — and
+`shellcheck -S style` is clean on it.
