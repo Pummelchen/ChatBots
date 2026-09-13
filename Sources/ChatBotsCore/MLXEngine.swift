@@ -31,6 +31,56 @@ public enum EngineState: Sendable, Equatable {
     }
 }
 
+/// Sampling and budget for one generation turn, resolved in a single place.
+///
+/// The bug this closes (A42) was a `compact` that built an overridden spec and handed it to
+/// a `generate` which re-read the seat's own `spec`, so the digest ran with the seat's full
+/// answer cap and live thinking level and the override was silently dead. Every setting the
+/// model is configured with now comes through here, and `generateExclusively` reads nothing
+/// else, so an override cannot be dropped on the floor again.
+public struct TurnSettings: Sendable, Equatable {
+    public var agentID: String
+    public var modelID: String
+    public var displayName: String
+    public var answerBudget: Int
+    public var thinking: ThinkingMode
+    public var temperature: Double
+    public var topP: Double
+    public var topK: Int
+    public var minP: Double
+    public var presencePenalty: Double?
+    public var repetitionPenalty: Double?
+    public var seed: UInt64
+    /// The model's context window, once it is known. Only `.unlimited` uses it, to size its
+    /// headroom without asking MLX for an infinite cap.
+    public var contextWindow: Int?
+
+    public init(spec: AgentSpec, thinking: ThinkingMode, contextWindow: Int?) {
+        self.agentID = spec.id
+        self.modelID = spec.modelID
+        self.displayName = spec.displayName
+        self.answerBudget = spec.maxTokens
+        self.thinking = thinking
+        self.temperature = spec.temperature
+        self.topP = spec.topP
+        self.topK = spec.topK
+        self.minP = spec.minP
+        self.presencePenalty = spec.presencePenalty
+        self.repetitionPenalty = spec.repetitionPenalty
+        self.seed = spec.samplingSeed
+        self.contextWindow = contextWindow
+    }
+
+    /// Total tokens the model may emit: the answer budget plus reasoning headroom.
+    public var generationCap: Int {
+        MLXEngine.generationCap(
+            answerBudget: answerBudget, thinking: thinking, contextWindow: contextWindow)
+    }
+
+    /// How this turn's thinking level is expressed to the chat template.
+    public var templateContext: [String: any Sendable] { thinking.templateContext }
+}
+
 public actor MLXEngine: LLMEngine {
 
     public let spec: AgentSpec
@@ -125,20 +175,36 @@ public actor MLXEngine: LLMEngine {
     /// Condense a transcript. Runs as an ordinary turn with no tools, so the seat's own
     /// sampling and persona apply — which is what makes the digest read like that seat's
     /// understanding of the discussion rather than a generic extract.
+    ///
+    /// The turn's budget is the digest's own, not the seat's: `compactSummaryTokens` and
+    /// thinking off reach the model through `compactTurnSettings`, which is the value
+    /// `generate` is given.
     public func compact(prompt: String, maxTokens: Int) async throws -> String {
-        var spec = self.spec
-        spec.maxTokens = maxTokens
-        spec.thinking = .off  // summarising is not the place for deliberation
+        let settings = Self.compactTurnSettings(
+            seat: spec, maxTokens: maxTokens, contextWindow: loadedContextWindow)
         let summary = try await generate(
             messages: [
                 .init(role: .system, content: "You condense discussions faithfully and add nothing."),
                 .init(role: .user, content: prompt),
             ],
             tools: [],
+            settings: settings,
             onToolCall: { _, _ in },
             onEvent: { _ in }
         )
         return summary.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The turn `compact` must run: the digest's own small answer cap — never the seat's
+    /// 32 768-token one — and thinking off, because summarising is not the place for
+    /// deliberation.
+    public static func compactTurnSettings(
+        seat: AgentSpec, maxTokens: Int, contextWindow: Int?
+    ) -> TurnSettings {
+        var overridden = seat
+        overridden.maxTokens = max(1, maxTokens)
+        overridden.thinking = .off
+        return TurnSettings(spec: overridden, thinking: .off, contextWindow: contextWindow)
     }
 
     // MARK: - Loading
@@ -304,7 +370,32 @@ public actor MLXEngine: LLMEngine {
         onToolCall: @escaping @Sendable (String, String) async -> Void,
         onEvent: @escaping @Sendable (TurnEvent) async -> Void
     ) async throws -> String {
+        try await generate(
+            messages: messages,
+            tools: tools,
+            settings: TurnSettings(
+                spec: spec, thinking: currentThinking, contextWindow: loadedContextWindow),
+            onToolCall: onToolCall,
+            onEvent: onEvent)
+    }
+
+    /// `generate` with an explicit turn configuration.
+    ///
+    /// `compact` goes through here so it can run on its own budget and thinking level;
+    /// every other caller goes through the public `generate`, which keeps the seat's live
+    /// configuration.
+    private func generate(
+        messages: [PromptMessage],
+        tools: [any ToolProvider],
+        settings: TurnSettings,
+        onToolCall: @escaping @Sendable (String, String) async -> Void,
+        onEvent: @escaping @Sendable (TurnEvent) async -> Void
+    ) async throws -> String {
         try await load()
+
+        // Resolved after loading, when the model's real context window is known.
+        var settings = settings
+        settings.contextWindow = loadedContextWindow
 
         // Held across the whole turn, not just the model call: the token stream keeps
         // evaluating on the GPU as it is consumed, so the slot must not be handed on
@@ -313,7 +404,8 @@ public actor MLXEngine: LLMEngine {
         await MLXGate.shared.acquire()
         do {
             let text = try await generateExclusively(
-                messages: messages, tools: tools, onToolCall: onToolCall, onEvent: onEvent)
+                messages: messages, tools: tools, settings: settings,
+                onToolCall: onToolCall, onEvent: onEvent)
             await MLXGate.shared.release()
             return text
         } catch {
@@ -326,18 +418,18 @@ public actor MLXEngine: LLMEngine {
     private func generateExclusively(
         messages: [PromptMessage],
         tools: [any ToolProvider],
+        settings: TurnSettings,
         onToolCall: @escaping @Sendable (String, String) async -> Void,
         onEvent: @escaping @Sendable (TurnEvent) async -> Void
     ) async throws -> String {
         guard let container else { throw ChatBotsError.engineNotLoaded }
         try Task.checkCancellation()
 
-        let spec = self.spec
-        let agentID = spec.id
-        let thinking = currentThinking
+        let agentID = settings.agentID
+        let thinking = settings.thinking
         let reasoningCeiling = thinking.reasoningTokenBudget
         /// Answer budget plus whatever this thinking level allows for reasoning.
-        let generationCap = spec.maxTokens + (reasoningCeiling ?? 0)
+        let generationCap = settings.generationCap
         // Copy the callbacks into locals: the tool-dispatch closure outlives this
         // scope, so it cannot capture the non-escaping parameters directly.
         let reportToolCall = onToolCall
@@ -350,23 +442,23 @@ public actor MLXEngine: LLMEngine {
         let toolRegistry = self.toolRegistry
 
         // The cap is the answer budget plus whatever the thinking mode allows for
-        // reasoning. Sampling mirrors the seat's spec exactly.
+        // reasoning. Sampling mirrors the turn's settings exactly.
         var mutableParameters = GenerateParameters(
             maxTokens: generationCap,
-            temperature: Float(spec.temperature),
-            topP: Float(spec.topP),
-            topK: spec.topK,
-            minP: Float(spec.minP),
-            seed: spec.samplingSeed
+            temperature: Float(settings.temperature),
+            topP: Float(settings.topP),
+            topK: settings.topK,
+            minP: Float(settings.minP),
+            seed: settings.seed
         )
         // Both penalties are optional in the spec; `nil` leaves MLX's default (off).
         // Note MLX *subtracts* `presencePenalty`, so the spec stores it already signed.
-        mutableParameters.presencePenalty = spec.presencePenalty.map(Float.init)
+        mutableParameters.presencePenalty = settings.presencePenalty.map(Float.init)
         mutableParameters.presenceContextSize = 256
-        mutableParameters.repetitionPenalty = spec.repetitionPenalty.map(Float.init)
+        mutableParameters.repetitionPenalty = settings.repetitionPenalty.map(Float.init)
         mutableParameters.repetitionContextSize = 256
         let parameters = mutableParameters
-        let additionalContext = thinking.templateContext
+        let additionalContext = settings.templateContext
 
         /// A conversation entry we can send across isolation. Tool metadata is kept
         /// alongside because `Chat.Message` itself is not `Sendable`.
@@ -577,7 +669,7 @@ public actor MLXEngine: LLMEngine {
                     "[ChatBots] \(agentID) stripped \(scrubbed.removedLines) line(s) of fabricated tool syntax from the answer\n"
                         .utf8))
         }
-        let final = Self.clean(scrubbed.text, spec: spec)
+        let final = Self.clean(scrubbed.text, settings: settings)
         if stats.generationTokens == 0 {
             stats.seconds = Date.now.timeIntervalSince(started)
         }
@@ -616,28 +708,45 @@ public actor MLXEngine: LLMEngine {
         }
 
         await onEvent(.turnFinished(agentID: agentID, text: final, stats: stats))
-        logConfigurationOnce(container: container, spec: spec)
+        logConfigurationOnce(container: container, settings: settings)
         return final
     }
 
-    private func logConfigurationOnce(container: ModelContainer, spec: AgentSpec) {
+    private func logConfigurationOnce(container: ModelContainer, settings: TurnSettings) {
         guard !didLogConfiguration else { return }
         didLogConfiguration = true
         let context = loadedContextWindow
         let sampler = String(
             format: "temp=%.2f topP=%.2f topK=%d minP=%.2f presence=%@ repetition=%@ maxOut=%d",
-            spec.temperature, spec.topP, spec.topK, spec.minP,
-            spec.presencePenalty.map { String(format: "%.2f", $0) } ?? "off",
-            spec.repetitionPenalty.map { String(format: "%.2f", $0) } ?? "off",
-            spec.generationCap)
+            settings.temperature, settings.topP, settings.topK, settings.minP,
+            settings.presencePenalty.map { String(format: "%.2f", $0) } ?? "off",
+            settings.repetitionPenalty.map { String(format: "%.2f", $0) } ?? "off",
+            settings.generationCap)
         FileHandle.standardError.write(
             Data(
-                "[ChatBots] \(spec.id) \(spec.modelID) ready — context \(context) tok, thinking \(currentThinking.rawValue)\n[ChatBots] \(spec.id) sampler: \(sampler)\n"
+                "[ChatBots] \(settings.agentID) \(settings.modelID) ready — context \(context) tok, thinking \(settings.thinking.rawValue)\n[ChatBots] \(settings.agentID) sampler: \(sampler)\n"
                     .utf8)
         )
     }
 
     // MARK: - Helpers
+
+    /// The hard `maxTokens` for one turn.
+    ///
+    /// A bounded mode adds its reasoning ceiling to the answer budget. `.unlimited` has no
+    /// ceiling, but MLX needs a finite cap, so it is given the model's whole context window as
+    /// headroom — and never less than `.high`, so choosing a higher level can never reduce the
+    /// budget. The old arithmetic, `maxTokens + (nil ?? 0)`, gave unlimited *less* than high.
+    public static func generationCap(
+        answerBudget: Int, thinking: ThinkingMode, contextWindow: Int?
+    ) -> Int {
+        if let ceiling = thinking.reasoningTokenBudget {
+            return answerBudget + ceiling
+        }
+        let highHeadroom = ThinkingMode.high.reasoningTokenBudget ?? 0
+        guard let contextWindow, contextWindow > 0 else { return answerBudget + highHeadroom }
+        return answerBudget + max(highHeadroom, contextWindow)
+    }
 
     /// Text that closes a reasoning block the model would have kept writing.
     ///
@@ -673,13 +782,13 @@ public actor MLXEngine: LLMEngine {
     }
 
     /// Drop a stray delimiter or an echoed speaker tag the model may have emitted.
-    private static func clean(_ text: String, spec: AgentSpec) -> String {
+    private static func clean(_ text: String, settings: TurnSettings) -> String {
         var output = text.trimmingCharacters(in: .whitespacesAndNewlines)
         for marker in ["<think>", "</think>"] where output.hasPrefix(marker) {
             output.removeFirst(marker.count)
             output = output.trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        for prefix in ["[\(spec.id)]", "\(spec.id):", "\(spec.displayName):"]
+        for prefix in ["[\(settings.agentID)]", "\(settings.agentID):", "\(settings.displayName):"]
         where output.hasPrefix(prefix) {
             output.removeFirst(prefix.count)
             output = output.trimmingCharacters(in: .whitespacesAndNewlines)
