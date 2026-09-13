@@ -13,9 +13,23 @@ CONFIG="${CONFIG:-release}"
 APP="$ROOT/dist/ChatBots.app"
 
 echo "==> Building ($CONFIG)"
-swift build -c "$CONFIG" --product ChatBots
+# All three products, not only the app. The bundle carries the engine and the transport probe,
+# and a bundle without them is broken in a way the user finds at launch: the window opens, says
+# it cannot reach its engine, and nothing else works.
+#
+# This used to build the app alone and then copy the other two *if they happened to be present*,
+# warning otherwise. On a clean checkout they never are, so `tools/make-app.sh` on its own — and
+# `tools/install.sh` with it — produced exactly that broken bundle. The copies below fail loudly
+# instead.
+#
+# One invocation per product on purpose: `swift build` takes a single `--product`, and passing
+# several silently builds only the last one. That is what produced a bundle containing the probe
+# and not the engine while writing this fix.
+for product in ChatBots chatbots-cli chatbots-probe; do
+  swift build -c "$CONFIG" --product "$product"
+done
 
-BIN="$(swift build -c "$CONFIG" --product ChatBots --show-bin-path)"
+BIN="$(swift build -c "$CONFIG" --show-bin-path)"
 
 echo "==> Assembling $APP"
 rm -rf "$APP"
@@ -29,20 +43,23 @@ cp "$BIN/ChatBots" "$APP/Contents/MacOS/ChatBots"
 #
 # It sits in MacOS/ rather than Resources/ because it is an executable. The app finds it by
 # looking beside its own binary, which is where this puts it.
-if [ -x "$BIN/chatbots-cli" ]; then
-  cp "$BIN/chatbots-cli" "$APP/Contents/MacOS/chatbots-cli"
-else
-  echo "    ! chatbots-cli was not built; the app will not be able to start an engine" >&2
-  echo "      Build it with: swift build -c $CONFIG --product chatbots-cli" >&2
+if [ ! -x "$BIN/chatbots-cli" ]; then
+  echo "error: chatbots-cli was not built, so the bundle could not start an engine." >&2
+  echo "       try: swift build -c $CONFIG --product chatbots-cli" >&2
+  exit 1
 fi
+cp "$BIN/chatbots-cli" "$APP/Contents/MacOS/chatbots-cli"
 
 # The app's own transport client, runnable from a terminal. It travels with the app so the
 # diagnostic the troubleshooting notes tell you to run exists on a machine that installed a
 # bundle rather than a checkout — which is exactly the machine that needs it. It is the same
 # client the app uses, so what it reports is what the app sees.
-if [ -x "$BIN/chatbots-probe" ]; then
-  cp "$BIN/chatbots-probe" "$APP/Contents/MacOS/chatbots-probe"
+if [ ! -x "$BIN/chatbots-probe" ]; then
+  echo "error: chatbots-probe was not built, so the bundle has no transport diagnostic." >&2
+  echo "       try: swift build -c $CONFIG --product chatbots-probe" >&2
+  exit 1
 fi
+cp "$BIN/chatbots-probe" "$APP/Contents/MacOS/chatbots-probe"
 
 # swift-transformers and swift-crypto ship resources as SwiftPM bundles next to the
 # binary. MLX's default.metallib is fetched separately, because mlx-swift's SwiftPM
