@@ -1400,6 +1400,23 @@
       "commit": null,
       "notes": "",
       "blocked_reason": null
+    },
+    {
+      "id": "A83",
+      "severity": "S3",
+      "unit": "test infrastructure",
+      "file_line": "Tests/ChatBotsCoreTests/TestPorts.swift:10-19",
+      "title": "The test port allocator is an in-process counter with no probe, so two runs of the suite on one machine collide from 7 900 upward",
+      "category": "defect",
+      "status": "DONE",
+      "host_used": "this Mac",
+      "discovered_by": "the coordinator, while trying to run two Swift fix lanes at once: the L6 pass scope includes flakiness, and this is a flakiness source that has nothing to do with the code under test",
+      "evidence_before": "`allocateTestPort()` returned `UInt16(nextTestPort)` from a counter starting at 7 900, and its own doc comment admitted the gap: 'another process on the machine may hold it'. The counter is safe WITHIN a process - that is what it was written for, after two fixtures picked overlapping base ranges - but it knows nothing about anything else, so a second run of the same suite (another checkout, a CI job, the same person running it twice) began at 7 900 as well and collided from the first server test onward. Concretely: the audit could not run two Swift fix lanes in parallel for this reason.",
+      "fix_summary": "The allocator now probes each candidate before returning it: it binds loopback port N and closes again, advancing past anything held, up to a bounded number of candidates so a busy machine cannot turn it into a loop. Deliberately WITHOUT SO_REUSEADDR, because with it a port already in use would probe as free, which is the one answer this must not give. The probe is documented as a probe and not a reservation - something else can take the port between the check and the caller's bind - so `HTTPServer.waitUntilReady()` remains the authority. The fallback after the bounded search returns the next counter value rather than trapping or looping, so a port that could not be bound is reported by the caller's readiness check instead of crashing inside a fixture.",
+      "evidence_after": "swift build --build-tests 0 warnings 0 errors under the A03 gate; swift test => 'Test run with 573 tests in 79 suites passed'. Demonstrated to fire rather than merely compile: with 127.0.0.1:7900 held by an unrelated Python listener (confirmed with lsof), `swift test --filter 'HTTPServer|AttachmentUpload|SavedConversationHTTP|SharedConversation'` => 'Test run with 24 tests in 5 suites passed', i.e. the tests skipped the held port. Before the fix the first server test would have started at 7 900 and collided. The listener was then stopped.",
+      "commit": null,
+      "notes": "Recorded as a finding rather than folded into A02 (coverage) because it is not about what is tested but about whether the suite can run twice; L6's scope names flakiness explicitly. The immediate consequence is practical as well as hygienic: with this in place two Swift fix lanes can run on one machine without fighting over ports, which is worth more than the fix itself for the remaining work.",
+      "blocked_reason": null
     }
   ]
 }
