@@ -480,7 +480,7 @@
       "fix_summary": null,
       "evidence_after": null,
       "commit": null,
-      "notes": "The errors run in both directions - the warning count was understated, the shellcheck count overstated, the force-unwrap review understated - so a reader cannot assume the error is conservative. The yardstick the whole audit measures against therefore needs a stated method per number, not just a number. The twelve `!` sites themselves are all currently unreachable traps and are part of this task's fix.",
+      "notes": "The errors run in both directions - the warning count was understated, the shellcheck count overstated, the force-unwrap review understated - so a reader cannot assume the error is conservative. The yardstick the whole audit measures against therefore needs a stated method per number, not just a number. The twelve `!` sites themselves are all currently unreachable traps and are part of this task's fix. RE-MEASURED AFTER THE FIX LANES, because their rewrites touched ConversationEngine, HTTPServer and others: the count is STILL 12, now at ZoomStore.swift:32,38,39,44,46 (5), StreamPacer.swift:163, HTTPServer.swift:442, ConversationEngine.swift:139,140 and 164,165,166 (three implicitly-unwrapped Continuations). METHOD, and it matters because a first attempt at this re-measurement got it wrong: the working pattern is `first!|last!|\\)!|\\]!|[A-Za-z0-9_]!\\s*$`, which finds all twelve. A quicker bash `grep -E '[A-Za-z0-9_\\)\\]]!\\s*($|[^=])'` reported ONE, and that undercount is exactly the mistake A28 exists to record - a number taken from a pattern that seemed to work rather than from one that was checked. The re-measurement caught it only because a second method was used on the same tree.",
       "blocked_reason": null
     },
     {
