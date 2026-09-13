@@ -746,3 +746,29 @@ check rather than a reliance on the browser rollout.
 
 A76 records the rest of the same boundary: no CSP, no `frame-ancestors`, no `nosniff`, no
 `Referrer-Policy`, in the server or in the Caddyfile.
+
+### A77 — the shipped app redistributes 14 libraries with no attribution
+
+**S2** · compliance · found by a go-live readiness check on dependency licensing
+
+Every dependency in the resolved graph is permissively licensed, so there is no copyleft
+problem — but the licences are not all the same and none of them is reproduced:
+
+| Licence | Packages |
+| --- | --- |
+| MIT | `mlx-swift-lm`, `mlx-swift`, `WebTransport`, `yyjson`, `EventSource`, and inside `Cmlx`: `fmt`, `json`, `mlx`, `mlx-c`, `metal-cpp` |
+| Apache-2.0 | `swift-transformers`, `swift-huggingface`, `swift-crypto`, `swift-collections`, `swift-numerics`, `swift-syntax`, `swift-asn1`, `swift-argument-parser` |
+
+`LICENSE` is the project's own MIT licence and nothing else. There is no third-party notices
+file anywhere in the repository, and `tools/make-app.sh` copies no licence text into the bundle,
+so a distributed `ChatBots.app` carries fourteen libraries' worth of code with no attribution.
+MIT requires the copyright and permission notice to accompany copies; Apache-2.0 requires the
+licence text and any `NOTICE` file to be retained.
+
+This is not a security defect, and it is not a reason the code cannot run — it is a reason the
+build cannot be *published* as it stands. The fix is mechanical: generate a notices file from the
+resolved graph (`Package.resolved` pins exact revisions, so it is deterministic), include it as a
+package resource so it reaches the bundle, and copy it into the `.app` beside the icon. The guard
+that keeps it true belongs in the `generated-files` CI job that already fails a push when a
+generated file has drifted — so a dependency added without its notice fails the push rather than
+shipping.
