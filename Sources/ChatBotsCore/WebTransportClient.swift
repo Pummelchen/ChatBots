@@ -72,10 +72,10 @@ public final class WebTransportEngineClient {
 
     /// The engine's state as it was when this client connected.
     ///
-    /// Collected by the first frame `connect` sends, which exists to put the stream prefix on
-    /// the wire before the engine reads it. Exposed because it is the freshest thing the client
-    /// has at that moment, and because a connection that never produced one did not really
-    /// arrive: a client can be attached and still be told nothing.
+    /// The reply to the first frame `connect` sends. That frame is not there to work around a
+    /// transport defect — see the comment in `connect()`, and WebTransport#24 — it is there
+    /// because the engine does not serve the stream, and so pushes nothing, until a byte arrives.
+    /// Its answer is the snapshot every front end draws when it opens.
     public private(set) var greeting: APISnapshot?
 
     // MARK: - Connecting
@@ -113,26 +113,25 @@ public final class WebTransportEngineClient {
                 }
             }
 
-            // Then speak first. The answer is wanted anyway — it is the same snapshot every front
-            // end draws when it opens — and speaking first also steps around a stream-prefix race
-            // that was seen once and has not been reproduced since.
+            // Then speak first — but not for the reason this used to give.
             //
-            // The transport writes the WebTransport stream prefix lazily, as part of the first
-            // `send` on the stream: opening a stream puts no byte on the wire. A client that
-            // connected and then waited was once observed to lose its session outright —
-            // "truncated: needed 1 bytes, available 0" — leaving it holding a connection that
-            // would never carry anything. It looked intermittent because it was a race: any
-            // frame sent in the same instant as connecting won it.
+            // The old justification was a race that does not exist: the theory was that the
+            // transport writes the stream prefix lazily, the engine reads it exactly once, and a
+            // read of zero bytes fails the session with "truncated: needed 1 bytes, available 0".
+            // WebTransport#24 settled it by measurement — an inbound stream is not even delivered
+            // to the handler until its first byte arrives, and the read waits for at least one
+            // byte by default, so an *open* stream with nothing on the wire cannot produce that
+            // error. The message came from a peer that *ended* a stream without writing to it,
+            // which the library now names instead.
             //
-            // What is actually established, measured while opening the issue for this: a client
-            // that connects, sends nothing for three seconds, and only then asks for the state is
-            // served normally, on **both 1.3.6 and 1.3.7**, against `WebTransportEngineServer`.
-            // The failure is not reproducible here and the interleaving that caused it was never
-            // captured, so nothing has been filed upstream.
+            // The frame stays for the reason that survived: the engine does not see this stream —
+            // and so does not serve the session or push the state a front end draws — until a
+            // byte arrives. Saying something is how a client subscribes. `.fetchState` is the
+            // cheapest thing to say, and its reply is the greeting every front end opens with.
             //
-            // The round trip is kept regardless, and deliberately: it is one small frame whose
-            // reply is wanted either way, and removing it would trade a certain no-op for an
-            // uncertain race. If someone does reproduce the failure, this is the line to revisit.
+            // That is also the one thing to remember if this line is ever re-examined: removing it
+            // does not break the transport, it silently stops the pushes, which is what the
+            // "a change is pushed to an attached client" test is there to catch.
             do {
                 greeting = try await send(.fetchState).snapshot
             } catch {

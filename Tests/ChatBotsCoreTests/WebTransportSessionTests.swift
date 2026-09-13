@@ -109,6 +109,33 @@ struct WebTransportSessionTests {
         #expect(snapshot.topic == "A transport test")
     }
 
+    /// A pause between connecting and the first request does not cost the client its session.
+    ///
+    /// `connect()` writes one frame, and then a caller may sit on the connection before asking
+    /// anything. Nothing about that idle gap should drop it — the app connects on launch and the
+    /// user may not touch it for a while, and the supervisor's probe is deliberately a
+    /// connect-ask-close in quick succession.
+    ///
+    /// The greeting assertion is the other half: it comes from the reply to the frame `connect()`
+    /// sends, which is there because the engine does not serve the stream, and so pushes nothing,
+    /// until a byte arrives. WebTransport#24 is why that is the reason rather than the stream
+    /// prefix.
+    @Test("A client is still served after sitting idle on its connection")
+    func idleClientIsStillServed() async throws {
+        let running = try await startEngine()
+        defer { Task { await running.stop() } }
+
+        let client = makeClient(port: running.port)
+        try await client.connect()
+        defer { Task { await client.disconnect() } }
+
+        try? await Task.sleep(for: .seconds(1))
+
+        let snapshot = try #require(await client.state())
+        #expect(snapshot.topic == "A transport test")
+        #expect(client.greeting?.topic == "A transport test", "the greeting is connect()'s reply")
+    }
+
     /// The supervisor's probe, then the app's real connection.
     ///
     /// This is the sequence that produced "the app connects but the thread stays empty": the
