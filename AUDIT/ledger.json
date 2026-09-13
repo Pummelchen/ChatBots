@@ -1842,6 +1842,23 @@
       "commit": null,
       "notes": "This is the L6 flakiness scope and it matters more than a normal intermittent test, for two reasons. A bounded stream's exact delivered count is not deterministic by design, so a test asserting 256 is a test that will fail for the right reason eventually; and a hard abort inside Network.framework would look like a catastrophic product failure in CI and be misattributed. Related: A102 recorded the same Network.framework abort, reduced by A40's single-closer change and not proven fixed. Phase E must expect this: a flaky or aborted run on node1 is not by itself evidence of a regression, and the honest response is to determine which of the two it is.",
       "blocked_reason": null
+    },
+    {
+      "id": "A109",
+      "severity": "S2",
+      "unit": "audit environment / repository integrity",
+      "file_line": ".git/index (Dropbox sync of git internals)",
+      "title": "Dropbox renames .git/index to a conflicted copy, which git reads as an empty index and shows the whole tree as deleted",
+      "category": "process",
+      "status": "START",
+      "host_used": "this Mac",
+      "discovered_by": "reported by the app-layer lane immediately after a commit, which is the only reason it was caught rather than misread as a catastrophic working-tree change",
+      "evidence_before": "Just after committing A48, `git status` showed all 226 tracked files as staged DELETIONS with everything untracked. The cause was that `.git/index` no longer existed: Dropbox had renamed it to `.git/index (Andre Borchert's conflicted copy 2026-09-13)`. Git read the missing index as empty, so HEAD's entire tree looked deleted. No `.git/index.lock` was held, so this was not a lock contention problem and serialising commits would not have prevented it. Verified afterwards from the coordinator side: `.git/index` restored at 24,643 bytes, HEAD 30f930c on branch audit/2026-09-13, `git diff --cached` empty, and A46/A47/A48 intact in history. `xattr -p com.dropbox.ignored .git` returns nothing, so Dropbox IS syncing git's internals - a previous session had marked `.build`, `models`, `dist` and `captures` as Dropbox-ignored for exactly this class of interference, and `.git` was not included.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "The recovery used was `git reset --mixed HEAD`, which rebuilds the index from HEAD without touching the working tree or history - the correct tool for a clobbered index, and worth recording because the wrong reflex (a hard reset, or re-adding everything) would have destroyed either the working tree or the staging state. The deeper risk is the one to state plainly: a clobbered index DURING a commit could produce a commit built from a wrong tree, and because this audit's evidence is its commits, that would corrupt the audit's own record rather than merely annoy a developer. The real fix is to mark `.git` as Dropbox-ignored so Dropbox stops syncing git internals - `origin` on GitHub already provides replication and every wave is pushed - but that changes the owner's sync configuration, so it is being asked rather than done.",
+      "blocked_reason": null
     }
   ]
 }
