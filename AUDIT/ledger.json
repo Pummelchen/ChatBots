@@ -1332,6 +1332,23 @@
       "commit": null,
       "notes": "Small and in the same family as A77: this is publishing readiness rather than a runtime defect, and it is cheap because make-app.sh already generates the plist in one place. The fix is to put the real copyright line in the key, state where the bundle identifier and version come from (and change the identifier if a distributed build is intended), and make the version a single value rather than a literal repeated across the plist and any release notes. It should be done alongside A77 so the two distribution fixes land coherently, and the generated-files CI job is the natural place to keep them true.",
       "blocked_reason": null
+    },
+    {
+      "id": "A79",
+      "severity": "S3",
+      "unit": "repository hygiene",
+      "file_line": ".gitignore",
+      "title": "Python bytecode is not ignored, so running any helper script or the CI byte-compile step leaves untracked noise",
+      "category": "defect",
+      "status": "DONE",
+      "host_used": "this Mac",
+      "discovered_by": "noticed while checking a lane's working tree: tools/__pycache__/ appeared untracked",
+      "evidence_before": ".gitignore has no Python rules at all: `git check-ignore -v tools/__pycache__` returns nothing, and `grep -n 'pycache\\|\\.pyc\\|python' .gitignore` matches nothing. `tools/` contains five Python helpers, and the `static-analysis` CI job that A04 added runs `python3 -m py_compile` over every one of them, which writes `__pycache__/`. So both running the tools locally and the push-time job leave untracked files in a tree the audit requires to be clean.",
+      "fix_summary": "Added `__pycache__/` and `*.py[cod]` to .gitignore, with a comment saying why: a tree that is dirty for the wrong reason is one nobody reads, and this audit's own integrity checks (a clean tree in the Phase E script, verify-done-commits) depend on `git status` meaning something.",
+      "evidence_after": "git check-ignore -v tools/__pycache__ => matches the new rule; the stray directory was removed; git status --short reports no untracked Python artefacts.",
+      "commit": null,
+      "notes": "S3 hygiene rather than a defect in behaviour, recorded because it was found the way the audit wants findings found - by looking at an actual working tree rather than at a document. It also matters slightly more than usual here: the new CI job byte-compiles every helper, so the noise would appear on every push.",
+      "blocked_reason": null
     }
   ]
 }

@@ -35,3 +35,10 @@ ChatBots.wiki/
 # An interrupted ledger write leaves this behind. It was committed once by accident (A19);
 # the ledger is only ever the file without the suffix.
 AUDIT/*.tmp
+
+# Python bytecode. The `static-analysis` CI job runs `python3 -m py_compile` over every helper
+# script, and running any of them locally leaves the same thing behind. A tree that is dirty for
+# the wrong reason is a tree nobody reads — and the audit's own checks (a clean tree in
+# AUDIT/phase-e.sh, and verify-done-commits.sh) depend on `git status` meaning something.
+__pycache__/
+*.py[cod]

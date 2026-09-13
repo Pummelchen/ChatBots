@@ -790,3 +790,20 @@ tied to no release or tag.
 Recorded with A77 because they are one piece of work: the app cannot be published until the
 libraries are attributed *and* the bundle says who made it and which version it is. The
 `generated-files` CI job is the natural guard for both.
+
+---
+
+## A79 — Python bytecode was not ignored — **DONE**
+
+**S3** · repository hygiene · found by looking at a lane's working tree rather than at a document
+
+`.gitignore` had no Python rules at all. `tools/` holds five Python helpers, and the
+`static-analysis` CI job that A04 added runs `python3 -m py_compile` over every one of them, so
+both running a helper locally and every push leaves `__pycache__/` behind as untracked noise.
+
+That matters slightly more here than it would elsewhere, for the same reason A19 and A28 exist: this
+audit's checks depend on `git status` meaning something — `AUDIT/phase-e.sh` fails the acceptance run
+when the tree is not clean, and `verify-done-commits.sh` reasons about what a commit contains. A tree
+that is dirty for the wrong reason is one nobody reads. `__pycache__/` and `*.py[cod]` are now
+ignored, with the reason written in the file; both patterns were checked with `git check-ignore`
+against a real directory and a real `.pyc` rather than assumed.
