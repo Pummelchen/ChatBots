@@ -76,6 +76,19 @@ jobs:
             echo "::error::make-app.sh declares macOS $bundle but Package.swift requires $package"
             exit 1
           }
+      # The installer declared the minimum a third time, as 14, so a Sonoma user downloaded the
+      # checkpoint and built the app before the bundle's own minimum refused to launch it (A121). It
+      # now reads the requirement from Package.swift; this catches a literal creeping back in.
+      - name: The installer does not declare its own minimum macOS
+        run: |
+          set -eu
+          if grep -nE 'OS_MAJOR.*-lt[[:space:]]*[0-9]' tools/install.sh; then
+            echo "::error::install.sh compares the OS version against a literal; read it from Package.swift (A121)"
+            exit 1
+          fi
+          # Anchored on `OS_MAJOR` rather than on `-lt <number>`, because the script compares other
+          # counters against literals and those are not this defect.
+          echo "install.sh reads the minimum macOS from Package.swift"
 
   static-analysis:
     name: Lint, type-check and scan

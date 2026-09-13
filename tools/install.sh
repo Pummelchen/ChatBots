@@ -76,7 +76,7 @@ if [ -z "$FREE_GB" ]; then
 else
   dim "Free disk space: ${FREE_GB} GB"
   if [ "$FREE_GB" -lt "$REQUIRED_GB" ]; then
-    die "This needs about ${REQUIRED_GB} GB free — the models alone are ~6 GB and the build
+    die "This needs about ${REQUIRED_GB} GB free — the checkpoint is ~3 GB and the build
 needs a few more. There is ${FREE_GB} GB free.
 
 Free some space and run the script again. The model folder can be found later at:
@@ -96,8 +96,17 @@ ok "Apple silicon ($ARCH)"
 
 OS_VERSION="$(sw_vers -productVersion)"
 OS_MAJOR="${OS_VERSION%%.*}"
-if [ "$OS_MAJOR" -lt 14 ] 2>/dev/null; then
-  die "macOS 14 (Sonoma) or newer is required. This Mac runs macOS $OS_VERSION."
+# Read the requirement from the one place that states it, rather than declaring it a third time
+# here. `Package.swift` states it and the app bundle copies it, which CI already checks against each
+# other; this script used to state it separately as 14, three major versions below the two that
+# matter, so a Sonoma user downloaded the checkpoint, built the app and was then refused at launch
+# by the bundle's own minimum (audit A121). Removing the duplicate value is the fix; a check that
+# the three agree would only have policed it.
+REQUIRED_MACOS_MAJOR="$(grep -oE '\.macOS\(\.v[0-9]+\)' "$ROOT/Package.swift" | grep -oE '[0-9]+' | head -1)"
+if [ -z "$REQUIRED_MACOS_MAJOR" ]; then
+  warn "Could not read the minimum macOS from Package.swift; continuing without the version check"
+elif [ "$OS_MAJOR" -lt "$REQUIRED_MACOS_MAJOR" ] 2>/dev/null; then
+  die "macOS $REQUIRED_MACOS_MAJOR or newer is required. This Mac runs macOS $OS_VERSION."
 fi
 ok "macOS $OS_VERSION"
 
