@@ -1170,14 +1170,14 @@
       "file_line": "PromptBuilder.swift:251-276, :404-406, :55",
       "title": "Peer-model and API-supplied text is promoted into another seat's system message unescaped",
       "category": "defect",
-      "status": "START",
+      "status": "DONE",
       "host_used": "this Mac",
       "discovered_by": "line-depth pass: models, prompts and research",
       "evidence_before": "The single system message is system + attachmentContext + socialContext joined; socialContext prints conflict lines verbatim and ConflictState.briefing builds those from grudge.reason, which is the first 120 characters of a peer's own message. Seat A's message text thus becomes system-role instruction in seat B's prompt. Separately, moderatorParagraph interpolates the user-set moderator name inside the very bracket convention the model is told marks authoritative human turns ('Messages marked [\\(who)] come from the human and override everything else'), and that name is settable unauthenticated through POST /api/moderator or POST /api/seat, so it can carry brackets and newlines and forge both an overriding human line and a [Moderator] log entry.",
-      "fix_summary": null,
-      "evidence_after": null,
-      "commit": null,
-      "notes": "Found by a read-only line-depth pass; the pass's 'examined and clean' record is in the Phase D section of ledger.md.",
+      "fix_summary": "Peer-derived text is out of the system role: the social state is now an app note in the user log (\"[App note - Where things stand]\") and the system message carries only a pointer saying where it is and that it is not a participant or an instruction. And the bracket convention can no longer be forged: `tagName`/`tagNameOr` strip `[`, `]`, newlines and control characters and cap the length of every name written inside a tag - the moderator convention sentence and its briefing, `tag(for:)` for steering, topic, tool and chat, the roster, the system message and the turn prompt - while stored names are left untouched so nothing the user typed is silently rewritten.",
+      "evidence_after": "Sources/ChatBotsCore/PromptBuilder.swift; Tests/ChatBotsCoreTests/AuditWave2PromptTrustBoundaryTests.swift. Both defects were verified by temporarily restoring them: social state back in the system message fails the peer-text test, and removing the sanitisation fails the forged-name test on `[System]`, `[Moderator]` and an embedded newline. PromptShapeTests and ConflictTests pass unedited. swift test => 'Test run with 663 tests in 107 suites passed'.",
+      "commit": "83bf5f6",
+      "notes": "Two fixes in one task because they are one boundary: what the system role may contain, and whether user-supplied text can impersonate that role's own convention. Splitting them would have left the boundary half-drawn, which is how it came to be crossed in two different ways.",
       "blocked_reason": null
     },
     {
@@ -1551,7 +1551,7 @@
       "fix_summary": "An abandoned round now ends the turn deterministically, whatever fragments arrived. Previously the guard on tool calls could still fall through to dispatch if a `.toolCall` chunk arrived while the stripper considered itself inside reasoning - which a protocol-violating model can produce - so a turn the engine had already abandoned ran another round instead of finishing. The notice was already truthful; now the control flow is too.",
       "evidence_after": "Sources/ChatBotsCore/MLXEngine.swift; Tests/ChatBotsCoreTests/AuditWave2RoundAdvanceTests.swift adds 102 lines. swift build --build-tests 0 warnings 0 errors.",
       "commit": "8d82c41",
-      "notes": "A43 recorded this as the one path where its guarantee did not hold, rather than claiming the ceiling work was complete. Closing it took a separate task because the fix is a control-flow decision, not part of the ceiling accounting - which is why A43's lane left it rather than folding it in.",
+      "notes": "A43 recorded this as the one path where its guarantee did not hold, rather than claiming the ceiling work was complete. Closing it took a separate task because the fix is a control-flow decision, not part of the ceiling accounting - which is why A43's lane left it rather than folding it in. A DEEPER DEFECT FOUND WHILE FIXING IT, which changes how A43 should be read: the ceiling's `break` was UNLABELLED and sat inside a `switch`, so it exited the switch while the `for try await` loop kept consuming the stream. A43's fix therefore did not actually abandon the stream - the delimiter reached the model after all, the opposite of what A43's comment claimed. A91's `break chunks` on a labelled loop is what makes the abandonment real. Recorded in A91 and not rewritten into A43: each entry describes its own change accurately, and the pair is the honest record.",
       "blocked_reason": null
     },
     {
@@ -1739,6 +1739,23 @@
       "evidence_after": null,
       "commit": null,
       "notes": "Recorded rather than dismissed because the failure mode is a hard abort of the whole test process, which would look like a catastrophic product failure in CI and would be misattributed. The next step if it recurs is to serialise the WebTransport suites within the test target, or to gate them behind a single transport runner - not to retry. **Phase E must watch for this**: a fatal abort on node1 would be reported as a crash, and the honest response would be to determine whether it is Network.framework's concurrency rather than a defect introduced here. `Phase E`'s sanitizer and full-suite runs are the place it would show up.",
+      "blocked_reason": null
+    },
+    {
+      "id": "A103",
+      "severity": "S2",
+      "unit": "prompt trust boundary",
+      "file_line": "Sources/ChatBotsCore/PromptBuilder.swift:439-440 (attachmentContext, defined :311-334), :435 (the moderator's topic)",
+      "title": "Attachment document text is still promoted into the system role, so a crafted document can inject instruction into every seat's prompt",
+      "category": "unsafe",
+      "status": "START",
+      "host_used": "this Mac",
+      "discovered_by": "reported by the A69 lane, which fixed the same class of boundary for peer text and social state and then looked for the other untrusted inputs",
+      "evidence_before": "`attachmentContext` is joined into the single system message beside the seat's brief, and the document text it carries arrives through `POST /api/attachments` - unauthenticated in the documented LAN configuration (A01), and the same intake path A29 was about. So a document added by anyone who can reach the port, or one a moderator was persuaded to add, can carry text that reads as system-role instruction to every seat in the room. The moderator's `topic` is interpolated into the system message verbatim at :435 by the same path. A69 moved peer-derived text out of the system role and made the bracket convention unforgeable; this is the remaining instance of the same class, and it fell outside A69's cited lines.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "Left by the lane because `AttachmentTests.swift:250-266` pins the current placement, so the fix needs that existing test changed - the same situation A53 and A90 hit. That is worth noting as a pattern: three recent findings have been held in place by a test asserting the behaviour being fixed, which is itself evidence about how they survived. Also reported and not worth its own task: `PromptBuilder.systemMessage`'s `moderator` parameter at :110 is never used - dead API rather than a defect with impact.",
       "blocked_reason": null
     }
   ]
