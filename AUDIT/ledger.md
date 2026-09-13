@@ -33,7 +33,7 @@ enumerated before they are fixed.
 
 | id | sev | unit | file:line | title | category | status | host | discovered-by |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| A01 | **S1** | deploy / `APIServer` | `Caddyfile:27`, `web/app.js` | The website binds every interface and the whole API is unauthenticated | unsafe | START | this Mac | L4 pass |
+| A01 | **S1** | deploy / `APIServer` | `Caddyfile:27`, `web/app.js` | The website binds every interface and the whole API is unauthenticated | unsafe | DONE (`c91a310`) | this Mac | L4 pass |
 | A02 | S1 | tests | `Sources/ChatBotsCore/MLXEngine.swift` (19/863 lines), `TransportCheck.swift` (0/216) | The core inference path and the installer's own smoke test are effectively uncovered | test | START | this Mac | L6 pass (coverage) |
 | A03 | S2 | build | `Package.swift`, `.github/workflows/checks.yml` | No warnings-as-errors gate, though the baseline is already 0 warnings | test | DONE (`8673488`) | this Mac | L0 pass |
 | A04 | S2 | CI | `.github/workflows/checks.yml` | CI runs no build, test, lint, type-check, scanner or coverage step | test | DONE (`31dc2e3`) | this Mac | L0 pass |
@@ -43,7 +43,7 @@ enumerated before they are fixed.
 | A08 | S2 | deps | `Package.swift:32` | `WebTransport` is pinned by range while the project has twice depended on an exact transport behaviour | deps | DONE (`6c1ef31`) | this Mac | L0 pass |
 | A09 | S3 | tooling | `tools/cdp.py:42,44,180` | SAST: insecure-websocket and dynamic-urllib findings in the dev-only DevTools client | unsafe | START | this Mac | baseline (semgrep) |
 | A10 | S3 | tooling | `tools/*.sh` (24 notes) | `shellcheck -S style` reports 24 notes, mostly SC2001 | style | START | this Mac | baseline |
-| A11 | S3 | docs/ops | `README.md`, wiki | Neither the README nor the wiki states that running the website exposes the API to the LAN | docs | START | this Mac | L4 pass (same evidence as A01) |
+| A11 | S3 | docs/ops | `README.md`, wiki | Neither the README nor the wiki states that running the website exposes the API to the LAN | docs | DONE (`067d953`) | this Mac | L4 pass (same evidence as A01) |
 | A12 | — | tests | `AUDIT/baseline/swift-test-asan.log` | AddressSanitizer over the whole suite: **clean** | test | DONE (`f9a359b`) | this Mac | §1 tooling requirement |
 | A13 | — | tests | `AUDIT/baseline/swift-test-tsan.log` | ThreadSanitizer over the whole suite: **one data race found** | test | DONE | this Mac | §1 tooling requirement |
 | A14 | **S1** | `HTTPServer` | `HTTPServer.swift:356` write vs `:380` read | `isRunning`/`lastError` are written from a Network.framework callback and read from `waitUntilReady` with no synchronisation | unsafe | DONE (`0de3123`) | this Mac | A13 (ThreadSanitizer) |

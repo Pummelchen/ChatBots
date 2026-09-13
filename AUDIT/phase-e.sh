@@ -209,11 +209,19 @@ fi
 
 if command -v shellcheck >/dev/null 2>&1; then
     shellcheck -S style tools/*.sh > "$out/shellcheck.txt" 2>&1
-    notes="$(grep -oE 'SC[0-9]{4}' "$out/shellcheck.txt" | wc -l | tr -d '[:space:]')"
-    # Counted from the SC codes, not from the lines of the output: 24 lines once passed for
-    # 24 findings when there were 7 (A28).
-    pass "shellcheck -S style: $notes finding(s)"
-    [ "$notes" = "0" ] || printf '        (non-zero is recorded, not hidden: see %s)\n' "$out/shellcheck.txt"
+    # Counted from the `SCnnnn (severity):` form, which is one per finding. Two earlier counts
+    # of this same output were wrong in two different ways: 24 was the file's line count, and 7
+    # was `grep -oE 'SC[0-9]{4}'`, which also matches the three `shellcheck.net/wiki/SCnnnn`
+    # help URLs printed under the findings. The real number is 4. Anchoring on the severity
+    # suffix is what makes this one a count of findings rather than of codes that appear.
+    notes="$(grep -cE 'SC[0-9]{4} \((style|info|warning|error)\):' "$out/shellcheck.txt" || true)"
+    if [ "$notes" = "0" ]; then
+        pass "shellcheck -S style: 0 findings"
+    else
+        # Recorded and reported, not hidden: A10 owns these, and a non-zero count must be
+        # visible in the acceptance run rather than rounded away.
+        pass "shellcheck -S style: $notes finding(s) — see $out/shellcheck.txt (A10's scope)"
+    fi
 else
     fail "shellcheck is not installed"
 fi
