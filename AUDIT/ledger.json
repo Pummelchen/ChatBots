@@ -2164,6 +2164,23 @@
       "commit": "9fa23a7",
       "notes": "The same class as A117 itself: the guard was right and the thing reading it was not. It was found by reading the summary rather than the exit status, which is the habit that found A116 and A102 as well.",
       "blocked_reason": null
+    },
+    {
+      "id": "A128",
+      "severity": "S3",
+      "unit": "audit tooling / process",
+      "file_line": "AUDIT/phase-e.sh:108-126 (the build gate's error count)",
+      "title": "The build gate's error count matched SwiftPM's cache notices, so a green section reported four errors",
+      "category": "process",
+      "status": "DONE",
+      "host_used": "node1",
+      "discovered_by": "reading the second Phase E run's own summary rather than its exit status — the run passed, and one line in it was false",
+      "evidence_before": "The green acceptance run printed `PASS|swift build --build-tests: 4 errors, 0 compiler warnings (4 SwiftPM notice(s) not counted)`. The build had exited 0 and the suite had run, so there were no errors: the four were SwiftPM's dependency-cache notices, whose text is `skipping cache due to an error: The file \"maintenance.lock\" doesn't exist`, and the expression was `grep -cE 'error:'`. A123 fixed the warning count on that same line and left the error count beside it, with the same defect — the second time the audit has read a count from a broad textual match instead of from the object that owns it.",
+      "fix_summary": "Both counts on that line are taken by diagnostic shape, `.swift:<line>:<col>: error:` and `: warning:`, and the SwiftPM notices are reported once as a number so they cannot be mistaken for either.",
+      "evidence_after": "`grep -cE '\\.swift:[0-9]+:[0-9]+: error:'` over the build log from the failing run returns 0, so the line now reads `0 compiler errors`. `bash -n AUDIT/phase-e.sh` parses. Verified by the third Phase E run: section 3 passes and reports zero of both.",
+      "commit": "c14db8a",
+      "notes": "Recorded as its own task rather than folded into A123, because A123's fix was committed and pushed before this was seen: the audit's rule is that a finding gets an id the moment it is found, and 'the fix for A123 was incomplete' is a finding about A123's fix. The wider point is the same one A28, A123, A124 and A125 make: a gate that greps for a word measures every line containing the word, so the count has to be taken from the diagnostic the tool emits.",
+      "blocked_reason": null
     }
   ]
 }

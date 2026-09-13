@@ -25,8 +25,8 @@ been run.
 <!-- BEGIN GENERATED: ledger status — rendered from ledger.json by AUDIT/render-ledger.sh -->
 | Metric | Count |
 | --- | --- |
-| Tasks enumerated | 127 |
-| DONE | 127 |
+| Tasks enumerated | 128 |
+| DONE | 128 |
 | START | 0 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
@@ -35,7 +35,7 @@ been run.
 
 Nothing is open.
 
-### Every task — 127
+### Every task — 128
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -79,6 +79,7 @@ Nothing is open.
 | A125 | S2 | DONE | 9fa23a7 | audit tooling / style gates | The style gates measured generated code and the recorded waivers were below the tree they govern, so Phase E could not have passed on the branch it was written for |
 | A126 | S3 | DONE | 9fa23a7 | web front end | A99's layout diagnostic passed a template literal to console.info, which semgrep reports as an unsafe format string |
 | A127 | S3 | DONE | 9fa23a7 | audit tooling / reporting | The acceptance statement reported the done-commit gate as passing with an empty count, because it read the blank line above the summary |
+| A128 | S3 | DONE | c14db8a | audit tooling / process | The build gate's error count matched SwiftPM's cache notices, so a green section reported four errors |
 | A13 | — | DONE | — | tests | ThreadSanitizer over the whole suite: one data race found |
 | A14 | S1 | DONE | 0de3123 | HTTPServer | isRunning/lastError are raced between the listener callback and waitUntilReady |
 | A15 | S1 | DONE | 8ece1d3 | EngineService/DocumentImport | Attaching a document blocks the engine main actor for the whole conversion, subprocess wait included |
