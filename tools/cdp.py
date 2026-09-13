@@ -42,6 +42,51 @@ type JsonValue = (
 )
 type JsonObject = dict[str, JsonValue]
 
+# This client drives a headless Chrome on the machine it runs on, so its endpoints are
+# loopback and nothing else. The websocket is deliberately unencrypted for exactly that reason:
+# TLS on a loopback debugging port would mean managing a certificate without changing who can
+# reach it. The safety property is the host check below, not the scheme, which is why a host
+# outside this set is refused rather than trusted.
+LOOPBACK_HOSTS: frozenset[str] = frozenset({"127.0.0.1", "localhost", "::1"})
+DEVTOOLS_HOST: str = "127.0.0.1"
+
+# The /json target list is a few kilobytes even with many tabs open. Reading a bounded prefix
+# keeps a stuck or hostile local service from making this client allocate without limit.
+MAX_TARGET_LIST_BYTES: int = 1 << 20
+
+
+def require_loopback_host(host: str) -> str:
+    """Return `host` when it names the loopback interface, and refuse anything else.
+
+    Refusing here — before a socket is opened or a URL is built — is what makes the plaintext
+    websocket and the dynamic HTTP URL below safe properties of the code rather than
+    assumptions a reader or a scanner has to make.
+    """
+    if host not in LOOPBACK_HOSTS:
+        allowed = ", ".join(sorted(LOOPBACK_HOSTS))
+        raise DevToolsError(
+            f"refusing non-loopback DevTools host {host!r} (expected {allowed})"
+        )
+    return host
+
+
+def require_valid_port(port: int) -> int:
+    """Return `port` when it is a usable TCP port, and refuse anything else."""
+    if not 0 < port < 65536:
+        raise DevToolsError(f"refusing out-of-range DevTools port: {port}")
+    return port
+
+
+def devtools_targets_url(port: int) -> str:
+    """The `http://` URL of the DevTools target list, built only from loopback values.
+
+    The scheme is a fixed literal and both host and port pass through the checks above, so no
+    part of this URL can be steered from outside this process — in particular there is no way
+    for it to become a `file://` read.
+    """
+    host = require_loopback_host(DEVTOOLS_HOST)
+    return f"http://{host}:{require_valid_port(port)}/json"
+
 
 class DevToolsError(RuntimeError):
     pass
@@ -54,13 +99,22 @@ class _WebSocket:
     _buffer: bytes
 
     def __init__(self, url: str, timeout: float = 20) -> None:
-        # ws://127.0.0.1:9222/devtools/page/ABC
+        # semgrep's insecure-websocket rule flags the two `ws`-scheme URL literals just below.
+        # It is right that they use the unencrypted scheme and not TLS — the peer is Chrome's
+        # DevTools endpoint on the loopback interface — and what the rule cannot see is the host
+        # check a few lines down, which refuses any endpoint that is not loopback before a
+        # socket is opened. This comment, and AUDIT/ledger.json's A09 entry, record that finding
+        # as deliberate rather than ignored.
         if not url.startswith("ws://"):
             raise DevToolsError(f"unsupported websocket url: {url}")
         rest = url[len("ws://") :]
         hostport, _, path = rest.partition("/")
         host, _, port = hostport.partition(":")
-        self.sock = socket.create_connection((host, int(port or 80)), timeout=timeout)
+        # The host is validated, so the plaintext transport cannot leave this machine.
+        self.sock = socket.create_connection(
+            (require_loopback_host(host), require_valid_port(int(port or 80))),
+            timeout=timeout,
+        )
         self.sock.settimeout(timeout)
         self._buffer = b""
 
@@ -199,10 +253,22 @@ class Chrome:
         deadline = time.time() + 30
         while time.time() < deadline:
             try:
+                # semgrep's dynamic-urllib rule flags the `urlopen` below because its URL is
+                # assembled at run time. The URL comes from `devtools_targets_url`, which pins
+                # the scheme to `http` and passes a fixed loopback host and the port through
+                # the same validation the websocket uses, so no external input can choose the
+                # scheme or host; `r.read` is bounded so the reply cannot be unbounded. The
+                # rule cannot see the pinning, the host check or the read limit, so the finding
+                # is recorded as a deliberate waiver in AUDIT/ledger.json's A09 entry.
                 with urllib.request.urlopen(
-                    f"http://127.0.0.1:{self.port}/json", timeout=2
+                    devtools_targets_url(self.port), timeout=2
                 ) as r:
-                    pages: JsonValue = json.load(r)
+                    body = r.read(MAX_TARGET_LIST_BYTES + 1)
+                if len(body) > MAX_TARGET_LIST_BYTES:
+                    raise DevToolsError(
+                        f"the DevTools target list exceeded {MAX_TARGET_LIST_BYTES} bytes"
+                    )
+                pages: JsonValue = json.loads(body)
                 if not isinstance(pages, list):
                     # A reply that is not the target list means the endpoint is not ready
                     # yet, which is exactly what this loop waits out.
