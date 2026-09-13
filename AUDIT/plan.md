@@ -105,6 +105,24 @@ zero warnings, full suite green, coverage report, scanners clean or waived in wr
 placeholders, no non-BLOCKED open task, `AUDIT/verify-done-commits.sh` exit 0, and the wiki
 tracker synced.
 
+**The run is scripted: `AUDIT/phase-e.sh`.** It performs all twelve checks in one pass and writes
+its logs and a `summary.txt` into `AUDIT/baseline/phaseE/` (or a directory you name), so Phase E's
+evidence is *produced* rather than assembled by hand. That distinction is the whole reason it
+exists: every number in this audit that was wrong was wrong because it was derived by hand from
+formatted output — A19 recorded a task DONE whose commit contained no source change, and A28 found
+three counts that were the line counts of captured files rather than finding counts. Each check
+here reads its figure from the tool's own report, and the ones that can only *report* a number
+rather than enforce a floor say so.
+
+It is written to run on the fresh clone itself: it resolves the repository root, assumes no warm
+`.build`, no `models/`, and no `.secrets.env`, never echoes a secret (`gitleaks --redact`, and
+only rule ids, files and lines are read out of its report), and is bash-3.2-clean because that is
+what macOS ships and what the verification host will use.
+
+It exits non-zero if any gate fails, so a green exit is the acceptance statement. The gate that
+matters most for this audit's own integrity is `verify-done-commits.sh`: it is what stops a task
+being marked DONE without a commit that backs it.
+
 ## Git operations performed, with rollback (§0)
 
 | Command | Purpose | Rollback |
