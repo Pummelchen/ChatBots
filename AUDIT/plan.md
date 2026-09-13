@@ -113,9 +113,14 @@ here the difference was 46 findings — including the audit's only S0. The table
 said L3, L5 and L7 were "not started" while the commits that ran them were already on the branch,
 and marked L1, L2, L4 and L6 "in progress". The table was the stale artifact, not the work.
 
+> **Session paused 2026-09-13 — start with [`HANDOVER.md`](HANDOVER.md).** It carries the
+> current counts, what was done, the seven open tasks and the two waves they were planned into, the
+> exact next steps (fix → Phase E on `node1` → wiki), and the environment facts a fresh session
+> needs. `ledger.md` remains the source of truth and wins on any conflict with it.
+
 ## Phase C — fix → test → audit
 
-In progress. Work order: S0, then S1, then S2, then S3. One task = one commit,
+**In progress: 109 of 116 tasks DONE, 7 open, 0 blocked.** Work order: S0, then S1, then S2, then S3. One task = one commit,
 `audit(<id>): <title>`, on `audit/2026-09-13`.
 
 A DONE status is a claim about the tree, so it is checked against the tree and not against the
@@ -132,7 +137,8 @@ Continuous; every new finding gets a ledger id the moment it is found.
 
 ## Phase E — final verification
 
-Not started. Requires a fresh clone on a Mac that did **not** develop the fix, clean build with
+**Not started.** Scripted as `AUDIT/phase-e.sh` (see below), and must run on a Mac that did not
+develop the fixes. Requires a fresh clone on a Mac that did **not** develop the fix, clean build with
 zero warnings, full suite green, coverage report, scanners clean or waived in writing, zero
 placeholders, no non-BLOCKED open task, `AUDIT/verify-done-commits.sh` exit 0, and the wiki
 tracker synced.
