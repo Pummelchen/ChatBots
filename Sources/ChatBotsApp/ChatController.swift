@@ -982,6 +982,17 @@ public final class ChatController: ObservableObject {
         return held + restoredAttachments.filter { !heldNames.contains($0.name) }
     }
 
+    /// The attachments the models cannot currently see: restored from a saved conversation but
+    /// not loaded into this engine.
+    ///
+    /// The chip renders from this rather than from the banner, so dismissing the notice cannot
+    /// leave a chip implying the models can read material they cannot (audit A112). The state is
+    /// derived from `restoredAttachments`, which is what `setAttachments` and `addFiles` keep in
+    /// step, so a file that is re-added leaves this set immediately.
+    public var attachmentsNotLoaded: Set<UUID> {
+        Set(restoredAttachments.map(\.id))
+    }
+
     /// Documents restored from settings that the engine has not been given.
     ///
     /// Held so a relaunch cannot destroy them. The engine is a separate, freshly started

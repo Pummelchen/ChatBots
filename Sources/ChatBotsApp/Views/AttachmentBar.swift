@@ -50,7 +50,10 @@ struct AttachmentBar: View {
                 ScrollView(.horizontal) {
                     HStack(spacing: 6) {
                         ForEach(controller.attachments) { document in
-                            AttachmentChip(document: document) {
+                            AttachmentChip(
+                                document: document,
+                                isLoaded: !controller.attachmentsNotLoaded.contains(document.id)
+                            ) {
                                 controller.removeAttachment(document.id)
                             }
                         }
@@ -73,24 +76,55 @@ struct AttachmentBar: View {
 /// One attached file: what it is, what was read from it, and a way to remove it.
 struct AttachmentChip: View {
     let document: AttachedDocument
+    /// False when the file was restored from a saved conversation but this engine does not
+    /// hold it, so the models cannot see it.
+    ///
+    /// This is part of what the chip renders rather than something the banner says: A47's
+    /// notice is dismissable, and once it is gone an ordinary-looking chip implies the models
+    /// can read material they cannot (audit A112).
+    let isLoaded: Bool
     let onRemove: () -> Void
 
     @Environment(\.themePalette) private var palette
     @State private var showingText = false
 
+    /// The warning colour, which is deliberately not a palette field: an unloaded attachment is
+    /// a state rather than a theme, and orange reads against both themes.
+    private var warning: Color { .orange }
+
+    private var helpText: String {
+        isLoaded
+            ? "\(document.name) — \(document.summary)"
+            : "\(document.name) — saved from a previous session but not loaded into this "
+                + "engine: the models cannot see it. Add the file again to load it."
+    }
+
+    /// The chip's fill and border. `AnyShapeStyle` so the loaded and unloaded branches have a
+    /// common type — the palette's text colours are shape styles rather than `Color`s.
+    private var chipFill: AnyShapeStyle {
+        isLoaded
+            ? AnyShapeStyle(palette.textTertiary.opacity(0.10))
+            : AnyShapeStyle(warning.opacity(0.12))
+    }
+
+    private var chipStroke: AnyShapeStyle {
+        isLoaded ? AnyShapeStyle(palette.border) : AnyShapeStyle(warning.opacity(0.7))
+    }
+
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: document.kind.symbol)
+            Image(systemName: isLoaded ? document.kind.symbol : "exclamationmark.triangle.fill")
                 .scaledFont(size: 10)
+                .foregroundStyle(isLoaded ? AnyShapeStyle(palette.textSecondary) : AnyShapeStyle(warning))
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(document.name)
                     .scaledFont(size: 10.5, weight: .medium)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Text(document.summary)
+                Text(isLoaded ? document.summary : "Not loaded — the models cannot see this")
                     .scaledFont(size: 9)
-                    .foregroundStyle(palette.textTertiary)
+                    .foregroundStyle(isLoaded ? palette.textTertiary : AnyShapeStyle(warning))
                     .lineLimit(1)
             }
             .frame(maxWidth: 220, alignment: .leading)
@@ -127,13 +161,13 @@ struct AttachmentChip: View {
         .padding(.vertical, 5)
         .background(
             RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(palette.textTertiary.opacity(0.10))
+                .fill(chipFill)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .strokeBorder(palette.border, lineWidth: 0.5)
+                .strokeBorder(chipStroke, lineWidth: 0.5)
         )
-        .help("\(document.name) — \(document.summary)")
+        .help(helpText)
     }
 }
 
