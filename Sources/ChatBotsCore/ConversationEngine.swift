@@ -215,6 +215,13 @@ public final class ConversationEngine {
     /// Turns that have begun generating (unlike `turnsCompleted`, counts the current one).
     public private(set) var startedTurns = 0
     private var generationTask: Task<Void, Never>?
+    /// Which loop `generationTask` belongs to.
+    ///
+    /// A cancelled task does not stop at the moment it is cancelled: it notices when it next
+    /// resumes, which can be after its replacement has already been installed. Each loop
+    /// carries the generation it was started in and clears the task reference only if it is
+    /// still that generation's loop — so a late predecessor cannot orphan its successor.
+    private var loopGeneration = 0
     private var pauseContinuation: CheckedContinuation<Void, Never>?
 
     public init(seats: [Seat], configuration: Configuration = .init()) {
@@ -447,6 +454,10 @@ public final class ConversationEngine {
         seedOpeningTurns()
         setStatus(.preparing)
 
+        // The new loop's identity is stamped before the task is installed, so a predecessor
+        // resuming from its cancellation sees a generation that is no longer its own.
+        loopGeneration += 1
+        let generation = loopGeneration
         let seats = self.seats
         generationTask = Task { [weak self] in
             // Load all seats concurrently — they are independent model instances.
@@ -463,7 +474,7 @@ public final class ConversationEngine {
                 }
             }
             guard let self, !Task.isCancelled else { return }
-            await self.runLoop()
+            await self.runLoop(generation: generation)
         }
     }
 
@@ -703,7 +714,7 @@ public final class ConversationEngine {
         note("Report ready — \(report.labelledStatements) labelled claims.")
     }
 
-    private func runLoop() async {
+    private func runLoop(generation: Int) async {
         while !Task.isCancelled {
             if status.isPaused {
                 await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
@@ -761,6 +772,15 @@ public final class ConversationEngine {
             }
         }
 
+        // Only the loop that owns the current generation may clear it. A cancelled
+        // predecessor resumes whenever its suspension ends — which `stop()` cannot wait for —
+        // and without this check its tail would run after a restart had installed the new
+        // task and clear *that* reference. `isLoopRunning`, `pause()` and `stop()` all key off
+        // this reference, so the new loop would become unpausable and unstoppable, and a
+        // further Start would pass `guard generationTask == nil` and run a second loop over
+        // the same transcript. A stale loop also must not overwrite the status its successor
+        // has set, so the status line is left alone unless this generation still owns it.
+        guard generation == loopGeneration else { return }
         generationTask = nil
         if status.isActive {
             setStatus(.stopped)
