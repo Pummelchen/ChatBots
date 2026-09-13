@@ -17,9 +17,9 @@ does not advance without its artifact.
 
 | Metric | Count |
 | --- | --- |
-| Tasks enumerated | 14 |
+| Tasks enumerated | 16 |
 | DONE | 2 (A12, A13 — both sanitizer baselines) |
-| START (proven / reproduced, expected behaviour written) | 12 |
+| START (proven / reproduced, expected behaviour written) | 14 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
@@ -46,6 +46,8 @@ Per §11, all findings are enumerated before any fix begins.
 | A12 | — | tests | `AUDIT/baseline/swift-test-asan.log` | AddressSanitizer over the whole suite: **clean** | test | DONE | this Mac | §1 tooling requirement |
 | A13 | — | tests | `AUDIT/baseline/swift-test-tsan.log` | ThreadSanitizer over the whole suite: **one data race found** | test | DONE | this Mac | §1 tooling requirement |
 | A14 | **S1** | `HTTPServer` | `HTTPServer.swift:356` write vs `:380` read | `isRunning`/`lastError` are written from a Network.framework callback and read from `waitUntilReady` with no synchronisation | unsafe | START | this Mac | A13 (ThreadSanitizer) |
+| A15 | **S1** | `EngineService` / `DocumentImport` | `DocumentImport.swift:160-168`, `EngineService.swift:325-357` | Attaching a document blocks the engine's `@MainActor` for the whole conversion, subprocess wait included | perf | START | this Mac | L5 pass |
+| A16 | S3 | `ChatBotsCLI` | `Sources/ChatBotsCLI/main.swift:689` | `--serve` has no signal handling, so the listener is never shut down and nothing is flushed on exit | incomplete | START | this Mac | L7 pass |
 
 ---
 
@@ -268,3 +270,69 @@ be verified by re-running the TSan command above and getting exit 0 with no repo
 fails before and passes after is required by §8's TEST gate; the race itself needs the sanitizer,
 so the test will assert the observable contract (the flags are coherent under concurrent access)
 and the sanitizer run is the evidence that the race is gone.
+
+---
+
+## A15 — attaching a document blocks the engine's main actor
+
+**S1** · perf · START · discovered by L5 pass
+
+`DocumentIngestorProvider.ingestor.add(url:)` is synchronous, and the subprocess path ends in a
+poll loop:
+
+```swift
+let outputData = out.fileHandleForReading.readDataToEndOfFile()   // blocks until EOF
+let errorData  = err.fileHandleForReading.readDataToEndOfFile()
+let deadline = Date.now.addingTimeInterval(timeout)
+while process.isRunning, Date.now < deadline { usleep(20_000) }   // DocumentImport.swift:163-166
+```
+
+`EngineService` is `@MainActor`, and its `addAttachment` calls straight into that on the actor
+(`EngineService.swift:325-357`). So while a document is being converted — a PDF extraction, or a
+`textutil` subprocess that may run to its timeout — **every other request to the engine waits**:
+the app's one-second state poll, the website, the transport push loop. The user sees a frozen
+interface, and on a large PDF it is frozen for as long as the conversion takes.
+
+**Expected-correct behaviour.** Conversion happens off the actor, and the engine stays responsive
+while it runs. `DocumentIngestor` is already `Sendable`-conformant, and `addAttachment` is already
+`async`, so the work can move to a detached task or a dedicated executor without changing the
+public API — but the `@unchecked Sendable` justification for `DocumentIngestor` (A05) has to be
+settled first, because this is exactly the state that crosses the boundary.
+
+**Why S1 and not S2.** §7 puts "blocking calls on async paths" under performance (S2), but the
+blocked actor is the one every front end and the transport share, so the failure is "the app stops
+responding while a document converts", not "a conversion is slow".
+
+---
+
+## A16 — `serving` has no shutdown path
+
+**S3** · incomplete · START · discovered by L7 pass
+
+`chatbots-cli --serve` ends in `while true { try? await Task.sleep(for: .seconds(3600)) }`
+(`main.swift:689`) with no `SIGINT`/`SIGTERM` handler. Ctrl-C kills the process, so
+`WebTransportEngineServer.stop()`, the HTTP server's teardown and the child-process reaping never
+run. Conversations are safe — `ConversationStore` writes on every turn — so this is not data loss;
+it is a listener that is never told to release its port, and log output that is never flushed.
+
+**Expected-correct behaviour.** A signal handler that stops the servers and exits, which is also
+what makes `tools/start.sh --stop` and the installer's lifecycle predictable.
+
+---
+
+## Reviewed and clean (recorded so they are not re-opened)
+
+* **72 `try?` sites** across 23 files. Sampled on the production paths — persistence, network,
+  filesystem — and the ones that matter have explicit fallbacks
+  (`ConversationStore` decode guards, `APIEndpointStore` defaults, `CertificateStore`). No silent
+  swallow found on a path where the error would change behaviour. Two discard a result a user might
+  care about (`ChatController.swift:255` moderator restore, `main.swift:498` engine load) but both
+  fall back to a working default rather than continuing in a broken state. **Not a task.**
+* **Force unwraps in `Sources/`: two.** `HTTPServer.swift:346` (`.init(rawValue: port)!`, `UInt16`,
+  infallible in practice) and `StreamPacer.swift:163` (`pacers[key]!` immediately after a
+  `guard pacers[key] != nil`). Safe but fragile; both are S3 style at most and neither is worth a
+  fix commit on its own. **Not a task.**
+* **No `Thread.sleep`, `DispatchSemaphore` or `DispatchQueue.sync` anywhere in `Sources/`.** The one
+  blocking wait is A15's `usleep` poll.
+* **L7 has a health endpoint** (`APIServer.swift:416`, `GET /api/health`) and the app flushes on
+  `applicationWillTerminate`.

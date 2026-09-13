@@ -244,6 +244,40 @@
       "commit": null,
       "notes": "Production path: chatbots-cli --serve calls APIServer.waitUntilReady (main.swift:649). Second half of A05 — HTTPServer is one of the four @unchecked Sendable types, and this is the state that conformance assumes needs no protecting. Graded S1 per §7 (unsafe concurrency); owner may call it S0 because a hoisted read would make a healthy server report as not ready.",
       "blocked_reason": null
+    },
+    {
+      "id": "A15",
+      "severity": "S1",
+      "unit": "EngineService/DocumentImport",
+      "file_line": "DocumentImport.swift:160-168, EngineService.swift:325-357",
+      "title": "Attaching a document blocks the engine main actor for the whole conversion, subprocess wait included",
+      "category": "perf",
+      "status": "START",
+      "host_used": "this Mac",
+      "discovered_by": "L5 pass",
+      "evidence_before": "DocumentIngestorProvider.ingestor.add is synchronous; DocumentImport.swift:163-166 polls usleep(20000) to a deadline; EngineService is @MainActor and calls it from addAttachment (EngineService.swift:325-357), so the actor every front end and the transport share is blocked",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "S1 not S2: the blocked actor is shared, so the failure is an unresponsive app, not a slow conversion. Moving it off the actor depends on settling A05 for DocumentIngestor.",
+      "blocked_reason": null
+    },
+    {
+      "id": "A16",
+      "severity": "S3",
+      "unit": "ChatBotsCLI",
+      "file_line": "Sources/ChatBotsCLI/main.swift:689",
+      "title": "--serve has no signal handling, so the listener is never shut down and nothing is flushed on exit",
+      "category": "incomplete",
+      "status": "START",
+      "host_used": "this Mac",
+      "discovered_by": "L7 pass",
+      "evidence_before": "main.swift:689 while true { try? await Task.sleep(for: .seconds(3600)) } with no SIGINT/SIGTERM handler; WebTransportEngineServer.stop() and HTTP teardown never run",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "No data loss — ConversationStore writes per turn — but the port is never released and logs are not flushed.",
+      "blocked_reason": null
     }
   ]
 }
