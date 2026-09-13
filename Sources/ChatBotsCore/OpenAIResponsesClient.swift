@@ -540,7 +540,9 @@ public struct OpenAIResponsesClient: Sendable {
         // which would replace the server's own reason with a less useful one.
         var sawFailure = false
         var utf8 = UTF8StreamBuffer()
-        for try await line in bytes.lines {
+        // Labelled so a terminal event can end the read, not merely the `switch` it is decoded
+        // in. A `break` inside a case only leaves the case.
+        readLoop: for try await line in bytes.lines {
             try Task.checkCancellation()
             guard let payload = Self.dataPayload(from: line) else { continue }
             if payload == "[DONE]" { break }
@@ -574,10 +576,18 @@ public struct OpenAIResponsesClient: Sendable {
                 let message = Self.failureMessage(from: event)
                 sawFailure = true
                 continuation.yield(.failed(message))
+                // The server has already given its answer, so the read ends here. Without this
+                // the loop went back to `bytes.lines` for a connection a server may hold open,
+                // and the turn stayed alive until the 600-second request timeout — ten minutes
+                // of waiting for a failure that was reported at once. It is also what concludes
+                // a stream that reports failure and then sends nothing: A54 made a missing
+                // terminal event a failure the reader must act on rather than wait out (A107).
+                break readLoop
 
             case "error":
                 sawFailure = true
                 continuation.yield(.failed(Self.failureMessage(from: event)))
+                break readLoop
 
             default:
                 break
