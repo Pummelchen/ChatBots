@@ -153,27 +153,47 @@ public struct AttachedDocument: Identifiable, Sendable, Equatable, Codable {
 }
 
 extension AttachedDocument {
+    /// The image media types the Responses API documents, and the only ones this app sends.
+    ///
+    /// A52's lane checked the API documentation: png, jpeg, webp and gif. **BMP and TIFF are not
+    /// in it** (audit A101), and the intake path used to send them anyway. They are common
+    /// enough to keep offering — macOS itself writes TIFF, and screenshots from other systems
+    /// are BMP — so they are *converted* at intake, exactly as HEIC is, and never put on the
+    /// wire under a type the API may reject.
+    ///
+    /// This is the one list the sniffer and the sender share, so "what this app describes to a
+    /// model" and "what the API accepts" cannot drift apart. The picker's list in
+    /// `DocumentKind.image.extensions` is deliberately **wider** and cannot be the same list:
+    /// it is "what ImageIO can read and convert", not "what the API takes", and the whole point
+    /// of intake is that those differ.
+    public static let acceptedImageMediaTypes: Set<String> = [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/gif",
+    ]
+
     /// The media type for image bytes, from the bytes rather than the filename.
     ///
     /// The extension can lie — a `.png` that is really a JPEG is common — and servers
     /// validate the declared type, so the magic bytes are what is believed. `nil` means the
-    /// bytes are not a type this app can describe to a model; the intake path converts what it
-    /// can into one of these and refuses the rest, so `nil` never reaches a request silently.
+    /// bytes are not a type the API accepts: the intake path converts what it can (HEIC, BMP,
+    /// TIFF) into one of `acceptedImageMediaTypes` and refuses the rest, so `nil` never reaches
+    /// a request silently.
     public static func mediaType(of data: Data) -> String? {
         guard data.count >= 4 else { return nil }
         let bytes = [UInt8](data.prefix(12))
         if bytes.starts(with: [0x89, 0x50, 0x4E, 0x47]) { return "image/png" }
         if bytes.starts(with: [0xFF, 0xD8, 0xFF]) { return "image/jpeg" }
         if bytes.starts(with: [0x47, 0x49, 0x46, 0x38]) { return "image/gif" }
-        if bytes.starts(with: [0x42, 0x4D]) { return "image/bmp" }
         if bytes.count >= 12, bytes[0..<4] == [0x52, 0x49, 0x46, 0x46],
             bytes[8..<12] == [0x57, 0x45, 0x42, 0x50]
         {
             return "image/webp"
         }
-        if bytes.starts(with: [0x49, 0x49, 0x2A, 0x00]) || bytes.starts(with: [0x4D, 0x4D, 0x00, 0x2A]) {
-            return "image/tiff"
-        }
+        // BMP (42 4D) and TIFF (49 49 2A 00 / 4D 4D 00 2A) are deliberately **not** returned:
+        // they are readable by ImageIO, so intake converts them to PNG or JPEG, but they are
+        // not types the Responses API documents and must not be declared on the wire.
         return nil
     }
 

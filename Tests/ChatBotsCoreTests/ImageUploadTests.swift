@@ -32,8 +32,16 @@ struct ImageUploadTests {
         #expect(image("actually-jpeg.png", bytes: jpeg).imageMediaType == "image/jpeg")
         let gif = Data([0x47, 0x49, 0x46, 0x38, 0x39, 0x61])
         #expect(image("x.png", bytes: gif).imageMediaType == "image/gif")
+        // BMP and TIFF are **not** types the Responses API documents, so they are not declared
+        // to it. Returning `image/bmp` / `image/tiff` here is what put an undocumented type on
+        // the wire and got the attachment rejected; intake now converts them (audit A101), so
+        // `nil` from the sniffer is the value that makes that conversion happen.
         let bmp = Data([0x42, 0x4D, 0x00, 0x00])
-        #expect(image("x.png", bytes: bmp).imageMediaType == "image/bmp")
+        #expect(image("x.png", bytes: bmp).imageMediaType == nil)
+        let littleEndianTIFF = Data([0x49, 0x49, 0x2A, 0x00])
+        #expect(image("x.png", bytes: littleEndianTIFF).imageMediaType == nil)
+        let bigEndianTIFF = Data([0x4D, 0x4D, 0x00, 0x2A])
+        #expect(image("x.png", bytes: bigEndianTIFF).imageMediaType == nil)
         let webp = Data([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50])
         #expect(image("x.png", bytes: webp).imageMediaType == "image/webp")
         // Something unrecognisable must not be sent under a made-up type.

@@ -159,6 +159,11 @@ public struct TextutilExtractor: DocumentExtracting {
 /// MLX backend read it fine. A silent, backend-dependent difference is the worst of the
 /// options; converting here means both backends get bytes they can use, and an image that
 /// cannot be converted is refused where the moderator can see the reason.
+///
+/// BMP and TIFF are the mirror case (audit A101): the app used to *send* them as `image/bmp`
+/// and `image/tiff`, which the API documentation A52's lane checked does not list, so those
+/// attachments were likely rejected with a 400. They are common — macOS writes TIFF and other
+/// systems produce BMP — so this conversion path, not a refusal, is what handles them now.
 public struct ImageExtractor: DocumentExtracting {
     public func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument {
         let data: Data
