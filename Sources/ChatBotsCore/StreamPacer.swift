@@ -26,6 +26,24 @@ public struct StreamPacer: Sendable {
     /// Characters per second when nothing has been measured yet. Roughly the pace of this
     /// hardware's generation, so the first turn is already close.
     public init() {}
+
+    /// Start already knowing how fast this stream produced text last time.
+    ///
+    /// A pacer created with the default rate re-converges from 40 cps, so a stream whose model
+    /// is slower than that drains its queue at the start of every turn — the visible gap this
+    /// whole mechanism exists to remove (audit A63). `StreamPacerPool` remembers the last
+    /// measured rate per stream and passes it here, so a new pacer starts where the previous
+    /// one finished rather than where the default assumption began.
+    ///
+    /// The seed is the same ceiling `observeGeneration` converges to, so the first frames
+    /// behave as the converged pacer did. A missing, zero or non-finite rate leaves the
+    /// defaults alone — nothing has been measured, so nothing is assumed.
+    public init(seedingFrom generationRate: Double?) {
+        guard let generationRate, generationRate > 0, generationRate.isFinite else { return }
+        self.generationRate = generationRate
+        revealRate = max(minimumRate, min(maximumRate, generationRate * 0.95))
+    }
+
     public var revealRate: Double = 40
     /// A safety net only.
     ///
@@ -144,12 +162,20 @@ public final class StreamPacerPool {
 
     private var pacers: [Key: StreamPacer] = [:]
     /// Per-channel generation rate, smoothed, for new pacers to start from.
+    ///
+    /// Kept across `clear`: the throughput belongs to the stream and the model behind it, not
+    /// to the turn, so it is what seeds the next turn's pacer (audit A63). Written by
+    /// `observe`, read by `enqueue`.
     private var generationRates: [Key: Double] = [:]
 
     public func enqueue(_ text: String, agentID: String, channel: Channel) {
         guard !text.isEmpty else { return }
         let key = Key(agentID: agentID, channel: channel)
-        var pacer = pacers[key] ?? StreamPacer()
+        // A pacer created here starts from the rate this stream last produced at, not from the
+        // default 40 cps. The app clears a seat's pacer at every `.turnStarted`, so without this
+        // the learned rate was stored and never read back and each turn re-converged from 40 —
+        // a slow stream drained its queue at the start of every turn (audit A63).
+        var pacer = pacers[key] ?? StreamPacer(seedingFrom: generationRates[key])
         pacer.enqueue(text)
         pacers[key] = pacer
     }
@@ -187,6 +213,10 @@ public final class StreamPacerPool {
         pacers.contains { $0.key.channel == .answer && $0.value.backlog > 0 }
     }
 
+    /// Drop a seat's queued text without forgetting how fast it was producing.
+    ///
+    /// Called at every `.turnStarted` so a new turn does not reveal the last one's tail. The
+    /// pacer goes; the measured rate in `generationRates` stays, and seeds the next pacer.
     public func clear(agentID: String) {
         for channel in [Channel.answer, .reasoning] {
             pacers[Key(agentID: agentID, channel: channel)] = nil
