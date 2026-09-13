@@ -658,8 +658,20 @@ public final class ConversationEngine {
     /// a two-seat run configured with two analysts — the first seat is asked instead, since a
     /// report is the deliverable and producing none would waste the whole session. The
     /// substitution is noted rather than silent.
+    ///
+    /// **One report per session.** A conversation restored by `load()` brings back the report
+    /// its session produced, and `start()` skips `beginResearchSessionIfNeeded` because
+    /// `research` is already there. Without this guard the loop's finished check then fired
+    /// against the restored session, called the moderator for a fresh minutes-long generation,
+    /// and appended a second report over a transcript that had gained no turns — the same
+    /// failure `reset()` documents fixing, reintroduced by the load path. `reset()` clears the
+    /// report along with the session, so a new run still gets a new report; a session that was
+    /// saved mid-run and has none yet still gets one when it finishes.
     private func writeReport(reason: ResearchStop) async {
         guard let session = conversation.research else { return }
+        guard conversation.report == nil,
+            !conversation.turns.contains(where: { $0.kind == .report })
+        else { return }
 
         let moderator =
             seats.first { $0.spec.personaID == AnalystLibrary.moderatorID }
