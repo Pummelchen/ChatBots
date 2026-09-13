@@ -876,3 +876,36 @@ and the answer is a habit rather than a script — a commit should always name i
 
 The mixed commit stays in the record. This audit forbids rewriting history, so it is annotated
 rather than repaired, and the `tools/` lane was told immediately not to re-commit those files.
+
+---
+
+## A87 — parallel Swift lanes share a module and cannot be isolated — **DONE**
+
+**S2** · process · found by the fix phase stalling rather than by reasoning
+
+Three Swift lanes were started on **disjoint files** (`ConversationEngine`/`ConversationStore`;
+`DocumentImport`/`MLXEngine`; `Sources/ChatBotsApp/**`), each with its own `--scratch-path` under
+`/tmp`, and A83 had just made the test-port allocator probe for a free port so concurrent test runs
+could not collide. None of that was sufficient, and the lanes stalled: edits from 10:38–10:45, no
+commit by 10:54, the app-layer lane having written **nothing at all** in half an hour, and the
+machine at load 57–92 with 25 compiler processes for 8 cores.
+
+**The reason is the module boundary, not the files.** `swift build` compiles
+`Sources/ChatBotsCore` as *one module*, so an in-progress edit in any lane's file is visible to
+every other lane's build. A fix that is half-applied — the ordinary state of a file between two
+edits — does not type-check, so the other lanes fail for a reason that has nothing to do with their
+own change. Separate scratch directories isolate build *artefacts*, and the port probe isolates test
+*sockets*; nothing isolates the thing that actually conflicted, which is the source.
+
+**The rule this produces**, written down so it is not rediscovered: parallelism is safe across
+repositories, and across language boundaries within one repository, and within Swift it is safe
+across *packages* — but not within one module. So the Swift lanes were serialised to one, the
+stalled batches were re-run afterwards one at a time, and the non-Swift lanes stayed parallel
+because `tools/` shares neither a module nor a compiler with `Sources/`.
+
+This is the **fourth** defect this audit has found in its own process, after A19 (a DONE claim whose
+commit carried nothing), A83 (a guard that skipped the case it targeted, and a test-port allocator
+that collided) and A84 (a commit that absorbed another lane's staged files). The pattern is the same
+in all four: **the audit was confident about its controls and had not checked its own mechanism** —
+and each was found by looking at observed behaviour, a `git status`, a guard's output, a file mtime,
+rather than by reasoning about the design. That is also how the substantive findings were found.

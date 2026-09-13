@@ -1468,6 +1468,23 @@
       "commit": null,
       "notes": "",
       "blocked_reason": null
+    },
+    {
+      "id": "A87",
+      "severity": "S2",
+      "unit": "audit process / parallelism",
+      "file_line": "AUDIT/ (how the fix lanes were scheduled)",
+      "title": "Parallel Swift fix lanes cannot be isolated by scratch path or port: they compile the same module, so one lane's half-finished edit fails every other lane's build",
+      "category": "process",
+      "status": "DONE",
+      "host_used": "this Mac",
+      "discovered_by": "the coordinator, from the fix phase stalling: three Swift lanes ran ~30 minutes without a single commit while the machine sat at load 57-92 with 25 compiler processes on 8 cores",
+      "evidence_before": "Three Swift lanes were started on disjoint FILES (ConversationEngine/ConversationStore; DocumentImport/MLXEngine; Sources/ChatBotsApp/**), each with its own `--scratch-path` under /tmp, and A83 had just made the test port allocator probe for a free port so concurrent test runs could not collide. None of that was sufficient. The lanes stalled: file mtimes showed edits from 10:38-10:45 and no commit by 10:54, the app-layer lane had written NOTHING at all in ~30 minutes, and the machine was at load 57-92 with 25 swift-frontend processes for 8 cores. The reason is the module boundary, not the files: `swift build` compiles Sources/ChatBotsCore as ONE module, so an in-progress edit in any lane's file is visible to every other lane's build. A fix that is half-applied - the normal state of a file between two edits - does not type-check, so the other two lanes fail their build for a reason that has nothing to do with their own change.",
+      "fix_summary": "Serialise Swift work: at most one lane editing Sources/ at a time. The two lanes that were stalled on each other were stopped and the remaining one was left to finish; the interrupted batches are re-run afterwards, one at a time. Non-Swift lanes stay parallel, because `tools/` and the docs share neither a module nor a compiler with Sources/. The scheduling rule this produces is stated here rather than rediscovered: parallelism is safe across REPOSITORIES and across LANGUAGE boundaries, and it is safe within Swift only across packages - not within one module.",
+      "evidence_after": "After stopping the app-layer lane, the remaining two completed and committed their work; the app-layer batch was re-run on its own and its scratch directory was removed. Load fell and the builds completed.",
+      "commit": null,
+      "notes": "This is the fourth defect this audit has found in its own process, after A19 (a DONE claim whose commit carried nothing), A83 (a guard that skipped the case it targeted, and a test port allocator that collided) and A84 (a commit that absorbed another lane's staged files). The pattern across all four is the same and worth stating plainly: the audit was confident about its CONTROLS and had not checked its own MECHANISM. Each was found by looking at observed behaviour - a git status, a guard output, a file mtime - rather than by reasoning about the design, which is also how the substantive findings were found.",
+      "blocked_reason": null
     }
   ]
 }
