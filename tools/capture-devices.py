@@ -49,6 +49,14 @@ CHROME_PORT: int = 9223
 # header can eat the whole screen.
 ORIENTATIONS: tuple[str, ...] = ("portrait", "landscape")
 
+# Caddy runs in front of an engine this script has already waited for, so readiness is normally
+# sub-second. The retry bound is wall-clock time rather than a count of attempts, and the pause
+# applies to every retry path, so a proxy that answers before it is ready cannot make this loop
+# spin and a slow-but-reachable one is not given up on for a reason that has nothing to do with
+# readiness.
+CADDY_READY_TIMEOUT: float = 15.0
+CADDY_RETRY_INTERVAL: float = 0.5
+
 # The engine's profile list is JSON over its own loopback API, so a value's shape is only
 # known at run time. `Any` is the honest type at that boundary: every field is read by name
 # and used the way the engine's documented schema defines it, and the one place this script
@@ -143,16 +151,28 @@ def caddy_process() -> subprocess.Popen[bytes] | None:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-    for _ in range(30):
+    deadline = time.monotonic() + CADDY_READY_TIMEOUT
+    while time.monotonic() < deadline:
+        # A caddy that has already exited will never answer, so there is nothing to wait for:
+        # stop now and let the caller serve from the engine instead. `terminate` below is a
+        # no-op for a process that has already been reaped.
+        if process.poll() is not None:
+            break
+        status: int | None = None
         try:
             conn = http.client.HTTPConnection("127.0.0.1", PORT, timeout=2)
             conn.request("GET", "/api/health")
-            if conn.getresponse().status == 200:
-                conn.close()
-                return process
+            status = conn.getresponse().status
             conn.close()
         except (OSError, http.client.HTTPException):
-            time.sleep(0.5)
+            pass
+        if status == 200:
+            return process
+        # Paced on every path. This used to sleep only inside `except`, so a proxy that
+        # answered with anything other than 200 was retried with no delay at all; and the loop
+        # counted 30 attempts rather than time, so what it waited for depended on how fast the
+        # endpoint responded rather than on whether it had become ready.
+        time.sleep(CADDY_RETRY_INTERVAL)
     process.terminate()
     return None
 
