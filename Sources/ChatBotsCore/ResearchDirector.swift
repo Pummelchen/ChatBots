@@ -469,14 +469,48 @@ public struct ResearchDirector: Sendable {
     /// Anything that cites, measures, or states an assumption as one. A claim with none of
     /// those is not necessarily wrong — it may simply be an opinion — but it is not evidence,
     /// and the investigation should not build on it as though it were.
+    ///
+    /// Each marker must be a whole word, and the inflections that count are listed rather than
+    /// inherited from a shared prefix. The bare `contains` version was looser than it read:
+    /// "statistic" matched "statistically", so a sentence with no source at all qualified as
+    /// basis-bearing. A67 made that looseness load-bearing — all coverage now rests on this —
+    /// which is why it is tightened rather than left (audit A97).
     public static func hasBasis(_ text: String) -> Bool {
         let lowered = text.lowercased()
-        let markers = [
-            "according to", "source", "reported", "data", "study", "survey", "filing",
-            "measured", "estimate", "figure", "statistic", "research", "i assume",
-            "assumption", "assuming", "we assume", "on the basis", "because it",
-        ]
-        return markers.contains { lowered.contains($0) }
+        return basisMarkers.contains { wholeWord($0, in: lowered) }
+    }
+
+    /// The words that count as a basis. Inflections are explicit: "estimated" and "estimates"
+    /// are here, "statistically" deliberately is not, and the bare noun "report" is not either —
+    /// "Report says" with nothing behind it is the unsourced case, which is why the original list
+    /// carried "reported" rather than "report".
+    private static let basisMarkers = [
+        "according to", "source", "sources", "sourced", "reported",
+        "data", "study", "survey", "surveys", "filing", "filings",
+        "measured", "estimate", "estimates", "estimated", "figure", "figures",
+        "statistic", "statistics", "statistical", "research",
+        "assume", "assumes", "assumed", "assuming", "assumption", "assumptions",
+        "on the basis", "because it",
+    ]
+
+    /// Whether a marker occurs in `lowered` as a whole word.
+    ///
+    /// Unlike `mentions`, both ends are anchored. `mentions` serves the subject keywords, whose
+    /// stems are meant to match ("customer", "customers"); a basis marker is a word the sentence
+    /// actually uses, and a longer word that merely starts with one is a different claim.
+    private static func wholeWord(_ marker: String, in lowered: String) -> Bool {
+        var searchStart = lowered.startIndex
+        while let range = lowered.range(of: marker, range: searchStart..<lowered.endIndex) {
+            let before = range.lowerBound == lowered.startIndex
+                ? nil : lowered[lowered.index(before: range.lowerBound)]
+            let after = range.upperBound == lowered.endIndex
+                ? nil : lowered[range.upperBound]
+            let boundaryBefore = before.map { !$0.isLetter && !$0.isNumber } ?? true
+            let boundaryAfter = after.map { !$0.isLetter && !$0.isNumber } ?? true
+            if boundaryBefore && boundaryAfter { return true }
+            searchStart = range.upperBound
+        }
+        return false
     }
 
     /// What to do next.
