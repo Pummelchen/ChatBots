@@ -100,13 +100,18 @@ public enum ResearchStop: String, Sendable, Hashable, Codable {
     /// The remaining disagreement is one more discussion cannot settle — a missing
     /// measurement, not a failure to communicate.
     case evidenceExhausted
-    /// Every part of the question has been addressed and nothing is left in dispute.
+    /// Every part of the question has been raised in a contribution that gave a basis for what
+    /// it said, and nothing is left in dispute.
     ///
     /// Not derived from the counters, because it is not a fact about how much has been spent
     /// but about what has been covered: the moderator reads the transcript and finds nothing it
     /// would point the room at. Reaching this before the budget is the point of having a
     /// moderator at all — spending the remaining rounds restating findings nobody disputes is
     /// the failure the moderator exists to prevent.
+    ///
+    /// The wording is deliberately narrower than "answered". The reading is a phrase matcher:
+    /// it can establish that a subject was raised with something behind it, not that the
+    /// subject was settled, and the report should not claim more than that.
     case answered
     /// The moderator stopped it.
     case stoppedByModerator
@@ -125,7 +130,7 @@ public enum ResearchStop: String, Sendable, Hashable, Codable {
         case .evidenceExhausted:
             "What remains in dispute cannot be settled by more discussion — it needs evidence nobody has gathered."
         case .answered:
-            "Every part of the question has been addressed and nothing remains in dispute."
+            "Every part of the question has been raised in a contribution that gave a basis for what it said, and nothing remains in dispute."
         case .stoppedByModerator: "The moderator stopped the investigation."
         }
     }

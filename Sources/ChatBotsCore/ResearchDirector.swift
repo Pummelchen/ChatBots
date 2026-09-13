@@ -103,6 +103,10 @@ public enum ResearchReading {
     /// mode uses, rather than from a second set of phrase lists that would drift out of step
     /// with the first.
     ///
+    /// Coverage is recorded only from contributions that gave a basis. A subject named in an
+    /// unsourced assertion is left open, because a mention is not an answer and the director
+    /// should not stop pointing at a gap just because the gap was named.
+    ///
     /// Two passes, because a gap has to be read *after* the room responds to it. A claim with
     /// no basis, or a disagreement, stays in the record for the rest of the session; without
     /// the second pass the director would take the first one it ever found and ask about it
@@ -145,8 +149,17 @@ public enum ResearchReading {
             contributions[seatID, default: 0] += 1
 
             let questions = ResearchDirector.subQuestions(in: turn.content)
-            for question in questions {
-                covered[question, default: []].insert(seatID)
+            // A subject is covered only by a contribution that also says what it is relying on.
+            //
+            // A keyword in an unsourced paragraph is a mention, not an answer, and treating a
+            // mention as coverage is what let a couple of paragraphs read as the whole question
+            // addressed. The relationship and conflict reads below still use every subject the
+            // text names, because pairing a challenge with what it answered is about what was
+            // said rather than about what was evidenced.
+            if ResearchDirector.hasBasis(turn.content) {
+                for question in questions {
+                    covered[question, default: []].insert(seatID)
+                }
             }
 
             let signals = ConflictReader.signals(
@@ -296,7 +309,7 @@ public struct ResearchDirector: Sendable {
         self.analystIDs = analystIDs
     }
 
-    /// The first sub-question nothing has addressed.
+    /// The first sub-question no contribution has raised with a basis.
     public var unanswered: ResearchSubQuestion? {
         ResearchSubQuestion.allCases.first { (covered[$0] ?? []).isEmpty }
     }
@@ -308,10 +321,12 @@ public struct ResearchDirector: Sendable {
     /// open question has just spoken — and they need opposite answers. "Not now" must not end a
     /// research session; "nothing left" is the best reason there is to end one.
     ///
-    /// The bar is deliberately high: every one of the ten subjects covered, no unsupported
-    /// claim outstanding, no live disagreement, and nobody sitting idle. A run that clears all
-    /// four has genuinely answered the question, and spending its remaining budget would only
-    /// restate findings nobody disputes.
+    /// The bar is deliberately high: every one of the ten subjects raised by a contribution
+    /// that gave a basis for what it said, no unsupported claim outstanding, no live
+    /// disagreement, and nobody sitting idle. Coverage here is the basis-bearing kind recorded
+    /// by `ResearchReading.read`; an unsourced mention leaves the subject open. A run that
+    /// clears all four has nothing the moderator can usefully point at, and spending its
+    /// remaining budget would only restate findings nobody disputes.
     public var hasOpenWork: Bool {
         if !unsupported.isEmpty { return true }
         if conflicts.contains(where: { !settled.contains($0.key) }) { return true }
@@ -320,16 +335,57 @@ public struct ResearchDirector: Sendable {
         return false
     }
 
-    /// Which sub-question a contribution is about, from its wording.
+    /// Which sub-questions a contribution is about, from its wording.
     ///
-    /// Several can be present; the first match in the enum's order is taken, because a
-    /// contribution that mentions both cost and regulation is usually *about* one of them and
-    /// treating it as covering both would leave gaps that are not really gaps.
+    /// Every subject the text actually names is returned, not only the first: a contribution
+    /// about cost and regulation is genuinely about both, and silently dropping one would leave
+    /// the director asking for something the room had already raised. What keeps that from
+    /// becoming a claim on a paragraph of ordinary prose is decided in two other places. The
+    /// match must begin a word — see `mentions` — so "law" no longer matches "flaw" or
+    /// "outlaw", "source" no longer matches "resource" and "figure" no longer matches
+    /// "configure". And `ResearchReading.read` counts a subject as covered only when the
+    /// contribution that names it also gives a basis for what it says, so an unsourced
+    /// assertion is a mention rather than coverage.
+    ///
+    /// The doc comment here used to claim the opposite rule — "the first match in the enum's
+    /// order is taken" — which the code never implemented. It is corrected rather than obeyed:
+    /// taking only the first match would under-read a contribution, and the over-reading it was
+    /// meant to prevent is handled where coverage is recorded.
     public static func subQuestions(in text: String) -> [ResearchSubQuestion] {
         let lowered = text.lowercased()
         return ResearchSubQuestion.allCases.filter { question in
-            keywords(for: question).contains { lowered.contains($0) }
+            keywords(for: question).contains { mentions($0, in: lowered) }
         }
+    }
+
+    /// Whether a marker occurs in `lowered` at the start of a word.
+    ///
+    /// The markers are short and several are fragments of ordinary words, so a bare
+    /// `contains` read a paragraph about a "flaw", a "resource" or a "configuration" as
+    /// covering regulation and evidence. Requiring the marker to begin a word is what closes
+    /// that: the character before it must not be a letter or a digit.
+    ///
+    /// The end is deliberately not anchored. The markers are stems — "assum", "competitor",
+    /// "customer", "regulat" is not one but "regulation" is — and "assumptions", "competitors"
+    /// and "customers" are plainly the same subject as the stem. Anchoring the end would trade
+    /// one kind of false positive for a larger number of false negatives.
+    ///
+    /// `"%"` is the one marker that is punctuation rather than a word, so it is matched only
+    /// where a number is attached to it — the only place it states a magnitude. A bare "%"
+    /// with no number in front of it does not.
+    private static func mentions(_ marker: String, in lowered: String) -> Bool {
+        var searchStart = lowered.startIndex
+        while let range = lowered.range(of: marker, range: searchStart..<lowered.endIndex) {
+            let before = range.lowerBound == lowered.startIndex
+                ? nil : lowered[lowered.index(before: range.lowerBound)]
+            if marker == "%" {
+                if before?.isNumber == true { return true }
+            } else if before.map({ !$0.isLetter && !$0.isNumber }) ?? true {
+                return true
+            }
+            searchStart = range.upperBound
+        }
+        return false
     }
 
     private static func keywords(for question: ResearchSubQuestion) -> [String] {
