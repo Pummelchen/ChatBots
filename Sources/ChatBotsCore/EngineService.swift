@@ -42,6 +42,13 @@ public final class EngineService {
     /// Where conversations are kept between runs.
     public let store: ConversationStore
 
+    /// The revision stamped on the next snapshot.
+    ///
+    /// Monotonic for the life of this service and incremented in `snapshot()`, the one place a
+    /// snapshot is produced — both front ends reach it through the same replies and pushes. A
+    /// client uses it to order two snapshots the wall clock cannot separate (audit A110).
+    private var snapshotRevision = 0
+
     /// Where a staged upload is read.
     ///
     /// A closure rather than a direct call to `DocumentIngestorProvider`, so a test can supply
@@ -470,6 +477,7 @@ public final class EngineService {
     public func snapshot() -> APISnapshot {
         let usage = engine.contextUsage
         let roomMode = engine.specs.first?.mode ?? .entertainment
+        snapshotRevision += 1
         return APISnapshot(
             topic: engine.topic,
             mode: roomMode.rawValue,
@@ -525,6 +533,7 @@ public final class EngineService {
                     emoji: $0.emoji, isAnalyst: $0.isAnalyst)
             },
             serverTime: .now,
+            revision: snapshotRevision,
             research: engine.researchStatus(),
             moderatorName: engine.moderator.speakerName,
             moderatorPersona: PersonaCatalog.style(

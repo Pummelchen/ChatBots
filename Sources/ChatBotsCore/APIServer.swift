@@ -91,6 +91,30 @@ public struct APISnapshot: Codable, Sendable {
     public var availablePersonas: [APIPersona]
     public var serverTime: Date
 
+    /// A counter the engine increments for every snapshot it produces.
+    ///
+    /// `serverTime` is encoded ISO-8601, so it is whole-second and cannot order two snapshots
+    /// produced inside the same second — a `run` reply racing a push within one second would
+    /// compare equal, and the older `status` could be applied last. It is also the wall clock,
+    /// so a backwards clock step would make every later snapshot look stale and freeze the
+    /// interface's updates. A revision orders snapshots whatever the clock does (audit A110).
+    ///
+    /// Optional so a snapshot from an engine that predates the field still decodes; `isOlder`
+    /// falls back to `serverTime` when either side has none.
+    public var revision: Int?
+
+    /// Whether this snapshot was produced before `other`.
+    ///
+    /// The engine's monotonic revision decides it whenever both snapshots carry one. When
+    /// either does not — an older engine on the other end of the wire — the wall clock is the
+    /// only ordering available, which is exactly what was used before the revision existed.
+    public func isOlder(than other: APISnapshot) -> Bool {
+        if let revision, let otherRevision = other.revision {
+            return revision < otherRevision
+        }
+        return serverTime < other.serverTime
+    }
+
     /// The research session, when there is one. Nil in entertainment, where there is no
     /// budget and no end condition on purpose.
     public var research: ResearchStatus?

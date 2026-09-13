@@ -186,9 +186,6 @@ public final class ChatController: ObservableObject {
     /// does not republish field by field.
     public private(set) var lastSnapshot: APISnapshot?
 
-    /// The engine's own clock for the newest snapshot applied. It is the only ordering a
-    /// snapshot offers, and it is what stops an older one being applied after a newer (A48).
-    private var appliedSnapshotTime: Date?
     /// Snapshots actually applied. A poll reads it before its request and again after, so a
     /// snapshot cannot be applied out of order behind one that landed while it was in flight.
     private var appliedSnapshotCount = 0
@@ -281,12 +278,13 @@ public final class ChatController: ObservableObject {
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .seconds(1))
                     guard let self, !Task.isCancelled else { return }
-                    // A poll is the one snapshot whose order relative to the push feed cannot
-                    // be known: its reply can be produced before a push the pump applies while
-                    // the request is in flight, and `serverTime` is only second-accurate. So it
-                    // is applied only if nothing else landed meanwhile. Pushes are the primary
-                    // path and the poll exists for a push feed that has gone quiet, so dropping
-                    // a poll the engine has already superseded costs nothing.
+                    // The poll's reply is the one snapshot whose arrival order relative to the
+                    // push feed is not the engine's order: it can be produced before a push the
+                    // pump applies while the request is in flight. The engine's revision orders
+                    // them, so `apply` would refuse the older one anyway; this in-flight check
+                    // is the belt to that braces, and it costs one integer comparison. Pushes are
+                    // the primary path and the poll exists for a push feed that has gone quiet,
+                    // so dropping a poll the engine has already superseded costs nothing.
                     let appliedBefore = self.appliedSnapshotCount
                     if let snapshot = try? await client.state(),
                         self.appliedSnapshotCount == appliedBefore
@@ -392,7 +390,6 @@ public final class ChatController: ObservableObject {
         // controller down two paths — the push feed and the replies to commands and the poll —
         // and the reply path wakes through a task group, so a newer push can be applied first.
         guard !isStale(snapshot) else { return }
-        appliedSnapshotTime = snapshot.serverTime
         appliedSnapshotCount += 1
         lastSnapshot = snapshot
         // A restored file that the engine turns out to hold under the same name is loaded, not
@@ -486,15 +483,16 @@ public final class ChatController: ObservableObject {
 
     /// Whether `snapshot` was produced before the newest state already applied.
     ///
-    /// The wire carries no revision number, so the engine's own clock is the only ordering a
-    /// snapshot offers. `serverTime` is ISO-8601 to the second (`ProtocolCodec`), so two
-    /// snapshots inside one second compare equal; the poll's in-flight check below covers that
-    /// window, and it is the only one that matters here. The message log deliberately is *not*
-    /// used as a tie-break: `reset`, `newConversation` and loading a kept conversation all
-    /// legitimately shrink it, so a shorter log is a newer state as often as an older one.
+    /// The engine stamps every snapshot with a monotonic revision, and that orders two produced
+    /// inside the same second — which its wall clock cannot, since `serverTime` is ISO-8601 to
+    /// the second — and keeps ordering them when the system clock moves backwards. A snapshot
+    /// from an engine that does not send a revision falls back to its clock, which is all there
+    /// was before. The message log deliberately is *not* used as a tie-break: `reset`,
+    /// `newConversation` and loading a kept conversation all legitimately shrink it, so a
+    /// shorter log is a newer state as often as an older one.
     private func isStale(_ snapshot: APISnapshot) -> Bool {
-        guard let appliedSnapshotTime else { return false }
-        return snapshot.serverTime < appliedSnapshotTime
+        guard let lastSnapshot else { return false }
+        return snapshot.isOlder(than: lastSnapshot)
     }
 
     /// Take one fragment of streamed output.
