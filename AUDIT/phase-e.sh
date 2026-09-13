@@ -156,6 +156,13 @@ if swift test --enable-code-coverage > "$out/coverage-test.log" 2>&1; then
     then
         total="$(grep -E '^TOTAL' "$out/coverage.log" | tail -1)"
         pass "coverage: ${total:-report written to $out/coverage.log}"
+        # The two files A02 was opened about, reported individually. Its own acceptance criterion
+        # was a number for each, so recording only the repository total would let the one task
+        # whose whole point is coverage pass on a figure that says nothing about it.
+        for file in MLXEngine.swift TransportCheck.swift TurnLoop.swift; do
+            row="$(grep -E "/$file( |$)" "$out/coverage.log" | tail -1)"
+            [ -n "$row" ] && printf '        %s\n' "$(printf '%s' "$row" | awk '{print $1, " lines:", $10}')"
+        done
     else
         fail "coverage: no profile or no test binary; see $out/coverage.log"
     fi
