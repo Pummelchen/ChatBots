@@ -36,8 +36,8 @@ error is conservative.
 | Tests | **555 → 557** in 77 suites | the runner's own `Test run with …` line | `baseline/swift-test.log`; 557 after A18 added two hermetic tests; 558 after A20 added the XSS guard |
 | Coverage `Sources/` | **71.6 % lines · 70.0 % functions · 66.1 % regions** | `llvm-cov report` over `Sources/` | `baseline/coverage-sources.txt` |
 | Coverage, core inference path | `MLXEngine.swift` **2.2 %** (19/863), `TransportCheck.swift` **0 %**, `OpenAIResponsesEngine` 11.0 %, `WebTools` 11.4 %, `TavilyClient` 16.5 %, `APIServer` 60.2 % | same report, per file | same |
-| `swiftlint` | **401** findings, scoped to `Sources`/`Tests` | count of the JSON reporter's array — **and the scoping is load-bearing**: an unscoped `swiftlint lint` also lints `.build/checkouts` and reports ~37 000. A06's config must exclude `.build` | `baseline/swiftlint.json` |
-| `swift-format lint` | **not reproducible as recorded** (was 29 900) | 29 904 was the line count of the captured file. Must be recounted from `warning:` lines; A06 owns the config and the number | `baseline/swift-format-lint.txt` is a line count, not a finding count |
+| `swiftlint` | **401** findings before A06, **222** after its config | count of the JSON reporter's array. A06's `.swiftlint.yml` excludes `.build`, so an unscoped `swiftlint lint` now reports the same 222 instead of ~37 000 from dependency code — the exclusion is load-bearing and is why the two commands agree | `baseline/swiftlint.json` |
+| `swift-format lint` | **not reproducible as recorded** (was 29 900); **3 003** after A06's config | 29 904 was the line count of the captured file (A28). Now counted from `warning:`/`error:` lines | `baseline/swift-format-lint.txt` |
 | `ruff check` / `ruff format --check` | **11 errors / 5 files would be reformatted** | `ruff check`'s own summary line; `ruff format --check`'s file list | `baseline/ruff-*.txt` — reproduces exactly |
 | `pyright` | **2 errors** | `pyright`'s own `N errors, M warnings` line | `baseline/pyright.json` — reproduces exactly |
 | `shellcheck -S style` | **7 findings** (was recorded as 24): 3 × SC2001, 2 × SC2034, 2 × SC2015 | `grep -oE 'SC[0-9]{4}'` over the run. 24 was the **line count** of the captured file | `baseline/shellcheck.txt` is 24 lines containing 7 findings |
@@ -55,6 +55,20 @@ error is conservative.
 Three baseline results are worth stating plainly because they are *good* and should not
 regress: **no secret in the full history**, **no known CVE in the dependency set**, and
 **no placeholder marker anywhere in tracked source**.
+
+**Recorded waivers.** Two style gates cannot reach zero without either reformatting the whole tree
+or hiding findings, so their residual is waived at a stated number rather than quietly tolerated.
+The lines below are the single source for those numbers — `AUDIT/phase-e.sh` reads them, and fails
+if either count is above its waiver, so raising one is a deliberate edit rather than a silent
+drift. A06 explains what the residual is, by rule, in `.swiftlint.yml` and `.swift-format`.
+
+```
+swiftlint waiver: 222
+swift-format waiver: 3003
+```
+
+`shellcheck -S style`, `ruff check`, `ruff format --check` and `pyright` are **not** waived: those
+are clean targets, and A09 and A10 exist to get them there.
 
 ## Phase B — audit passes (in progress)
 

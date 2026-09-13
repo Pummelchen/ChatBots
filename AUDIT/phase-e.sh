@@ -238,20 +238,49 @@ else
     fail "pyright is not installed"
 fi
 
+# A06 left documented style debt: a config that states the house style rather than hiding
+# findings, so a real number remains. The gate is therefore not "zero" but "no worse than the
+# number this audit recorded" — the same shape as every other baseline. The waiver lives in
+# plan.md so that raising it is a deliberate, reviewable edit rather than a silent drift.
+waiver_for() {
+    sed -n "s/.*$1 waiver: \([0-9][0-9]*\).*/\1/p" AUDIT/plan.md | head -1
+}
+
 if command -v swiftlint >/dev/null 2>&1; then
     swiftlint lint --quiet --reporter json Sources Tests > "$out/swiftlint.json" 2>/dev/null
     findings="$(jq 'length' "$out/swiftlint.json" 2>/dev/null || echo unknown)"
-    pass "swiftlint (scoped to Sources, Tests): $findings finding(s)"
-    [ "$findings" = "0" ] || printf '        (recorded, not hidden: counts by rule in %s)\n' "$out/swiftlint.json"
+    allowed="$(waiver_for swiftlint)"
+    case "$findings" in
+        ''|*[!0-9]*)
+            fail "swiftlint: could not read a count from the JSON reporter"
+            ;;
+        *)
+            if [ -z "$allowed" ]; then
+                fail "swiftlint: $findings finding(s) with no waiver recorded in AUDIT/plan.md"
+            elif [ "$findings" -le "$allowed" ]; then
+                pass "swiftlint: $findings finding(s), within the recorded waiver of $allowed"
+            else
+                fail "swiftlint: $findings finding(s) exceeds the recorded waiver of $allowed — fix them, or raise the waiver deliberately in AUDIT/plan.md"
+            fi
+            ;;
+    esac
 else
     fail "swiftlint is not installed"
 fi
 
 if command -v swift-format >/dev/null 2>&1; then
     swift-format lint --recursive Sources Tests > "$out/swift-format.txt" 2>&1
+    # Counted from diagnostic lines, never from the length of the file: 29 900 was once the
+    # line count of this output rather than a finding count (A28).
     diagnostics="$(grep -cE 'warning:|error:' "$out/swift-format.txt" || true)"
-    pass "swift-format lint: $diagnostics diagnostic(s)"
-    [ "$diagnostics" = "0" ] || printf '        (counted from diagnostic lines, not the file length: %s)\n' "$out/swift-format.txt"
+    allowed="$(waiver_for swift-format)"
+    if [ -z "$allowed" ]; then
+        fail "swift-format: $diagnostics diagnostic(s) with no waiver recorded in AUDIT/plan.md"
+    elif [ "$diagnostics" -le "$allowed" ]; then
+        pass "swift-format: $diagnostics diagnostic(s), within the recorded waiver of $allowed"
+    else
+        fail "swift-format: $diagnostics diagnostic(s) exceeds the recorded waiver of $allowed"
+    fi
 else
     fail "swift-format is not installed"
 fi
