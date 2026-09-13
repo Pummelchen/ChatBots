@@ -81,6 +81,115 @@ public struct TurnSettings: Sendable, Equatable {
     public var templateContext: [String: any Sendable] { thinking.templateContext }
 }
 
+/// Accumulates a turn's reasoning and enforces the mode's ceiling.
+///
+/// The pinned MLX release has no budget-transition API, so the ceiling is a stop condition
+/// the engine applies to its own stream rather than something the model is told about. The
+/// budget is counted in roughly 4-characters-per-token units, which is accurate enough for
+/// "think less" and needs no tokenizer round trip from the generation loop.
+public struct ReasoningCeiling: Sendable, Equatable {
+    public let mode: ThinkingMode
+    public let ceiling: Int?
+    public private(set) var tokens = 0
+    public private(set) var wasReached = false
+
+    public init(mode: ThinkingMode) {
+        self.mode = mode
+        self.ceiling = mode.reasoningTokenBudget
+    }
+
+    /// Account for one reasoning segment. Returns `true` the first time the ceiling is
+    /// reached, and `false` on every later call, so the caller acts exactly once.
+    public mutating func account(reasoning: String) -> Bool {
+        guard !wasReached, let ceiling, ceiling > 0, !reasoning.isEmpty else { return false }
+        tokens += reasoning.count / 4
+        guard tokens >= ceiling else { return false }
+        wasReached = true
+        return true
+    }
+}
+
+/// Splits decoded chunks into reasoning and answer, enforcing the mode's ceiling.
+///
+/// This is the engine's per-chunk text handling, extracted so the ceiling path is testable
+/// without weights. A43 was that hitting the ceiling appended a closing delimiter to the
+/// answer and then abandoned the stream: the model never saw the delimiter, the answer
+/// stayed empty, and the notice claimed the model had answered from the cut-off.
+public struct TurnTextAssembler: Sendable {
+    private var stripper: ThinkingStripper
+    private var ceiling: ReasoningCeiling
+
+    /// The answer text seen so far. The forced delimiter is deliberately not part of it.
+    public private(set) var answer = ""
+    /// True once any reasoning text has been produced.
+    public private(set) var sawReasoning = false
+    /// True once the mode's reasoning ceiling ended the turn.
+    public private(set) var ceilingReached = false
+
+    public init(thinking: ThinkingMode) {
+        self.stripper = ThinkingStripper(startsPrimed: thinking.thinks)
+        self.ceiling = ReasoningCeiling(mode: thinking)
+    }
+
+    /// What one chunk produced.
+    public struct Step: Sendable, Equatable {
+        public var reasoning: String
+        public var answer: String
+        /// Set on the chunk that reached the ceiling, so the caller stops the stream.
+        public var ceilingReached: Bool
+    }
+
+    /// Process one decoded chunk.
+    ///
+    /// When the ceiling is reached the closing delimiter is run through the stripper, so
+    /// reasoning it was holding back is still attributed and reported, but the model never
+    /// sees it — the stream is abandoned and no answer can follow.
+    public mutating func consume(_ chunk: String) -> Step {
+        let segment = stripper.process(chunk)
+        var step = Step(reasoning: segment.reasoning, answer: segment.answer, ceilingReached: false)
+        if !segment.reasoning.isEmpty { sawReasoning = true }
+        answer += segment.answer
+
+        if ceiling.account(reasoning: segment.reasoning), stripper.isInsideReasoning {
+            ceilingReached = true
+            step.ceilingReached = true
+            let closed = stripper.process(MLXEngine.forcedThinkingExit)
+            step.reasoning += closed.reasoning
+            step.answer += closed.answer
+            answer += closed.answer
+            if !closed.reasoning.isEmpty { sawReasoning = true }
+        }
+        return step
+    }
+
+    /// Flush text held back for delimiter matching once the stream ends.
+    public mutating func finish() -> Step {
+        let tail = stripper.finalize()
+        if !tail.reasoning.isEmpty { sawReasoning = true }
+        answer += tail.answer
+        return Step(reasoning: tail.reasoning, answer: tail.answer, ceilingReached: false)
+    }
+}
+
+/// The mode's reasoning ceiling ended the turn before the model produced an answer.
+///
+/// Thrown rather than returning an empty string, so a caller cannot present the truncated
+/// turn as a successful empty answer; `ConversationEngine` turns the throw into a
+/// `turnFailed` event.
+public struct ReasoningCeilingError: LocalizedError, Sendable, Equatable {
+    public let mode: ThinkingMode
+    public let ceiling: Int
+
+    public init(mode: ThinkingMode, ceiling: Int) {
+        self.mode = mode
+        self.ceiling = ceiling
+    }
+
+    public var errorDescription: String? {
+        MLXEngine.reasoningCeilingNotice(mode: mode, ceiling: ceiling, producedAnswer: false)
+    }
+}
+
 public actor MLXEngine: LLMEngine {
 
     public let spec: AgentSpec
@@ -478,8 +587,6 @@ public actor MLXEngine: LLMEngine {
         /// Set when this turn produced reasoning text, so an empty answer can be
         /// explained as "ran out of budget while thinking" rather than silence.
         var stripperSpentItsBudget = false
-        /// Reasoning tokens seen this turn, for the mode's ceiling.
-        var reasoningTokens = 0
         /// Set when the ceiling cut the thought short, so the UI can say so.
         var reasoningWasTruncated = false
         /// Set when generation was cut short because the model began repeating itself.
@@ -529,7 +636,6 @@ public actor MLXEngine: LLMEngine {
         rounds: while true {
             let isFirstRound = roundIndex == 0
             roundIndex += 1
-            reasoningTokens = 0
             repetition = RepetitionDetector()
             let entriesForRound = promptEntries
             // Captured before the closure: `container.perform` runs off the actor, so it can
@@ -573,36 +679,32 @@ public actor MLXEngine: LLMEngine {
                 return session.streamDetails(to: messagesForRound)
             }
 
-            var stripper = ThinkingStripper(startsPrimed: thinking.thinks)
+            var assembler = TurnTextAssembler(thinking: thinking)
             var toolCalls: [ToolCall] = []
 
             for try await generation in stream {
                 try Task.checkCancellation()
                 switch generation {
                 case .chunk(let text):
-                    let segment = stripper.process(text)
-                    if !segment.reasoning.isEmpty {
-                        stripperSpentItsBudget = true
-                        reasoningTokens += segment.reasoning.count / 4
-                    }
-                    answer += segment.answer
-                    await report(segment)
+                    let step = assembler.consume(text)
+                    if !step.reasoning.isEmpty { stripperSpentItsBudget = true }
+                    answer += step.answer
+                    await report(
+                        ThinkingStripper.Segment(reasoning: step.reasoning, answer: step.answer))
 
-                    // Enforce the mode's ceiling. The budget is counted in roughly
-                    // 4-characters-per-token units rather than exact token ids, which is
-                    // accurate enough for "think less" and needs no extra bookkeeping
-                    // from the generation loop.
-                    if let ceiling = reasoningCeiling, ceiling > 0, reasoningTokens >= ceiling,
-                        stripper.isInsideReasoning
-                    {
+                    // Enforce the mode's ceiling. The stream is abandoned here: the pinned
+                    // MLX release has no budget-transition API, so there is no way to tell
+                    // the model to stop thinking and answer. The turn therefore has no
+                    // answer to come, and the notice below says so rather than pretending
+                    // the model answered from the cut-off.
+                    if step.ceilingReached {
                         reasoningWasTruncated = true
-                        answer += Self.forcedThinkingExit
                         break
                     }
 
                     // A loop is a stop condition regardless of the token budget, which is
                     // what keeps a bad sampler setting from producing 32k tokens of noise.
-                    if repetition.ingest(segment.answer) {
+                    if repetition.ingest(step.answer) {
                         loopDetected = true
                         break rounds
                     }
@@ -626,10 +728,10 @@ public actor MLXEngine: LLMEngine {
             }
 
             // A held-back partial delimiter must still be attributed to this round.
-            let tail = stripper.finalize()
+            let tail = assembler.finish()
             if !tail.reasoning.isEmpty { stripperSpentItsBudget = true }
             answer += tail.answer
-            await report(tail)
+            await report(ThinkingStripper.Segment(reasoning: tail.reasoning, answer: tail.answer))
 
             guard !toolCalls.isEmpty, toolSpecs != nil, round < maxToolRounds else { break rounds }
             round += 1
@@ -675,8 +777,9 @@ public actor MLXEngine: LLMEngine {
         }
         // A reasoning model can burn the entire budget inside `<think>` and emit no
         // answer at all. That is legitimate behaviour, not an error, but the user must be
-        // told — otherwise the pane just stays empty with no explanation.
-        if final.isEmpty, stripperSpentItsBudget {
+        // told — otherwise the pane just stays empty with no explanation. When the ceiling
+        // is what ended the turn, the ceiling's own notice below is the truthful one.
+        if final.isEmpty, stripperSpentItsBudget, !reasoningWasTruncated {
             await onEvent(
                 .toolFailure(
                     agentID: agentID,
@@ -698,13 +801,22 @@ public actor MLXEngine: LLMEngine {
         }
 
         if reasoningWasTruncated {
+            let producedAnswer = !final.isEmpty
             await onEvent(
                 .toolFailure(
                     agentID: agentID,
                     name: "thinking",
-                    message: "thinking stopped at the \(thinking.label.lowercased()) ceiling (\(reasoningCeiling ?? 0) tokens) and the model answered from there"
+                    message: Self.reasoningCeilingNotice(
+                        mode: thinking, ceiling: reasoningCeiling ?? 0,
+                        producedAnswer: producedAnswer)
                 )
             )
+            if !producedAnswer {
+                // The ceiling abandoned the stream, so the model never saw the delimiter
+                // and cannot answer from it. Fail rather than hand the caller an empty
+                // turn dressed up as a successful one, which is what this used to do.
+                throw ReasoningCeilingError(mode: thinking, ceiling: reasoningCeiling ?? 0)
+            }
         }
 
         await onEvent(.turnFinished(agentID: agentID, text: final, stats: stats))
@@ -746,6 +858,21 @@ public actor MLXEngine: LLMEngine {
         let highHeadroom = ThinkingMode.high.reasoningTokenBudget ?? 0
         guard let contextWindow, contextWindow > 0 else { return answerBudget + highHeadroom }
         return answerBudget + max(highHeadroom, contextWindow)
+    }
+
+    /// The truthful message for a turn the mode's reasoning ceiling cut short.
+    ///
+    /// The ceiling abandons the stream, so the model never sees the closing delimiter and
+    /// cannot answer from it. The old notice claimed the opposite — "the model answered from
+    /// there" — on a turn that came back empty.
+    public static func reasoningCeilingNotice(
+        mode: ThinkingMode, ceiling: Int, producedAnswer: Bool
+    ) -> String {
+        let level = mode.label.lowercased()
+        if producedAnswer {
+            return "thinking hit the \(level) ceiling (\(ceiling) reasoning tokens) and was cut off; the turn keeps the answer written so far — raise the thinking level to let the model finish before answering"
+        }
+        return "thinking hit the \(level) ceiling (\(ceiling) reasoning tokens) and the turn ended before the model produced an answer — raise the thinking level or turn thinking off"
     }
 
     /// Text that closes a reasoning block the model would have kept writing.
