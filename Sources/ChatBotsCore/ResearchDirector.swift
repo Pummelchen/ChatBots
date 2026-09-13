@@ -464,7 +464,15 @@ public struct ResearchDirector: Sendable {
         }
 
         // 2. Two analysts disagreeing about the same thing.
-        if let (question, parties) = conflicts.first(where: { !settled.contains($0.key) }),
+        //
+        // The sub-questions are walked in their declaration order rather than by iterating the
+        // dictionary, whose order depends on the per-process hash seed. This function promises
+        // that "the same investigation state should direct the same way", so a saved transcript
+        // must direct the same sub-question and analyst on every launch (audit A74).
+        if let question = ResearchSubQuestion.allCases.first(where: {
+                conflicts[$0] != nil && !settled.contains($0)
+            }),
+            let parties = conflicts[question],
             let seat = seatFor(question)
         {
             let names = parties.map(displayName).joined(separator: " and ")
