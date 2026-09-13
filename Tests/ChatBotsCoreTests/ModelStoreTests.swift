@@ -123,13 +123,23 @@ struct ModelStoreTests {
         #expect(ModelStore.availableCheckpoints(in: root).isEmpty)
     }
 
-    @Test("A sharded checkpoint counts as complete")
+    /// Strengthened under A53. This test used to write an *empty* index file and assert the
+    /// directory complete, which codified the defect: the index is a map from tensor name to
+    /// shard, and an index-only directory is exactly what an interrupted download leaves. The
+    /// assertion now requires the shards to exist as well, so it is strictly stronger. The
+    /// partial cases are covered in `AuditModelStoreTests`.
+    @Test("A sharded checkpoint counts as complete only with its shards")
     func shardedCheckpoint() throws {
         let root = try temporaryRoot()
         defer { try? FileManager.default.removeItem(at: root) }
-        try makeCheckpoint(
-            at: root.appending(path: "sharded", directoryHint: .isDirectory),
-            weights: "model.safetensors.index.json")
+        let directory = root.appending(path: "sharded", directoryHint: .isDirectory)
+        try makeCheckpoint(at: directory, weights: "model.safetensors.index.json")
+        try Data(
+            #"{"weight_map": {"model.embed": "shard-1.safetensors", "model.head": "shard-2.safetensors"}}"#
+                .utf8
+        ).write(to: directory.appending(path: "model.safetensors.index.json"))
+        try Data().write(to: directory.appending(path: "shard-1.safetensors"))
+        try Data().write(to: directory.appending(path: "shard-2.safetensors"))
 
         #expect(ModelStore.localCheckpoint(for: "sharded", in: root) != nil)
     }

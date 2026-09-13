@@ -126,6 +126,14 @@ public enum ModelStore {
     }
 
     /// True when a directory looks like a loadable MLX checkpoint.
+    ///
+    /// "Complete" has to mean the files a load actually needs, which is why a sharded
+    /// checkpoint is no longer accepted on the strength of its index alone. The index is a map
+    /// from tensor name to shard file, and an interrupted download leaves it behind with some
+    /// or none of the shards it names; `MLXEngine.load` prefers this local hit and never falls
+    /// back to the hub, so an index-only directory was listed as available and then hard-failed
+    /// at load. This contradicted `localCheckpoint`'s own doc — "a partial download is not
+    /// mistaken for a usable model" — and `ModelStoreTests` codified the wrong rule.
     static func isCompleteCheckpoint(_ directory: URL, fileManager: FileManager = .default) -> Bool {
         var isDirectory: ObjCBool = false
         guard
@@ -135,10 +143,43 @@ public enum ModelStore {
             fileManager.fileExists(atPath: directory.appending(path: "tokenizer.json").path)
         else { return false }
 
-        // At least one weight file, either a single blob or a sharded index.
+        // The index, when there is one, is the manifest: the checkpoint is complete only when
+        // every shard it names is beside it. A shard fragment on its own must not count as a
+        // single blob below — a directory with one of two shards and the index is exactly what
+        // an interrupted download leaves, and it ends in `.safetensors` too.
         let contents = (try? fileManager.contentsOfDirectory(atPath: directory.path)) ?? []
+        let indexes = contents.filter { $0.hasSuffix(".safetensors.index.json") }
+        if !indexes.isEmpty {
+            return indexes.allSatisfy { name in
+                shardsArePresent(
+                    namedIn: directory.appending(path: name), beside: directory,
+                    fileManager: fileManager)
+            }
+        }
+
+        // No index, so a single weight blob is complete on its own.
         return contents.contains { $0.hasSuffix(".safetensors") }
-            || contents.contains { $0.hasSuffix(".safetensors.index.json") }
+    }
+
+    /// Whether every shard an index names is a file beside it.
+    ///
+    /// `weight_map` is the Hugging Face index format: tensor name to shard filename. A shard
+    /// has to be a plain `.safetensors` direct child, so an index cannot make a checkpoint look
+    /// complete by naming a file somewhere else. An index that cannot be read, that has no
+    /// `weight_map`, or whose map is empty proves nothing, and the honest answer then is no.
+    private static func shardsArePresent(
+        namedIn index: URL, beside directory: URL, fileManager: FileManager
+    ) -> Bool {
+        guard let data = try? Data(contentsOf: index),
+            let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let weightMap = root["weight_map"] as? [String: String],
+            !weightMap.isEmpty
+        else { return false }
+
+        return Set(weightMap.values).allSatisfy { shard in
+            shard.hasSuffix(".safetensors") && !shard.contains("/")
+                && fileManager.fileExists(atPath: directory.appending(path: shard).path)
+        }
     }
 
     /// The project directory, found by walking up from the working directory or the bundle
