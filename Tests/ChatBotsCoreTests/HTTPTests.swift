@@ -93,6 +93,47 @@ struct HTTPParserTests {
         }
     }
 
+    @Test("A negative Content-Length is refused rather than used as a slice offset")
+    func negativeContentLength() {
+        // `Int.init` read "-1" happily, both guards passed, and the value then indexed before
+        // the start of the buffer — a trap, not a 400, which took the process with it.
+        #expect(throws: HTTPError.self) {
+            try HTTPParser.parse(Data("POST / HTTP/1.1\r\nContent-Length: -1\r\n\r\n".utf8))
+        }
+    }
+
+    @Test("A Content-Length too large to be an Int is refused, not crashed on")
+    func enormousContentLength() {
+        // A run of digits is well-formed but does not fit an Int; the conversion must not trap.
+        #expect(throws: HTTPError.self) {
+            try HTTPParser.parse(
+                Data("POST / HTTP/1.1\r\nContent-Length: 99999999999999999999999999\r\n\r\n".utf8))
+        }
+    }
+
+    @Test("A non-numeric Content-Length is refused")
+    func nonNumericContentLength() {
+        // Including the signed and spaced spellings `Int.init` would have accepted.
+        for value in ["abc", "1 2", "+5", "5.0", "0x10", ""] {
+            #expect(throws: HTTPError.self) {
+                try HTTPParser.parse(
+                    Data("POST / HTTP/1.1\r\nContent-Length: \(value)\r\n\r\n".utf8))
+            }
+        }
+    }
+
+    @Test("A duplicated Content-Length is refused, not joined and misread as zero")
+    func duplicatedContentLength() {
+        // The header parser joins duplicates with ", ", which `Int.init` could not read — so
+        // this used to become 0 and the body silently vanished. One integer or nothing.
+        #expect(throws: HTTPError.self) {
+            try HTTPParser.parse(
+                Data(
+                    "POST / HTTP/1.1\r\nContent-Length: 5\r\nContent-Length: 5\r\n\r\nhello"
+                        .utf8))
+        }
+    }
+
     @Test("A malformed request line is rejected, not guessed at")
     func malformedRequestLine() {
         #expect(throws: HTTPError.self) { try HTTPParser.parse(Data("GARBAGE\r\n\r\n".utf8)) }

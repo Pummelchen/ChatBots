@@ -181,7 +181,7 @@ public enum HTTPParser {
             headers[name.lowercased()] = headers[name.lowercased()].map { "\($0), \(value)" } ?? value
         }
 
-        let declaredLength = headers["content-length"].flatMap(Int.init) ?? 0
+        let declaredLength = try declaredBodyLength(headers["content-length"])
         guard declaredLength <= maximumBodyBytes else {
             throw HTTPError.tooLarge
         }
@@ -205,6 +205,29 @@ public enum HTTPParser {
 
         return HTTPRequest(
             method: method, path: path, query: query, headers: headers, body: body)
+    }
+
+    /// The body length a `Content-Length` header declares, or zero when it is absent.
+    ///
+    /// Parsed strictly on purpose. `Int.init` accepts a leading `-`, and a negative length used
+    /// to pass both guards that followed — `declaredLength <= maximumBodyBytes` and
+    /// `available >= declaredLength` — and then became a slice offset that indexed before
+    /// `startIndex` and trapped, killing the process and the running conversation with it. The
+    /// header parser also joins duplicate headers with `", "`, so a repeated `Content-Length: 5`
+    /// arrives here as `"5, 5"`; requiring a single run of digits closes both holes at once.
+    /// A malformed value throws, which the read loop answers with 400 and closes the
+    /// connection; a value too large to be an `Int` is reported as too large rather than
+    /// trapping on the conversion.
+    static func declaredBodyLength(_ raw: String?) throws -> Int {
+        guard let raw else { return 0 }
+        guard !raw.isEmpty,
+            raw.utf8.allSatisfy({ $0 >= UInt8(ascii: "0") && $0 <= UInt8(ascii: "9") })
+        else {
+            throw HTTPError.malformed(
+                "Content-Length must be a single non-negative integer")
+        }
+        guard let value = Int(raw) else { throw HTTPError.tooLarge }
+        return value
     }
 
     /// Percent-decoding that leaves a malformed escape alone rather than dropping it.
