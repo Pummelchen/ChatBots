@@ -368,6 +368,18 @@ public final class ChatController: ObservableObject {
     /// to decide.
     private func apply(_ snapshot: APISnapshot) {
         lastSnapshot = snapshot
+        // A restored file that the engine turns out to hold under the same name is loaded, not
+        // restored — an adopted engine that already had it, or a file re-added a moment ago.
+        // Dropping the stored copy here is what stops the same file appearing twice and what
+        // retires the "could not be loaded" notice once it is no longer true.
+        if !restoredAttachments.isEmpty {
+            let heldNames = Set(snapshot.attachments.map(\.name))
+            let remaining = restoredAttachments.filter { !heldNames.contains($0.name) }
+            if remaining.count != restoredAttachments.count {
+                restoredAttachments = remaining
+                refreshAttachmentRestoreNotice()
+            }
+        }
         turns = snapshot.messages.map { message in
             Turn(
                 id: UUID(uuidString: message.id) ?? UUID(),
@@ -896,8 +908,8 @@ public final class ChatController: ObservableObject {
 
     // MARK: - Source material
 
-    /// Documents and images the moderator has added.
-    /// The files the engine is holding.
+    /// Documents and images the moderator has added: what the engine is holding, plus anything
+    /// restored from settings that the engine could not be given (see `setAttachments`).
     ///
     /// Rebuilt from the state rather than kept separately, so the app and the engine cannot
     /// disagree about what is attached. The extracted text is the engine's and is not sent
@@ -906,7 +918,7 @@ public final class ChatController: ObservableObject {
     /// every chip (audit A46). The body itself is not here, which is why the chip does not
     /// offer to show it.
     public var attachments: [AttachedDocument] {
-        (lastSnapshot?.attachments ?? []).map { attachment in
+        let held = (lastSnapshot?.attachments ?? []).map { attachment in
             AttachedDocument(
                 id: UUID(uuidString: attachment.id) ?? UUID(),
                 name: attachment.name,
@@ -919,18 +931,69 @@ public final class ChatController: ObservableObject {
                 engineSummary: attachment.summary,
                 engineTokens: attachment.tokens)
         }
+        guard !restoredAttachments.isEmpty else { return held }
+        // A restored file the engine has since been given — an adopted engine that already had
+        // it, or the moderator re-added it — is the engine's; the stored copy is superseded by
+        // name. Matching by id would show the same file twice, since a re-upload gets a new id.
+        let heldNames = Set(held.map(\.name))
+        return held + restoredAttachments.filter { !heldNames.contains($0.name) }
     }
+
+    /// Documents restored from settings that the engine has not been given.
+    ///
+    /// Held so a relaunch cannot destroy them. The engine is a separate, freshly started
+    /// process holding nothing, and the app cannot hand a stored document to it: a document the
+    /// moderator added was read *by the engine*, and what this side saved is the engine's
+    /// description of it, never the file. So they are shown and saved until the moderator
+    /// re-adds the file, and `setAttachments` says which ones the models cannot currently see.
+    private var restoredAttachments: [AttachedDocument] = []
+    /// The restore notice currently in the banner, so refreshing it never eats another message.
+    private var attachmentRestoreNotice: String?
 
     /// Push the attachment set to the engine.
     ///
     /// Adding a file already happened over the request channel, so this only reconciles the
-    /// engine with the app's view — it removes what is gone. Adding here would re-upload.
+    /// engine with the app's view — it removes what is gone. Adding here would re-upload, which
+    /// a restored document cannot be: the app never kept its body.
+    ///
+    /// An attachment is kept when its name is wanted as well as when its id is, because a
+    /// restored document carries the id of whichever engine first accepted it. Matching on ids
+    /// alone would delete the engine's copy of a file the moderator restored.
     private func syncAttachments(_ documents: [AttachedDocument]) {
-        let wanted = Set(documents.map(\.id.uuidString))
-        let present = Set((lastSnapshot?.attachments ?? []).map(\.id))
-        for missing in present.subtracting(wanted) {
-            run { client in _ = try await client.send(.removeAttachment(id: missing)) }
+        let wantedIDs = Set(documents.map(\.id.uuidString))
+        let wantedNames = Set(documents.map(\.name))
+        for present in lastSnapshot?.attachments ?? [] {
+            if wantedIDs.contains(present.id) { continue }
+            if wantedNames.contains(present.name) { continue }
+            run { client in _ = try await client.send(.removeAttachment(id: present.id)) }
         }
+    }
+
+    /// Keep the "restored but not loaded" notice in step with `restoredAttachments`.
+    ///
+    /// It is a warning the moderator has to read, not a transient error: until the file is
+    /// added again the models cannot see it, and the list is kept so the relaunch that dropped
+    /// it is not also the relaunch that forgot it. Nothing is shown once every restored file is
+    /// either loaded or removed.
+    private func refreshAttachmentRestoreNotice() {
+        let notice: String?
+        if restoredAttachments.isEmpty {
+            notice = nil
+        } else {
+            let count = restoredAttachments.count
+            let names = restoredAttachments.map(\.name).joined(separator: ", ")
+            notice =
+                "\(count) saved source file\(count == 1 ? "" : "s") could not be loaded into this "
+                + "engine. The file itself was not kept, only what was read from it, so the "
+                + "models cannot see \(count == 1 ? "it" : "them") until "
+                + "\(count == 1 ? "it is" : "they are") added again: \(names)"
+        }
+        // Replace a previous notice, but never overwrite a different message the moderator has
+        // not read yet.
+        if errorBanner == nil || errorBanner == attachmentRestoreNotice {
+            errorBanner = notice
+        }
+        attachmentRestoreNotice = notice
     }
 
     /// True when every seat's model can accept images, which is what decides whether the
@@ -1031,6 +1094,9 @@ public final class ChatController: ObservableObject {
             for file in pending {
                 do {
                     try await client.addAttachment(filename: file.name, contents: file.data)
+                    // The engine now holds the real file, so a stored copy of the same name is
+                    // no longer "restored but not loaded".
+                    self?.restoredAttachments.removeAll { $0.name == file.name }
                 } catch {
                     // The engine's reason, which is what the user needs to read.
                     rejected.append("\(file.name): \(error.localizedDescription)")
@@ -1038,27 +1104,45 @@ public final class ChatController: ObservableObject {
             }
             guard let self else { return }
             self.errorBanner = rejected.isEmpty ? nil : rejected.joined(separator: "\n")
+            self.refreshAttachmentRestoreNotice()
         }
         return queued.count
     }
 
     /// Seed the attached material at launch, before any turn can run.
+    ///
+    /// The engine is a separate, freshly started process holding nothing, and a document the
+    /// moderator added was extracted *there*: what settings kept is the engine's description of
+    /// the file, never the file. So the stored list cannot be re-uploaded from here, and this
+    /// does not pretend otherwise. It keeps the list (see `restoredAttachments`), leaves it in
+    /// `attachments` so the chips and the saved settings survive the relaunch, reconciles away
+    /// anything the engine holds that is no longer wanted, and tells the moderator which files
+    /// the models cannot see until they are added again.
+    ///
+    /// Returns false when something could not be loaded, true when the engine already holds
+    /// everything asked for. The launch path ignores the result and reads the notice instead.
     @discardableResult
     public func setAttachments(_ documents: [AttachedDocument]) -> Bool {
-        // Uploads happen over the request channel, so this reconciles rather than sends: a
-        // document the engine has not been told about cannot be added from here, because its
-        // text is not on this side of the wire.
+        // A file the engine already holds under the same name is loaded, not restored, so the
+        // stored copy is superseded rather than reported as missing.
+        let heldNames = Set((lastSnapshot?.attachments ?? []).map(\.name))
+        restoredAttachments = documents.filter { !heldNames.contains($0.name) }
         syncAttachments(documents)
-        return true
+        refreshAttachmentRestoreNotice()
+        return restoredAttachments.isEmpty
     }
 
     public func removeAttachment(_ id: UUID) {
+        restoredAttachments.removeAll { $0.id == id }
         syncAttachments(attachments.filter { $0.id != id })
+        refreshAttachmentRestoreNotice()
         saveSettings()
     }
 
     public func removeAllAttachments() {
+        restoredAttachments.removeAll()
         syncAttachments([])
+        refreshAttachmentRestoreNotice()
         saveSettings()
     }
 

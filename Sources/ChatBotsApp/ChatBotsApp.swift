@@ -30,7 +30,11 @@ struct ChatBotsApp: App {
             initialShowReasoning: store.settings.showReasoning,
             initialModerator: store.settings.moderator
         )
-        // Source material is restored before any turn can run.
+        // Source material is handed back before any turn can run. The engine is a fresh
+        // process and the app never kept the files themselves, so this is the point where the
+        // stored list is either already in the engine (an adopted one) or reported as not
+        // loaded; it is never silently dropped and the settings are not rewritten empty. See
+        // `ChatController.setAttachments` (audit A47).
         _ = restored.setAttachments(store.settings.attachments)
         // Every change writes: the topic as it is typed, and each seat's persona, thinking
         // level and backend as they are picked.
