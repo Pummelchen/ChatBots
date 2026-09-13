@@ -119,7 +119,18 @@ public struct ConversationStore: Sendable {
         do {
             try FileManager.default.createDirectory(
                 at: directory, withIntermediateDirectories: true)
-            var all = load()
+            // The read-modify-write rebuilds the file from every record, so it must see the
+            // records `load()` refuses to hand out. Reading through `load()` here dropped
+            // anything from a newer format (and treated a corrupt file as empty) and then
+            // wrote the survivors back over the file — destroying exactly the work the
+            // version check exists to protect.
+            //
+            // A file that cannot be decoded at all is left completely alone. Writing the
+            // records this build happens to understand over bytes it cannot account for would
+            // discard conversations it never read, and refusing is the only answer that keeps
+            // them; `isUnreadable` already tells a caller this happened.
+            guard let existing = readAll() else { return false }
+            var all = existing
             if let index = all.firstIndex(where: { $0.id == record.id }) {
                 all[index] = record
             } else {
@@ -128,7 +139,18 @@ public struct ConversationStore: Sendable {
             // Newest first when listed, so the order is useful as well as stable.
             all.sort { $0.updatedAt > $1.updatedAt }
             if all.count > Self.maximumKept {
-                all = Array(all.prefix(Self.maximumKept))
+                // Trim only what this build understands. A record from a newer format is not
+                // ours to discard, and the cap exists to keep the list short rather than to
+                // delete another build's work.
+                let unknown = all.filter {
+                    $0.formatVersion > StoredConversation.currentFormatVersion
+                }
+                let known = all.filter {
+                    $0.formatVersion <= StoredConversation.currentFormatVersion
+                }
+                let room = max(0, Self.maximumKept - unknown.count)
+                all = Array(known.prefix(room)) + unknown
+                all.sort { $0.updatedAt > $1.updatedAt }
             }
             try write(all)
             return true
@@ -156,33 +178,37 @@ public struct ConversationStore: Sendable {
     // MARK: - Reading
 
     /// Every saved conversation, newest first.
+    ///
+    /// A record from a newer format is kept on disk but not offered: a later build may
+    /// understand it, and dropping it here would destroy work. "There are none" and "the file
+    /// cannot be read" both read as empty here; `isUnreadable` tells them apart.
     public func load() -> [StoredConversation] {
-        guard let data = try? Data(contentsOf: indexURL) else { return [] }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        guard let all = try? decoder.decode([StoredConversation].self, from: data) else {
-            // A corrupt file returns nothing rather than throwing, and `isUnreadable` says
-            // which it was: "there are none" and "the file cannot be read" need different
-            // answers, and silently conflating them loses work without saying so.
-            return []
+        (readAll() ?? []).filter {
+            $0.formatVersion <= StoredConversation.currentFormatVersion
         }
-        // Anything from a newer format is kept but not offered: a later build may understand
-        // it, and dropping it here would destroy work.
-        return all.filter { $0.formatVersion <= StoredConversation.currentFormatVersion }
     }
 
     /// Just the summaries, which is what a list needs.
     public func list() -> [StoredConversation] { load() }
+
+    /// Every record in the file, including those this build cannot read.
+    ///
+    /// `nil` means the file exists but cannot be decoded at all. That is deliberately not the
+    /// same as `[]`: a save that treated it as empty would overwrite bytes it never read.
+    private func readAll() -> [StoredConversation]? {
+        guard FileManager.default.fileExists(atPath: indexURL.path) else { return [] }
+        guard let data = try? Data(contentsOf: indexURL) else { return nil }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try? decoder.decode([StoredConversation].self, from: data)
+    }
 
     /// Whether the saved file exists but cannot be read.
     ///
     /// A caller that cares about losing work can tell this apart from an empty history.
     public var isUnreadable: Bool {
         guard FileManager.default.fileExists(atPath: indexURL.path) else { return false }
-        guard let data = try? Data(contentsOf: indexURL) else { return true }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return (try? decoder.decode([StoredConversation].self, from: data)) == nil
+        return readAll() == nil
     }
 
     public func conversation(id: UUID) -> StoredConversation? {
@@ -190,7 +216,11 @@ public struct ConversationStore: Sendable {
     }
 
     public func delete(id: UUID) -> Bool {
-        var all = load()
+        // Like `save`, this rebuilds the whole file, so it must carry the records `load()`
+        // holds back rather than deleting them as a side effect of removing one conversation.
+        // A file that cannot be decoded is left alone for the same reason as in `save`.
+        guard let existing = readAll() else { return false }
+        var all = existing
         let before = all.count
         all.removeAll { $0.id == id }
         guard all.count != before else { return false }
