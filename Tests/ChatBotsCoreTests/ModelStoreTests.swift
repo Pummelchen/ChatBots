@@ -67,17 +67,22 @@ struct ModelStoreTests {
         #expect(resolved.path == models.path, "walking up from dist/ChatBots.app should find the checkout's models/")
     }
 
-    @Test("With nothing on disk yet, it names the folder a download would create")
+    @Test("With nothing on disk yet, it names a folder a download can create — outside the bundle")
     func fallsBackToAName() throws {
         let root = try temporaryRoot()
         defer { try? FileManager.default.removeItem(at: root) }
-        let bundle = root.appending(path: "empty", directoryHint: .isDirectory)
+        let app = root.appending(path: "ChatBots.app", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: app, withIntermediateDirectories: true)
 
         let resolved = ModelStore.directory(
-            environment: [:], bundleURL: bundle, currentDirectory: root)
+            environment: [:], bundleURL: app, currentDirectory: root)
         #expect(resolved.lastPathComponent == "models")
-        // It must not invent a path it cannot write to.
-        #expect(resolved.path.hasPrefix(root.path))
+        // The first candidate walking up from the bundle is `<ChatBots.app>/models`, and
+        // `prepare()` creates it — so an installed app with no checkpoints yet would download
+        // several gigabytes into its own app and invalidate its signature the first time it
+        // launched. It has to be a writable folder outside the bundle.
+        #expect(!resolved.path.contains(".app/"), "got \(resolved.path)")
+        #expect(resolved.path.contains("Application Support"), "got \(resolved.path)")
     }
 
     @Test("A complete flat checkpoint is found by repo id or by bare name")

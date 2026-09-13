@@ -64,9 +64,18 @@ public enum ModelStore {
                 return candidate
             }
         }
-        // Nothing exists yet: name the one we would use, so a download creates it.
-        return candidates.first
-            ?? currentDirectory.appending(path: "models", directoryHint: .isDirectory)
+        // Nothing exists yet: name the one a download should create.
+        //
+        // Never a path inside an app bundle. The first candidate walking up from `ChatBots.app`
+        // is `<bundle>/models`, and `prepare()` creates it — so an installed app on a machine
+        // with no checkpoints yet would fetch several gigabytes into its own app and invalidate
+        // its signature the first time it launched. That is the same mistake the engine log made,
+        // one directory over. A per-user folder is used instead.
+        //
+        // A checkout is unaffected: its `models/` already exists after `tools/install.sh`, and the
+        // loop above returns it before reaching here.
+        return RunDirectory.applicationSupport.appending(
+            path: "models", directoryHint: .isDirectory)
     }
 
     /// Create the directory if needed, and make sure the hub downloader writes here.
