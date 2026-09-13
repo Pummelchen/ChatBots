@@ -26,22 +26,19 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 122 |
-| DONE | 113 |
-| START | 9 |
+| DONE | 116 |
+| START | 6 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 9
+### Open — 6
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
 | A102 | S2 | START | — | test infrastructure | One full-suite run aborted with a Network.framework fatal error, reduced but not fixed by A40's single-close |
 | A108 | S2 | START | — | test infrastructure | Two pre-existing sources of full-suite flakiness, both reproducing with the newest suites excluded |
-| A113 | S3 | START | — | probe and CLI arguments | The probe's own arguments have the two defects A59 and A62 just fixed in the CLI's |
-| A114 | S3 | START | — | CLI arguments | Five more CLI flags silently keep their defaults or are silently ignored when they cannot take effect |
 | A119 | S3 | START | — | web front end / engine API | The page POSTs a layout diagnostic to /api/client-report, a route that has never existed in any commit, and the 404 is swallowed by design |
 | A120 | S3 | START | — | app lifecycle / engine API | The engine the app spawns opens an HTTP listener on 7788 that the app does not use, so it cannot start at all while Caddy holds that port |
-| A122 | S3 | START | — | transport smoke test | TransportCheck declares a timeout it never uses and creates both child pipes without ever draining them |
 | A77 | S2 | START | — | distribution / licensing | The shipped app redistributes ~14 third-party libraries with no licence notices or attribution |
 | A99 | S2 | START | — | web surface / routing | Kept-conversation share links 404 in the documented deployment, because Caddy proxies only /api/* and the engine serves /s/<id> |
 
@@ -73,8 +70,8 @@ been run.
 | A110 | S2 | DONE | 81a4f4a | engine API | APISnapshot carries no revision and its only ordering field is whole-second, so a reply racing a push within one second can still regress the interface's state |
 | A111 | S3 | DONE | 4590a21 | settings | The stored-attachment doc claims the saved record carries the extracted text, which it does not |
 | A112 | S3 | DONE | f200e05 | app attachments | Restored-but-not-loaded files appear as ordinary attachment chips, distinguished only by a notice the user can dismiss |
-| A113 | S3 | START | — | probe and CLI arguments | The probe's own arguments have the two defects A59 and A62 just fixed in the CLI's |
-| A114 | S3 | START | — | CLI arguments | Five more CLI flags silently keep their defaults or are silently ignored when they cannot take effect |
+| A113 | S3 | DONE | 7eeea5a | probe and CLI arguments | The probe's own arguments have the two defects A59 and A62 just fixed in the CLI's |
+| A114 | S3 | DONE | 4ee7df0 | CLI arguments | Five more CLI flags silently keep their defaults or are silently ignored when they cannot take effect |
 | A115 | S2 | DONE | 48615c6 | engine protocol conformance | Three MLXEngine methods are synchronous while the protocol requirement is async, so a call on the concrete type silently resolves to the protocol's no-op default |
 | A116 | S2 | DONE | — | audit environment / build integrity | Dropbox corrupted the build directory: 5 334 conflicted copies inside .build and a module cache compiled at a checkout path that no longer exists |
 | A117 | S2 | DONE | 078efd0 | audit tooling / process | The done-commit guard separated its fields with U+0001, which bash consumes as its own CTLESC marker, so it skipped all 109 DONE tasks and exited 0 |
@@ -83,7 +80,7 @@ been run.
 | A12 | — | DONE | f9a359b | tests | AddressSanitizer over the whole suite: clean |
 | A120 | S3 | START | — | app lifecycle / engine API | The engine the app spawns opens an HTTP listener on 7788 that the app does not use, so it cannot start at all while Caddy holds that port |
 | A121 | S2 | DONE | 3c7f9a6 | installer | The installer accepts macOS 14 while the package and the bundle require macOS 26, so a Sonoma user downloads ~3 GB and builds before the app refuses to launch |
-| A122 | S3 | START | — | transport smoke test | TransportCheck declares a timeout it never uses and creates both child pipes without ever draining them |
+| A122 | S3 | DONE | 4e5e89d | transport smoke test | TransportCheck declares a timeout it never uses and creates both child pipes without ever draining them |
 | A13 | — | DONE | — | tests | ThreadSanitizer over the whole suite: one data race found |
 | A14 | S1 | DONE | 0de3123 | HTTPServer | isRunning/lastError are raced between the listener callback and waitUntilReady |
 | A15 | S1 | DONE | 8ece1d3 | EngineService/DocumentImport | Attaching a document blocks the engine main actor for the whole conversion, subprocess wait included |
