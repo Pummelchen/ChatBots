@@ -26,8 +26,8 @@ been run.
 <!-- BEGIN GENERATED: ledger status — rendered from ledger.json by AUDIT/render-ledger.sh -->
 | Metric | Count |
 | --- | --- |
-| Tasks enumerated | 128 |
-| DONE | 128 |
+| Tasks enumerated | 130 |
+| DONE | 130 |
 | START | 0 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
@@ -36,7 +36,7 @@ been run.
 
 Nothing is open.
 
-### Every task — 128
+### Every task — 130
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -81,7 +81,9 @@ Nothing is open.
 | A126 | S3 | DONE | 9fa23a7 | web front end | A99's layout diagnostic passed a template literal to console.info, which semgrep reports as an unsafe format string |
 | A127 | S3 | DONE | 9fa23a7 | audit tooling / reporting | The acceptance statement reported the done-commit gate as passing with an empty count, because it read the blank line above the summary |
 | A128 | S3 | DONE | c14db8a | audit tooling / process | The build gate's error count matched SwiftPM's cache notices, so a green section reported four errors |
+| A129 | S2 | DONE | cf589e9 | CI / audit tooling | The CI semgrep step ran with `--error` and would have failed on the very findings the audit waived in writing, and it had never executed because the workflow does not run on the audit branch |
 | A13 | — | DONE | — | tests | ThreadSanitizer over the whole suite: one data race found |
+| A130 | S3 | DONE | cf589e9 | CI / audit tooling | The CI dependency step scanned the whole tree with `-r .` — the same defect A124 fixed in phase-e.sh, in the second copy of the same check |
 | A14 | S1 | DONE | 0de3123 | HTTPServer | isRunning/lastError are raced between the listener callback and waitUntilReady |
 | A15 | S1 | DONE | 8ece1d3 | EngineService/DocumentImport | Attaching a document blocks the engine main actor for the whole conversion, subprocess wait included |
 | A16 | S3 | DONE | 9c53771 | ChatBotsCLI | --serve has no signal handling, so the listener is never shut down and nothing is flushed on exit |

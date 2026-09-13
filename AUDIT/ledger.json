@@ -2181,6 +2181,40 @@
       "commit": "c14db8a",
       "notes": "Recorded as its own task rather than folded into A123, because A123's fix was committed and pushed before this was seen: the audit's rule is that a finding gets an id the moment it is found, and 'the fix for A123 was incomplete' is a finding about A123's fix. The wider point is the same one A28, A123, A124 and A125 make: a gate that greps for a word measures every line containing the word, so the count has to be taken from the diagnostic the tool emits.",
       "blocked_reason": null
+    },
+    {
+      "id": "A129",
+      "severity": "S2",
+      "unit": "CI / audit tooling",
+      "file_line": ".github/workflows/checks.yml (the `source passes semgrep` step), AUDIT/phase-e.sh section 9",
+      "title": "The CI semgrep step ran with `--error` and would have failed on the very findings the audit waived in writing, and it had never executed because the workflow does not run on the audit branch",
+      "category": "process",
+      "status": "DONE",
+      "host_used": "node1",
+      "discovered_by": "the session that landed the audit, by asking whether the CI it was about to enable had ever run — it had not",
+      "evidence_before": "The `static-analysis` job's last step was `semgrep scan --config auto --error Sources tools web`. A09 waived three findings in `tools/cdp.py` in writing, in `AUDIT/plan.md`, and deliberately did not suppress them — there is no `nosemgrep`, because that hides a finding rather than justifying it — so `--error` fails on exactly those three. Reproduced on a clean export of the tree (`git archive`, no `.build`, no scratch): `Ran 461 rules on 87 files: 3 findings`, exit 1. The gate had never run: the workflow triggers on `push: branches: [main]` and `pull_request`, and all of this work is on `audit/2026-09-13`, so the job would have failed the first time it executed — on `main`, after the landing, which is the worst moment to find it. The Mac-side gate in `phase-e.sh` had the correct logic (an allowlist matched on rule id and path suffix), so the two gates also disagreed about what had been justified.",
+      "fix_summary": "The allowlist is now one implementation, `tools/semgrep-waivers.py`, called by both the CI job and `AUDIT/phase-e.sh`, so the hosted gate and the Mac gate cannot disagree. Semgrep runs without `--error` and writes JSON; the script matches each finding against the `semgrep waiver: <rule> <path>` lines in `AUDIT/plan.md` and fails only on a finding that no waiver covers. It exits 2 rather than 0 when the report is missing or unparseable, because a report that cannot be read is not a clean one (A89).",
+      "evidence_after": "tools/semgrep-waivers.py, .github/workflows/checks.yml, AUDIT/phase-e.sh. Four cases exercised: the real report gives `semgrep: 3 finding(s), all covered by a recorded waiver`, exit 0; a fourth, unwaived finding added to it gives exit 1 naming the rule and path; an unparseable report gives exit 2; a missing report gives exit 2. The exact CI steps were then run on a clean export of the tree: semgrep exit 0, waiver check exit 0, shellcheck/ruff/pyright/gitleaks/osv all exit 0.",
+      "commit": "cf589e9",
+      "notes": "This is the fourth time this audit has found a control that had never been exercised — after A89 (a gate that passed on a ledger it could not parse), A102 (a test suite that aborted under a concurrency the suite itself created) and A123-A127 (five gates the first Phase E run had never reached in that combination). The generalisable question, now asked before landing: **has this check ever actually run in the place it will run?** A gate that is only written is not a gate.",
+      "blocked_reason": null
+    },
+    {
+      "id": "A130",
+      "severity": "S3",
+      "unit": "CI / audit tooling",
+      "file_line": ".github/workflows/checks.yml (the `no known vulnerable dependency` step)",
+      "title": "The CI dependency step scanned the whole tree with `-r .` — the same defect A124 fixed in phase-e.sh, in the second copy of the same check",
+      "category": "process",
+      "status": "DONE",
+      "host_used": "node1",
+      "discovered_by": "the same question that found A129: what has never run, and what would it do if it did?",
+      "evidence_before": "The step was `osv-scanner scan source -r .`, where `phase-e.sh` had already been corrected to `--lockfile Package.resolved` for A124. On a clean CI checkout the recursive form happens to be harmless — measured: it finds only `Package.resolved` and reports `No issues found` — because there are no dependency checkouts in the tree. That is luck rather than correctness: the same command in the Mac gate reported 16 vulnerabilities from dependencies' own example projects inside the sanitizer scratch directories, and `AUDIT/baseline/` already contains captured scanner output that a future recursive scan could read.",
+      "fix_summary": "Scoped to `--lockfile Package.resolved`, the object the check is about and the same object `tools/third-party-notices.py` checks.",
+      "evidence_after": "`.github/workflows/checks.yml`; `osv-scanner scan source --lockfile Package.resolved` on a clean export reports 14 packages and no issues. Both gates now name the same object.",
+      "commit": "cf589e9",
+      "notes": "Recorded separately from A124 rather than folded in, because it is a different file and a different copy of the defect — and because A124's fix would have been described as complete while a second instance remained. It is the same lesson as A129: a fix applied where the problem was found, rather than everywhere it exists, leaves the next surface wrong.",
+      "blocked_reason": null
     }
   ]
 }
