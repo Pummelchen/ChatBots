@@ -29,20 +29,13 @@ public struct TavilyClient: Sendable {
     /// variables or the developer's own `.secrets.env`: a test that reads the real file
     /// passes on the machine that wrote it and fails on a fresh clone.
     public static func resolveKey(environment: String?, secretsFile: [String: String]) -> String? {
-        // `whitespacesAndNewlines`, not `whitespaces`: a key exported from a shell or pasted
-        // from a file routinely carries a trailing newline, and `whitespaces` does not strip it.
-        if let environment = environment?.trimmingCharacters(in: .whitespacesAndNewlines),
-            !environment.isEmpty
-        {
-            return environment
-        }
-        if let fromFile = secretsFile[environmentKey]?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-            !fromFile.isEmpty
-        {
-            return fromFile
-        }
-        return nil
+        // Both sources are normalised through `BuiltInKeys.normalisedKey`, the same function the
+        // DeepSeek path uses. The two paths used to trim differently — `.whitespaces` there,
+        // `.whitespacesAndNewlines` here — so a CRLF `.secrets.env` produced a key with a
+        // trailing carriage return on one path and a clean one on the other (audit A55). One
+        // normaliser is what stops that disagreement coming back.
+        BuiltInKeys.normalisedKey(environment)
+            ?? BuiltInKeys.normalisedKey(secretsFile[environmentKey])
     }
 
     public enum Depth: String, Sendable {

@@ -150,30 +150,58 @@ public enum BuiltInKeys {
 
     /// The DeepSeek key, or nil when this machine has none configured.
     public static var deepSeek: String? {
-        if let value = ProcessInfo.processInfo.environment[deepSeekEnvironmentKey],
-            !value.trimmingCharacters(in: .whitespaces).isEmpty
-        {
-            return value.trimmingCharacters(in: .whitespaces)
-        }
-        return secretsFile()[deepSeekEnvironmentKey]
+        normalisedKey(ProcessInfo.processInfo.environment[deepSeekEnvironmentKey])
+            ?? normalisedKey(secretsFile()[deepSeekEnvironmentKey])
+    }
+
+    /// A key value as it should be used, or nil when there is not really one.
+    ///
+    /// **One function for every key path**, because they did disagree: this file trimmed
+    /// `.whitespaces`, which excludes `\r`, while `TavilyClient` trimmed
+    /// `.whitespacesAndNewlines`. A CRLF `.secrets.env` therefore gave the DeepSeek path a key
+    /// ending in a carriage return — non-empty, so `isMissingKey` stayed false and no warning
+    /// was shown, while the Authorization header carried a control character and the 401 that
+    /// came back read as "the key is wrong" rather than "there is no usable key". Both resolvers
+    /// now normalise through here, so the difference cannot come back one caller at a time.
+    /// Blank is absent rather than an empty key: an exported-but-empty variable otherwise means
+    /// sending `Bearer ` to the API.
+    public static func normalisedKey(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !trimmed.isEmpty
+        else { return nil }
+        return trimmed
     }
 
     /// Parse `.secrets.env`, one `NAME=value` per line.
     ///
     /// Deliberately minimal: no expansion, no quoting rules, no includes. It holds one or two
     /// keys and a parser with features is a parser with surprises.
+    ///
+    /// Line endings are normalised before the split, and that is not cosmetic. `split(separator:
+    /// "\n")` does **not** split a CRLF file: Swift's `Character` is an extended grapheme
+    /// cluster and `CR LF` is one cluster, so no character equals `"\n"` and the whole file
+    /// arrives as a single "line" (measured). A CRLF file therefore used to parse as one entry
+    /// whose value was the remainder of the file — so with the two keys this file documents,
+    /// neither key was usable and neither was reported missing. Lines are then trimmed with
+    /// `.whitespacesAndNewlines`, so a lone `\r` cannot ride inside a key either (audit A55).
     public static func secretsFile(in root: URL? = nil) -> [String: String] {
         let directory = root ?? ModelStore.projectRoot() ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         let url = directory.appending(path: secretsFileName)
         guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [:] }
 
+        let normalised = text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+
         var values: [String: String] = [:]
-        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
+        for line in normalised.split(separator: "\n", omittingEmptySubsequences: false) {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty || trimmed.hasPrefix("#") { continue }
             guard let separator = trimmed.firstIndex(of: "=") else { continue }
-            let name = trimmed[trimmed.startIndex..<separator].trimmingCharacters(in: .whitespaces)
-            var value = trimmed[trimmed.index(after: separator)...].trimmingCharacters(in: .whitespaces)
+            let name = trimmed[trimmed.startIndex..<separator]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            var value = trimmed[trimmed.index(after: separator)...]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
             // Tolerate quotes, because people write them.
             if value.count >= 2, value.hasPrefix("\""), value.hasSuffix("\"") {
                 value = String(value.dropFirst().dropLast())
