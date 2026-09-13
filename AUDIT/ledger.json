@@ -164,7 +164,7 @@
       "id": "A10",
       "severity": "S3",
       "unit": "tooling",
-      "file_line": "tools/*.sh (24 notes)",
+      "file_line": "tools/make-app.sh:167, :170, tools/start-app.sh:29, tools/start.sh:151",
       "title": "shellcheck -S style reports 4 findings, and the recorded count was wrong twice before it was right",
       "category": "style",
       "status": "DONE",
@@ -174,7 +174,7 @@
       "fix_summary": "All four shellcheck findings are fixed on their merits, with nothing suppressed: the two SC2001 indentation pipelines in make-app.sh, the SC2034 unused variable in start-app.sh, and the SC2015 `A && B || C` in start.sh rewritten as an explicit if so the intent is what the code says. The count went from 4 to 0 - measured, and it is worth repeating that this number was wrong twice before it was right (24 was a captured file's line count, and a correction to 7 counted three shellcheck.net help URLs as findings).",
       "evidence_after": "`shellcheck -S style tools/*.sh` => 0 findings, exit 0, no shellcheck directives added; `bash -n` clean on every script touched.",
       "commit": "f6dc8c2",
-      "notes": "This task's fix is carried by commit f6dc8c2, which is titled after an unrelated AUDIT/ change because the coordinator committed the whole index while the tools/ lane had these three paths staged. Recorded as A84 rather than repaired: the commit is true in content and wrong in scope, and this audit forbids rewriting history. The tree-visible result is what matters and it was verified independently - shellcheck is 0. The lane's own framing of the cause is the one worth keeping: `git add` plus `git commit` is not atomic, because the index is shared between lanes, so explicit staging does not protect a commit - only naming its paths does.",
+      "notes": "This task's fix is carried by commit f6dc8c2, which is titled after an unrelated AUDIT/ change because the coordinator committed the whole index while the tools/ lane had these three paths staged. Recorded as A84 rather than repaired: the commit is true in content and wrong in scope, and this audit forbids rewriting history. The tree-visible result is what matters and it was verified independently - shellcheck is 0. The lane's own framing of the cause is the one worth keeping: `git add` plus `git commit` is not atomic, because the index is shared between lanes, so explicit staging does not protect a commit - only naming its paths does. file_line was 'tools/*.sh (24 notes)', whose glob the verifier reduces to the degenerate path '.sh' and then fails to match against any real file - the same defect A07's record had. Replaced with the concrete paths and lines, which is what the guard needs and what a reader wants.",
       "blocked_reason": null
     },
     {
