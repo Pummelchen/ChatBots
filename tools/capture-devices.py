@@ -427,7 +427,28 @@ def main() -> int:
 
         build_index(rows)
 
-        print(f"\n{len(rows)} captured, {failures} failed.")
+        # Every class that forces a non-zero exit is named in the summary, and `failed` is
+        # computed once and used for both the verdict and the exit status, so the line a person
+        # reads cannot disagree with the status they just got. The alternative — folding every
+        # class into the `failed` figure — would be less honest, not more: a viewport mismatch
+        # or an overflow still produced a file in `rows`, so calling it a capture failure
+        # misstates what happened. `len(rows)` therefore stays what it is (captures written),
+        # each class is reported by name, and the derived verdict closes the line.
+        failed = bool(
+            failures
+            or overflows
+            or forced_failures
+            or viewport_mismatches
+            or empty_captures
+        )
+        print(
+            f"\n{len(rows)} captured, {failures} failed, "
+            f"{len(viewport_mismatches)} viewport mismatch(es), "
+            f"{len(empty_captures)} empty capture(s), "
+            f"{len(overflows)} overflow(s), "
+            f"{len(forced_failures)} forced-view failure(s) — "
+            f"{'FAILED' if failed else 'OK'}"
+        )
         if viewport_mismatches:
             print(
                 "\nViewport mismatch — the page did not lay out at the requested width:"
@@ -447,17 +468,7 @@ def main() -> int:
         else:
             print("No horizontal overflow in any profile.")
         print(f"\nOpen: {OUT / 'index.html'}")
-        return (
-            1
-            if (
-                failures
-                or overflows
-                or forced_failures
-                or viewport_mismatches
-                or empty_captures
-            )
-            else 0
-        )
+        return 1 if failed else 0
     finally:
         if not args.keep_open:
             if caddy:
