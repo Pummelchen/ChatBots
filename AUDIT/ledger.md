@@ -26,12 +26,12 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 122 |
-| DONE | 112 |
-| START | 10 |
+| DONE | 113 |
+| START | 9 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 10
+### Open — 9
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -39,7 +39,6 @@ been run.
 | A108 | S2 | START | — | test infrastructure | Two pre-existing sources of full-suite flakiness, both reproducing with the newest suites excluded |
 | A113 | S3 | START | — | probe and CLI arguments | The probe's own arguments have the two defects A59 and A62 just fixed in the CLI's |
 | A114 | S3 | START | — | CLI arguments | Five more CLI flags silently keep their defaults or are silently ignored when they cannot take effect |
-| A115 | S2 | START | — | engine protocol conformance | Three MLXEngine methods are synchronous while the protocol requirement is async, so a call on the concrete type silently resolves to the protocol's no-op default |
 | A119 | S3 | START | — | web front end / engine API | The page POSTs a layout diagnostic to /api/client-report, a route that has never existed in any commit, and the 404 is swallowed by design |
 | A120 | S3 | START | — | app lifecycle / engine API | The engine the app spawns opens an HTTP listener on 7788 that the app does not use, so it cannot start at all while Caddy holds that port |
 | A122 | S3 | START | — | transport smoke test | TransportCheck declares a timeout it never uses and creates both child pipes without ever draining them |
@@ -76,7 +75,7 @@ been run.
 | A112 | S3 | DONE | f200e05 | app attachments | Restored-but-not-loaded files appear as ordinary attachment chips, distinguished only by a notice the user can dismiss |
 | A113 | S3 | START | — | probe and CLI arguments | The probe's own arguments have the two defects A59 and A62 just fixed in the CLI's |
 | A114 | S3 | START | — | CLI arguments | Five more CLI flags silently keep their defaults or are silently ignored when they cannot take effect |
-| A115 | S2 | START | — | engine protocol conformance | Three MLXEngine methods are synchronous while the protocol requirement is async, so a call on the concrete type silently resolves to the protocol's no-op default |
+| A115 | S2 | DONE | 48615c6 | engine protocol conformance | Three MLXEngine methods are synchronous while the protocol requirement is async, so a call on the concrete type silently resolves to the protocol's no-op default |
 | A116 | S2 | DONE | — | audit environment / build integrity | Dropbox corrupted the build directory: 5 334 conflicted copies inside .build and a module cache compiled at a checkout path that no longer exists |
 | A117 | S2 | DONE | 078efd0 | audit tooling / process | The done-commit guard separated its fields with U+0001, which bash consumes as its own CTLESC marker, so it skipped all 109 DONE tasks and exited 0 |
 | A118 | S2 | DONE | 33568a4 | audit documentation / source of truth | ledger.md is declared the audit's source of truth and the entry point for the next session, but it enumerates 28 tasks and stops at A89; A90-A116 appear nowhere in it |
