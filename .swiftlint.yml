@@ -71,9 +71,16 @@ identifier_name:
     warning: 2
     error: 1
   excluded:
+    # `id` is excluded explicitly, and it has to be, because SwiftLint's `excluded:` REPLACES
+    # its own default list rather than extending it — the default is `[id]`. Today that makes
+    # no difference: `min_length.warning: 2` already masks every `id`, so the measured count is
+    # the same either way. It matters the moment anyone raises `min_length`: without this line
+    # 109 `id` findings would appear out of a config that claims to state the house style.
+    # Written down because it is invisible until it is not.
+    - id
     # Field names mirrored verbatim from the Tavily HTTP API's JSON in the request and
     # response DTOs in TavilyClient.swift (`search_depth`, `max_results`, ...). Renaming
-    # them would need hand-written CodingKeys and gain nothing; 9 findings.
+    # them would need hand-written CodingKeys and gain nothing; 8 findings.
     - search_depth
     - max_results
     - include_answer
