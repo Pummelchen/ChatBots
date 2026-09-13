@@ -148,10 +148,6 @@ public struct StreamPacer: Sendable {
 public final class StreamPacerPool {
     public init() {}
 
-
-    /// The same floor the pacer uses, for deciding when a trickle is really a stall.
-    public static let minimumRate: Double = 26
-
     /// Which stream a piece of text belongs to.
     public enum Channel: Hashable, Sendable { case answer, reasoning }
 
