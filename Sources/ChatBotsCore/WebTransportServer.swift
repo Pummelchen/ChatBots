@@ -76,6 +76,15 @@ public final class WebTransportEngineServer {
     /// One continuation per subscribed session, so each has its own buffer and a stalled
     /// client costs only its own events.
     private var subscribers: [UUID: AsyncStream<EngineEvent>.Continuation] = [:]
+    /// The live sessions and the tasks serving them, by session id.
+    ///
+    /// A session's serve task used to be untracked. `stop()` cancelled only the accept loop, so
+    /// a connected client kept its receive loop, kept driving the shared `EngineService` and
+    /// kept its admission slot; and the library documents `shutdown()` as severing nothing
+    /// cleanly, so stopping the listener was not stopping the session either. Tracking them is
+    /// what lets `stop()` end them.
+    private var sessions: [UUID: WebTransportSession] = [:]
+    private var sessionTasks: [UUID: Task<Void, Never>] = [:]
 
     public init(
         service: EngineService, identity: EngineIdentity, configuration: Configuration = .init()
@@ -138,6 +147,20 @@ public final class WebTransportEngineServer {
         }
         for continuation in subscribers.values { continuation.finish() }
         subscribers.removeAll()
+
+        // End the live sessions before the listener goes. Each serve task is a sibling of the
+        // accept loop, not a child of it, so cancelling the accept task does nothing to them;
+        // and `listener.shutdown()` severs nothing cleanly. Closing the session is what ends
+        // the client's receive loop, releases its admission slot and stops it driving the
+        // engine. Copied out of the dictionaries first, because the serve tasks' own cleanup
+        // mutates them as they finish.
+        let liveTasks = Array(sessionTasks.values)
+        let liveSessions = Array(sessions.values)
+        sessions.removeAll()
+        sessionTasks.removeAll()
+        for task in liveTasks { task.cancel() }
+        for session in liveSessions { try? await session.close() }
+
         if let listener {
             listener.shutdown()
         }
@@ -150,9 +173,12 @@ public final class WebTransportEngineServer {
         while !Task.isCancelled {
             do {
                 let session = try await listener.acceptSession()
-                // Serving a session is not awaited: one client must not hold up the next.
-                Task { [weak self] in
-                    await self?.serve(session)
+                // Serving a session is not awaited: one client must not hold up the next. The
+                // task is tracked under the session's id so `stop()` can cancel and close it.
+                let id = UUID()
+                sessions[id] = session
+                sessionTasks[id] = Task { [weak self] in
+                    await self?.serve(session, id: id)
                 }
             } catch {
                 // A failed accept is not fatal — a client that disconnected mid-handshake
@@ -165,8 +191,17 @@ public final class WebTransportEngineServer {
 
     // MARK: - Sessions
 
-    private func serve(_ session: WebTransportSession) async {
-        let id = UUID()
+    private func serve(_ session: WebTransportSession, id: UUID) async {
+        // Every exit from this method deregisters the session and closes it. That is the one
+        // path that lets go of an admission slot and ends the client's receive loop; without
+        // it a session outlived both the client and `stop()`.
+        defer {
+            subscribers[id] = nil
+            sessions[id] = nil
+            sessionTasks[id] = nil
+            Task { try? await session.close() }
+        }
+
         // One stream, and that is not a simplification for its own sake: the transport
         // serialises stream operations on a session, and a second bidirectional stream does
         // not open. A single stream carrying tagged frames avoids both the deadlock and the
@@ -194,7 +229,6 @@ public final class WebTransportEngineServer {
         defer {
             writer.cancel()
             continuation.finish()
-            subscribers[id] = nil
         }
 
         // The current state first, so a client that has just connected can draw something
