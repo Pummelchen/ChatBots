@@ -146,10 +146,19 @@ public final class EngineSupervisor: ObservableObject {
         state = .idle
     }
 
-    /// Wait briefly for the process to exit, so quitting does not leave an orphan.
+    /// Wait for the process to exit, and kill it if it will not, so quitting does not leave an
+    /// orphan.
+    ///
+    /// SIGTERM first, then SIGKILL after `timeout`: a child that ignores or outlives the signal
+    /// would otherwise keep holding the GPU and the WebTransport port after the app is gone.
+    /// This is the teardown the termination path uses. It takes the process reference before
+    /// its first suspension point, so the two things that can run on the way out — the window
+    /// disappearing and the app terminating — cannot both run the wait and the escalation; the
+    /// second caller finds nothing left to stop.
     public func shutdown(timeout: Duration = .seconds(5)) async {
-        guard let process, process.isRunning else { return }
-        process.terminate()
+        guard let process else { return }
+        self.process = nil
+        if process.isRunning { process.terminate() }
         let deadline = ContinuousClock.now.advanced(by: timeout)
         while process.isRunning, ContinuousClock.now < deadline {
             try? await Task.sleep(for: .milliseconds(100))
@@ -159,7 +168,6 @@ public final class EngineSupervisor: ObservableObject {
             // holding the GPU and the port.
             kill(process.processIdentifier, SIGKILL)
         }
-        self.process = nil
         try? logHandle?.close()
         logHandle = nil
         state = .idle

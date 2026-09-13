@@ -69,13 +69,18 @@ struct ChatBotsApp: App {
         // cannot write could not start its engine at all. `RunDirectory` decides once, for the app
         // and the engine together.
         let runDirectory = RunDirectory.current
-        _supervisor = StateObject(
-            wrappedValue: EngineSupervisor(logURL: runDirectory.appending(path: "app-engine.log")))
+        let engineSupervisor = EngineSupervisor(
+            logURL: runDirectory.appending(path: "app-engine.log"))
+        _supervisor = StateObject(wrappedValue: engineSupervisor)
 
         AppDelegate.flush = { [weak store] in
             guard let store else { return }
             store.saveNow(snapshot())
         }
+        // Quitting must wait for the child to go, and kill it if it will not. That cannot be
+        // done in `applicationWillTerminate`, which cannot await, so the delegate answers
+        // `.terminateLater` and awaits this. See `EngineSupervisor.shutdown`.
+        AppDelegate.engine = engineSupervisor
     }
     @StateObject private var supervisor: EngineSupervisor
     @StateObject private var theme = ThemeStore()
@@ -121,7 +126,12 @@ struct ChatBotsApp: App {
                 }
                 // The engine is this app's child, so quitting stops it. An engine the app did
                 // not start is left alone — the supervisor knows which it is.
-                .onDisappear { supervisor.stop() }
+                //
+                // A window that closes without quitting also stops it, and it waits: the same
+                // teardown the termination path uses, so a child that ignores SIGTERM does not
+                // outlive the window either. Quitting does not depend on this firing — see
+                // `AppDelegate.applicationShouldTerminate`.
+                .onDisappear { Task { await supervisor.shutdown() } }
                 // The black theme is dark-only regardless of the Mac's setting; the
                 // original theme follows the system.
                 .preferredColorScheme(theme.mode == .black ? .dark : nil)
@@ -218,18 +228,45 @@ struct ChatBotsApp: App {
 }
 
 /// Opens a small standard About-panel-style help window.
-/// Writes the settings one last time on the way out.
+/// Writes the settings one last time on the way out, and waits for the engine to stop.
 ///
-/// The store already writes as changes happen, so this only closes the gap of the short
+/// The store already writes as changes happen, so the flush only closes the gap of the short
 /// coalescing window — but "it forgot my last edit" is exactly the kind of thing that makes
 /// an app feel unreliable, so it is worth the few lines.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Set once the controller exists; called on termination. Main-actor isolated because
-    /// it closes over the controller, and `applicationWillTerminate` arrives on the main
-    /// thread.
+    /// it closes over the controller, and the delegate methods arrive on the main thread.
     @MainActor static var flush: (() -> Void)?
+    /// Set once the supervisor exists; its engine is terminated — and killed if it ignores
+    /// SIGTERM — before the app is allowed to exit. `applicationWillTerminate` cannot await,
+    /// which is why the teardown lives here and the delegate defers termination until it has
+    /// run. A weak reference because the supervisor is owned by the scene.
+    @MainActor static weak var engine: EngineSupervisor?
+
+    /// Defer termination until the engine has actually stopped.
+    ///
+    /// The old path relied on SwiftUI delivering `onDisappear` and on `stop()` having sent
+    /// SIGTERM; a child that ignored it, or a quit where the view never disappeared, left the
+    /// engine holding the GPU and the WebTransport port after the app was gone (audit A49).
+    /// Answering `.terminateLater`, awaiting the teardown, and then replying removes that
+    /// dependency and makes quitting wait. With no engine installed there is nothing to wait
+    /// for and termination is immediate.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let engine = MainActor.assumeIsolated({ Self.engine }) else {
+            MainActor.assumeIsolated { Self.flush?() }
+            return .terminateNow
+        }
+        Task { @MainActor in
+            Self.flush?()
+            await engine.shutdown()
+            NSApp.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // Belt and braces: the settings are written on the way out whether or not the deferred
+        // path above ran, and the shutdown there is idempotent, so running both is harmless.
         MainActor.assumeIsolated { Self.flush?() }
     }
 }
