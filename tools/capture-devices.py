@@ -67,18 +67,32 @@ type JsonObject = dict[str, Any]
 def profiles() -> list[JsonObject]:
     """Ask the running server for the profile list, so there is one source of truth."""
     conn = http.client.HTTPConnection("127.0.0.1", PORT, timeout=10)
-    conn.request("GET", "/api/devices")
-    body = conn.getresponse().read()
-    conn.close()
+    try:
+        conn.request("GET", "/api/devices")
+        body = conn.getresponse().read()
+    finally:
+        # Closed on the failure paths as well as the success path: `request` or
+        # `getresponse` can raise before the old `close` was reached, leaving the socket
+        # open until the garbage collector ran. The body is read in full above, so nothing
+        # is used after the close; the caller is handed the parsed list, never this
+        # connection.
+        conn.close()
     return json.loads(body)["profiles"]
 
 
 def server_is_up() -> bool:
     try:
         conn = http.client.HTTPConnection("127.0.0.1", ENGINE_PORT, timeout=2)
-        conn.request("GET", "/api/health")
-        ok = conn.getresponse().status == 200
-        conn.close()
+        try:
+            conn.request("GET", "/api/health")
+            ok = conn.getresponse().status == 200
+        finally:
+            # Closed on the failure paths as well as the success path, for the same reason
+            # as `caddy_process`: a raise from `request` or `getresponse` used to skip the
+            # close, and `wait_for_server` calls this in a loop of up to 90 attempts, so
+            # every failed probe leaked a socket until the garbage collector ran. Only the
+            # boolean is returned, never the connection.
+            conn.close()
         return ok
     except (OSError, http.client.HTTPException):
         return False
