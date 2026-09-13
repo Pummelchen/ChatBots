@@ -89,7 +89,7 @@ private func makeClient(port: UInt16) -> WebTransportEngineClient {
 }
 
 @MainActor
-@Suite("A failed connect leaves no session behind", .serialized)
+@Suite("A failed connect leaves no session behind", .serialized, TransportSerialized())
 struct AuditTransportLifecycleTests {
 
     /// The observable half of A38: a client that has a session and is asked to connect again

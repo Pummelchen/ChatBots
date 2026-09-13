@@ -92,7 +92,7 @@ private func makeClient(port: UInt16) -> WebTransportEngineClient {
 }
 
 @MainActor
-@Suite("Engine transport", .serialized)
+@Suite("Engine transport", .serialized, TransportSerialized())
 struct WebTransportSessionTests {
 
     @Test("A client can ask the engine for its state and get it")

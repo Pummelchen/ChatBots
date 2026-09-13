@@ -116,7 +116,7 @@ private func makeClient(port: UInt16, timeoutMilliseconds: Int32 = 10_000)
 }
 
 @MainActor
-@Suite("Replies are matched to requests", .serialized)
+@Suite("Replies are matched to requests", .serialized, TransportSerialized())
 struct AuditReplyMatchingTests {
 
     /// The defect, deterministically. Request A is a conversion held open by the test, so A can

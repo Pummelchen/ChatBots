@@ -94,7 +94,7 @@ private func poll(
 }
 
 @MainActor
-@Suite("A silent stream is not killed by the request timeout (A100)", .serialized)
+@Suite("A silent stream is not killed by the request timeout (A100)", .serialized, TransportSerialized())
 struct AuditWave2IdleTimeoutTests {
 
     /// The finding itself. The stream is quiet for twice the request deadline, which under the

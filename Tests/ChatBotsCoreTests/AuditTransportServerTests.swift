@@ -86,7 +86,7 @@ private func makeClient(port: UInt16) -> WebTransportEngineClient {
 }
 
 @MainActor
-@Suite("Stopping the engine stops its sessions", .serialized)
+@Suite("Stopping the engine stops its sessions", .serialized, TransportSerialized())
 struct AuditTransportServerTests {
 
     @Test("A connected client is no longer served after the server stops")
