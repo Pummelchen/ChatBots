@@ -26,19 +26,18 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 122 |
-| DONE | 116 |
-| START | 6 |
+| DONE | 117 |
+| START | 5 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 6
+### Open — 5
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
 | A102 | S2 | START | — | test infrastructure | One full-suite run aborted with a Network.framework fatal error, reduced but not fixed by A40's single-close |
 | A108 | S2 | START | — | test infrastructure | Two pre-existing sources of full-suite flakiness, both reproducing with the newest suites excluded |
 | A119 | S3 | START | — | web front end / engine API | The page POSTs a layout diagnostic to /api/client-report, a route that has never existed in any commit, and the 404 is swallowed by design |
-| A120 | S3 | START | — | app lifecycle / engine API | The engine the app spawns opens an HTTP listener on 7788 that the app does not use, so it cannot start at all while Caddy holds that port |
 | A77 | S2 | START | — | distribution / licensing | The shipped app redistributes ~14 third-party libraries with no licence notices or attribution |
 | A99 | S2 | START | — | web surface / routing | Kept-conversation share links 404 in the documented deployment, because Caddy proxies only /api/* and the engine serves /s/<id> |
 
@@ -78,7 +77,7 @@ been run.
 | A118 | S2 | DONE | 33568a4 | audit documentation / source of truth | ledger.md is declared the audit's source of truth and the entry point for the next session, but it enumerates 28 tasks and stops at A89; A90-A116 appear nowhere in it |
 | A119 | S3 | START | — | web front end / engine API | The page POSTs a layout diagnostic to /api/client-report, a route that has never existed in any commit, and the 404 is swallowed by design |
 | A12 | — | DONE | f9a359b | tests | AddressSanitizer over the whole suite: clean |
-| A120 | S3 | START | — | app lifecycle / engine API | The engine the app spawns opens an HTTP listener on 7788 that the app does not use, so it cannot start at all while Caddy holds that port |
+| A120 | S3 | DONE | 4aa3b46 | app lifecycle / engine API | The engine the app spawns opens an HTTP listener on 7788 that the app does not use, so it cannot start at all while Caddy holds that port |
 | A121 | S2 | DONE | 3c7f9a6 | installer | The installer accepts macOS 14 while the package and the bundle require macOS 26, so a Sonoma user downloads ~3 GB and builds before the app refuses to launch |
 | A122 | S3 | DONE | 4e5e89d | transport smoke test | TransportCheck declares a timeout it never uses and creates both child pipes without ever draining them |
 | A13 | — | DONE | — | tests | ThreadSanitizer over the whole suite: one data race found |
