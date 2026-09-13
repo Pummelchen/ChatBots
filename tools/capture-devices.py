@@ -161,9 +161,15 @@ def caddy_process() -> subprocess.Popen[bytes] | None:
         status: int | None = None
         try:
             conn = http.client.HTTPConnection("127.0.0.1", PORT, timeout=2)
-            conn.request("GET", "/api/health")
-            status = conn.getresponse().status
-            conn.close()
+            try:
+                conn.request("GET", "/api/health")
+                status = conn.getresponse().status
+            finally:
+                # Closed on the failure paths as well as the success path: the probe used to
+                # leak its connection whenever `request` or `getresponse` raised, leaving the
+                # socket open until the garbage collector ran. The caller is given the caddy
+                # process, never this connection, so closing it here is the whole contract.
+                conn.close()
         except (OSError, http.client.HTTPException):
             pass
         if status == 200:
