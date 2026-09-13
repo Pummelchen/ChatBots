@@ -161,7 +161,9 @@ done
 
 # ── Models ──────────────────────────────────────────────────────────────────────────
 # Resumable and verified: each file is checked against the size the server reports, so an
-# interrupted download is detected and continued rather than silently accepted.
+# interrupted download is detected and continued rather than silently accepted. A file whose
+# size cannot be learned is refused rather than recorded as 0 and then waved through — see
+# `file_list_is_complete` and `download_file` below.
 step "Downloading the models"
 info "Checkpoint: $MODEL_ID"
 mkdir -p "$MODELS_DIR"
@@ -171,28 +173,72 @@ mkdir -p "$MODEL_DIR"
 API_URL="https://huggingface.co/api/models/$MODEL_ID"
 FILE_LIST="$MODELS_DIR/.huggingface-file-list.txt"
 
-if [ ! -s "$FILE_LIST" ]; then
-  dim "Asking huggingface.co which files this checkpoint has…"
-  if ! curl -sSfL --max-time 60 "$API_URL" -o "$MODELS_DIR/.hf-model.json"; then
-    die "Could not look up the model files. The connection may have dropped."
-  fi
+# The list is only trusted when every row carries a positive integer size. A zero used to
+# mean "unknown — accept any size", which made the integrity check a no-op: a truncated
+# transfer, or an error page written by `curl -o` without `--fail`, was recorded as a
+# complete model. A list an older installer left with a zero in it is rebuilt, not trusted.
+file_list_is_complete() {
+  [ -s "$FILE_LIST" ] || return 1
+  ! awk -F'\t' '$2 !~ /^[0-9]+$/ || $2 + 0 == 0 { bad = 1 } END { exit bad ? 0 : 1 }' "$FILE_LIST"
+}
 
-  if ! python3 "$SCRIPT_DIR/hf-file-list.py" "$MODELS_DIR/.hf-model.json" > "$FILE_LIST.names"; then
-    die "The checkpoint did not come back with a usable file list. This usually means the
-model name is wrong or the repository has moved."
-  fi
-
-  # The sizes are not in that response, so they are read with a HEAD request per file.
-  # The size is what proves a download finished rather than stopping part-way.
-  dim "Reading file sizes from the server…"
-  : > "$FILE_LIST"
+# Reads the size of every listed file with a HEAD request. The size is what proves a download
+# finished rather than stopping part-way, so when it cannot be read the lookup fails and the
+# installer says so; recording 0 and continuing would remove the check entirely. `--fail`
+# keeps an HTTP error out of the size calculation too.
+#
+# The result is written to a temporary file and moved into place only after every size has
+# been read, so a lookup that stops half-way can never leave a short list that a re-run would
+# treat as complete.
+read_file_sizes() {
+  local names_file="$1" name size attempt
+  local building="$FILE_LIST.building"
+  : > "$building"
   while IFS= read -r name; do
     [ -z "$name" ] && continue
-    size="$(curl -sIL --max-time 60 "https://huggingface.co/$MODEL_ID/resolve/main/$name" \
-      | tr -d '\r' \
-      | awk 'tolower($1) == "content-length:" { value = $2 } END { print value }')"
-    printf "%s\t%s\n" "$name" "${size:-0}" >> "$FILE_LIST"
-  done < "$FILE_LIST.names"
+    size=""
+    for attempt in 1 2 3; do
+      size="$(curl -fsIL --max-time 60 \
+        "https://huggingface.co/$MODEL_ID/resolve/main/$name" \
+        | tr -d '\r' \
+        | awk 'tolower($1) == "content-length:" { value = $2 } END { print value }')" || size=""
+      case "$size" in
+        ''|*[!0-9]*) size="" ;;
+        *) if [ "$size" -gt 0 ]; then break; fi ;;
+      esac
+      if [ "$attempt" -lt 3 ]; then sleep 3; fi
+    done
+    if [ -z "$size" ]; then
+      rm -f "$building"
+      return 1
+    fi
+    printf "%s\t%s\n" "$name" "$size" >> "$building"
+  done < "$names_file"
+  mv "$building" "$FILE_LIST"
+}
+
+if ! file_list_is_complete; then
+  if [ ! -s "$FILE_LIST.names" ]; then
+    dim "Asking huggingface.co which files this checkpoint has…"
+    if ! curl -sSfL --max-time 60 "$API_URL" -o "$MODELS_DIR/.hf-model.json"; then
+      die "Could not look up the model files. The connection may have dropped."
+    fi
+
+    if ! python3 "$SCRIPT_DIR/hf-file-list.py" "$MODELS_DIR/.hf-model.json" > "$FILE_LIST.names"; then
+      die "The checkpoint did not come back with a usable file list. This usually means the
+model name is wrong or the repository has moved."
+    fi
+  fi
+
+  dim "Reading file sizes from the server…"
+  if ! read_file_sizes "$FILE_LIST.names"; then
+    die "The size of one or more model files could not be read from huggingface.co, so the
+download cannot be verified and was not started.
+
+This is usually a dropped connection or a rate limit, and running the script again retries
+it. It is deliberately fatal: without the size there is nothing to check the download
+against, and this installer will not record a model it cannot verify as complete."
+  fi
   rm -f "$FILE_LIST.names"
 fi
 
@@ -204,20 +250,31 @@ download_file() {
   local url="https://huggingface.co/$MODEL_ID/resolve/main/$name"
   local target="$MODEL_DIR/$name"
 
+  # A zero or non-numeric size is not "unknown, so accept anything": it means this file
+  # cannot be verified, and an unverifiable model file is not recorded as complete. The size
+  # list is validated before it is used, so this only fires on a corrupt or hand-edited list.
+  case "$expected" in
+    ''|*[!0-9]*|0)
+      fail "$name has no size to verify against — refusing to download it"
+      return 1
+      ;;
+  esac
+
   if [ -f "$target" ]; then
     # A file whose size matches is complete; one that is short was interrupted.
     local actual
     actual="$(stat -f%z "$target" 2>/dev/null || echo 0)"
-    if [ "$expected" = "0" ] || [ "$actual" = "$expected" ]; then
+    if [ "$actual" = "$expected" ]; then
       ok "$name (already downloaded)"
       return 0
     fi
     dim "$name is incomplete ($actual of $expected bytes) — continuing it"
-    # `-C -` resumes from where it stopped, which matters for a 3 GB file.
-    if curl -sSL -C - --retry 5 --retry-delay 3 --retry-all-errors \
+    # `-C -` resumes from where it stopped, which matters for a 3 GB file. `--fail` keeps an
+    # error response out of the file, so a 404 page is never resumed into model bytes.
+    if curl -fsSL -C - --retry 5 --retry-delay 3 --retry-all-errors \
         -o "$target" "$url"; then
       actual="$(stat -f%z "$target" 2>/dev/null || echo 0)"
-      if [ "$expected" = "0" ] || [ "$actual" = "$expected" ]; then
+      if [ "$actual" = "$expected" ]; then
         ok "$name (resumed)"
         return 0
       fi
@@ -231,7 +288,7 @@ download_file() {
   local human
   human="$(awk -v b="$expected" 'BEGIN { printf "%.0f MB", b/1048576 }')"
   info "$name ($human)"
-  if ! curl -L --retry 5 --retry-delay 3 --retry-all-errors --progress-bar \
+  if ! curl -fL --retry 5 --retry-delay 3 --retry-all-errors --progress-bar \
       -o "$target" "$url"; then
     fail "$name did not finish downloading"
     return 1
@@ -239,7 +296,7 @@ download_file() {
 
   local actual
   actual="$(stat -f%z "$target" 2>/dev/null || echo 0)"
-  if [ "$expected" != "0" ] && [ "$actual" != "$expected" ]; then
+  if [ "$actual" != "$expected" ]; then
     fail "$name is the wrong size ($actual of $expected bytes)"
     # An error page or a truncated transfer is not a partial download, so it is removed
     # rather than left for a resume that would build on corrupt bytes.
