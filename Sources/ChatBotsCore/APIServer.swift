@@ -641,6 +641,10 @@ public final class APIServer {
             // A refusal is an answer, so it is 409 rather than 500 — the client shows the
             // reason and carries on.
             return .error(reason, status: 409)
+        case .failed(let reason):
+            // The engine could not answer at all, which is a server-side failure rather than
+            // something the caller did: 500, with the reason the transport gave.
+            return .error(reason, status: 500)
         }
     }
 

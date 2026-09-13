@@ -269,6 +269,40 @@ struct WebTransportSessionTests {
         #expect(pushed?.topic == "Changed elsewhere")
         #expect(pushed?.topic == "Changed elsewhere")
     }
+
+    /// A request the framing will not carry fails at the sender, with the size named, and the
+    /// session it was going to travel on is still usable afterwards.
+    ///
+    /// The shape this replaces: `LengthFraming.read` threw `messageTooLarge`, `try?` discarded
+    /// it, the buffer was never consumed, and every later frame was unreachable — a session
+    /// that stayed connected and answered nothing for the rest of its life. It was not only
+    /// adversarial: the protocol cap was 32 MB while the engine accepted 64 MB attachments, and
+    /// the request base64-encodes, so a legitimate upload over roughly 24 MB hit it.
+    @Test("A request too large to frame fails at the sender and leaves the session usable")
+    func oversizeRequestFailsFast() async throws {
+        let running = try await startEngine()
+        defer { Task { await running.stop() } }
+
+        let client = makeClient(port: running.port)
+        try await client.connect()
+        defer { Task { await client.disconnect() } }
+
+        // Over the cap once the bytes are base64-encoded into the request JSON.
+        let contents = Data(repeating: 0x41, count: ProtocolLimits.maximumMessageBytes)
+        do {
+            _ = try await client.send(.addAttachment(filename: "too-large.bin", contents: contents))
+            Issue.record("an over-cap request should fail at the sender")
+        } catch let error as WebTransportEngineClient.ClientError {
+            // The reason names the limit rather than the request timeout: the sender refused it,
+            // it did not sit on a session that would never answer.
+            #expect(error.errorDescription?.contains("refused") == true)
+            #expect(error.errorDescription?.contains("did not answer") == false)
+        }
+
+        // Not hung, and not desynced: the same connection still answers.
+        let snapshot = try #require(await client.state())
+        #expect(snapshot.topic == "A transport test")
+    }
 }
 
 /// The next pushed state, or `nil` if none arrived in time.

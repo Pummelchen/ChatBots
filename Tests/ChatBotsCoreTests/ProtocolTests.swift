@@ -130,6 +130,65 @@ struct LengthFramingTests {
         }
         #expect(message.count == ProtocolLimits.maximumMessageBytes)
     }
+
+    @Test("A sender refuses a message over the cap rather than framing it")
+    func checkedFramingRefusesOversize() {
+        // The frame is not put on the wire at all: its length prefix would say where the next
+        // frame begins, so a receiver that refuses it can never read past it. The error names
+        // the size and the limit instead.
+        let over = Data(count: ProtocolLimits.maximumMessageBytes + 1)
+        do {
+            _ = try LengthFraming.frameChecked(over)
+            Issue.record("an over-cap message should be refused at the sender")
+        } catch let error as ProtocolError {
+            #expect(error == .messageTooLarge(ProtocolLimits.maximumMessageBytes + 1))
+            #expect(
+                error.errorDescription?.contains("\(ProtocolLimits.maximumMessageBytes)") == true)
+        } catch {
+            Issue.record("expected a ProtocolError, got \(error)")
+        }
+    }
+
+    @Test("An attachment at the engine's own size limit fits the wire cap")
+    func largestAttachmentIsAccepted() throws {
+        // This is the reconciliation, exercised rather than declared: the documented attachment
+        // limit has to become a message the cap accepts, or the limit is a claim the transport
+        // refuses. It was 64 MB against a 32 MB message cap, so a legitimate attachment over
+        // roughly 24 MB could never be sent.
+        let contents = Data(
+            repeating: 0x41, count: AttachmentLimits.defaultMaximumFileBytes)
+        let framed = try LengthFraming.frameChecked(
+            try ProtocolCodec.encode(
+                EngineRequest.addAttachment(filename: "largest.txt", contents: contents)))
+
+        guard case .message(let payload, let remainder) = try LengthFraming.read(from: framed) else {
+            Issue.record("the largest legitimate message should be readable")
+            return
+        }
+        #expect(payload.count <= ProtocolLimits.maximumMessageBytes)
+        #expect(remainder.isEmpty)
+        // And it really is the largest attachment, not a smaller stand-in.
+        let decoded = try ProtocolCodec.decodeRequest(payload)
+        guard case .addAttachment(_, let decodedContents) = decoded else {
+            Issue.record("expected the attachment request back")
+            return
+        }
+        #expect(decodedContents.count == AttachmentLimits.defaultMaximumFileBytes)
+    }
+
+    @Test("The three size limits are derived from one place")
+    func limitsAreDerivedFromTheAttachmentLimit() {
+        let attachment = AttachmentLimits.defaultMaximumFileBytes
+        let base64 =
+            (attachment * ProtocolLimits.base64Numerator + ProtocolLimits.base64Denominator - 1)
+            / ProtocolLimits.base64Denominator
+        // The message cap covers the base64 form and the JSON around it.
+        #expect(ProtocolLimits.maximumMessageBytes >= base64 + ProtocolLimits.envelopeOverheadBytes)
+        // The HTTP body is the same request, so it carries the same budget.
+        #expect(HTTPParser.maximumBodyBytes == ProtocolLimits.maximumMessageBytes)
+        // And the shipped limits are the ones the derivation names.
+        #expect(AttachmentLimits.standard.maximumFileBytes == attachment)
+    }
 }
 
 @Suite("Newline framing")

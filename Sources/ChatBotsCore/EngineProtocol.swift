@@ -130,9 +130,21 @@ public enum EngineReply: Sendable, Codable {
     /// The command was understood and refused. Distinct from a transport failure: "the topic
     /// cannot be changed once the conversation has started" is an answer, not an error.
     case refused(String)
+    /// The engine could not answer, and the session is ending. Distinct from `.refused`, which
+    /// is a well-formed request the engine chose not to carry out: this is the transport
+    /// saying why the frame could not be served — a message over the protocol cap, for
+    /// instance — so the client is told rather than left with a session that answers nothing.
+    case failed(String)
 
     public var snapshot: APISnapshot? {
         if case .state(let snapshot) = self { return snapshot }
+        return nil
+    }
+
+    /// Why the engine could not answer, when it could not. A front end shows this; a caller
+    /// that needs to distinguish it from a refusal does so on this case.
+    public var failure: String? {
+        if case .failed(let reason) = self { return reason }
         return nil
     }
 
@@ -221,12 +233,33 @@ public enum EngineEvent: Sendable, Codable {
 
 /// The largest single message either side will accept.
 ///
-/// A guard, not a limit anyone should meet: the largest legitimate message is a state
-/// snapshot with a long transcript, or an uploaded document. Refusing something absurd is
+/// A guard, not a limit anyone should meet: the largest legitimate message is an uploaded
+/// document, which travels as JSON with its bytes base64-encoded. Refusing something absurd is
 /// better than buffering until memory runs out.
+///
+/// **Derived from the attachment limit, not written as a second literal.** The comment here
+/// used to call 32 MB "a generous multiple of the largest attachment the engine accepts" while
+/// `AttachmentLimits` accepted 64 MB: base64 turns that into about 85 MB, so the protocol cap
+/// was *below* the documented limit, and a legitimate attachment over roughly 24 MB was framed,
+/// refused by the receiver, and left the session permanently desynced. The three numbers are
+/// now one number plus arithmetic — see `AttachmentLimits.defaultMaximumFileBytes` and
+/// `HTTPParser.maximumBodyBytes` — so they cannot drift apart again.
 public enum ProtocolLimits {
-    /// 32 MB. A generous multiple of the largest attachment the engine accepts.
-    public static let maximumMessageBytes = 32 * 1024 * 1024
+    /// Base64 turns every three bytes into four characters, so a document of `n` bytes needs
+    /// `ceil(n * 4 / 3)` characters on the wire.
+    public static let base64Numerator = 4
+    public static let base64Denominator = 3
+    /// Room for the JSON around one attachment: the key names, the frame tag, the filename
+    /// (capped at 255 bytes when the engine stages it) and separators. Generous by orders of
+    /// magnitude, so the message cap is decided by the document rather than by the envelope.
+    public static let envelopeOverheadBytes = 64 * 1024
+
+    /// The largest single message either side will accept: the base64 form of the largest
+    /// attachment the engine accepts, plus the envelope around it.
+    public static let maximumMessageBytes =
+        (AttachmentLimits.defaultMaximumFileBytes * base64Numerator + base64Denominator - 1)
+        / base64Denominator
+        + envelopeOverheadBytes
 }
 
 // MARK: - Framing
@@ -238,11 +271,28 @@ public enum ProtocolLimits {
 public enum LengthFraming {
 
     /// Wrap an encoded message.
+    ///
+    /// The unchecked primitive: it is what a test uses to forge a frame the cap would refuse,
+    /// and what `frameChecked` calls once it has checked. A production sender wants the checked
+    /// form, so an over-cap message fails where it was made rather than on the far side.
     public static func frame(_ payload: Data) -> Data {
         var length = UInt32(payload.count).bigEndian
         var out = Data(bytes: &length, count: 4)
         out.append(payload)
         return out
+    }
+
+    /// Wrap an encoded message, refusing one the receiver would reject.
+    ///
+    /// A sender must use this: framing a message over `ProtocolLimits.maximumMessageBytes` puts
+    /// a length prefix on the wire that the receiver throws on, and because the prefix is the
+    /// only thing that says where the next frame begins, nothing after it is readable. Failing
+    /// at the sender names the size and leaves the session usable.
+    public static func frameChecked(_ payload: Data) throws -> Data {
+        guard payload.count <= ProtocolLimits.maximumMessageBytes else {
+            throw ProtocolError.messageTooLarge(payload.count)
+        }
+        return frame(payload)
     }
 
     /// What a read produced.

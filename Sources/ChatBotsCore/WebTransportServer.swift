@@ -216,7 +216,26 @@ public final class WebTransportEngineServer {
             // Several frames can arrive together and one can be split across reads; the
             // framing holds partial messages until they are complete.
             while true {
-                let result = try? LengthFraming.read(from: buffer)
+                let result: LengthFraming.ReadResult
+                do {
+                    result = try LengthFraming.read(from: buffer)
+                } catch let error as ProtocolError {
+                    // A frame the framing refuses cannot be skipped: the length prefix is the
+                    // only thing that says where the next frame begins, so every later frame is
+                    // unreachable. Say why and close, rather than leaving a session that
+                    // answers nothing for the rest of its life. This was `try?`, which
+                    // discarded the error and did exactly that — and the cap was low enough
+                    // that a legitimate large attachment reached it.
+                    let reason = error.errorDescription ?? "the frame was refused"
+                    lastSessionError = reason
+                    await send(.reply(.failed(reason)), on: stream)
+                    try? await session.close(reason: reason)
+                    return
+                } catch {
+                    lastSessionError = error.localizedDescription
+                    try? await session.close(reason: error.localizedDescription)
+                    return
+                }
                 guard case .message(let payload, let remainder) = result else { break }
                 buffer = remainder
                 if let request = try? ProtocolCodec.decodeRequest(payload) {
@@ -237,10 +256,27 @@ public final class WebTransportEngineServer {
     /// Write one frame. Every write goes through here so there is one place that serialises
     /// them: replies and events reach the same stream from different tasks, and interleaving
     /// two writes would corrupt the framing.
+    ///
+    /// A frame the receiver would refuse is not put on the wire at all: framing it would put a
+    /// length prefix before bytes that will never be read as a message, and the error names the
+    /// size where it was made instead. `lastSessionError` carries the reason.
     private func send(_ frame: EngineFrame, on stream: WebTransportBidirectionalStream) async {
-        guard let encoded = try? ProtocolCodec.encode(frame) else { return }
+        let encoded: Data
         do {
-            try await stream.send(LengthFraming.frame(encoded))
+            encoded = try ProtocolCodec.encode(frame)
+        } catch {
+            lastSessionError = "could not encode a frame: \(error.localizedDescription)"
+            return
+        }
+        let framed: Data
+        do {
+            framed = try LengthFraming.frameChecked(encoded)
+        } catch {
+            lastSessionError = error.localizedDescription
+            return
+        }
+        do {
+            try await stream.send(framed)
         } catch {
             // The client is gone; the reader will notice and end the session.
         }

@@ -144,9 +144,16 @@ public struct HTTPResponse: Sendable {
 /// Request parsing, kept separate from the socket so it can be tested directly.
 public enum HTTPParser {
 
-    /// The largest request this server will accept. A conversation export is small and the
-    /// only bodies are commands and attachment lists, so anything larger is a mistake.
-    public static let maximumBodyBytes = 8 * 1024 * 1024
+    /// The largest request this server will accept.
+    ///
+    /// The same wire budget as the WebTransport protocol, because an attachment upload is the
+    /// largest request either transport carries — the body is JSON with the file base64-encoded
+    /// — and two caps that disagree mean one transport refuses what the other documents as
+    /// supported. It was 8 MB against a documented 64 MB attachment, so the limit was
+    /// unreachable here as well as being unreachable over WebTransport. Derived from
+    /// `ProtocolLimits`, which is in turn derived from `AttachmentLimits`, so the three cannot
+    /// drift apart again.
+    public static let maximumBodyBytes = ProtocolLimits.maximumMessageBytes
 
     public struct Incomplete: Error {}
 

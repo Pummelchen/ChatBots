@@ -191,8 +191,10 @@ public final class WebTransportEngineClient {
         }
 
         do {
-            try await stream.send(LengthFraming.frame(try ProtocolCodec.encode(request)))
+            try await stream.send(LengthFraming.frameChecked(try ProtocolCodec.encode(request)))
         } catch {
+            // A message over the cap fails here, with its size named, rather than being framed
+            // for a receiver that would refuse it and leave the session unreadable.
             throw ClientError.streamFailed(error.localizedDescription)
         }
 
@@ -221,7 +223,15 @@ public final class WebTransportEngineClient {
                 "the engine did not answer within \(configuration.timeoutMilliseconds)ms")
         }
 
-        if let reply { return reply }
+        if let reply {
+            // `.failed` is the engine saying why it could not answer, and the session is
+            // closing. Raised as the same typed failure as a dropped reader so a caller cannot
+            // mistake it for a normal reply and carry on.
+            if case .failed(let reason) = reply {
+                throw ClientError.streamFailed(reason)
+            }
+            return reply
+        }
         if let readerError {
             throw ClientError.streamFailed("live updates stopped: \(readerError)")
         }
@@ -265,19 +275,32 @@ public final class WebTransportEngineClient {
             do {
                 chunk = try await stream.receive()
             } catch {
-                readerError = error.localizedDescription
-                break
+                failReader(error.localizedDescription)
+                return
             }
             if chunk.isEmpty {
-                readerError = readerError ?? "the engine closed the stream"
-                break
+                failReader(readerError ?? "the engine closed the stream")
+                return
             }
             buffer.append(chunk)
 
             while true {
-                guard case .message(let payload, let remainder) = try? LengthFraming.read(
-                    from: buffer)
-                else { break }
+                let result: LengthFraming.ReadResult
+                do {
+                    result = try LengthFraming.read(from: buffer)
+                } catch let error as ProtocolError {
+                    // The length prefix is the only thing that says where the next frame
+                    // begins, so a refused frame cannot be skipped and every later frame is
+                    // unreachable. Stop the reader with the reason rather than looping on a
+                    // buffer that will never advance — which is what the discarded `try?` did,
+                    // leaving a client that was connected, silent and useless.
+                    failReader(error.errorDescription ?? "a frame was refused")
+                    return
+                } catch {
+                    failReader(error.localizedDescription)
+                    return
+                }
+                guard case .message(let payload, let remainder) = result else { break }
                 buffer = remainder
                 guard let frame = try? ProtocolCodec.decodeFrame(payload) else { continue }
                 switch frame {
@@ -293,6 +316,17 @@ public final class WebTransportEngineClient {
                 }
             }
         }
+        eventContinuation?.finish()
+    }
+
+    /// End the reader with a reason, and wake anything waiting on it immediately.
+    ///
+    /// A waiting `send` learns the reason now rather than at its own timeout, and the event
+    /// stream ends, so "the connection is dead" is a sentence the caller can read instead of a
+    /// wait that eventually gives up.
+    private func failReader(_ reason: String) {
+        readerError = reason
+        for reply in pendingReplies { reply.finish() }
         eventContinuation?.finish()
     }
 }

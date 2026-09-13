@@ -215,9 +215,20 @@ public struct AttachmentLimits: Sendable {
     /// — sizeable but well inside the window, leaving room for the discussion itself.
     public var maximumTextCharacters: Int = 120_000
     /// Refuse files larger than this outright, since reading them is the slow part.
-    public var maximumFileBytes: Int = 64 * 1024 * 1024
+    public var maximumFileBytes: Int = AttachmentLimits.defaultMaximumFileBytes
 
-    public init(maximumTextCharacters: Int = 120_000, maximumFileBytes: Int = 64 * 1024 * 1024) {
+    /// The shipped per-file ceiling, and the figure the wire limits are derived from.
+    ///
+    /// A named constant rather than a literal repeated in the initialiser, because
+    /// `ProtocolLimits` has to cover the base64 form of this many bytes and
+    /// `HTTPParser.maximumBodyBytes` has to cover the same request: three literals that must
+    /// agree did not agree, and the documented limit was unreachable over both transports.
+    public static let defaultMaximumFileBytes = 64 * 1024 * 1024
+
+    public init(
+        maximumTextCharacters: Int = 120_000,
+        maximumFileBytes: Int = AttachmentLimits.defaultMaximumFileBytes
+    ) {
         self.maximumTextCharacters = maximumTextCharacters
         self.maximumFileBytes = maximumFileBytes
     }
