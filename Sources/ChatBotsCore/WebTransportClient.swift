@@ -113,23 +113,26 @@ public final class WebTransportEngineClient {
                 }
             }
 
-            // Then speak first, before anyone asks. This is not politeness, and it is not
-            // optional.
+            // Then speak first. The answer is wanted anyway — it is the same snapshot every front
+            // end draws when it opens — and speaking first also steps around a stream-prefix race
+            // that was seen once and has not been reproduced since.
             //
             // The transport writes the WebTransport stream prefix lazily, as part of the first
-            // `send` on the stream: opening a stream puts no byte on the wire. The engine
-            // accepts the stream and reads it exactly once, to consume that prefix. If nothing
-            // has been written yet, that read finds zero bytes and fails the session outright —
-            // "truncated: needed 1 bytes, available 0" — the engine's serve loop returns, and
-            // the client is left holding a connection that will never carry anything.
+            // `send` on the stream: opening a stream puts no byte on the wire. A client that
+            // connected and then waited was once observed to lose its session outright —
+            // "truncated: needed 1 bytes, available 0" — leaving it holding a connection that
+            // would never carry anything. It looked intermittent because it was a race: any
+            // frame sent in the same instant as connecting won it.
             //
-            // So a client that connects and then waits to be spoken to kills its own session,
-            // and waiting is the natural thing to do. This looked intermittent because it was a
-            // race: any frame sent in the same instant as connecting won it. That is why the
-            // app sometimes drew a conversation and usually drew nothing.
+            // What is actually established, measured while opening the issue for this: a client
+            // that connects, sends nothing for three seconds, and only then asks for the state is
+            // served normally, on **both 1.3.6 and 1.3.7**, against `WebTransportEngineServer`.
+            // The failure is not reproducible here and the interleaving that caused it was never
+            // captured, so nothing has been filed upstream.
             //
-            // Asking for the state is the cheapest possible first frame, and its answer is
-            // worth keeping: it is the same snapshot every front end draws when it opens.
+            // The round trip is kept regardless, and deliberately: it is one small frame whose
+            // reply is wanted either way, and removing it would trade a certain no-op for an
+            // uncertain race. If someone does reproduce the failure, this is the line to revisit.
             do {
                 greeting = try await send(.fetchState).snapshot
             } catch {
