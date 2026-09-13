@@ -123,11 +123,6 @@ public struct HTTPResponse: Sendable {
         head += "Content-Type: \(contentType)\r\n"
         head += "Content-Length: \(body.count)\r\n"
         head += "Cache-Control: no-store\r\n"
-        // The page is served from the same origin in the Caddy setup, but a browser
-        // reload during development sometimes hits the port directly.
-        head += "Access-Control-Allow-Origin: *\r\n"
-        head += "Access-Control-Allow-Headers: Content-Type\r\n"
-        head += "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
         head += "Connection: \(keepAlive ? "keep-alive" : "close")\r\n"
         for (name, value) in headers.sorted(by: { $0.key < $1.key }) {
             head += "\(name): \(value)\r\n"
@@ -636,7 +631,6 @@ public final class HTTPServer: @unchecked Sendable {
                         + "Content-Type: text/event-stream; charset=utf-8\r\n"
                         + "Cache-Control: no-store\r\n"
                         + "X-Accel-Buffering: no\r\n"
-                        + "Access-Control-Allow-Origin: *\r\n"
                         + "Connection: keep-alive\r\n"
                         + "\r\n"
                     connection.send(content: Data(head.utf8), completion: .contentProcessed { _ in })

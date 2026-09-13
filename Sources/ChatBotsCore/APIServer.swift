@@ -389,9 +389,6 @@ public final class APIServer {
     // MARK: - Routing
 
     func handle(_ request: HTTPRequest) async -> HTTPResponse {
-        // A browser issues a preflight before a cross-origin write; answer it and stop.
-        if request.method == "OPTIONS" { return HTTPResponse(status: 204) }
-
         let response = await route(request)
         // Anything that is not an API route may be a static asset, which is how the web
         // interface is served when Caddy is not in front.
