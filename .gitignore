@@ -9,9 +9,12 @@ models/
 
 # Installer output. These are logs and caches rather than sources, and they contain
 # machine-specific paths.
-.install.log
-.install-build.log
-.install-check.log
+#
+# One pattern rather than a list of names: the installer writes four logs today
+# (`.install.log`, `-build`, `-check`, `-transport`) and the last of them was missing here,
+# so `git status` was never clean after running the installer. A new log should not have to
+# be remembered in two places.
+.install*.log
 models/.huggingface-file-list.txt
 models/.hf-model.json
 
