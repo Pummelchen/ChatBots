@@ -367,19 +367,34 @@ CHECK_TIMEOUT=300
 # the app — they cannot tell whether to wait or give up.
 run_with_timeout() {
   local seconds="$1"; shift
+  local pid waited
+
+  # Job control puts the command in its own process group. That is what makes the timeout
+  # actually stop the work: `swift run` and the `chatbots-cli` it spawns are grandchildren of
+  # this shell, so signalling only the direct child left the process that holds the GPU
+  # running for the rest of the install while the log said the check had been stopped.
+  set -m
   "$@" &
-  local pid=$!
-  local waited=0
+  pid=$!
+  set +m
+
+  waited=0
   while kill -0 "$pid" 2>/dev/null; do
     if [ "$waited" -ge "$seconds" ]; then
-      kill -TERM "$pid" 2>/dev/null || true
+      # A negative pid addresses the whole process group created above; the plain-pid
+      # fallback is there only in case job control was unavailable and no group was created.
+      kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
       sleep 2
-      kill -KILL "$pid" 2>/dev/null || true
+      kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true
+      # Reap the group leader so the next step does not see a zombie.
+      wait "$pid" 2>/dev/null || true
       return 124
     fi
     sleep 2
     waited=$((waited + 2))
   done
+
+  # The command's real status: a passing run must stay a pass.
   wait "$pid"
 }
 
