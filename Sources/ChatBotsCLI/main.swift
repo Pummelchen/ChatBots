@@ -609,14 +609,18 @@ if options.sessionProbe {
 
 if options.memoryProbe {
     let mib = 1024.0 * 1024.0
+    /// The five quantities MLX's `Memory` actually exposes: active and cached allocations,
+    /// their peak, the cache cap and the overall cap. There is no separate GPU limit — the
+    /// table printed `memoryLimit` twice, once under `gpuLimit` and once under `memLimit`,
+    /// so one of the five was never shown and one number wore two names (A65).
     func report(_ label: String) {
         log(String(
-            format: "  %-22@ active=%7.1f MiB  cache=%7.1f MiB  peak=%7.1f MiB  gpuLimit=%7.1f MiB  memLimit=%7.1f MiB",
+            format: "  %-22@ active=%7.1f MiB  cache=%7.1f MiB  peak=%7.1f MiB  cacheLimit=%7.1f MiB  memLimit=%7.1f MiB",
             label as NSString,
             Double(Memory.activeMemory) / mib,
             Double(Memory.cacheMemory) / mib,
             Double(Memory.peakMemory) / mib,
-            Double(Memory.memoryLimit) / mib,
+            Double(Memory.cacheLimit) / mib,
             Double(Memory.memoryLimit) / mib))
     }
     log(
