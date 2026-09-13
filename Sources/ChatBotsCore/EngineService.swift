@@ -322,6 +322,15 @@ public final class EngineService {
     /// Written to a temporary file because the extractors take a URL — the same path the app
     /// uses for a dragged file — so there is one implementation of "what is in this document"
     /// rather than a second one for bytes.
+    ///
+    /// **`filename` is caller-supplied data, not a name.** It arrives verbatim in the request
+    /// body of `POST /api/attachments` and in the WebTransport `addAttachment` command, so it
+    /// cannot be trusted to describe a location. It is reduced to a single path component and
+    /// refused unless what remains is a usable name; the destination is then checked to be
+    /// inside the per-upload directory this method created. The upload can only ever be written
+    /// inside that directory, whatever the caller sends — without this, a name like
+    /// `../../../../Users/<user>/Library/LaunchAgents/x.plist` wrote attacker-controlled bytes
+    /// outside it, and the file outlived the `defer` that removes the staging directory.
     private func addAttachment(filename: String, contents: Data) -> EngineReply {
         guard engine.canAttachFiles else {
             return .refused("source material must be added before the conversation starts")
@@ -330,13 +339,31 @@ public final class EngineService {
             return .refused("too many attached files")
         }
 
+        guard let name = Self.stagedAttachmentName(filename) else {
+            // Not silently renamed: a name that cannot be used is something the caller is told
+            // about, and the raw value is not echoed because it is untrusted too.
+            return .refused("the uploaded file name is not a usable name")
+        }
+
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "chatbots-upload-\(UUID().uuidString)")
-        let temporary = directory.appending(path: filename)
         defer { try? FileManager.default.removeItem(at: directory) }
 
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        } catch {
+            return .refused("could not stage the upload: \(error.localizedDescription)")
+        }
+
+        // The belt to the validation's braces: even if the name check above were ever bypassed,
+        // the write is refused unless the destination really is a direct child of the directory
+        // created a moment ago.
+        let temporary = directory.appending(path: name)
+        guard Self.isDirectChild(temporary, of: directory) else {
+            return .refused("the uploaded file name is not a usable name")
+        }
+
+        do {
             try contents.write(to: temporary)
         } catch {
             return .refused("could not stage the upload: \(error.localizedDescription)")
@@ -354,6 +381,38 @@ public final class EngineService {
         } catch {
             return .refused(error.localizedDescription)
         }
+    }
+
+    /// The name an upload is staged under, or `nil` when what the caller sent cannot be used.
+    ///
+    /// The value is untrusted data from the request body, not a path. `lastPathComponent` keeps
+    /// the final component — which is also the display name the extractor reports — and the
+    /// checks below refuse anything that is still not a usable name. On Darwin a backslash is
+    /// not a separator, so it survives the reduction and has to be refused explicitly; a NUL or
+    /// other control character could truncate the path at the filesystem boundary; and a cap
+    /// keeps a pathological name out of a path that would fail there anyway.
+    static func stagedAttachmentName(_ filename: String) -> String? {
+        let name = (filename as NSString).lastPathComponent
+        guard !name.isEmpty, name != ".", name != ".." else { return nil }
+        guard !name.contains("/"), !name.contains("\\") else { return nil }
+        guard name.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) })
+        else { return nil }
+        // A few hundred bytes is plenty for a file name; 255 is the usual single-component cap.
+        guard name.utf8.count <= 255 else { return nil }
+        return name
+    }
+
+    /// Whether `url` is a direct child of `directory`, compared by resolved path components.
+    ///
+    /// A string prefix test would be fooled by a sibling whose name merely starts with the same
+    /// characters, so this compares whole components after both sides are standardised and have
+    /// had symlinks resolved. The write happens after the directory exists, so resolving the
+    /// parent is resolving a real directory rather than a guess.
+    static func isDirectChild(_ url: URL, of directory: URL) -> Bool {
+        let base = directory.standardizedFileURL.resolvingSymlinksInPath().pathComponents
+        let target = url.standardizedFileURL.resolvingSymlinksInPath().pathComponents
+        guard target.count == base.count + 1 else { return false }
+        return Array(target.dropLast()) == base
     }
 
     /// The whole state, which every successful command returns.
