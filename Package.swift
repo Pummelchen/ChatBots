@@ -30,10 +30,21 @@ let package = Package(
         // The channel between the desktop app and the engine. Internal only: the website is
         // served by Caddy, which does not speak WebTransport.
         //
-        // 1.3.7 is the floor rather than a preference: before it, the listener's connection
-        // limit was a budget for its whole life instead of a concurrency cap, so an engine
-        // stopped accepting after sixteen connects and never recovered. See the wiki tracker.
-        .package(url: "https://github.com/Pummelchen/WebTransport.git", from: "1.3.7"),
+        // Pinned exactly rather than by range: this transport is the security boundary for the
+        // engine connection, and two behaviours this app depends on are tied to its exact
+        // version. 1.3.6 passed the ceiling to `NetworkListener.newConnectionLimit`, a budget
+        // for the listener's whole life on macOS 26 rather than a concurrency cap, so a fresh
+        // engine stopped accepting after sixteen connects and never recovered; 1.3.7 counts
+        // in-flight sessions and returns the slot instead. And the client still subscribes by
+        // sending a first frame, because an inbound stream is not delivered until its first
+        // byte arrives — the trigger documented in `WebTransportClient.connect()`. A range
+        // would let a future release move either behaviour under this app without the version
+        // changing to notice. See the wiki tracker.
+        //
+        // `exact:` is the labelled form of the old `.exact("1.3.7")` requirement — the same
+        // pin, and the only spelling of it that is not deprecated in tools-version 6.3, which
+        // would otherwise make this manifest itself a warning.
+        .package(url: "https://github.com/Pummelchen/WebTransport.git", exact: "1.3.7"),
     ],
     targets: [
         // MARK: - Core
