@@ -145,7 +145,7 @@ public struct ImageExtractor: DocumentExtracting {
 
         let name = filename.isEmpty ? "the image" : filename
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-            let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
+            let decoded = CGImageSourceCreateImageAtIndex(source, 0, nil)
         else {
             throw DocumentError.unreadable(
                 "\(name) is not an image format a model can be given, and it could not be "
@@ -153,6 +153,27 @@ public struct ImageExtractor: DocumentExtracting {
         }
 
         let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+
+        // Orientation is carried in the file, not in the pixels, and a re-encode that ignores
+        // it hands the model a sideways picture. That is the normal iPhone case, not an edge
+        // one: a portrait photo is stored landscape with an EXIF orientation, and the format
+        // being converted here is the one iPhones write. `CreateImageAtIndex` deliberately
+        // does not apply the tag, so an image that carries one is decoded through the thumbnail
+        // path instead, which does — at the image's own longest side, so nothing is downscaled.
+        let orientation = (properties?[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+        let image: CGImage
+        if orientation == 1 {
+            image = decoded
+        } else {
+            let options: [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: max(decoded.width, decoded.height),
+            ]
+            image =
+                CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) ?? decoded
+        }
+
         let hasAlpha = (properties?[kCGImagePropertyHasAlpha] as? NSNumber)?.boolValue ?? false
         let type: UTType = hasAlpha ? .png : .jpeg
 

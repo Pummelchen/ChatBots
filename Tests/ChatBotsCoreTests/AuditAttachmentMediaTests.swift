@@ -25,7 +25,7 @@ private enum MediaTestError: Error {
 
 /// A real image file in `type`, written by ImageIO, returned as bytes.
 private func writeImage(
-    as type: UTType, width: Int, height: Int, to url: URL
+    as type: UTType, width: Int, height: Int, orientation: Int? = nil, to url: URL
 ) throws -> Data {
     let space = CGColorSpaceCreateDeviceRGB()
     guard
@@ -40,7 +40,9 @@ private func writeImage(
     context.fill(CGRect(x: 0, y: 0, width: width, height: height))
     guard let image = context.makeImage() else { throw MediaTestError.cannotWriteImage }
 
-    CGImageDestinationAddImage(destination, image, nil)
+    var properties: [CFString: Any] = [:]
+    if let orientation { properties[kCGImagePropertyOrientation] = orientation }
+    CGImageDestinationAddImage(destination, image, properties as CFDictionary)
     guard CGImageDestinationFinalize(destination) else { throw MediaTestError.cannotWriteImage }
     return try Data(contentsOf: url)
 }
@@ -96,6 +98,29 @@ struct AuditImageMediaTests {
         let image = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
         #expect(image.width == 6)
         #expect(image.height == 4)
+    }
+
+    /// An iPhone stores a portrait photo landscape with an EXIF orientation. Orientation lives
+    /// in metadata, not in the pixels, and `CGImageSourceCreateImageAtIndex` does not apply it,
+    /// so a conversion that just re-encoded the decoded image would hand the model a sideways
+    /// picture — a regression introduced by fixing the silent drop. The conversion decodes
+    /// through the transforming path instead, and this is the assertion that says so: 6x4
+    /// tagged "rotate 90 degrees" has to come out 4x6.
+    @Test("A photo's EXIF orientation is applied by the conversion")
+    func orientationIsApplied() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appending(path: "portrait.heic")
+        _ = try writeImage(as: .heic, width: 6, height: 4, orientation: 6, to: url)
+
+        let document = try SystemDocumentExtractor.ingestor.add(url: url)
+        let converted = try #require(document.imageData)
+        let source = try #require(CGImageSourceCreateWithData(converted as CFData, nil))
+        let image = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
+
+        #expect(
+            image.width == 4 && image.height == 6,
+            "got \(image.width)x\(image.height); the orientation tag was dropped")
     }
 
     @Test("An image already in a supported format is passed through untouched")
