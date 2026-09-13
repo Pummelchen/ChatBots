@@ -227,8 +227,13 @@ public enum BuiltInKeys {
     static let allowedHosts: Set<String> = ["api.deepseek.com"]
 
     /// The host of a base URL, lowercased, or nil when there is not one.
+    ///
+    /// Trimmed with `.whitespacesAndNewlines`, not `.whitespaces`: `responsesURL` already
+    /// strips line endings, so a base URL ending in `\n` was requestable but this check read
+    /// its host as nil and refused to attach the built-in key — two halves of the same
+    /// endpoint disagreeing about the same string (A106, the shape A55 fixed for keys).
     static func host(of baseURL: String) -> String? {
-        let trimmed = baseURL.trimmingCharacters(in: .whitespaces)
+        let trimmed = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         // A base URL is normally given with a scheme; tolerate one without.
         let candidate = trimmed.contains("://") ? trimmed : "https://\(trimmed)"
         guard let host = URLComponents(string: candidate)?.host else { return nil }
@@ -281,8 +286,16 @@ public struct OpenAIEndpoint: Sendable, Hashable, Codable {
     /// Resolved here rather than stored, so a saved endpoint keeps whatever the user typed
     /// and the fallback stays a fallback — nothing is written into their settings that they
     /// did not put there.
+    ///
+    /// The typed value goes through `BuiltInKeys.normalisedKey`, the same function the file
+    /// and environment paths use. It is the third caller the A55 fix named, and it had the
+    /// same defect: a pasted key with a trailing newline was taken verbatim, so it carried a
+    /// control character into the Authorization header while being non-empty, which kept
+    /// `isMissingKey` false and suppressed the warning that should have said there was no
+    /// usable key. A value that is only whitespace now reads as absent rather than as an
+    /// empty bearer token (audit A106).
     public var effectiveAPIKey: String? {
-        if let apiKey, !apiKey.isEmpty { return apiKey }
+        if let typed = BuiltInKeys.normalisedKey(apiKey) { return typed }
         return BuiltInKeys.key(forBaseURL: baseURL)
     }
 
