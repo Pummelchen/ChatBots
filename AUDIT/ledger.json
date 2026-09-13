@@ -167,14 +167,14 @@
       "file_line": "tools/*.sh (24 notes)",
       "title": "shellcheck -S style reports 4 findings, and the recorded count was wrong twice before it was right",
       "category": "style",
-      "status": "START",
+      "status": "DONE",
       "host_used": "this Mac",
       "discovered_by": "baseline",
       "evidence_before": "baseline/shellcheck.txt, 24 lines, 0 warnings/errors",
-      "fix_summary": null,
-      "evidence_after": null,
-      "commit": null,
-      "notes": " The count in this task's title was 24, which is the line count of the captured shellcheck output; the first correction to 7 counted the SC codes with `grep -oE 'SC[0-9]{4}'`, which also matches the three shellcheck.net/wiki/SCnnnn help URLs printed beneath the findings. The real number is 4: 2 x SC2001 in make-app.sh, SC2034 in start-app.sh, SC2015 in start.sh. AUDIT/phase-e.sh now counts the `SCnnnn (severity):` form, which is one per finding, and the plan records the method beside the number.",
+      "fix_summary": "All four shellcheck findings are fixed on their merits, with nothing suppressed: the two SC2001 indentation pipelines in make-app.sh, the SC2034 unused variable in start-app.sh, and the SC2015 `A && B || C` in start.sh rewritten as an explicit if so the intent is what the code says. The count went from 4 to 0 - measured, and it is worth repeating that this number was wrong twice before it was right (24 was a captured file's line count, and a correction to 7 counted three shellcheck.net help URLs as findings).",
+      "evidence_after": "`shellcheck -S style tools/*.sh` => 0 findings, exit 0, no shellcheck directives added; `bash -n` clean on every script touched.",
+      "commit": "f6dc8c2",
+      "notes": "This task's fix is carried by commit f6dc8c2, which is titled after an unrelated AUDIT/ change because the coordinator committed the whole index while the tools/ lane had these three paths staged. Recorded as A84 rather than repaired: the commit is true in content and wrong in scope, and this audit forbids rewriting history. The tree-visible result is what matters and it was verified independently - shellcheck is 0. The lane's own framing of the cause is the one worth keeping: `git add` plus `git commit` is not atomic, because the index is shared between lanes, so explicit staging does not protect a commit - only naming its paths does.",
       "blocked_reason": null
     },
     {
@@ -1432,7 +1432,7 @@
       "fix_summary": "Commit with an explicit pathspec from now on: `git commit -F - -- <paths>` commits only the named paths and leaves everything else staged and untouched, whatever else is in the index. Demonstrated rather than assumed, in a throwaway repository: with files a and b both staged and modified, `git commit -- a` produced a commit containing only a and left b staged and uncommitted. The lanes' own explicit-path staging discipline was already correct; the failure was on the coordinator's side of it, in the one place it was not being applied. The incident is recorded rather than repaired because this audit forbids rewriting history - the mixed commit stays in the record with this entry explaining it.",
       "evidence_after": "f6dc8c2 is left as it stands and annotated by this entry. The tools/ lane was told immediately what happened, asked NOT to re-commit those files, and asked to verify independently that its A10 changes are intact in the tree and that `shellcheck -S style tools/*.sh` reports 0 findings; shellcheck measured 0 at the time of writing. Subsequent coordinator commits use the pathspec form.",
       "commit": null,
-      "notes": "This is the SECOND time a task's changes were carried by another task's commit (the first was A18's test edits riding in the A19 repair commit, recorded in A18's notes). Two occurrences of one failure mode is a process defect, not bad luck, and the shape is the same both times: staging was done correctly per task and then a commit was issued that did not name what it was committing. The guard for the *content* of a commit is verify-done-commits.sh; what was missing was a guard for the *scope* of a commit, and the answer here is procedural rather than a script - a commit should always name its paths.",
+      "notes": "This is the SECOND time a task's changes were carried by another task's commit (the first was A18's test edits riding in the A19 repair commit, recorded in A18's notes). Two occurrences of one failure mode is a process defect, not bad luck, and the shape is the same both times: staging was done correctly per task and then a commit was issued that did not name what it was committing. The guard for the *content* of a commit is verify-done-commits.sh; what was missing was a guard for the *scope* of a commit, and the answer here is procedural rather than a script - a commit should always name its paths. The tools/ lane supplied the crispest statement of the cause and it is worth quoting rather than paraphrasing: `git add` + `git commit` is not atomic, because the index is shared. That is why the rule has to be that a commit names its paths rather than merely that staging is explicit - staging discipline alone cannot protect a commit, because another writer can commit in the window between the add and the commit.",
       "blocked_reason": null
     }
   ]

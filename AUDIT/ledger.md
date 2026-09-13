@@ -42,7 +42,7 @@ enumerated before they are fixed.
 | A07 | S2 | typing | `tools/*.py` (5 files) | Python is 3.14 but unannotated and unchecked: ruff 11, format 5, pyright 2 | style | DONE (`b85fc8b`) | this Mac | baseline |
 | A08 | S2 | deps | `Package.swift:32` | `WebTransport` is pinned by range while the project has twice depended on an exact transport behaviour | deps | DONE (`6c1ef31`) | this Mac | L0 pass |
 | A09 | S3 | tooling | `tools/cdp.py:42,44,180` | SAST: insecure-websocket and dynamic-urllib findings in the dev-only DevTools client | unsafe | DONE (`53183e6`) | this Mac | baseline (semgrep) |
-| A10 | S3 | tooling | `tools/*.sh` (24 notes) | `shellcheck -S style` reports 24 notes, mostly SC2001 | style | START | this Mac | baseline |
+| A10 | S3 | tooling | `tools/*.sh` (24 notes) | `shellcheck -S style` reports 24 notes, mostly SC2001 | style | DONE (`f6dc8c2`) | this Mac | baseline |
 | A11 | S3 | docs/ops | `README.md`, wiki | Neither the README nor the wiki states that running the website exposes the API to the LAN | docs | DONE (`067d953`) | this Mac | L4 pass (same evidence as A01) |
 | A12 | — | tests | `AUDIT/baseline/swift-test-asan.log` | AddressSanitizer over the whole suite: **clean** | test | DONE (`f9a359b`) | this Mac | §1 tooling requirement |
 | A13 | — | tests | `AUDIT/baseline/swift-test-tsan.log` | ThreadSanitizer over the whole suite: **one data race found** | test | DONE | this Mac | §1 tooling requirement |
