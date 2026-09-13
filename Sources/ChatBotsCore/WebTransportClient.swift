@@ -19,7 +19,6 @@
 // SHA-256 against the stored fingerprint — which the library would need to expose.
 
 import Foundation
-import WebTransport
 import WebTransportNetworkRuntime
 
 @MainActor
@@ -47,14 +46,41 @@ public final class WebTransportEngineClient {
         public var host = "127.0.0.1"
         public var port: UInt16 = 7790
         public var path = "/chatbots"
+        /// How long one request waits for its reply.
+        ///
+        /// This is a *request* deadline: it bounds a command the user is waiting on. It used
+        /// to double as the reader's idle receive timeout as well, which is a different thing
+        /// — see `idleTimeoutMilliseconds`.
         public var timeoutMilliseconds: Int32 = 10_000
+        /// How long the reader may go without a frame before it calls the stream dead.
+        ///
+        /// Its own value, not the request deadline. The transport exposes one timeout per
+        /// session and applies it to connect, send and receive alike; passing the request
+        /// deadline here meant a stream that was merely *quiet* for longer than one request
+        /// killed the reader. A15 moved document conversion off the main actor, so a
+        /// conversion can legitimately exceed ten seconds, and the command then reported a
+        /// connection failure while `isConnected` stayed true (audit A100).
+        ///
+        /// It is a backstop, not the only liveness check: a genuinely dead peer is still
+        /// detected — the QUIC connection closes on its own idle timeout, and any receive
+        /// error or closed stream fails the reader immediately. Nothing legitimate is silent
+        /// for this long, so choosing a value well beyond any single request does not hide a
+        /// dead channel.
+        public var idleTimeoutMilliseconds: Int32 = 120_000
 
         public init() {}
     }
 
     public let configuration: Configuration
-    private var session: WebTransportSession?
-    private var stream: WebTransportBidirectionalStream?
+    /// The session and its one stream, at the transport runtime layer.
+    ///
+    /// The runtime rather than the convenience wrapper, because only the runtime's
+    /// `openBidirectionalStream(timeoutMilliseconds:)` lets one session carry two different
+    /// deadlines: the connect gets the request deadline, and the stream gets the idle one.
+    /// The wrapper's `openBidirectionalStream()` has no override, so the stream would inherit
+    /// the connect deadline again — which is the borrowed timeout this fixes (A100).
+    private var session: WebTransportNetworkSession?
+    private var stream: WebTransportNetworkBidirectionalStream?
     /// The requests waiting for their replies, oldest first.
     ///
     /// There is at most one *live* entry: `send` takes the request slot before it registers, so
@@ -121,25 +147,35 @@ public final class WebTransportEngineClient {
         greeting = nil
         readerError = nil
 
-        let clientConfiguration = WebTransportClientConfiguration(
-            authority: "localhost",
-            path: configuration.path,
+        do {
             // Loopback only, and the identity is self-signed, so the platform trust path
             // cannot be used. See the note at the top of this file.
-            trustPolicy: .localDevelopmentSelfSigned,
-            settingsValidation: .draft16Strict,
-            timeoutMilliseconds: configuration.timeoutMilliseconds)
-
-        do {
-            let client = WebTransportClient(configuration: clientConfiguration)
-            let session = try await client.connect(
-                to: WebTransportEndpoint(host: configuration.host, port: configuration.port))
+            let client = WebTransportQUICClient(trustPolicy: .localDevelopmentSelfSigned)
+            // The connect gets the *request* deadline. This is the same handshake the
+            // convenience wrapper performs, with the one difference that matters here: the
+            // session timeout is not the reader's idle deadline, because the stream below
+            // overrides it (A100).
+            let session = try await client.connectSession(
+                to: WebTransportNetworkEndpoint(
+                    host: configuration.host, port: configuration.port),
+                authority: "localhost",
+                path: configuration.path,
+                origin: nil,
+                protocols: [],
+                optimisticCapsules: [],
+                settingsValidation: .draft16Strict,
+                timeoutMilliseconds: configuration.timeoutMilliseconds)
 
             do {
                 self.session = session
                 // One stream. See EngineProtocol for why two deadlocked and the second would not
                 // open at all.
-                self.stream = try await session.openBidirectionalStream()
+                //
+                // The override is the whole point of the A100 fix: this stream's receive and
+                // send use the idle deadline, so a silent-but-alive engine — a document
+                // conversion that takes longer than one request — no longer kills the reader.
+                self.stream = try await session.openBidirectionalStream(
+                    timeoutMilliseconds: configuration.idleTimeoutMilliseconds)
 
                 let (events, continuation) = AsyncStream<EngineEvent>.makeStream(
                     bufferingPolicy: .unbounded)
@@ -208,7 +244,11 @@ public final class WebTransportEngineClient {
         for reply in pendingReplies { reply.continuation.finish() }
         pendingReplies.removeAll()
         if let session {
-            try? await session.close()
+            // Bounded by the request deadline, not the idle one: closing is a command, and a
+            // client tearing down should not sit in it for two minutes.
+            try? await session.close(
+                applicationErrorCode: 0,
+                timeoutMilliseconds: configuration.timeoutMilliseconds)
         }
         session = nil
         stream = nil
@@ -359,7 +399,7 @@ public final class WebTransportEngineClient {
     public private(set) var readerError: String?
 
     /// Read frames until the stream ends, routing each to its destination.
-    private func read(from stream: WebTransportBidirectionalStream) async {
+    private func read(from stream: WebTransportNetworkBidirectionalStream) async {
         var buffer = Data()
         while !Task.isCancelled {
             let chunk: Data
