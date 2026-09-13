@@ -1578,14 +1578,31 @@
       "file_line": "tools/capture-devices.py:129 (call order at :293-294)",
       "title": "The documented capture command fails on a fresh checkout because `.run/` does not exist yet",
       "category": "defect",
-      "status": "START",
+      "status": "DONE",
       "host_used": "this Mac",
       "discovered_by": "reported by a fix lane while working on an adjacent task, and left unfixed because it falls outside that task's scope",
       "evidence_before": "`start_servers()` opens `ROOT/.run/capture-engine.log` at :129, but nothing has created `.run/` at that point: `caddy_process()` creates it (`config.parent.mkdir(exist_ok=True)`) and `main()` calls `start_servers()` at ~:293 BEFORE `caddy_process()` at ~:294. `.run/` is gitignored and is otherwise created by `tools/start-app.sh`, so on a fresh clone the documented `python3 tools/capture-devices.py` raises an unhandled FileNotFoundError at :129 instead of the tool's own message. Established from the call order and `git check-ignore -v .run`; not executed on a fresh checkout because that path reaches `swift build`, which the reporting lane was not permitted to run.",
+      "fix_summary": "A `run_directory()` helper creates `ROOT/.run` and returns it; `start_servers()` opens its engine log through it, and `caddy_process()` now derives its generated Caddyfile path from it too, replacing its own mkdir. That makes ONE ensurement point rather than one that happened to work because another function ran first. Fixed at the WRITE SITE, deliberately: reordering `main()` would have been wrong, because `caddy_process()` waits for a 200 from the Caddy port and the Caddyfile proxies /api/* to the engine, so the engine must already be running - reordering would make Caddy time out on every run. `RunDirectory.swift` answers the same question for the app and engine, and its 'one place decides' invariant is mirrored while its `~/Library/Application Support` fallback is deliberately NOT: this tool builds and serves the checkout it lives in, so its log belongs beside that checkout's state.",
+      "evidence_after": "The failure was demonstrated before it was fixed, using HEAD's own source: with ROOT set to a directory with no `.run`, `git show HEAD:tools/capture-devices.py` loaded as a module raised `FileNotFoundError: '.../.run/capture-engine.log'` from `start_servers()`, and the fixed module created the directory and the log instead. python3 -m py_compile, ruff check, ruff format --check and pyright all clean; no suppression, no except added.",
+      "commit": "6ca2dbf",
+      "notes": "This is the fresh-clone class A18 was about, one layer down - the suite was made hermetic and this tool still assumed a developer's machine. The fix's shape is the same as A86's and A88's: establish the invariant (one place creates the directory) rather than patch the symptom at each site.",
+      "blocked_reason": null
+    },
+    {
+      "id": "A94",
+      "severity": "S3",
+      "unit": "device capture tool",
+      "file_line": "tools/capture-devices.py (capture, downscale, build_index; OUT created only in main at :303)",
+      "title": "The capture output directory is created only by main(), so any other caller of capture() or build_index() hits the same fresh-directory failure A93 fixed",
+      "category": "defect",
+      "status": "START",
+      "host_used": "this Mac",
+      "discovered_by": "reported by the A93 lane, which checked for the same assumption elsewhere in the file and found it",
+      "evidence_before": "`capture()` (through `cdp.screenshot`) and `downscale()` write into `OUT`, and `build_index()` writes `OUT/index.html`, without any of them ensuring OUT exists - only `main()` creates it, at :303. From the documented entry point main() runs first, so it is latent today; any other caller, or a future reordering, hits the same FileNotFoundError class A93 fixed for `.run/`.",
       "fix_summary": null,
       "evidence_after": null,
       "commit": null,
-      "notes": "A fresh-clone failure is exactly what A18 was about, one layer down: the test suite was made hermetic, and this is a tool that still assumes a developer's machine. It shares its shape with A53 and A59 - the documented path does not work from a clean start.",
+      "notes": "Latent rather than live, and recorded because A93's own fix is the argument for recording it: the `.run/` case was latent in exactly the same way - correct from the documented entry point, wrong for every other caller - and it was reported as a real defect the moment someone used a different path through the file. The presence of the directory creation in main() is what makes both look safe.",
       "blocked_reason": null
     }
   ]
