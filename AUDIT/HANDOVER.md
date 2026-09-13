@@ -148,8 +148,9 @@ is the useful part.
 6. **Then sync the wiki tracker**, whose tables are generated from `ledger.json`. Done — "Open —
    none", 127 tasks, and a changelog entry for this session.
 7. **The goal is complete when the ledger has no task that is not DONE or BLOCKED-with-owner, and
-   `phase-e.sh` exits 0 on the fresh clone.** Both hold: 127/127 DONE, 0 BLOCKED, and
-   `AUDIT/baseline/phaseE/summary.txt` from the final run is the acceptance statement.
+   `phase-e.sh` exits 0 on the fresh clone.** Both hold: **128/128 DONE, 0 BLOCKED**, and
+   `AUDIT/baseline/phaseE/summary.txt` from the final run is the acceptance statement — **23 passed,
+   0 failed**, on commit `90e9f7b6`, from a fresh clone on `node1`.
 
 ## Environment facts the next session needs
 

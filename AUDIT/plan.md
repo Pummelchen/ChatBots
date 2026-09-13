@@ -174,7 +174,27 @@ compiler warnings), A124 (the dependency scan walked the sanitizer scratch check
 third-party example projects), A125 (the style gates linted generated code, and the recorded waivers
 were below the tree they governed), A126 (a semgrep finding in A99's own new code), A127 (the
 acceptance statement read the blank line above the guard's summary). All five were fixed in
-`9fa23a7`, and the run was repeated from a new clone of the final head.
+`9fa23a7`, and a sixth was found in the next green run's own summary — the error count had the same
+defect the warning count was just fixed for (A128, `c14db8a`). The run was then repeated from a new
+clone of the final head.
+
+### Acceptance
+
+| | |
+| --- | --- |
+| Commit tested | `90e9f7b6f75956be387097b0d8e47ded6ea21e66` (`audit/2026-09-13`) |
+| Host | `node1`, a Mac that did not develop the fixes, from a fresh clone of the pushed branch |
+| Result | **23 passed, 0 failed** — `AUDIT/baseline/phaseE/summary.txt` |
+| Evidence | `AUDIT/baseline/phaseE/` — the run's own logs, the identity of what was tested, and the summary. The instrumented build trees are `.gitignore`d; the logs are committed. |
+
+The figures it produced: 824 tests in 139 suites; 0 compiler errors and 0 compiler warnings; ASan and
+TSan clean; coverage `Sources/` 77.03 % lines, 80.49 % functions; `gitleaks` 0 findings over the full
+history; `osv-scanner` no issues; `semgrep` 3 findings, all covered by a written waiver; `shellcheck`,
+`ruff` and `pyright` clean; `swiftlint` 255 and authored `swift-format` 744, both exactly at their
+recorded waivers; `verify-done-commits.sh` backed 115 · skipped 13 · unbacked 0; the ledger at 128
+tasks with none open; and the generated files — the web interface, the name lists and the ledger's own
+status tables — all in step.
+
 
 
 **The run is scripted: `AUDIT/phase-e.sh`.** It performs all twelve checks in one pass and writes

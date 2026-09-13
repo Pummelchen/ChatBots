@@ -42,3 +42,8 @@ AUDIT/*.tmp
 # AUDIT/phase-e.sh, and verify-done-commits.sh) depend on `git status` meaning something.
 __pycache__/
 *.py[cod]
+
+# Phase E's instrumented build trees. `AUDIT/phase-e.sh` writes its logs and summary beside them,
+# and those are committed as the acceptance evidence; the scratch directories are several GB of
+# `.build` copies and are not.
+AUDIT/baseline/phaseE/scratch-*/
