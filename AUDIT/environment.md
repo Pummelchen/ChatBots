@@ -9,7 +9,7 @@ listed so the fleet can be returned to a known state.
 | Host | Class | Spec | Role in this audit | Installed by this audit |
 | --- | --- | --- | --- | --- |
 | `MacBook-AB.local` (`Mac15,3`) | Mac, arm64 | macOS 26.6.2 (25G83), 24 GB | Development, all Swift/Apple work, baseline | **nothing** — every tool was already present (see provenance) |
-| `node1`–`node4` | Mac Mini M2, arm64 | 8 GB each, Xcode + Docker | Phase E only: fresh-clone verification on a machine that did not develop the fix | not touched yet |
+| `node1`–`node4` | Mac Mini M2, arm64 | 8 GB each, Xcode + Docker | Phase E only: fresh-clone verification on a machine that did not develop the fix | **`node1` used and cleaned** — see "Hosts touched" below |
 | Intel VPS (Debian 13) | Linux x86_64 | — | **not provisioned.** §1b requires asking first; no Linux/x86 work has been identified in this repository | not touched |
 
 Per §1b: Swift/Xcode builds and Apple-platform tests stay on the Mac; at most one heavy job
@@ -66,6 +66,22 @@ brew install swift-format swiftlint llvm gitleaks osv-scanner semgrep ruff pyrig
 
 ## What this audit installed
 
-**Nothing.** No tool was installed, upgraded, or removed on any host, and no remote host was
-touched. The fleet is in the state it was found in, apart from the audit branch and `AUDIT/`
-directory committed to this repository.
+**Nothing.** No tool was installed, upgraded, or removed on any host. The fleet is in the state it
+was found in, apart from the audit branch and `AUDIT/` directory committed to this repository.
+
+## Hosts touched
+
+| Host | What was written | Removed afterwards |
+| --- | --- | --- |
+| `this Mac` | the audit branch, `AUDIT/`, and build scratch under the default `.build` | n/a — this is the working checkout |
+| `node1` (`ssh node1@node1.local`) | `~/chatbots-audit/`: a fresh `git clone --branch audit/2026-09-13 --single-branch` of the public repository, plus `build.log`, `test.log`, `clone.log`, `guard.log`, `run.log` | **yes** — `rm -rf ~/chatbots-audit`. Verified gone; no `~/Library/Caches/ChatBots`; no chatbot- or audit-named entry left in the home directory. Nothing was installed on `node1`. |
+
+`node1` was used rather than the development Mac because §1b requires the final verification to run
+on a host that did not develop the fix. It was used for the A18 fresh-clone check (an independent
+host is the entire point of that task, and finding the problem on the first independent run rather
+than at the end is why the check was done early) and it will be used again for Phase E, which needs
+the same property.
+
+Both runs on `node1` recorded the same facts: `swift build` exit 0, `swift test` exit 0, and
+`git rev-parse --short HEAD` naming the exact commit under test, so the result is tied to a commit
+rather than to "the branch at some point".

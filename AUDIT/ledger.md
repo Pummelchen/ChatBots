@@ -18,8 +18,8 @@ does not advance without its artifact.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 19 |
-| DONE | 5 (A12, A13 — sanitizer baselines; A14, A17 — the two HTTPServer races; A19 — the commit that claimed them) |
-| START (proven / reproduced, expected behaviour written) | 14 |
+| DONE | 8 (A05, A08 — concurrency and dependency pinning; A12, A13 — sanitizer baselines; A14, A17 — the two HTTPServer races; A18 — hermetic suite; A19 — the commit that claimed A14/A17) |
+| START (proven / reproduced, expected behaviour written) | 11 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
@@ -36,10 +36,10 @@ Per §11, all findings are enumerated before any fix begins.
 | A02 | S1 | tests | `Sources/ChatBotsCore/MLXEngine.swift` (19/863 lines), `TransportCheck.swift` (0/216) | The core inference path and the installer's own smoke test are effectively uncovered | test | START | this Mac | L6 pass (coverage) |
 | A03 | S2 | build | `Package.swift`, `.github/workflows/checks.yml` | No warnings-as-errors gate, though the baseline is already 0 warnings | test | START | this Mac | L0 pass |
 | A04 | S2 | CI | `.github/workflows/checks.yml` | CI runs no build, test, lint, type-check, scanner or coverage step | test | START | this Mac | L0 pass |
-| A05 | S2 | concurrency | `Attachments.swift:269`, `HTTPServer.swift:233,251`, `MLXEngine.swift:791` | Four `@unchecked Sendable` declarations, none with a written justification | unsafe | START | this Mac | L2 pass |
+| A05 | S2 | concurrency | `Attachments.swift:269`, `HTTPServer.swift:233,251`, `MLXEngine.swift:791` | Five `@unchecked Sendable` declarations, none with a written justification | unsafe | DONE | this Mac | L2 pass |
 | A06 | S2 | style | `Sources/**`, `Tests/**` | `swiftlint` 401 findings and `swift-format` 29 900 diagnostics with no repository config | style | START | this Mac | baseline |
 | A07 | S2 | typing | `tools/*.py` (5 files) | Python is 3.14 but unannotated and unchecked: ruff 11, format 5, pyright 2 | style | START | this Mac | baseline |
-| A08 | S2 | deps | `Package.swift:32` | `WebTransport` is pinned by range while the project has twice depended on an exact transport behaviour | deps | START | this Mac | L0 pass |
+| A08 | S2 | deps | `Package.swift:32` | `WebTransport` is pinned by range while the project has twice depended on an exact transport behaviour | deps | DONE | this Mac | L0 pass |
 | A09 | S3 | tooling | `tools/cdp.py:42,44,180` | SAST: insecure-websocket and dynamic-urllib findings in the dev-only DevTools client | unsafe | START | this Mac | baseline (semgrep) |
 | A10 | S3 | tooling | `tools/*.sh` (24 notes) | `shellcheck -S style` reports 24 notes, mostly SC2001 | style | START | this Mac | baseline |
 | A11 | S3 | docs/ops | `README.md`, wiki | Neither the README nor the wiki states that running the website exposes the API to the LAN | docs | START | this Mac | L4 pass (same evidence as A01) |
@@ -47,7 +47,7 @@ Per §11, all findings are enumerated before any fix begins.
 | A13 | — | tests | `AUDIT/baseline/swift-test-tsan.log` | ThreadSanitizer over the whole suite: **one data race found** | test | DONE | this Mac | §1 tooling requirement |
 | A14 | **S1** | `HTTPServer` | `HTTPServer.swift:356` write vs `:380` read | `isRunning`/`lastError` are written from a Network.framework callback and read from `waitUntilReady` with no synchronisation | unsafe | DONE | this Mac | A13 (ThreadSanitizer) |
 | A17 | **S1** | `HTTPServer` | `HTTPServer.swift:555` append vs `:588-596` `finish()` | `streams` was appended on the main actor without the lock that every other access takes — a concurrent mutation of a Swift array | unsafe | DONE | this Mac | found while fixing A14 |
-| A18 | **S1** | tests | `BuiltInKeyTests.swift:20`, `ImageUploadTests.swift:136`, `AttachmentTests.swift:308` | Three tests need the developer's private `models/` and `.secrets.env`, so a fresh clone cannot pass | test | START | node1 | early independent check on node1 |
+| A18 | **S1** | tests | `BuiltInKeyTests.swift:20`, `ImageUploadTests.swift:136`, `AttachmentTests.swift:308` | Three tests need the developer's private `models/` and `.secrets.env`, so a fresh clone cannot pass | test | DONE | node1 | early independent check on node1 |
 | A15 | **S1** | `EngineService` / `DocumentImport` | `DocumentImport.swift:160-168`, `EngineService.swift:325-357` | Attaching a document blocks the engine's `@MainActor` for the whole conversion, subprocess wait included | perf | START | this Mac | L5 pass |
 | A16 | S3 | `ChatBotsCLI` | `Sources/ChatBotsCLI/main.swift:689` | `--serve` has no signal handling, so the listener is never shut down and nothing is flushed on exit | incomplete | START | this Mac | L7 pass |
 
@@ -168,9 +168,7 @@ already uses elsewhere.
 * **A07 typing** — `tools/*.py` on Python 3.14 with no annotations and no strict config; ruff 11
   errors, 5 files unformatted, pyright 2 errors (`capture-devices.py:303` operator on `object`,
   `cdp.py:288` return type). Expected: full annotations and a strict `pyright` config, per §1.
-* **A08 deps** — `WebTransport` is `from: "1.3.7"`, a range. The project has already had to raise a
-  transport floor once because a behaviour it depended on changed. Expected: an exact pin, or a
-  documented reason a range is safe here. Decision task, not a code change.
+* **A08 deps — DONE**, see the section below.
 * **A09 SAST** — `tools/cdp.py` insecure websocket (×2) and dynamic urllib. Dev-only, loopback
   DevTools client, so genuinely low; expected: an inline justification comment or a guard, so the
   scanner result is intentional rather than ignored.
@@ -379,7 +377,7 @@ instead of trusting that it was done.
 
 ---
 
-## A18 — the suite is not hermetic — **START**
+## A18 — the suite is not hermetic — **DONE**
 
 **S1** · test · discovered by the early independent check on **node1**
 
@@ -405,6 +403,32 @@ is the argument for doing that run early.
 and no network. Machine-local assertions become `.enabled(if:)`-gated, and `declaresVision` is
 covered hermetically by pointing it at a synthetic checkpoint in a temporary directory — which
 tests the logic rather than the presence of 3 GB of weights.
+
+**Fix, in `0de3123`.** All three assertions are gated on the state they actually need:
+`BuiltInKeyTests.deepSeekGetsTheKey` on a DeepSeek key existing, and
+`ImageUploadTests.localCheckpointSees` and `AttachmentTests.localCheckpoint` on the default
+checkpoint being on disk. The rule they were standing in for moved to two hermetic tests that need
+no download: `AttachmentTests` now writes synthetic checkpoints into a temporary models root and
+asserts that a config declaring a `vision_config` reads `true`, a text-only config reads a definite
+`false`, and an absent model reads `nil` — the unknown/`false` distinction is the part that decides
+whether the interface offers images on a guess, so it is asserted directly rather than incidentally.
+**Coverage of the rule went up while the dependency on the machine went away.**
+
+**Evidence — both directions, not just the happy one.**
+
+| Run | Result |
+| --- | --- |
+| `node1`, fresh clone of `518c38e`, no `models/`, no `.secrets.env`, independent host | `BUILD_EXIT=0`, `TEST_EXIT=0`, **557 tests in 77 suites passed**; the three tests report exactly `skipped.` |
+| this Mac, `swift test` | 557 tests in 77 suites passed |
+| this Mac, `CHATBOTS_MODELS_DIR` aimed at an empty directory | passes, and the two vision tests report `skipped.` |
+
+The third run is the one that shows the gate is keyed on the checkpoint rather than on the host: if
+the gate were wrong in the permissive direction the test would have run and failed, and if it were
+wrong in the restrictive direction it would have skipped on this Mac too.
+
+**node1 was cleaned up afterwards** — `~/chatbots-audit` (2.5 GB) removed, with no
+`~/Library/Caches/ChatBots`, and no chatbot- or audit-named residue left in the home directory.
+Recorded in `environment.md`.
 
 ---
 
@@ -456,3 +480,48 @@ it was fixed to match a bare basename against the last path component (a path co
 directory is still matched in full, so `Sources/A.swift` cannot be satisfied by
 `Sources/B/A.swift`). It now exits 0 — `backed 3 · skipped 2 · unbacked 0` — and
 `shellcheck -S style` is clean on it.
+
+
+---
+
+## A05 — a written justification for every `@unchecked Sendable` — **DONE**
+
+**DONE** · unsafe · discovered by L2, closed in `3ef1cc6`
+
+`@unchecked Sendable` is a promise the compiler stops checking. The ledger found four of them with
+no statement of what was being promised; there are **five** — `ToolRegistry` post-dates the
+enumeration and turned up under `grep` while the fix was being made. Every conformance in
+`Sources/` now carries the invariant it is asserting:
+
+| Type | What is confined, and by what |
+| --- | --- |
+| `HTTPServer` | `connections`, `streams`, `running`, `failure` under `stateLock`; `listener` touched only by `start()`/`stop()` |
+| `EventStream` | private `open` under `lock`; all four accessors take it; `connection` is a `let` |
+| `ProgressBox` | private `lastReported` under `lock`, whole read-modify-write; the callback runs *after* unlock |
+| `ToolRegistry` | private `tools` under `lock`; `ToolProvider: Sendable` is what makes the escaping value safe |
+| `DocumentIngestor` | declares no `var` at all — `let` immutability is the whole confinement |
+
+Each type was read for a genuinely broken invariant rather than merely annotated; none was found,
+so this closes without a new task. Doc comments only — **no code changed**, which is stated because
+a justification that needed a code change to be true would have been a different task.
+
+`swift build` 0 warnings 0 errors; `swift test` 557 tests in 77 suites passing.
+
+---
+
+## A08 — `WebTransport` is pinned exactly — **DONE**
+
+**DONE** · deps · discovered by L0, closed in `6c1ef31`
+
+`Package.swift` now reads `exact: "1.3.7"` in place of the `from: "1.3.7"` range, with the reason
+written beside it: the transport is the security boundary for the engine connection, and two
+behaviours this app depends on are tied to an exact version — the `newConnectionLimit` lifetime-cap
+semantics that changed in 1.3.7, and the first-frame subscription trigger documented in
+`WebTransportClient.connect()`. A range would let a future release move either behaviour under this
+app without the version changing to notice.
+
+**Stated deviation.** The literal `.exact("1.3.7")` spelling is deprecated under
+swift-tools-version 6.3 and emits a manifest warning. Suppressing a warning is forbidden by §0, so
+the non-deprecated labelled form `exact:` was used: the same exact requirement, without the
+warning. Verified independently by the coordinator — the manifest builds with 0 warnings and
+`swift package resolve` still resolves to 1.3.7 (`3df28f2a`).
