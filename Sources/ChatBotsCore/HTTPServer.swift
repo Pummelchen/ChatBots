@@ -124,7 +124,11 @@ public struct HTTPResponse: Sendable {
         head += "Content-Length: \(body.count)\r\n"
         head += "Cache-Control: no-store\r\n"
         head += "Connection: \(keepAlive ? "keep-alive" : "close")\r\n"
-        for (name, value) in headers.sorted(by: { $0.key < $1.key }) {
+        // The security headers first, then anything the response set itself, so a page that
+        // genuinely needs inline script or style can replace the policy in its own `headers`.
+        var allHeaders = Self.securityHeaders(for: contentType)
+        for (name, value) in headers { allHeaders[name] = value }
+        for (name, value) in allHeaders.sorted(by: { $0.key < $1.key }) {
             head += "\(name): \(value)\r\n"
         }
         head += "\r\n"
@@ -132,6 +136,65 @@ public struct HTTPResponse: Sendable {
         data.append(body)
         return data
     }
+
+    /// The headers every response carries, with the policy chosen from its content type.
+    ///
+    /// `nosniff` stops a browser treating a JSON error or a stylesheet as HTML, and the referrer
+    /// policy stops this local address leaking to anything a rendered link reaches. Neither can
+    /// break a page that serves its own assets, so both are unconditional. `X-Frame-Options` and
+    /// `frame-ancestors` stop any page the user visits framing this interface and overlaying it.
+    ///
+    /// The content type decides the CSP because the interface and the kept-conversation page
+    /// need different things: the interface is separate files with no inline script or style,
+    /// while the share page carries both in the document.
+    static func securityHeaders(for contentType: String) -> [String: String] {
+        [
+            "X-Content-Type-Options": "nosniff",
+            "Referrer-Policy": "no-referrer",
+            "X-Frame-Options": "DENY",
+            "Content-Security-Policy":
+                contentType.hasPrefix("text/html") ? interfacePolicy : documentPolicy,
+        ]
+    }
+
+    /// The policy for a response that renders no document: API JSON, an asset, an error.
+    ///
+    /// Nothing should load from it and nothing should be able to frame it.
+    static let documentPolicy =
+        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; "
+        + "object-src 'none'"
+
+    /// The policy for the interface.
+    ///
+    /// The page loads `/app.js` and `/style.css` from this same origin, has no inline script, no
+    /// inline event handler and no inline style, and reaches the engine only through relative
+    /// `/api` paths with `fetch` and `EventSource`. That is what lets the policy keep
+    /// `script-src 'self'` with no `'unsafe-inline'` — the grant an injected `<script>`,
+    /// `onerror=` attribute or `javascript:` URL would need in order to run. The page renders
+    /// model and document text, so that grant is the point of the policy rather than a detail.
+    static let interfacePolicy =
+        "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+        + "connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; "
+        + "form-action 'none'; object-src 'none'"
+
+    /// The policy for a page that carries its own inline stylesheet and replay script.
+    ///
+    /// The kept-conversation page renders the transcript with `textContent` and travels its data
+    /// as escaped JSON, but its script and stylesheet are part of the document, so it needs
+    /// `'unsafe-inline'` for both. There is no nonce to give it: the page generator does not
+    /// emit one and is outside this change. The grant is confined to this one response rather
+    /// than given to the interface and the API with it, and the page has no network access to
+    /// give away.
+    static let inlinePagePolicy =
+        "default-src 'none'; script-src 'self' 'unsafe-inline'; "
+        + "style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; "
+        + "frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'"
+
+    /// The policy for the "no conversation with that link" page, which carries an inline `style`
+    /// attribute on its body and no script at all.
+    static let inlineStylePagePolicy =
+        "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; "
+        + "base-uri 'none'; form-action 'none'; object-src 'none'"
 }
 
 // MARK: - Parsing

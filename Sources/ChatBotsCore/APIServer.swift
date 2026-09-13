@@ -498,12 +498,18 @@ public final class APIServer {
             ].joined(separator: "\n")
             return HTTPResponse(
                 status: 404, contentType: "text/html; charset=utf-8",
-                body: Data(missing.utf8))
+                body: Data(missing.utf8),
+                // The default page policy refuses inline style, and this page carries one on
+                // its body. It carries no script, so the replacement grants style only.
+                headers: ["Content-Security-Policy": HTTPResponse.inlineStylePagePolicy])
         }
         let base = "http://127.0.0.1:\(port)"
         return HTTPResponse(
             contentType: "text/html; charset=utf-8",
-            body: Data(SharedConversationPage.html(record, shareBase: base).utf8))
+            body: Data(SharedConversationPage.html(record, shareBase: base).utf8),
+            // The share page carries its own inline stylesheet and replay script, so it says so
+            // rather than inheriting the interface's policy, which has no inline grant.
+            headers: ["Content-Security-Policy": HTTPResponse.inlinePagePolicy])
     }
 
     /// The mode a query asks about, defaulting to entertainment.
