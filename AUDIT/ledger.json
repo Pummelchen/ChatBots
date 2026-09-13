@@ -1595,14 +1595,14 @@
       "file_line": "tools/capture-devices.py (capture, downscale, build_index; OUT created only in main at :303)",
       "title": "The capture output directory is created only by main(), so any other caller of capture() or build_index() hits the same fresh-directory failure A93 fixed",
       "category": "defect",
-      "status": "START",
+      "status": "DONE",
       "host_used": "this Mac",
       "discovered_by": "reported by the A93 lane, which checked for the same assumption elsewhere in the file and found it",
       "evidence_before": "`capture()` (through `cdp.screenshot`) and `downscale()` write into `OUT`, and `build_index()` writes `OUT/index.html`, without any of them ensuring OUT exists - only `main()` creates it, at :303. From the documented entry point main() runs first, so it is latent today; any other caller, or a future reordering, hits the same FileNotFoundError class A93 fixed for `.run/`.",
-      "fix_summary": null,
-      "evidence_after": null,
-      "commit": null,
-      "notes": "Latent rather than live, and recorded because A93's own fix is the argument for recording it: the `.run/` case was latent in exactly the same way - correct from the documented entry point, wrong for every other caller - and it was reported as a real defect the moment someone used a different path through the file. The presence of the directory creation in main() is what makes both look safe.",
+      "fix_summary": "One ensurement point, `output_directory()`, creates the capture output directory and returns it, and all three writers go through it: `capture()` and `downscale()` were changed to take the capture's file NAME and resolve `output_directory() / name` internally, so they can no longer be handed a path whose parent some other function was trusted to have created, and `build_index()` writes through the same helper. `main()`'s own raw mkdir was REMOVED and its stale-sweep now calls the helper too, so there is one mechanism invoked from three sites rather than a live one plus a dead one - which is the same choice A93 made when it replaced caddy_process()'s raw mkdir with run_directory().",
+      "evidence_after": "The fault and the fix were both demonstrated, with the pre-fix source loaded from the commit that recorded A93: with the output directory absent, pre-fix `capture()` printed a failed capture and left no directory, `downscale()` raised FileNotFoundError, and `build_index()` raised FileNotFoundError; post-fix all three succeeded and the directory existed. py_compile, ruff check, ruff format --check and pyright all clean; no suppression, no except added.",
+      "commit": "c04a044",
+      "notes": "An accuracy note from the reporter that is worth keeping, because it calibrates the severity rather than the fix: at the capture site the pre-fix FileNotFoundError does NOT escape - capture()'s own `except (DevToolsError, OSError, ValueError, KeyError)` catches it (FileNotFoundError is an OSError) and reports a generic failed capture - so only build_index() was fatal. The fault was real at all three sites but loud at two. That is also why it survived: a missing directory was indistinguishable from a dead Chrome in the tool's own output, which is an adjacent diagnosability gap reported rather than fixed.",
       "blocked_reason": null
     }
   ]
