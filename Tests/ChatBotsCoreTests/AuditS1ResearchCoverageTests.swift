@@ -103,14 +103,25 @@ struct AuditS1CoverageTests {
             "a mention with nothing behind it was read as coverage: \(read.covered.keys)")
     }
 
-    @Test("A sourced contribution covers the subjects it names")
+    @Test("A sourced mention is coverage only once the room has engaged")
     func sourcedMentionIsCoverage() {
-        let read = ResearchReading.read(
+        // One seat's sourced sentence is a mention. A95 raised the bar after A67: the room has to
+        // take the subject up, here by a second seat naming it with a basis.
+        let oneSeat = ResearchReading.read(
             seats: readingSeats,
             turns: [line(1, from: "eco", sourcedCoverage)])
+        #expect(
+            oneSeat.covered.isEmpty,
+            "one seat's sourced sentence is a mention, not the room's answer")
 
-        #expect(read.covered[.economics]?.contains("eco") == true)
-        #expect(read.covered[.methodology]?.contains("eco") == true)
+        let twoSeats = ResearchReading.read(
+            seats: readingSeats,
+            turns: [
+                line(1, from: "eco", sourcedCoverage),
+                line(2, from: "sta", sourcedCoverage),
+            ])
+        #expect(twoSeats.covered[.economics]?.contains("eco") == true)
+        #expect(twoSeats.covered[.methodology]?.contains("eco") == true)
     }
 
     @Test("The answered reason no longer claims the subjects were answered")
@@ -198,10 +209,11 @@ struct AuditS1ResearchClaimTests {
             "the session must keep working rather than concluding after a mention")
     }
 
-    @Test("A sourced contribution covering every subject can still conclude")
+    @Test("The room taking every subject up can still conclude")
     func sourcedCoverageCanAnswer() async {
-        // The other side of the rule: coverage is not made unreachable, only earned. This is
-        // the shape the existing `theSessionEndsWhenNothingIsOutstanding` test uses.
+        // The other side of the rule: coverage is not made unreachable, only earned. Every seat
+        // returns the sourced all-subject sentence, so once the second seat has spoken the room
+        // has engaged with every subject and the session can conclude.
         let complete = """
             According to the filings, the cost is 12 percent of a million units. Our competitors \
             are feasible, customers face regulation, and the forecast rests on one assumption \
@@ -212,6 +224,9 @@ struct AuditS1ResearchClaimTests {
         await engine.waitUntilFinished()
 
         #expect(engine.researchSession?.stop == .answered)
+        #expect(
+            (engine.researchSession?.rounds ?? 0) >= 2,
+            "the second seat is what turns a mention into the room's coverage (A95)")
         #expect((engine.researchSession?.rounds ?? 0) < 20, "it stops before the budget")
     }
 }

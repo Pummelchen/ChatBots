@@ -61,19 +61,22 @@ struct ResearchReadingTests {
         #expect(read.lastSpeakerID == "sta")
     }
 
-    @Test("A contribution is read as covering the subjects it names")
+    @Test("Coverage is the room's engagement, not one seat's mention")
     func coverageIsRead() {
         let read = ResearchReading.read(
             seats: seats,
             turns: [
                 line(1, from: "eco", "According to the filing, capital cost per unit is the problem."),
                 line(2, from: "sta", "The effect is statistically significant, though the sample is small."),
+                line(3, from: "sta", "The capital cost is the problem, and the filing shows it."),
             ])
 
+        // Two seats named cost with a basis, so the room has taken the subject up.
         #expect(read.covered[.economics]?.contains("eco") == true)
-        #expect(read.covered[.methodology]?.contains("sta") == true)
-        // The statistician said nothing about cost, so the gap is real rather than inferred.
-        #expect(read.covered[.economics]?.contains("sta") != true)
+        #expect(read.covered[.economics]?.contains("sta") == true)
+        // The statistician raised method and nobody else did, so it is a mention and the subject
+        // stays open rather than counting as answered (A95).
+        #expect(read.covered[.methodology] == nil, "one seat's mention is not coverage")
     }
 
     @Test("A claim with nothing behind it is flagged, and named by what it claimed")
@@ -221,17 +224,25 @@ struct ResearchProseTests {
                 """
                 On the capital cost, the figure was measured directly from the audited filing,                 so I would defend that one. Obviously the whole market will collapse if nobody                 can fund the working capital.
                 """),
+            line(
+                40, from: "sta",
+                """
+                On the cost side, the audited filing puts capital cost per vehicle at 4,200                 euros, so I accept that figure.
+                """),
         ]
     }
 
-    @Test("Coverage is read from the subjects the prose actually discusses")
+    @Test("Coverage is the subjects the room took up, not one seat's prose")
     func proseCoverage() {
         let read = ResearchReading.read(seats: seats, turns: transcript)
 
         #expect(read.contributions["eco"] == 2)
-        #expect(read.contributions["sta"] == 1)
+        #expect(read.contributions["sta"] == 2)
+        // Both seats named cost with a basis, so the room has engaged with the economics.
         #expect(read.covered[.economics]?.contains("eco") == true)
-        #expect(read.covered[.methodology]?.contains("sta") == true)
+        #expect(read.covered[.economics]?.contains("sta") == true)
+        // The statistician is the only seat that raised method, so it stays open (A95).
+        #expect(read.covered[.methodology] == nil, "one seat's criticism is a mention, not coverage")
         // Neither analyst has touched regulation, which is the gap the run should close.
         #expect(read.covered[.regulation] == nil)
     }
@@ -247,7 +258,16 @@ struct ResearchProseTests {
         let read = ResearchReading.read(seats: seats, turns: transcript)
 
         #expect(read.conflicts.isEmpty, "implicit criticism must not be invented into a conflict")
-        #expect(read.covered[.methodology]?.contains("sta") == true, "it is still read as coverage")
+        // It is read as being about method, but one seat's criticism does not cover the subject:
+        // the room has to take it up before the moderator stops pointing at it (A95).
+        #expect(
+            ResearchDirector.subQuestions(
+                in: """
+                    The method behind that 18 percent figure concerns me. It comes from a single                     registry with a small sample in the final quarter, and the confidence interval                     is wide enough to include flat growth. Correlation between registrations and                     demand is being treated as causation here.
+                    """
+            ).contains(.methodology),
+            "the criticism is about method")
+        #expect(read.covered[.methodology] == nil, "but it is not yet the room's coverage")
         // And the consequence for the moderator is stated in the test above it: coverage, not a
         // named disagreement, is what steers the next turn for this transcript.
     }
@@ -293,12 +313,14 @@ struct ResearchProseTests {
         quiet.conflicts = [:]
         quiet.unsupported = []
         quiet.covered[.evidence] = ["eco", "sta"]
-        quiet.covered[.magnitude] = ["eco"]
-        quiet.covered[.assumptions] = ["eco"]
-        quiet.covered[.outlook] = ["sta"]
-        quiet.covered[.humanBehaviour] = ["eco"]
-        quiet.covered[.competition] = ["sta"]
-        quiet.covered[.feasibility] = ["sta"]
+        quiet.covered[.magnitude] = ["eco", "sta"]
+        quiet.covered[.economics] = ["eco", "sta"]
+        quiet.covered[.assumptions] = ["eco", "sta"]
+        quiet.covered[.outlook] = ["eco", "sta"]
+        quiet.covered[.humanBehaviour] = ["eco", "sta"]
+        quiet.covered[.competition] = ["eco", "sta"]
+        quiet.covered[.feasibility] = ["eco", "sta"]
+        quiet.covered[.methodology] = ["eco", "sta"]
         let next = quiet.direction()
         #expect(next.subQuestion == ResearchSubQuestion.regulation.rawValue)
         #expect(next.seatID == "law", "the legal analyst is who owns this question")
@@ -592,12 +614,13 @@ struct DirectedEngineTests {
         #expect(!exported.contains("RESEARCH MODERATOR — ASSIGNMENT\n[Moderator]"))
     }
 
-    @Test("The session ends when the moderator has nothing left to point at")
+    @Test("The session ends when the room has taken every subject up")
     func theSessionEndsWhenNothingIsOutstanding() async {
-        // One contribution that touches all ten subjects and gives a basis for itself. Two
-        // analysts, one turn each, and the moderator has nothing left to ask — so the session
-        // concludes rather than spending the rest of its budget restating findings nobody
-        // disputes.
+        // One sourced sentence that touches all ten subjects, returned by every seat. A single
+        // seat saying it is a mention, not the room working through the question, so coverage
+        // requires the second seat to take it up as well (A95). Once that has happened the
+        // moderator has nothing left to ask and the session concludes rather than spending the
+        // rest of its budget restating findings nobody disputes.
         let complete = """
             According to the filings, the cost is 12 percent of a million units. Our competitors             are feasible, customers face regulation, and the forecast rests on one assumption             and a small sample.
             """
@@ -606,10 +629,24 @@ struct DirectedEngineTests {
         await engine.waitUntilFinished()
 
         #expect(engine.researchSession?.stop == .answered)
+        #expect(
+            (engine.researchSession?.rounds ?? 0) >= 2,
+            "one seat's sourced sentence must not close the session on its own (A95)")
         #expect((engine.researchSession?.rounds ?? 0) < 20, "it must stop before the budget")
         #expect(
             engine.researchReport()?.stopReason.contains("Every part of the question") == true,
             "and the report must say why, or the reader cannot tell this from running out")
+
+        // The reading says the same thing directly: after the first contribution alone every
+        // subject is still open.
+        let turns = engine.conversation.turns
+        if let firstChat = turns.firstIndex(where: { $0.kind == .chat }) {
+            let afterOneSeat = ResearchReading.read(
+                seats: engine.specs, turns: Array(turns[...firstChat]))
+            #expect(
+                afterOneSeat.hasOpenWork,
+                "one seat naming every subject with a basis covered them")
+        }
     }
 
     @Test("A session that has not covered the question does not conclude early")

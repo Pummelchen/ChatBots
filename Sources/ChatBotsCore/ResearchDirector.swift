@@ -103,9 +103,11 @@ public enum ResearchReading {
     /// mode uses, rather than from a second set of phrase lists that would drift out of step
     /// with the first.
     ///
-    /// Coverage is recorded only from contributions that gave a basis. A subject named in an
-    /// unsourced assertion is left open, because a mention is not an answer and the director
-    /// should not stop pointing at a gap just because the gap was named.
+    /// Coverage is recorded only from contributions that gave a basis, and only once the room
+    /// has engaged: a subject one seat named with a basis is a mention, not an answer, and is
+    /// covered only when a second seat names it or a seat answers the moderator's assignment on
+    /// it. A keyword in an unsourced assertion stays open, because a mention is not an answer and
+    /// the director should not stop pointing at a gap just because the gap was named.
     ///
     /// Two passes, because a gap has to be read *after* the room responds to it. A claim with
     /// no basis, or a disagreement, stays in the record for the rest of the session; without
@@ -130,7 +132,13 @@ public enum ResearchReading {
         let names = seats.map(\.displayName)
 
         var contributions: [String: Int] = [:]
-        var covered: [ResearchSubQuestion: Set<String>] = [:]
+        /// Basis-bearing mentions, before the room-engagement rule below is applied.
+        var named: [ResearchSubQuestion: Set<String>] = [:]
+        /// Subjects the moderator has pointed the room at with a "nothing so far has addressed"
+        /// assignment, so the response to that assignment counts even from one seat.
+        var directed: Set<ResearchSubQuestion> = []
+        /// Subjects a directed assignment was answered on.
+        var directedCovered: Set<ResearchSubQuestion> = []
         /// A disagreement, and the contribution that raised it.
         var marks: [ResearchSubQuestion: (parties: [String], sequence: Int)] = [:]
         /// A claim with nothing behind it, and where it was made.
@@ -144,12 +152,25 @@ public enum ResearchReading {
         // ── Pass one: what was said. ──────────────────────────────────────────────────
         // Read in log order: pairing a challenge with the claim it answers only works
         // left-to-right, and a settled question is one that was agreed *and not* reopened.
-        for turn in turns where turn.kind == .chat {
-            guard let seatID = turn.speakerID, analystIDs.contains(seatID) else { continue }
+        for turn in turns {
+            // A direction the app itself wrote, asking the room at a subject nobody has
+            // addressed. Recorded so the answer to it counts as engagement below. The
+            // instruction for an unanswered subject begins with a fixed phrase, which is what
+            // identifies it without adding a field to `Turn`.
+            if turn.kind == .direction {
+                for question in ResearchSubQuestion.allCases
+                where turn.content.contains("Nothing so far has addressed \(question.label)") {
+                    directed.insert(question)
+                }
+                continue
+            }
+            guard turn.kind == .chat,
+                let seatID = turn.speakerID, analystIDs.contains(seatID)
+            else { continue }
             contributions[seatID, default: 0] += 1
 
             let questions = ResearchDirector.subQuestions(in: turn.content)
-            // A subject is covered only by a contribution that also says what it is relying on.
+            // A subject is *named* only by a contribution that also says what it is relying on.
             //
             // A keyword in an unsourced paragraph is a mention, not an answer, and treating a
             // mention as coverage is what let a couple of paragraphs read as the whole question
@@ -158,7 +179,8 @@ public enum ResearchReading {
             // said rather than about what was evidenced.
             if ResearchDirector.hasBasis(turn.content) {
                 for question in questions {
-                    covered[question, default: []].insert(seatID)
+                    named[question, default: []].insert(seatID)
+                    if directed.contains(question) { directedCovered.insert(question) }
                 }
             }
 
@@ -199,6 +221,21 @@ public enum ResearchReading {
                 lastClaimant[question] = seatID
             }
         }
+
+        // Coverage is the room's engagement, not one seat's mention (audit A95). A subject that
+        // one contribution named with a basis is a mention, however well sourced: text matching
+        // cannot tell "the room worked through the cost question" from "someone wrote a sentence
+        // containing the word cost", and a single sentence naming all ten subjects used to close
+        // a session as fully answered. A subject therefore counts as covered when more than one
+        // seat has named it with a basis — the room took it up — or when it is the subject the
+        // moderator asked about and a seat answered that assignment. Coverage is not made
+        // unreachable by this: the director keeps pointing at the gap until the room responds.
+        var covered: [ResearchSubQuestion: Set<String>] = [:]
+        for (question, seatIDs) in named
+        where seatIDs.count >= 2 || directedCovered.contains(question) {
+            covered[question] = seatIDs
+        }
+
 
         // ── Pass two: what the room did about it. ────────────────────────────────────
         // "Addressed" is not "resolved". The director cannot see whether a claim was actually
@@ -273,7 +310,11 @@ public struct ResearchDirector: Sendable {
     public var seats: [AgentSpec]
     /// How many contributions each seat has made.
     public var contributions: [String: Int]
-    /// Which sub-questions each seat has addressed.
+    /// Which sub-questions the room has taken up, and which seats named each with a basis.
+    ///
+    /// The key is present only once the room has engaged — more than one seat named the subject
+    /// with a basis, or a seat answered the moderator's assignment on it — so a single sourced
+    /// sentence naming every subject does not close the investigation (audit A95).
     public var covered: [ResearchSubQuestion: Set<String>]
     /// Sub-questions where two analysts have made incompatible claims.
     public var conflicts: [ResearchSubQuestion: [String]]
@@ -309,7 +350,7 @@ public struct ResearchDirector: Sendable {
         self.analystIDs = analystIDs
     }
 
-    /// The first sub-question no contribution has raised with a basis.
+    /// The first sub-question the room has not taken up.
     public var unanswered: ResearchSubQuestion? {
         ResearchSubQuestion.allCases.first { (covered[$0] ?? []).isEmpty }
     }
@@ -321,12 +362,13 @@ public struct ResearchDirector: Sendable {
     /// open question has just spoken — and they need opposite answers. "Not now" must not end a
     /// research session; "nothing left" is the best reason there is to end one.
     ///
-    /// The bar is deliberately high: every one of the ten subjects raised by a contribution
-    /// that gave a basis for what it said, no unsupported claim outstanding, no live
-    /// disagreement, and nobody sitting idle. Coverage here is the basis-bearing kind recorded
-    /// by `ResearchReading.read`; an unsourced mention leaves the subject open. A run that
-    /// clears all four has nothing the moderator can usefully point at, and spending its
-    /// remaining budget would only restate findings nobody disputes.
+    /// The bar is deliberately high: every one of the ten subjects the room has taken up, no
+    /// unsupported claim outstanding, no live disagreement, and nobody sitting idle. Coverage
+    /// here is the engaged kind recorded by `ResearchReading.read`: a subject one seat named with
+    /// a basis is still open until a second seat names it or a seat answers the moderator's
+    /// assignment on it, and an unsourced mention leaves it open too. A run that clears all four
+    /// has nothing the moderator can usefully point at, and spending its remaining budget would
+    /// only restate findings nobody disputes.
     public var hasOpenWork: Bool {
         if !unsupported.isEmpty { return true }
         if conflicts.contains(where: { !settled.contains($0.key) }) { return true }
