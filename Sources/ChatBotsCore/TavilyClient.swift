@@ -57,10 +57,19 @@ public struct TavilyClient: Sendable {
     }
 
     private let apiKey: String
+    private let baseURL: String
     private let session: URLSession
 
     public init(apiKey: String? = nil) {
+        self.init(apiKey: apiKey, baseURL: "https://api.tavily.com")
+    }
+
+    /// The base URL is injectable so the search and retry logic can be tested against a local
+    /// server instead of the live API. The public initialiser below always uses the real one,
+    /// so this changes nothing about how the app reaches Tavily.
+    init(apiKey: String?, baseURL: String) {
         self.apiKey = apiKey ?? Self.configuredKey ?? ""
+        self.baseURL = baseURL
 
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 60
@@ -99,7 +108,7 @@ public struct TavilyClient: Sendable {
             let answer: String?
         }
 
-        var hits = try await post(
+        let mapped = try await post(
             path: "/search",
             body: Request(
                 query: query,
@@ -118,13 +127,38 @@ public struct TavilyClient: Sendable {
             )
         } ?? []
 
-        // Empty-result responses do happen for very odd phrasing; retry once with the
-        // advanced depth rather than burning one of the model's turns on a blank.
-        if hits.isEmpty, depth == .basic {
-            return try await search(query: query, maxResults: maxResults, depth: .advanced)
+        switch Self.outcome(for: mapped, depth: depth) {
+        case .hits(let hits):
+            return hits
+        case .retryAdvanced:
+            // The retry keeps the caller's `includeAnswer`. The recursive call used to drop it,
+            // so a caller that asked for Tavily's own answer lost it on exactly the path the
+            // retry exists for. No caller passes `true` today, which is why it went unnoticed.
+            return try await search(
+                query: query, maxResults: maxResults, depth: .advanced,
+                includeAnswer: includeAnswer)
         }
-        hits.removeAll { $0.content.isEmpty && $0.title == "(untitled)" }
-        return hits
+    }
+
+    /// What a mapped search response means.
+    ///
+    /// The *ordering* here is the fix, which is why this is one function rather than two steps
+    /// inside `search`: the blank-hit filter has to run before the retry is decided. It used to
+    /// run after, so a response of three blank items mapped to a non-empty array, skipped the
+    /// advanced-depth retry, and was then stripped to `[]` — and `WebSearchTool` reported "No
+    /// results" for exactly the case the retry exists for (audit A56). Separated from the
+    /// network call so the rule can be tested directly as well as end to end.
+    enum SearchOutcome: Equatable {
+        /// Hits worth giving the model.
+        case hits([SearchHit])
+        /// Nothing usable at basic depth: try once more at `advanced`.
+        case retryAdvanced
+    }
+
+    static func outcome(for hits: [SearchHit], depth: Depth) -> SearchOutcome {
+        let usable = hits.filter { !($0.content.isEmpty && $0.title == "(untitled)") }
+        if usable.isEmpty, depth == .basic { return .retryAdvanced }
+        return .hits(usable)
     }
 
     // MARK: - Extract
@@ -189,7 +223,7 @@ public struct TavilyClient: Sendable {
                 "no Tavily key is configured — set \(Self.environmentKey) or add it to "
                     + BuiltInKeys.secretsFileName)
         }
-        guard let url = URL(string: "https://api.tavily.com" + path) else {
+        guard let url = URL(string: baseURL + path) else {
             throw ChatBotsError.toolFailed("bad Tavily URL")
         }
 
