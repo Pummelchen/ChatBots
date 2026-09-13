@@ -541,14 +541,14 @@
       "file_line": "WebTransportServer.swift:219 and WebTransportClient.swift:278",
       "title": "A frame over the protocol cap is swallowed by try?, permanently desyncing the session",
       "category": "unsafe",
-      "status": "START",
+      "status": "DONE",
       "host_used": "this Mac",
       "discovered_by": "line-depth pass: HTTP, transport, TLS and protocol",
       "evidence_before": "`try? LengthFraming.read(from: buffer)` discards ProtocolError.messageTooLarge; the buffer is never consumed or reset, so the bad frame is never skipped and every later frame is unreachable. Not only adversarial: the 32 MB protocol cap is below AttachmentLimits.maximumFileBytes of 64 MB and the request JSON base64-encodes (4/3), so a legitimate attachment over ~24 MB triggers it. The session then answers nothing for the rest of its life.",
-      "fix_summary": null,
-      "evidence_after": null,
-      "commit": null,
-      "notes": "Found by a read-only line-depth pass. Reported with file:line, impact and quoted evidence; the pass's own 'examined and clean' record is in the Phase D section of ledger.md.",
+      "fix_summary": "Three things, because the defect was three numbers that disagreed. (1) An over-cap frame is no longer swallowed: LengthFraming surfaces the error and the session is closed with a typed failure instead of being left permanently desynced and silently unresponsive. (2) The ceilings are DERIVED rather than three literals. ProtocolLimits.maximumMessageBytes is computed as the base64 form of AttachmentLimits.defaultMaximumFileBytes plus a 64 KB envelope allowance, with the 4/3 base64 ratio written as named constants, and HTTPParser.maximumBodyBytes is defined as ProtocolLimits.maximumMessageBytes. One number, one arithmetic, so they cannot drift apart again - previously 8 MB HTTP, 32 MB frame and 64 MB attachment meant the documented limit was unreachable on BOTH transports, and the comment calling the frame cap 'a generous multiple of the largest attachment' was false by a factor of about 2.7. (3) A sender-side `frameChecked(_:)` refuses to frame a message the receiver would reject, because the length prefix is the only thing that says where the next frame begins: an over-cap frame makes everything after it unreadable, whereas failing at the sender names the size and leaves the session usable.",
+      "evidence_after": "Attachment ceiling 64 MB -> frame ceiling 89,544,022 bytes (64 MB x 4/3 + 64 KB) -> HTTP body cap the same, all from AttachmentLimits.defaultMaximumFileBytes. 93 lines of new tests across ProtocolTests.swift and WebTransportSessionTests.swift. swift build --build-tests 0 warnings 0 errors; full suite green.",
+      "commit": "c63b7b3",
+      "notes": "The lying comment ('a generous multiple of the largest attachment the engine accepts') was replaced by the actual arithmetic, and the HTTP parser's comment now records that its old 8 MB cap made the documented 64 MB limit unreachable there too.",
       "blocked_reason": null
     },
     {
@@ -633,7 +633,7 @@
       "fix_summary": null,
       "evidence_after": null,
       "commit": null,
-      "notes": "Found by a read-only line-depth pass. Reported with file:line, impact and quoted evidence; the pass's own 'examined and clean' record is in the Phase D section of ledger.md.",
+      "notes": "Found by a read-only line-depth pass. Reported with file:line, impact and quoted evidence; the pass's own 'examined and clean' record is in the Phase D section of ledger.md. CROSS-REFERENCE, and its arithmetic changed under it: A32 raised HTTPParser.maximumBodyBytes from 8 MB to 85.4 MB so that the documented 64 MB attachment limit is reachable. That is the right fix for A32, but it means each accepted connection can now buffer about ten times more than before, while this task records that there is no connection cap and no read or idle deadline. The exposure this task describes is therefore larger than when it was found, and the fix should decide the connection cap with that number in mind rather than the old 8 MB one.",
       "blocked_reason": null
     },
     {
