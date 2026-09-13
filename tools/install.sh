@@ -383,6 +383,17 @@ run_with_timeout() {
   wait "$pid"
 }
 
+# Runs a command with the project root as its working directory. The directory is passed as
+# an argument and the command as the remaining words, so no shell command string is ever
+# built from the path: an apostrophe or a semicolon in the checkout's name is just a
+# character in a path, not shell syntax. The previous form pasted `$ROOT` into
+# `bash -c "cd '…' && …"`, so an apostrophe broke the quoting and a crafted directory name
+# was command injection at install time.
+run_in_root() {
+  local dir="$1"; shift
+  ( cd "$dir" || exit 1; exec "$@" )
+}
+
 # The engine's certificate is made here rather than on first launch.
 #
 # Two reasons: generating a key takes a moment, and during setup a pause is expected while in
@@ -406,7 +417,7 @@ fi
 step "Checking the app's connection to the engine"
 TRANSPORT_LOG="$ROOT/.install-transport.log"
 if run_with_timeout 180 \
-  bash -c "cd '$ROOT' && swift run -c release chatbots-cli --check-transport" \
+  run_in_root "$ROOT" swift run -c release chatbots-cli --check-transport \
   > "$TRANSPORT_LOG" 2>&1
 then
   ok "The app can reach the engine over WebTransport"
@@ -416,7 +427,7 @@ else
 fi
 
 run_with_timeout "$CHECK_TIMEOUT" \
-  bash -c "cd '$ROOT' && swift run -c release chatbots-cli --check" > "$CHECK_LOG" 2>&1
+  run_in_root "$ROOT" swift run -c release chatbots-cli --check > "$CHECK_LOG" 2>&1
 CHECK_STATUS=$?
 
 if [ "$CHECK_STATUS" -eq 0 ]; then
@@ -454,16 +465,27 @@ LAUNCHER_DIR="$HOME/Applications"
 LAUNCHER="$LAUNCHER_DIR/ChatBots.command"
 mkdir -p "$LAUNCHER_DIR"
 
-cat > "$LAUNCHER" <<EOF
-#!/bin/bash
-# Launches ChatBots. Created by the installer; safe to move or delete.
+# The launcher is generated, and no path is pasted into shell or AppleScript syntax:
+# `printf %q` writes each path as a single shell word, and the installer's path is passed to
+# osascript as an argument rather than interpolated into the AppleScript source. A checkout
+# named with an apostrophe (or a double quote, a backtick or a `$`) therefore cannot break
+# the launcher or inject a command into it.
+{
+  printf '%s\n' '#!/bin/bash'
+  printf '%s\n' '# Launches ChatBots. Created by the installer; safe to move or delete.'
+  printf 'ROOT=%q\n' "$ROOT"
+  printf 'APP=%q\n' "$APP"
+  cat <<'LAUNCHER'
 cd "$ROOT" || exit 1
 if [ ! -d "$APP" ]; then
-  osascript -e 'display alert "ChatBots is not built yet" message "Open Terminal and run:\n\nbash $ROOT/tools/install.sh" as critical'
+  osascript -e 'on run argv
+    display alert "ChatBots is not built yet" message ("Open Terminal and run:" & return & return & "bash " & (item 1 of argv)) as critical
+  end run' "$ROOT/tools/install.sh"
   exit 1
 fi
 open "$APP"
-EOF
+LAUNCHER
+} > "$LAUNCHER"
 chmod +x "$LAUNCHER"
 # A file made by a script is not quarantined, but the app may have been copied in from
 # elsewhere; clearing it here avoids a misleading "damaged" warning.
