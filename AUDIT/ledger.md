@@ -25,8 +25,8 @@ been run.
 <!-- BEGIN GENERATED: ledger status — rendered from ledger.json by AUDIT/render-ledger.sh -->
 | Metric | Count |
 | --- | --- |
-| Tasks enumerated | 122 |
-| DONE | 122 |
+| Tasks enumerated | 127 |
+| DONE | 127 |
 | START | 0 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
@@ -35,7 +35,7 @@ been run.
 
 Nothing is open.
 
-### Every task — 122
+### Every task — 127
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -74,6 +74,11 @@ Nothing is open.
 | A120 | S3 | DONE | 4aa3b46 | app lifecycle / engine API | The engine the app spawns opens an HTTP listener on 7788 that the app does not use, so it cannot start at all while Caddy holds that port |
 | A121 | S2 | DONE | 3c7f9a6 | installer | The installer accepts macOS 14 while the package and the bundle require macOS 26, so a Sonoma user downloads ~3 GB and builds before the app refuses to launch |
 | A122 | S3 | DONE | 4e5e89d | transport smoke test | TransportCheck declares a timeout it never uses and creates both child pipes without ever draining them |
+| A123 | S2 | DONE | 9fa23a7 | audit tooling / process | The build gate counted SwiftPM's dependency-cache notices as compiler warnings, so a clean tree failed the acceptance run |
+| A124 | S2 | DONE | 9fa23a7 | audit tooling / dependencies | The dependency gate scanned the sanitizer scratch directories and reported 16 vulnerabilities from third-party example projects, not from this repository's resolved set |
+| A125 | S2 | DONE | 9fa23a7 | audit tooling / style gates | The style gates measured generated code and the recorded waivers were below the tree they govern, so Phase E could not have passed on the branch it was written for |
+| A126 | S3 | DONE | 9fa23a7 | web front end | A99's layout diagnostic passed a template literal to console.info, which semgrep reports as an unsafe format string |
+| A127 | S3 | DONE | 9fa23a7 | audit tooling / reporting | The acceptance statement reported the done-commit gate as passing with an empty count, because it read the blank line above the summary |
 | A13 | — | DONE | — | tests | ThreadSanitizer over the whole suite: one data race found |
 | A14 | S1 | DONE | 0de3123 | HTTPServer | isRunning/lastError are raced between the listener callback and waitUntilReady |
 | A15 | S1 | DONE | 8ece1d3 | EngineService/DocumentImport | Attaching a document blocks the engine main actor for the whole conversion, subprocess wait included |
@@ -1213,3 +1218,35 @@ both were wrong. They are recorded here so that they are not re-opened as if the
   and cites a stale test count — but it says so itself, in its first paragraph: "this file is kept as
   the record of what was planned and why, so it describes the intent at the time rather than the
   current state. The test count below (372) is the figure when the plan was written, not today's."
+
+---
+
+## Phase E — the first acceptance run, and the five defects it found
+
+**18 passed, 5 failed.** The run took a fresh clone of the pushed branch on `node1`, a host that did
+not develop the fixes, and it is the first time the acceptance script was executed end to end. Every
+one of the five failures was a defect in a **gate** or a **stale record**, not in the product — which
+is what the run is for, and it is the same pattern as A19, A83, A84, A87, A89, A109, A116 and A117:
+*the audit was confident about its controls and had not checked its own mechanism.*
+
+| | |
+| --- | --- |
+| A123 | The build gate counted SwiftPM's dependency-cache notices (`skipping cache due to an error: The file "maintenance.lock" doesn't exist`) as compiler warnings. Not statements about this code, and not governed by warnings-as-errors. |
+| A124 | The dependency gate ran `osv-scanner -r .` over the sanitizer scratch directories, so it reported 16 vulnerabilities from dependencies' own example projects. Scoped to `Package.resolved`: **no issues found**. |
+| A125 | The style gates linted generated code (~2 300 of the 3 003 `swift-format` diagnostics were `WebAssets.swift` indentation), and the recorded waivers were **below the tree they governed** — `swiftlint` 222 against a measured 256 at `9eafa54`, so the gate could not have passed on the branch it was written for. |
+| A126 | A99's own `console.info` passed a template literal, which semgrep reports as an unsafe format string. The audit's gates caught code the audit had just written. |
+| A127 | Section 10 read `tail -2 \| head -1` of the guard's output and printed the blank line, so the acceptance statement asserted its most important gate with no count at all. |
+
+What the first run **passed** is worth stating too, because it is the part that had to be true before
+anything else could be believed: `swift test` 824 tests in 139 suites; AddressSanitizer clean;
+ThreadSanitizer clean — the branch that A13 opened on a race and A14/A17 fixed; coverage
+`Sources/` 77.15 % lines, up from 71.6 % at baseline; `gitleaks` over the full history 0 findings;
+`shellcheck`, `ruff` and `pyright` clean; the ledger consistent, every DONE task backed by its own
+commit, and the generated files — the web interface, the name lists and the ledger's own status
+tables — all in step.
+
+The lesson is recorded once and applies to all five: **a count is only as good as the object it is
+taken from.** A28 found figures that were the line counts of captured files; A83 and A117 found
+guards that skipped their own targets; A123 and A124 found gates reading SwiftPM's chatter and other
+people's example projects; A125 found a waiver quoted from a state the tree had left behind. Each was
+found by reading what the mechanism actually did rather than what it was written to do.
