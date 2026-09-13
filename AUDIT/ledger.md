@@ -26,16 +26,15 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 122 |
-| DONE | 119 |
-| START | 3 |
+| DONE | 120 |
+| START | 2 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 3
+### Open — 2
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
-| A119 | S3 | START | — | web front end / engine API | The page POSTs a layout diagnostic to /api/client-report, a route that has never existed in any commit, and the 404 is swallowed by design |
 | A77 | S2 | START | — | distribution / licensing | The shipped app redistributes ~14 third-party libraries with no licence notices or attribution |
 | A99 | S2 | START | — | web surface / routing | Kept-conversation share links 404 in the documented deployment, because Caddy proxies only /api/* and the engine serves /s/<id> |
 
@@ -73,7 +72,7 @@ been run.
 | A116 | S2 | DONE | — | audit environment / build integrity | Dropbox corrupted the build directory: 5 334 conflicted copies inside .build and a module cache compiled at a checkout path that no longer exists |
 | A117 | S2 | DONE | 078efd0 | audit tooling / process | The done-commit guard separated its fields with U+0001, which bash consumes as its own CTLESC marker, so it skipped all 109 DONE tasks and exited 0 |
 | A118 | S2 | DONE | 33568a4 | audit documentation / source of truth | ledger.md is declared the audit's source of truth and the entry point for the next session, but it enumerates 28 tasks and stops at A89; A90-A116 appear nowhere in it |
-| A119 | S3 | START | — | web front end / engine API | The page POSTs a layout diagnostic to /api/client-report, a route that has never existed in any commit, and the 404 is swallowed by design |
+| A119 | S3 | DONE | ffea5f5 | web front end / engine API | The page POSTs a layout diagnostic to /api/client-report, a route that has never existed in any commit, and the 404 is swallowed by design |
 | A12 | — | DONE | f9a359b | tests | AddressSanitizer over the whole suite: clean |
 | A120 | S3 | DONE | 4aa3b46 | app lifecycle / engine API | The engine the app spawns opens an HTTP listener on 7788 that the app does not use, so it cannot start at all while Caddy holds that port |
 | A121 | S2 | DONE | 3c7f9a6 | installer | The installer accepts macOS 14 while the package and the bundle require macOS 26, so a Sonoma user downloads ~3 GB and builds before the app refuses to launch |
