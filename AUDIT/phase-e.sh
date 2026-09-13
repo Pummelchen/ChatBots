@@ -69,12 +69,18 @@ else
     fail "the tree has $dirty uncommitted path(s): evidence would not describe a commit"
     git status --porcelain | sed 's/^/        /'
 fi
-if [ "$branch" = "audit/2026-09-13" ]; then
-    pass "on the audit branch"
-else
-    fail "on branch '$branch', not audit/2026-09-13"
-fi
-# §0: main must not have moved under the audit.
+# The run has to be on a branch that is meant to be verified, not on whatever happens to be checked
+# out. There are two: the audit branch while the audit is in progress, and `main` once the audit has
+# been landed on. A gate that refuses to run on the branch the code actually ships from is a gate
+# that stops being run — which is how the acceptance script came to fail on its own `main` (A132).
+case "$branch" in
+    audit/2026-09-13) pass "on the audit branch, where the audit was developed" ;;
+    main) pass "on main, which the audit was landed on" ;;
+    *) fail "on branch '$branch', which is neither the audit branch nor main" ;;
+esac
+# §0, recorded rather than asserted, because the number means different things either side of the
+# landing: before it, `origin/main` is the base commit and this counts the branch's distance from it;
+# afterwards, `origin/main` is this branch, so it counts the whole history.
 if git rev-parse --verify --quiet origin/main >/dev/null; then
     behind="$(git rev-list --count "origin/main" 2>/dev/null)"
     printf 'origin/main commits reachable: %s\n' "$behind" >> "$out/identity.txt"
