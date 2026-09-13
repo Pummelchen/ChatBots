@@ -115,7 +115,11 @@ if swift build --build-tests > "$out/build.log" 2>&1; then
     warnings="$(grep -cE '\.swift:[0-9]+:[0-9]+: warning:' "$out/build.log" || true)"
     notices="$(grep -cE '^warning: ' "$out/build.log" || true)"
     if [ "$warnings" = "0" ]; then
-        pass "swift build --build-tests: $(grep -cE 'error:' "$out/build.log" || true) errors, 0 compiler warnings (${notices} SwiftPM notice(s) not counted)"
+        # The error count had the same defect as the warning count and the first fix missed it:
+        # `grep 'error:'` matched the four SwiftPM notices, whose text is "skipping cache due to an
+        # error:", so a *green* section reported "4 errors" (A128). Counted by diagnostic shape now.
+        errors="$(grep -cE '\.swift:[0-9]+:[0-9]+: error:' "$out/build.log" || true)"
+        pass "swift build --build-tests: ${errors} compiler errors, 0 compiler warnings (${notices} SwiftPM notice(s) not counted)"
     else
         fail "build produced $warnings compiler warning line(s) despite warnings-as-errors"
         grep -E '\.swift:[0-9]+:[0-9]+: warning:' "$out/build.log" | head -5 | sed 's/^/        /'
