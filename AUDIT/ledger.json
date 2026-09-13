@@ -1194,7 +1194,7 @@
       "fix_summary": "The opening brief describes the moderator the room actually has. `moderatorParagraph` hardcoded `briefing(mode: .entertainment)`, so in a research run the moderator's analyst persona was not found in the entertainment library and silently fell back to `SocialLibrary.featured[0]` - 'The Alpha', a reality-show character - and every analyst read a brief describing the human moderator that way. The brief now uses the room's mode, and the fallback is no longer silent.",
       "evidence_after": "Sources/ChatBotsCore/PromptBuilder.swift and ModeratorIdentity.swift; Tests/ChatBotsCoreTests/AuditResearchModeratorBriefTests.swift adds 74 lines. swift build --build-tests 0 warnings 0 errors; suite green.",
       "commit": "2ab2157",
-      "notes": "Found by a read-only line-depth pass; the pass's 'examined and clean' record is in the Phase D section of ledger.md.",
+      "notes": "Found by a read-only line-depth pass; the pass's 'examined and clean' record is in the Phase D section of ledger.md. FILE OUTSIDE THE ALLOWLIST, reported rather than hidden: the fix required editing ModeratorIdentity.swift, because the silent PersonaCatalog.style substitution lives in briefing(mode:) and the task required the fallback be made impossible rather than merely unused. The deviation was declared with its reason, which is the standard this audit asks for - a boundary bent knowingly and in writing, not a scope quietly widened.",
       "blocked_reason": null
     },
     {
@@ -1646,14 +1646,14 @@
       "file_line": "Sources/ChatBotsCore/ResearchDirector.swift:437",
       "title": "`hasBasis` matches bare substrings, and A67 made its looseness load-bearing",
       "category": "defect",
-      "status": "START",
+      "status": "DONE",
       "host_used": "this Mac",
       "discovered_by": "reported by the S1 lane while fixing A67/A75/A76, and left unfixed because it falls outside those tasks' scope",
       "evidence_before": "`hasBasis` tests for markers with bare `contains`, so 'statistic' matches 'statistically' and 'assum' matches 'assumptions'. Before A67 that only affected a secondary read; A67 now gates ALL coverage on it, so every claim that a subject has been answered rests on this looseness. The bar A67 raised is therefore not as high as it reads: a turn can qualify as basis-bearing on a word that merely contains a marker.",
-      "fix_summary": null,
-      "evidence_after": null,
-      "commit": null,
-      "notes": "Found by the same lane that introduced the dependency, which is the useful part: it reported that its own fix now rests on a matcher it did not tighten, rather than leaving that for someone to discover later. Tightening it is a separate change with its own tests, because it moves the coverage bar again.",
+      "fix_summary": "`hasBasis` requires a basis marker to be a whole word, with an explicit inflection list, so 'statistic' no longer matches 'statistically' and 'assum' no longer matches 'assumptions'. That matters more than it looks: A67 made this matcher load-bearing for ALL coverage, so the bar A67 raised rested on a looseness A67 did not tighten. The lane also removed 'report' from the marker list after finding that adding it broke A67's behaviour by admitting unsourced 'the report says' prose - caught and reverted rather than shipped.",
+      "evidence_after": "Sources/ChatBotsCore/ResearchDirector.swift (`hasBasis` and a `wholeWord` helper with an explicit inflection list); Tests/ChatBotsCoreTests/AuditResearchBasisTests.swift. swift build --build-tests 0 warnings 0 errors; swift test => 'Test run with 699 tests in 117 suites passed'.",
+      "commit": "d66386d",
+      "notes": "Reported by the lane that INTRODUCED the dependency on this matcher, which is the useful part: it flagged that its own fix rested on something it had not tightened. A95 and A97 interact by design - tightening the basis test moves the coverage bar again - so they were reasoned about together and committed separately.",
       "blocked_reason": null
     },
     {
@@ -1756,6 +1756,40 @@
       "evidence_after": "Sources/ChatBotsCore/PromptBuilder.swift; Tests/ChatBotsCoreTests/AuditResearchPromptTrustTests.swift adds 110 lines, and Tests/ChatBotsCoreTests/AttachmentTests.swift is UPDATED - it pinned the old placement in the system message, which is why the defect survived. swift build --build-tests 0 warnings 0 errors; suite green.",
       "commit": "482e036",
       "notes": "Left by the lane because `AttachmentTests.swift:250-266` pins the current placement, so the fix needs that existing test changed - the same situation A53 and A90 hit. That is worth noting as a pattern: three recent findings have been held in place by a test asserting the behaviour being fixed, which is itself evidence about how they survived. Also reported and not worth its own task: `PromptBuilder.systemMessage`'s `moderator` parameter at :110 is never used - dead API rather than a defect with impact.",
+      "blocked_reason": null
+    },
+    {
+      "id": "A104",
+      "severity": "S2",
+      "unit": "tool dispatch",
+      "file_line": "Sources/ChatBotsCore/MLXEngine.swift:762",
+      "title": "Tool dispatch runs the injected registry rather than the tool set the caller passed, so disabling a tool does not prevent it running",
+      "category": "unsafe",
+      "status": "START",
+      "host_used": "this Mac",
+      "discovered_by": "reported by the research lane while fixing A73 and A95, and left unfixed because it falls outside those tasks' scope",
+      "evidence_before": "`generate` accepts a `tools` array and `ConversationEngine` passes `tools: []` when `webSearchEnabled` is false - but dispatch calls `toolRegistry.run(name:)` against the registry rather than against the passed array. So a model that emits a `web_search` call (a hallucinated or injected tool call) reaches the network even though the user turned web search off, and no per-turn budget gate can be enforced at the provider level at all. It is also why A73's search ceiling can only bind BETWEEN turns: the count is known at turn end, so one in-flight turn can overshoot by however many calls it makes.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "This is a privacy boundary rather than a correctness detail: a setting the interface presents as 'web search off' does not stop an outbound request. Graded S2 because it needs the model to produce the call, and left as its own task because the fix is in the dispatch path rather than in the budget accounting A73 was about. It is also the third task in this batch whose stated limit turned out to have a cause elsewhere - A73's partial ceiling, A95's exact-prefix coupling, and this.",
+      "blocked_reason": null
+    },
+    {
+      "id": "A105",
+      "severity": "S3",
+      "unit": "research quality",
+      "file_line": "Sources/ChatBotsCore/ResearchDirector.swift:162 (detect), :573 (emit)",
+      "title": "A95's directed-engagement path identifies the moderator's assignment by an exact phrase, so rewording the assignment silently disables it",
+      "category": "defect",
+      "status": "START",
+      "host_used": "this Mac",
+      "discovered_by": "reported by the research lane while fixing A73 and A95, and left unfixed because it falls outside those tasks' scope",
+      "evidence_before": "The rule that makes a directed assignment count from a single seat works by matching the exact prefix \"Nothing so far has addressed \\(label)\" in a `.direction` turn. If the wording is ever changed - by a copy edit, a localisation, or someone tightening the prose - the match fails, the assignment no longer registers, and the engagement rule silently reverts to requiring two seats with nothing reporting the change. The lane that wrote it reported the coupling itself.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "The coupling is real rather than theoretical because the phrase is user-visible copy in the same file's output. An explicit marker on the Turn - or a `kind` for a directed assignment - would be the structural fix; `Turn` would need a field, which is why it was not done inside A95.",
       "blocked_reason": null
     }
   ]
