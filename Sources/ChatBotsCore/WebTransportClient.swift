@@ -81,6 +81,19 @@ public final class WebTransportEngineClient {
     // MARK: - Connecting
 
     public func connect() async throws {
+        // A client that already holds a session must not begin a second one: the first would be
+        // left live on the server, holding an admission slot with nothing reading it. This is
+        // the same invariant as the failed-connect cleanup below, applied to a retry — the app
+        // reconnects on failure, and every attempt that leaked a session cost the next one.
+        if session != nil {
+            await teardown()
+        }
+        // A fresh attempt has no confirmed greeting and no reason to carry the last channel's
+        // failure: a stale `readerError` would make `send` report a dead reader on a session
+        // that is perfectly alive.
+        greeting = nil
+        readerError = nil
+
         let clientConfiguration = WebTransportClientConfiguration(
             authority: "localhost",
             path: configuration.path,
@@ -94,58 +107,56 @@ public final class WebTransportEngineClient {
             let client = WebTransportClient(configuration: clientConfiguration)
             let session = try await client.connect(
                 to: WebTransportEndpoint(host: configuration.host, port: configuration.port))
-            self.session = session
-            // One stream. See EngineProtocol for why two deadlocked and the second would not
-            // open at all.
-            self.stream = try await session.openBidirectionalStream()
 
-            let (events, continuation) = AsyncStream<EngineEvent>.makeStream(
-                bufferingPolicy: .unbounded)
-            self.events = events
-            self.eventContinuation = continuation
-
-            // Reading starts immediately: the engine sends the current state as soon as the
-            // stream exists, and a client that waited to be told it could read would never
-            // see it.
-            if let stream = self.stream {
-                readerTask = Task { [weak self] in
-                    await self?.read(from: stream)
-                }
-            }
-
-            // Then speak first — but not for the reason this used to give.
-            //
-            // The old justification was a race that does not exist: the theory was that the
-            // transport writes the stream prefix lazily, the engine reads it exactly once, and a
-            // read of zero bytes fails the session with "truncated: needed 1 bytes, available 0".
-            // WebTransport#24 settled it by measurement — an inbound stream is not even delivered
-            // to the handler until its first byte arrives, and the read waits for at least one
-            // byte by default, so an *open* stream with nothing on the wire cannot produce that
-            // error. The message came from a peer that *ended* a stream without writing to it,
-            // which the library now names instead.
-            //
-            // The frame stays for the reason that survived: the engine does not see this stream —
-            // and so does not serve the session or push the state a front end draws — until a
-            // byte arrives. Saying something is how a client subscribes. `.fetchState` is the
-            // cheapest thing to say, and its reply is the greeting every front end opens with.
-            //
-            // That is also the one thing to remember if this line is ever re-examined: removing it
-            // does not break the transport, it silently stops the pushes, which is what the
-            // "a change is pushed to an attached client" test is there to catch.
             do {
+                self.session = session
+                // One stream. See EngineProtocol for why two deadlocked and the second would not
+                // open at all.
+                self.stream = try await session.openBidirectionalStream()
+
+                let (events, continuation) = AsyncStream<EngineEvent>.makeStream(
+                    bufferingPolicy: .unbounded)
+                self.events = events
+                self.eventContinuation = continuation
+
+                // Reading starts immediately: the engine sends the current state as soon as the
+                // stream exists, and a client that waited to be told it could read would never
+                // see it.
+                if let stream = self.stream {
+                    readerTask = Task { [weak self] in
+                        await self?.read(from: stream)
+                    }
+                }
+
+                // Then speak first — but not for the reason this used to give.
+                //
+                // The old justification was a race that does not exist: the theory was that the
+                // transport writes the stream prefix lazily, the engine reads it exactly once, and a
+                // read of zero bytes fails the session with "truncated: needed 1 bytes, available 0".
+                // WebTransport#24 settled it by measurement — an inbound stream is not even delivered
+                // to the handler until its first byte arrives, and the read waits for at least one
+                // byte by default, so an *open* stream with nothing on the wire cannot produce that
+                // error. The message came from a peer that *ended* a stream without writing to it,
+                // which the library now names instead.
+                //
+                // The frame stays for the reason that survived: the engine does not see this stream —
+                // and so does not serve the session or push the state a front end draws — until a
+                // byte arrives. Saying something is how a client subscribes. `.fetchState` is the
+                // cheapest thing to say, and its reply is the greeting every front end opens with.
+                //
+                // That is also the one thing to remember if this line is ever re-examined: removing it
+                // does not break the transport, it silently stops the pushes, which is what the
+                // "a change is pushed to an attached client" test is there to catch.
                 greeting = try await send(.fetchState).snapshot
             } catch {
-                // Fail the connect rather than hand back a client whose channel is already
-                // dead. A caller can retry a connection; it cannot retry a silent connection.
-                readerTask?.cancel()
-                readerTask = nil
-                eventContinuation?.finish()
-                eventContinuation = nil
-                for reply in pendingReplies { reply.finish() }
-                pendingReplies.removeAll()
-                try? await session.close()
-                self.session = nil
-                self.stream = nil
+                // `self.session` may already be assigned here — `openBidirectionalStream()` can
+                // throw after the handshake succeeded, and a greeting can fail — so the session
+                // is closed and cleared on *both* failures. Without this the client reported
+                // `isConnected` (`session != nil`) while it had no stream and no reader, every
+                // command threw "not connected", and the server kept an admission slot for a
+                // session nothing would read. A caller can retry a failed connection; it cannot
+                // retry a silent one.
+                await teardown()
                 throw error
             }
         } catch {
@@ -154,6 +165,15 @@ public final class WebTransportEngineClient {
     }
 
     public func disconnect() async {
+        await teardown()
+    }
+
+    /// Drop the session, its reader and every waiter, and close the transport session.
+    ///
+    /// The one path that stops using a session, so a failed connect, a disconnect and a
+    /// reconnect all leave the client in the same state: `session` nil, which is what
+    /// `isConnected` reports, and no server-side session to serve or hold a slot for.
+    private func teardown() async {
         readerTask?.cancel()
         readerTask = nil
         eventContinuation?.finish()
