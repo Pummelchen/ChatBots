@@ -241,7 +241,7 @@
       "evidence_before": "TSan: Write of size 1 at HTTPServer.swift:356 (closure #2 in start(), GCD worker) vs Previous read at HTTPServer.swift:380 (waitUntilReady, concurrency thread); block allocated by APIServer.start() APIServer.swift:350",
       "fix_summary": "isRunning/lastError moved behind stateLock: private stored flags with markRunning()/markStopped() writers and lock-guarded computed accessors; the class doc now carries a true invariant instead of an assertion",
       "evidence_after": "swift test --sanitize=thread --scratch-path ~/Library/Caches/ChatBots/audit-tsan => TSAN_AFTER_EXIT=0, 555 tests passed, no ThreadSanitizer report (baseline/swift-test-tsan-after.log); plain swift test: 555 pass",
-      "commit": "HEAD",
+      "commit": "0de3123",
       "notes": "The race is only observable under the instrument, so the failing-then-passing evidence is the TSan pair rather than a unit assertion. A17 was found while fixing this and shares the commit: same class, same conformance, same invariant.",
       "blocked_reason": null
     },
@@ -292,7 +292,7 @@
       "evidence_before": "stop(), closeStreams() and finish() all mutate streams under stateLock; the append in the SSE path ran on @MainActor carrying the comment that streams is only ever touched on the main actor, which was never true because finish() runs on the network queue",
       "fix_summary": "addStream(_:) takes stateLock and is the only append; the false comment replaced with the reason",
       "evidence_after": "swift test 555 pass; swift test --sanitize=thread exit 0 (baseline/swift-test-tsan-after.log)",
-      "commit": "HEAD",
+      "commit": "0de3123",
       "notes": "A concurrent append against a locked mutation of a Swift array is memory unsafety, not a stale value, so S1. Shares A14's commit deliberately: same class, same conformance, same invariant; splitting would have committed a knowingly half-fixed type.",
       "blocked_reason": null
     },
@@ -310,14 +310,14 @@
       "fix_summary": null,
       "evidence_after": null,
       "commit": null,
-      "notes": "Would have blocked Phase E, which requires a fresh clone to be green. Fix: .enabled(if:) traits for the machine-local assertions, and test declaresVision against a synthetic checkpoint in a temp dir so the logic stays covered hermetically.",
+      "notes": "Would have blocked Phase E, which requires a fresh clone to be green. Fix: .enabled(if:) traits for the machine-local assertions, and test declaresVision against a synthetic checkpoint in a temp dir so the logic stays covered hermetically. The A18 edits were staged at the same time as the A19 repair and rode into commit 0de3123 rather than a commit of their own - a stated deviation from one-task-one-commit, recorded here rather than repaired by rewriting the commit, because this audit forbids rewriting history. The changes are the seven lines in the three named test files; the repair commit message describes A19 only.",
       "blocked_reason": null
     },
     {
       "id": "A19",
       "severity": "S2",
       "unit": "process / git history",
-      "file_line": "commit 948ea29 (A14, A17)",
+      "file_line": "Sources/ChatBotsCore/HTTPServer.swift (named by 948ea29, which commits no source file)",
       "title": "A DONE task was committed with its evidence and its ledger entry but without its fix: 948ea29 claims A14 and A17 and contains no source change",
       "category": "process",
       "status": "DONE",
@@ -326,7 +326,7 @@
       "evidence_before": "git show --name-only 948ea29 => AUDIT/baseline/swift-test-tsan-after.log, AUDIT/baseline/test-warnings.txt, AUDIT/ledger.json, AUDIT/ledger.json.tmp, AUDIT/ledger.md, AUDIT/plan.md; no file under Sources/. git show HEAD:Sources/ChatBotsCore/HTTPServer.swift | grep 'private var running' => no match, so the flags that commit message says are guarded by stateLock were still plain stored properties at HEAD. A 0-byte AUDIT/ledger.json.tmp was committed by the same accident.",
       "fix_summary": "The A14/A17 fix is committed for real on this branch (repair commit below), AUDIT/*.tmp is ignored so an interrupted ledger write cannot be committed again, and AUDIT/verify-done-commits.sh makes the claim mechanically checkable: it reads every DONE task, takes the source paths that task's own record names, and fails unless that task's commit touches one of them.",
       "evidence_after": "AUDIT/verify-done-commits.sh => exit 0, every DONE task backed; git show --stat of the repair commit lists Sources/ChatBotsCore/HTTPServer.swift; swift test 557 tests in 77 suites pass; swift test --sanitize=thread exit 0 with no report",
-      "commit": null,
+      "commit": "0de3123",
       "notes": "The sanitizer evidence in 948ea29 is genuine: the ThreadSanitizer re-run was done against a working tree with the fix applied, and baseline/swift-test-tsan-after.log shows zero race reports. What was missing was the code. This is the one failure mode where the ledger is not wrong about the result, only about where the result lives, so the guard is mechanical rather than a matter of care. The guard is deliberately narrow: a DONE task that names no source path (a CI file, a decision, a document) is reported as skipped, not as passed.",
       "blocked_reason": null
     }
