@@ -624,3 +624,88 @@ worse than no guard: the A19 lesson in a different medium.
 
 **Verification.** `swift build --build-tests` 0 warnings 0 errors under the new A03 gate;
 `python3 tools/embed-web.py --check` exit 0; `swift test` **558 tests in 77 suites passed**.
+
+### Findings from the remaining slices
+
+The five slices still outstanding when the first batch was recorded have now reported. Every
+finding below is a ledger entry with file:line, concrete impact and quoted evidence in
+`ledger.json`; the table is generated from that file so the two cannot drift. **One of them is the
+audit's first S0.**
+
+| id | sev | file:line | what | status |
+| --- | --- | --- | --- | --- |
+| A29 | **S0** | `APIServer.swift:612 -> EngineService.swift:335` | The attachment filename is used verbatim as a filesystem path: unauthenticated arbitrary file write | START |
+| A30 | **S1** | `HTTPServer.swift:184,191` | A negative Content-Length passes both guards and is used as a slice offset, trapping the process | START |
+| A31 | **S1** | `HTTPServer.swift:571` | SSE connections are never reaped, so streams and connections grow for the life of the process | START |
+| A32 | **S1** | `WebTransportServer.swift:219 and WebTransportClient.swift:278` | A frame over the protocol cap is swallowed by try?, permanently desyncing the session | START |
+| A33 | **S1** | `ConversationEngine.swift:764` | Restarting a running conversation orphans the new turn loop, so Stop and Pause become no-ops | START |
+| A34 | **S1** | `ConversationStore.swift:122` | ConversationStore.save destroys the records it deliberately refuses to read | START |
+| A35 | **S1** | `ChatController.swift:428-452` | A turn ending is never observed, so isGenerating sticks on forever: stuck UI, duplicated answer, disabled controls | START |
+| A36 | **S1** | `DocumentImport.swift:158-171` | The conversion timeout can never fire: the pipe reads block forever first, and the drain order can deadlock | START |
+| A37 | **S2** | `HTTPServer.swift:519` | The HTTP listener has no read or idle deadline and no connection cap | START |
+| A38 | **S2** | `WebTransportClient.swift:97-100` | A failed openBidirectionalStream leaks the session and leaves isConnected true | START |
+| A39 | **S2** | `WebTransportClient.swift:184-190, :286` | Replies are matched by queue order, and removeFirst() assumes in-order completion | START |
+| A40 | **S3** | `WebTransportServer.swift:128` | stop() leaves live WebTransport sessions serving and never closes them | START |
+| A41 | **S2** | `ConversationEngine.swift:230` | An orphaned unbounded event stream retains every event, including a full prompt per turn, for the process lifetime | START |
+| A42 | **S2** | `MLXEngine.swift:129` | MLXEngine.compact mutates a local spec that generate() never reads, so maxTokens and thinking-off are ignored | START |
+| A43 | **S2** | `MLXEngine.swift:503` | The reasoning ceiling truncates the turn instead of forcing an answer, and unlimited thinking gets less headroom than high | START |
+| A44 | **S2** | `ConversationEngine.swift:718` | Reopening a finished research conversation and pressing Start writes a second report with zero turns | START |
+| A45 | **S2** | `ConversationEngine.swift:1040` | Auto-compaction is measured against a static window instead of the engine's learned one | START |
+| A46 | **S2** | `ChatController.swift:890-902` | Attachment chips print '0 words' / 'Zero bytes' because the engine's summary and token count are discarded | START |
+| A47 | **S2** | `ChatController.swift:1026-1033 + ChatBotsApp.swift:33-34` | Saved source material is silently discarded at launch and then erased from settings | START |
+| A48 | **S2** | `ChatController.swift:675-687` | ChatController issues overlapping requests against a client whose protocol is documented as one-request-at-a-time, so replies cross | START |
+| A49 | **S2** | `EngineSupervisor.swift:149-166 + ChatBotsApp.swift:120` | The wait-then-SIGKILL engine teardown is dead code, so an owned engine can outlive the app | START |
+| A50 | **S3** | `EngineSupervisor.swift:129-131` | A startup timeout reports .idle, discarding the failure reason the app exists to show | START |
+| A51 | **S3** | `Views/ControlBar.swift:266-279 + ChatController.swift:839-843` | 'Models > Load ...' is a no-op placeholder presented as a working control | START |
+| A52 | **S2** | `Attachments.swift:160-176 + OpenAIResponsesEngine.swift:171-177, :215` | An accepted image with unrecognized magic bytes, notably HEIC, is silently never sent | START |
+| A53 | **S2** | `ModelStore.swift:129-142` | A partial sharded download is reported as a complete checkpoint | START |
+| A54 | **S2** | `OpenAIResponsesClient.swift:492-538` | A truncated SSE stream is accepted as a finished turn: the terminal event is never required | START |
+| A55 | **S3** | `OpenAIResponsesClient.swift:165-184` | A CRLF .secrets.env yields a key that cannot authenticate, and the app does not report it missing | START |
+| A56 | **S3** | `TavilyClient.swift:128-134` | The 'empty results' retry is decided before the blank-result filter runs | START |
+| A57 | **S3** | `OpenAIResponsesEngine.swift:187, :99-157` | The engine re-probes /v1/models every turn and misreports an unparseable body as 'no model loaded' | START |
+| A58 | **S3** | `DocumentImport.swift:68-82` | A PDF reports truncation one character early and the joined text exceeds the declared ceiling | START |
+| A59 | **S2** | `ChatBotsProbe/main.swift:41, :68, :126` | chatbots-probe reports 'all cycles succeeded' and exits 0 when --cycles 0 probes nothing, and aborts on a negative count | START |
+| A60 | **S2** | `Sources/ChatBotsCLI/main.swift:461-491` | --benchmark and --session-probe exit 0 when a seat fails to load, reporting success for a checkpoint that never loaded | START |
+| A61 | **S2** | `Sources/ChatBotsCLI/main.swift:349, :468, :550, :557` | A legal single-seat roster crashes the flag paths that hard-index seat 2 | START |
+| A62 | **S2** | `Sources/ChatBotsCLI/main.swift:133, :638` | An out-of-range --port traps the process, --port 0 announces an unusable URL, and an invalid --transport-port is silently swallowed | START |
+| A63 | **S3** | `StreamPacer.swift:146-147, :161-163 + ChatController.swift:486` | StreamPacerPool.generationRates is written but never read, so the learned rate never seeds a new pacer | START |
+| A64 | **S3** | `StreamPacer.swift:134-135` | StreamPacerPool.minimumRate is dead API and its comment contradicts the pacer's actual floor | START |
+| A65 | **S3** | `Sources/ChatBotsCLI/main.swift:538-544` | --memory-probe prints memoryLimit under both 'gpuLimit' and 'memLimit' | START |
+| A66 | **S3** | `Sources/ChatBotsCLI/main.swift:626` | Flags are accepted in modes where they do nothing, without warning | START |
+
+**A29 is the S0**, and it was found independently by two of the five passes. `POST /api/attachments`
+takes a `filename` from the request body and `EngineService` appends it to a staging directory with
+`appending(path:)` and writes the decoded bytes there. A filename of
+`../../../../Users/<user>/Library/LaunchAgents/x.plist` therefore writes attacker-controlled bytes
+anywhere the app's user can write, and the file survives the `defer` cleanup. The write happens
+before the extractor's type check, so no valid document type is required, and the only gate is
+`canAttachFiles`, which is true on every freshly started engine. Combined with A01 — the API is
+reachable from the LAN with no credential — this is remote code execution on the next login, not
+merely a filesystem nuisance.
+
+**Three of the S1s are the same shape as defects this project has already shipped once**: a
+guarantee stated in a comment that the code does not implement (A33's `generationTask`, A34's
+`isUnreadable` contract, A36's "bounded" timeout). That is the A18 and A19 pattern, and it is why
+the passes were asked to report what they read rather than only what they found.
+
+### Findings from the models, prompts and research slice
+
+| id | sev | file:line | what | status |
+| --- | --- | --- | --- | --- |
+| A67 | **S1** | `ResearchDirector.swift:328-333` | `.answered` is decided by keyword substring presence and then reported as a complete, undisputed investigation | START |
+| A68 | **S2** | `ResearchReport.swift:282-329` | The report synthesis prompt concatenates the untrusted transcript with its own rules, with no boundary | START |
+| A69 | **S2** | `PromptBuilder.swift:251-276, :404-406, :55` | Peer-model and API-supplied text is promoted into another seat's system message unescaped | START |
+| A70 | **S2** | `PromptBuilder.swift:59` | Research sessions get an entertainment persona in the shared opening brief | START |
+| A71 | **S2** | `ConflictState.swift:144, :370-371 vs ConflictReader.swift` | Position changes are counted as 'added nothing', so research sessions converge early | START |
+| A72 | **S2** | `ResearchReport.swift:146-150, :157, :198-200` | A mostly-unlabelled report is still declared labelled and traceable | START |
+| A73 | **S2** | `ResearchSession.swift:173-179` | The web-search ceiling is not reliably enforced and can also fire early | START |
+| A74 | **S3** | `ResearchDirector.swift:411` | The director picks a conflict by Dictionary iteration order, contradicting its own determinism contract | START |
+
+**Counts after every pass: 74 tasks — 9 DONE, 65 open, 0 BLOCKED**, of which **1 is S0**, 13 are S1,
+30 are S2 and 30 are S3 (A12-A19 carry no severity: they are baselines and process findings).
+
+The two S1s that are not about a crash are worth separating from the rest. **A67** and **A33/A34/A36**
+are all the same failure: a guarantee the product states and the code does not implement. A67 is the
+worst of them because the guarantee is the product's whole claim — a report that says "every part of
+the question has been addressed and nothing remains in dispute" on the strength of substring
+matches over `"%"`, `"cost"` and `"law"`.
