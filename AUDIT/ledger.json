@@ -1264,6 +1264,40 @@
       "commit": null,
       "notes": "Found by a read-only line-depth pass; the pass's 'examined and clean' record is in the Phase D section of ledger.md.",
       "blocked_reason": null
+    },
+    {
+      "id": "A75",
+      "severity": "S1",
+      "unit": "web surface / browser boundary",
+      "file_line": "HTTPServer.swift:128-130 (every response) + APIServer.swift:393 (every preflight)",
+      "title": "CORS is `Access-Control-Allow-Origin: *` and every preflight is answered, so any website the user visits can read every kept conversation and drive the engine",
+      "category": "unsafe",
+      "status": "START",
+      "host_used": "this Mac",
+      "discovered_by": "closing the one declared Phase B coverage gap (web/style.css) and following the missing browser-facing defences it exposed",
+      "evidence_before": "`HTTPResponse.serialised` appends `Access-Control-Allow-Origin: *`, `Access-Control-Allow-Headers: Content-Type` and `Access-Control-Allow-Methods: GET, POST, OPTIONS` to EVERY response, including the API's. `APIServer.handle` begins `if request.method == \"OPTIONS\" { return HTTPResponse(status: 204) }`, which answers every cross-origin preflight with those same wide-open headers. So a page served from any origin can `fetch('http://localhost:7788/api/conversations')` and READ the reply - every kept conversation, the full transcript, the roster - and can POST to /api/conversations/new, /api/roster, /api/moderator, /api/seat and /api/attachments, because the preflight that would otherwise block a JSON write succeeds. The comment above the header says it is there because 'a browser reload during development sometimes hits the port directly', which is how a development convenience became a universal grant.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "Nuance, stated because it changes the practical severity: Chrome is rolling out Private Network Access, which requires a preflight carrying `Access-Control-Request-Private-Network` and a matching `Access-Control-Allow-Private-Network` response header. That header is not sent, so a current Chrome may block a public-to-localhost request. Safari and Firefox do not implement PNA, so the attack works there today, and PNA is not a defence to rely on - it is a browser rollout that does not cover the installed base. Graded S1 rather than S0 for that reason, and because A29 (arbitrary file write) is being fixed in the same pass: before A29's fix this same path was a remote file-write primitive from any web page, which would have been S0. This is independent of A01: A01 is about the LAN, this needs no network position at all, only that the user visits a hostile page while ChatBots is running.",
+      "blocked_reason": null
+    },
+    {
+      "id": "A76",
+      "severity": "S3",
+      "unit": "web surface / browser boundary",
+      "file_line": "HTTPServer.swift:120-135 (and Caddyfile)",
+      "title": "No CSP, no X-Frame-Options or frame-ancestors, no X-Content-Type-Options, no Referrer-Policy",
+      "category": "unsafe",
+      "status": "START",
+      "host_used": "this Mac",
+      "discovered_by": "closing the one declared Phase B coverage gap (web/style.css) and following the missing browser-facing defences it exposed",
+      "evidence_before": "`HTTPResponse.serialised` writes only Content-Type, Content-Length, Cache-Control, the wide-open CORS triple and Connection; there is no Content-Security-Policy, no X-Frame-Options or CSP frame-ancestors, no X-Content-Type-Options: nosniff and no Referrer-Policy, in the server or in Caddyfile. The interface can therefore be framed by any page the user visits, and A20's stored XSS had no CSP behind it to make it harder. The page renders model output, document text and share pages, which is exactly the content a CSP would bound. `web/style.css` itself is clean - it contains no url(), @import, expression(), javascript: or behavior() - so this is about the response headers rather than the stylesheet.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "Recorded while closing the one coverage gap the line-depth wave declared: the tools/web pass had grepped style.css rather than reading it. Reading it (917 lines) found nothing, so the gap is closed and this is what it exposed next door.",
+      "blocked_reason": null
     }
   ]
 }

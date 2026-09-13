@@ -710,3 +710,39 @@ are all the same failure: a guarantee the product states and the code does not i
 worst of them because the guarantee is the product's whole claim — a report that says "every part of
 the question has been addressed and nothing remains in dispute" on the strength of substring
 matches over `"%"`, `"cost"` and `"law"`.
+
+### A75 and A76 — the browser-facing boundary, found by closing the last coverage gap
+
+The line-depth wave declared exactly one coverage gap: `web/style.css` had been grepped, not read.
+Reading it closed the gap and found it clean — no `url()`, no `@import`, no `expression()`, no
+`javascript:`, no `behavior()`. What it exposed next door is the more interesting result.
+
+`HTTPResponse.serialised` puts
+
+```
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: Content-Type
+Access-Control-Allow-Methods: GET, POST, OPTIONS
+```
+
+on **every** response, and `APIServer.handle` answers **every** preflight with `204`. The comment
+above the header says it exists because "a browser reload during development sometimes hits the
+port directly". The effect is that any web page the user visits can read
+`http://localhost:7788/api/conversations` and receive every kept conversation, and can POST to
+`/api/roster`, `/api/moderator`, `/api/seat` and `/api/conversations/new`, because the preflight
+that would otherwise block a JSON write succeeds.
+
+**This is independent of A01, and in one way worse.** A01 is about the LAN: it needs someone on the
+same network. A75 needs no network position at all — only that the user visits a hostile page while
+ChatBots is running. Before A29's fix the same path was a remote file-write primitive from any web
+page, which would have been S0.
+
+**Stated nuance**, because it changes what "fixed" has to mean: Chrome is rolling out Private
+Network Access, which requires `Access-Control-Request-Private-Network` on the preflight and
+`Access-Control-Allow-Private-Network` in the response. Neither is sent, so a current Chrome may
+block a public-to-localhost request. Safari and Firefox do not implement PNA, so the attack works
+there today. That is why this is graded S1 rather than S0, and why the fix must be a real origin
+check rather than a reliance on the browser rollout.
+
+A76 records the rest of the same boundary: no CSP, no `frame-ancestors`, no `nosniff`, no
+`Referrer-Policy`, in the server or in the Caddyfile.
