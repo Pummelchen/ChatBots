@@ -239,7 +239,7 @@ def main() -> int:
             return 1
 
         print(f"Capturing {len(selected)} profile(s)…")
-        rows, failures, overflows = [], 0, []
+        rows, failures, overflows, viewport_mismatches = [], 0, [], []
 
         with Chrome(CHROME, port=CHROME_PORT) as browser:
             for profile in selected:
@@ -275,6 +275,10 @@ def main() -> int:
                     requested_width = (profile["height"] if orientation == "landscape"
                                        else profile["width"])
                     if metrics["viewport"] != requested_width:
+                        # A screenshot rendered at the wrong width looks plausible and would
+                        # otherwise be published under this profile's name on a green run.
+                        viewport_mismatches.append(
+                            (profile["name"], orientation, metrics["viewport"], requested_width))
                         print(f"    ! viewport {metrics['viewport']} != requested {requested_width}")
                     if metrics["overflowing"]:
                         overflows.append((profile["name"], orientation, metrics["overflowing"]))
@@ -313,6 +317,10 @@ def main() -> int:
         build_index(rows)
 
         print(f"\n{len(rows)} captured, {failures} failed.")
+        if viewport_mismatches:
+            print("\nViewport mismatch — the page did not lay out at the requested width:")
+            for name, orientation, actual, requested in viewport_mismatches:
+                print(f"  {name} ({orientation}): rendered at {actual}, requested {requested}")
         if overflows:
             print("\nHorizontal overflow — these are layout bugs:")
             for name, orientation, items in overflows:
@@ -320,7 +328,7 @@ def main() -> int:
         else:
             print("No horizontal overflow in any profile.")
         print(f"\nOpen: {OUT / 'index.html'}")
-        return 1 if (failures or overflows or forced_failures) else 0
+        return 1 if (failures or overflows or forced_failures or viewport_mismatches) else 0
     finally:
         if not args.keep_open:
             if caddy:
