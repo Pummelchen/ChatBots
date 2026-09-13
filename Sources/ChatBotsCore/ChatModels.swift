@@ -143,6 +143,32 @@ public struct Conversation: Sendable {
     }
 }
 
+// MARK: - Reasoning headroom
+
+extension ThinkingMode {
+    /// Total tokens a model may emit for one turn: the answer budget plus this mode's
+    /// reasoning headroom.
+    ///
+    /// The one implementation of the arithmetic, so a caller cannot get a different answer
+    /// from the one the engine uses. A bounded mode adds its own ceiling. `.unlimited` has no
+    /// ceiling but MLX still needs a finite cap, so it is given the model's whole context
+    /// window as headroom — floored at `.high`, so choosing a higher thinking level can never
+    /// *lower* the budget. The old arithmetic, `maxTokens + (reasoningTokenBudget ?? 0)`,
+    /// made `.unlimited` the smallest cap of any mode.
+    ///
+    /// Kept here rather than on `MLXEngine` because it is arithmetic, not inference: the
+    /// engine-agnostic model can answer it, and `MLXEngine.generationCap` delegates so the
+    /// engine's own cap and `AgentSpec.generationCap` cannot disagree (audit A90).
+    public func generationCap(answerBudget: Int, contextWindow: Int?) -> Int {
+        if let ceiling = reasoningTokenBudget {
+            return answerBudget + ceiling
+        }
+        let highHeadroom = ThinkingMode.high.reasoningTokenBudget ?? 0
+        guard let contextWindow, contextWindow > 0 else { return answerBudget + highHeadroom }
+        return answerBudget + max(highHeadroom, contextWindow)
+    }
+}
+
 // MARK: - Participant
 
 /// Static description of one LLM seat at the table.
@@ -542,8 +568,15 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
     /// seed-stream, otherwise the two seats converge on identical phrasing.
     /// Total tokens the model may emit for one turn: the answer budget plus whatever
     /// this thinking mode allows for reasoning.
+    ///
+    /// Delegates to `ThinkingMode.generationCap`, which is also what
+    /// `MLXEngine.generationCap` (and therefore the running engine) uses. This property
+    /// used to do its own `maxTokens + (thinking.reasoningTokenBudget ?? 0)`, so it kept
+    /// returning the pre-A43 answer — `.unlimited` came out *smaller* than `.high` — long
+    /// after the engine had been fixed, and any public caller got the wrong cap. One
+    /// implementation is the only way the two cannot drift again.
     public var generationCap: Int {
-        maxTokens + (thinking.reasoningTokenBudget ?? 0)
+        thinking.generationCap(answerBudget: maxTokens, contextWindow: contextWindow)
     }
 
     /// What the badge under a seat's name should read.

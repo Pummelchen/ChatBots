@@ -849,15 +849,13 @@ public actor MLXEngine: LLMEngine {
     /// ceiling, but MLX needs a finite cap, so it is given the model's whole context window as
     /// headroom — and never less than `.high`, so choosing a higher level can never reduce the
     /// budget. The old arithmetic, `maxTokens + (nil ?? 0)`, gave unlimited *less* than high.
+    ///
+    /// Delegates to `ThinkingMode.generationCap`, the single implementation, so this and
+    /// `AgentSpec.generationCap` cannot disagree (audit A90).
     public static func generationCap(
         answerBudget: Int, thinking: ThinkingMode, contextWindow: Int?
     ) -> Int {
-        if let ceiling = thinking.reasoningTokenBudget {
-            return answerBudget + ceiling
-        }
-        let highHeadroom = ThinkingMode.high.reasoningTokenBudget ?? 0
-        guard let contextWindow, contextWindow > 0 else { return answerBudget + highHeadroom }
-        return answerBudget + max(highHeadroom, contextWindow)
+        thinking.generationCap(answerBudget: answerBudget, contextWindow: contextWindow)
     }
 
     /// The truthful message for a turn the mode's reasoning ceiling cut short.

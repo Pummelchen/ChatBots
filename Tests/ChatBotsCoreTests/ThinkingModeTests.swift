@@ -45,11 +45,34 @@ struct ThinkingModeTests {
         spec.thinking = .low
         #expect(spec.generationCap == 1_000 + 512)
 
-        spec.thinking = .unlimited
-        #expect(spec.generationCap == 1_000, "unlimited adds no ceiling to the cap")
-
+        // A43 fixed the engine's cap but left this public property on the old arithmetic,
+        // which made unlimited the *smallest* cap of any mode. It now delegates to the same
+        // implementation the engine uses, so high can never exceed unlimited.
         spec.thinking = .high
-        #expect(spec.generationCap == 1_000 + 8_192)
+        let high = spec.generationCap
+        #expect(high == 1_000 + 8_192)
+
+        spec.thinking = .unlimited
+        #expect(
+            spec.generationCap >= high,
+            "unlimited granted less headroom than high — the pre-A43 arithmetic is back")
+        #expect(spec.generationCap > 1_000, "unlimited is not the smallest cap")
+
+        // And the whole ladder is monotone non-decreasing, agreeing with the engine helper
+        // the running turn actually uses.
+        var previous = 0
+        for mode in ThinkingMode.allCases {
+            spec.thinking = mode
+            let cap = spec.generationCap
+            #expect(cap >= previous, "\(mode.rawValue) lowered the cap")
+            #expect(
+                cap
+                    == MLXEngine.generationCap(
+                        answerBudget: 1_000, thinking: mode,
+                        contextWindow: spec.contextWindow),
+                "\(mode.rawValue): the property and the engine disagree")
+            previous = cap
+        }
     }
 
     @Test("Both seats share the requested preset by default")
