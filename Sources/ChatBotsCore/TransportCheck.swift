@@ -38,6 +38,55 @@ public struct TransportCheckReport: Sendable {
         }
         return lines.joined(separator: "\n")
     }
+
+    // MARK: - Recording one step
+    //
+    // Each check the run performs decides two things: whether the round trip happened, and
+    // whether it proved what it was meant to. Both are recorded here rather than inline in
+    // `run`, so the reporting is exercised without a socket — which is the part of the
+    // installer's smoke test that can be tested at all (audit A02). `run` still owns the
+    // requests; these own what a result means.
+
+    /// Something the check could not do, reported verbatim.
+    public mutating func recordFailure(_ message: String) { failures.append(message) }
+
+    /// The state read returned. `false` means it returned no state, which is a failure: the
+    /// channel answered but the engine had nothing to say.
+    public mutating func recordStateRead(received: Bool) {
+        roundTrips += 1
+        receivedState = received
+        if !received { failures.append("fetchState returned no state") }
+    }
+
+    /// A command changed what it was meant to. The reply is one round trip either way.
+    public mutating func recordCommand(tookEffect: Bool, failure: String) {
+        roundTrips += 1
+        if !tookEffect { failures.append(failure) }
+    }
+
+    /// A request that should have been refused by the engine. `failureWhenNotRefused` is nil
+    /// for a command where not being refused is merely surprising rather than wrong.
+    public mutating func recordRefusal(wasRefused: Bool, failureWhenNotRefused: String?) {
+        roundTrips += 1
+        if wasRefused {
+            refusedAsExpected = true
+        } else if let failureWhenNotRefused {
+            failures.append(failureWhenNotRefused)
+        }
+    }
+
+    /// The session still answers after the refusals.
+    public mutating func recordStateAfterRefusals(received: Bool) {
+        roundTrips += 1
+        if !received { failures.append("the session did not survive a refusal") }
+    }
+
+    /// What arrived on the event stream. An output fragment is optional — nothing is
+    /// generated here, so its absence is not a failure — but the initial state is not.
+    public mutating func recordEventStream(state: Bool, event: Bool) {
+        receivedEvent = event
+        if !state { failures.append("no state arrived on the event stream") }
+    }
 }
 
 public enum TransportCheck {
@@ -56,7 +105,7 @@ public enum TransportCheck {
         do {
             identity = try CertificateStore.loadOrCreate(in: directory)
         } catch {
-            report.failures.append("certificate: \(error.localizedDescription)")
+            report.recordFailure("certificate: \(error.localizedDescription)")
             return report
         }
         report.fingerprint = identity.fingerprintDisplay
@@ -79,7 +128,7 @@ public enum TransportCheck {
         // in-process pair takes a shortcut that does not exist across a process boundary, so
         // the check was proving nothing. It now spawns the engine the same way the app does.
         guard let executable = ProcessInfo.processInfo.arguments.first else {
-            report.failures.append("cannot locate the engine executable to start")
+            report.recordFailure("cannot locate the engine executable to start")
             return report
         }
         let engineProcess = Process()
@@ -95,7 +144,7 @@ public enum TransportCheck {
         do {
             try engineProcess.run()
         } catch {
-            report.failures.append("could not start the engine: \(error.localizedDescription)")
+            report.recordFailure("could not start the engine: \(error.localizedDescription)")
             return report
         }
         defer {
@@ -123,7 +172,7 @@ public enum TransportCheck {
             }
         }
         if !report.connected {
-            report.failures.append("connect across processes: \(lastError ?? "unknown")")
+            report.recordFailure("connect across processes: \(lastError ?? "unknown")")
             return report
         }
 
@@ -141,60 +190,51 @@ public enum TransportCheck {
         // 1. A state read.
         do {
             let snapshot = try await client.state()
-            report.receivedState = snapshot != nil
-            report.roundTrips += 1
-            if snapshot == nil { report.failures.append("fetchState returned no state") }
+            report.recordStateRead(received: snapshot != nil)
         } catch {
-            report.failures.append("fetchState: \(error.localizedDescription)")
+            report.recordFailure("fetchState: \(error.localizedDescription)")
         }
 
         // 2. A command that changes something.
         do {
             let reply = try await client.send(.setTopic("Transport check, second topic"))
-            report.roundTrips += 1
-            if reply.snapshot?.topic != "Transport check, second topic" {
-                report.failures.append("setTopic did not take effect")
-            }
+            report.recordCommand(
+                tookEffect: reply.snapshot?.topic == "Transport check, second topic",
+                failure: "setTopic did not take effect")
         } catch {
-            report.failures.append("setTopic: \(error.localizedDescription)")
+            report.recordFailure("setTopic: \(error.localizedDescription)")
         }
 
         // 3. A refusal, which must arrive as an answer rather than closing the stream.
         do {
             let reply = try await client.send(.setMode(.research))
-            report.roundTrips += 1
-            if case .refused = reply { report.refusedAsExpected = true }
+            report.recordRefusal(wasRefused: reply.refusal != nil, failureWhenNotRefused: nil)
         } catch {
-            report.failures.append("setMode: \(error.localizedDescription)")
+            report.recordFailure("setMode: \(error.localizedDescription)")
         }
 
         // 4. An invalid seat, to prove a refusal does not kill the session.
         do {
             let reply = try await client.send(.updateSeat(.init(seatID: "Agent 99", name: "Nobody")))
-            report.roundTrips += 1
-            if case .refused = reply {
-                report.refusedAsExpected = true
-            } else {
-                report.failures.append("an unknown seat was not refused")
-            }
+            report.recordRefusal(
+                wasRefused: reply.refusal != nil,
+                failureWhenNotRefused: "an unknown seat was not refused")
         } catch {
-            report.failures.append("updateSeat: \(error.localizedDescription)")
+            report.recordFailure("updateSeat: \(error.localizedDescription)")
         }
 
         // 5. The session must still work after two refusals.
         do {
             let snapshot = try await client.state()
-            report.roundTrips += 1
-            if snapshot == nil { report.failures.append("the session did not survive a refusal") }
+            report.recordStateAfterRefusals(received: snapshot != nil)
         } catch {
-            report.failures.append("state after refusals: \(error.localizedDescription)")
+            report.recordFailure("state after refusals: \(error.localizedDescription)")
         }
 
         // Give the event stream a moment to deliver the initial state.
         try? await Task.sleep(for: .milliseconds(400))
         let seen = await collector.snapshot()
-        report.receivedEvent = seen.event
-        if !seen.state { report.failures.append("no state arrived on the event stream") }
+        report.recordEventStream(state: seen.state, event: seen.event)
 
         report.sessionCount = 1
 

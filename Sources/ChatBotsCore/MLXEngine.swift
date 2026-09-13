@@ -193,7 +193,7 @@ public struct ReasoningCeilingError: LocalizedError, Sendable, Equatable {
 public actor MLXEngine: LLMEngine {
 
     public let spec: AgentSpec
-    private let toolRegistry: ToolRegistry
+    let toolRegistry: ToolRegistry
     private let onStateChange: @Sendable (EngineState) -> Void
 
     private var container: ModelContainer?
@@ -209,7 +209,7 @@ public actor MLXEngine: LLMEngine {
     private var currentDisplayName: String
 
     /// Throughput of this seat's most recent turn, for diagnostics and benchmarks.
-    public private(set) var lastStats: TurnStats?
+    public internal(set) var lastStats: TurnStats?
 
     public init(
         spec: AgentSpec,
@@ -247,15 +247,14 @@ public actor MLXEngine: LLMEngine {
     /// decoded on the far side, where the image is going to be used anyway.
     private var imageData: [Data] = []
 
+    /// How many images this seat is holding.
+    ///
+    /// The bytes themselves stay private; this is the whole of what a caller (or a test)
+    /// needs to see that `setAttachments` filtered what it was given.
+    var attachedImageCount: Int { imageData.count }
+
     public func setAttachments(_ documents: [AttachedDocument]) async {
-        imageData = documents.filter { $0.kind.isImage }.compactMap { document in
-            guard let data = document.imageData, CIImage(data: data) != nil else {
-                FileHandle.standardError.write(
-                    Data("[ChatBots] \(spec.id) could not read the attached image \(document.name)\n".utf8))
-                return nil
-            }
-            return data
-        }
+        imageData = Self.usableImages(from: documents, specID: spec.id)
     }
 
     /// The style this seat will use on its next turn.
@@ -524,6 +523,11 @@ public actor MLXEngine: LLMEngine {
     }
 
     /// The body of `generate`, run while holding the MLX gate.
+    ///
+    /// Only the model call lives here. `runTurn` performs the whole turn over an injected
+    /// stream, and this is the one place that builds that stream from a loaded container, so
+    /// the turn's logic is exercised by tests with a scripted stream rather than only with
+    /// weights (audit A02).
     private func generateExclusively(
         messages: [PromptMessage],
         tools: [any ToolProvider],
@@ -534,311 +538,50 @@ public actor MLXEngine: LLMEngine {
         guard let container else { throw ChatBotsError.engineNotLoaded }
         try Task.checkCancellation()
 
-        let agentID = settings.agentID
-        let thinking = settings.thinking
-        let reasoningCeiling = thinking.reasoningTokenBudget
-        /// Answer budget plus whatever this thinking level allows for reasoning.
-        let generationCap = settings.generationCap
-        // Copy the callbacks into locals: the tool-dispatch closure outlives this
-        // scope, so it cannot capture the non-escaping parameters directly.
-        let reportToolCall = onToolCall
-        // `Chat.Message` is not Sendable (it can carry CIImage-backed media), so the
-        // text prompt crosses into the model's isolation as plain strings and is
-        // rebuilt inside `perform`.
-        let promptText = messages.map { (role: $0.role.rawValue, content: $0.content) }
-
-        // The tools this turn may actually reach, resolved from the caller's array rather than
-        // from the registry, so a name that was not offered cannot be dispatched (audit A104).
-        let turnTools = TurnToolSet(offered: tools, registry: toolRegistry)
-        let toolSpecs = turnTools.isEmpty ? nil : tools.map { Self.toolSpec(for: $0) }
-
-        // The cap is the answer budget plus whatever the thinking mode allows for
-        // reasoning. Sampling mirrors the turn's settings exactly.
-        var mutableParameters = GenerateParameters(
-            maxTokens: generationCap,
-            temperature: Float(settings.temperature),
-            topP: Float(settings.topP),
-            topK: settings.topK,
-            minP: Float(settings.minP),
-            seed: settings.seed
-        )
-        // Both penalties are optional in the spec; `nil` leaves MLX's default (off).
-        // Note MLX *subtracts* `presencePenalty`, so the spec stores it already signed.
-        mutableParameters.presencePenalty = settings.presencePenalty.map(Float.init)
-        mutableParameters.presenceContextSize = 256
-        mutableParameters.repetitionPenalty = settings.repetitionPenalty.map(Float.init)
-        mutableParameters.repetitionContextSize = 256
-        let parameters = mutableParameters
-        let additionalContext = settings.templateContext
-
-        /// A conversation entry we can send across isolation. Tool metadata is kept
-        /// alongside because `Chat.Message` itself is not `Sendable`.
-        struct Entry: Sendable {
-            var role: String
-            var content: String
-            var toolCalls: [ToolCall] = []
-            var toolResultID: String?
-        }
-
-        var promptEntries = promptText.map { Entry(role: $0.role, content: $0.content) }
-
-        // Reasoning is streamed to the pane and never enters the log, so it is always
-        // reported; `.off` simply produces none.
-        let emitReasoning = thinking.thinks
-        var answer = ""
-        /// Set when this turn produced reasoning text, so an empty answer can be
-        /// explained as "ran out of budget while thinking" rather than silence.
-        var stripperSpentItsBudget = false
-        /// Set when the ceiling cut the thought short, so the UI can say so.
-        var reasoningWasTruncated = false
-        /// Set when generation was cut short because the model began repeating itself.
-        var loopDetected = false
-        /// Watches for degenerate repetition; see `RepetitionDetector`.
-        var repetition = RepetitionDetector()
-        var stats = TurnStats()
-        let started = Date.now
-
-        /// Everything sent on the round currently in flight. Each round restates the
-        /// whole list (rather than leaning on the session to accumulate) because the
-        /// session's KV cache still reuses the shared prefix, and being explicit keeps
-        /// the Qwen tool protocol below correct.
-        var round = 0
-        let maxToolRounds = 3
-
-        // Nested functions capture their context by reference, which the compiler
-        // correctly refuses to send across `await`. Returning the segment and folding
-        // it here keeps every mutation in this actor's isolation.
-        // Reports one stripped segment. This is a nested function that only forwards
-        // events; it deliberately neither reads nor writes the turn's mutable state, which
-        // the compiler rejects across `await` (and which was a real data-race finding).
-        func report(_ segment: ThinkingStripper.Segment) async {
-            if !segment.reasoning.isEmpty, emitReasoning {
-                await onEvent(.reasoning(agentID: agentID, text: segment.reasoning))
-            }
-            if !segment.answer.isEmpty {
-                await onEvent(.token(agentID: agentID, text: segment.answer))
-            }
-        }
-
-        // Both seats compute on the GPU. This is not a preference: Qwen 3.5's
-        // linear-attention layers call `metal_kernel`, and MLX reports
-        // "[metal_kernel] Only supports the GPU" if it is forced onto the CPU, so a
-        // CPU seat is not possible for this checkpoint (and is slower for dense models
-        // anyway). Apple GPUs are shared, so two seats coexist; when they generate at
-        // the same time they time-share rather than overlap. The orchestrator's turn
-        // loop is sequential, so in practice one seat is always idle.
-        // Which pass over the prompt this is. Images go on the first one only: after a tool
-        // round the log already contains the image turn, and re-sending it would duplicate it
-        // in the KV cache and confuse a template expecting a single image token run.
-        //
-        // This was previously a `isToolRound` flag that nothing ever set, so the guard never
-        // engaged and the ternary below it was dead code. A round counter says the same thing
-        // and cannot silently stop working.
-        var roundIndex = 0
-        rounds: while true {
-            let isFirstRound = roundIndex == 0
-            roundIndex += 1
-            repetition = RepetitionDetector()
-            let entriesForRound = promptEntries
-            // Captured before the closure: `container.perform` runs off the actor, so it can
-            // see neither the engine's properties nor a mutable local.
-            let imagesForRound: [Data] = isFirstRound ? imageData : []
-            let stream = await container.perform {
-                context -> AsyncThrowingStream<Generation, Error> in
-                // Images ride on the user message itself. They are attached only while the
-                // prompt is still the opening one: after a tool round the log already
-                // contains the image turn, and re-sending it would both duplicate it in the
-                // KV cache and confuse a template that expects one image token run.
-                let attachImages = !imagesForRound.isEmpty
-                var lastUserIndex: Int? = attachImages
-                    ? entriesForRound.lastIndex { $0.role == "user" } : nil
-                // Decoded here, inside the model's isolation, from bytes that crossed it.
-                let decodedImages: [UserInput.Image] = imagesForRound.compactMap { data in
-                    CIImage(data: data).map { UserInput.Image.ciImage($0) }
-                }
-
-                let messagesForRound = entriesForRound.enumerated().map { index, entry in
-                    let isImageHost = lastUserIndex == index
-                    if isImageHost { lastUserIndex = nil }
-                    return Chat.Message(
-                        role: Chat.Message.Role(rawValue: entry.role) ?? .user,
-                        content: entry.content,
-                        images: isImageHost ? decodedImages : [],
-                        tool: entry.toolResultID.map { .result(id: $0) }
-                            ?? (entry.toolCalls.isEmpty ? nil : .calls(entry.toolCalls))
-                    )
-                }
-                // No `toolDispatch`: we dispatch ourselves so the assistant message
-                // that requested the tool is present in the transcript. Qwen 3.5's
-                // template requires it (and requires a following user turn) before it
-                // will render a tool response at all.
-                let session = ChatSession(
-                    context,
-                    generateParameters: parameters,
-                    additionalContext: additionalContext,
-                    tools: toolSpecs
-                )
-                return session.streamDetails(to: messagesForRound)
-            }
-
-            var assembler = TurnTextAssembler(thinking: thinking)
-            var toolCalls: [ToolCall] = []
-
-            // Labelled, because the ceiling below has to leave the *stream*, not merely the
-            // `switch`: an unlabelled `break` inside a switch case exits the switch and the
-            // loop then keeps consuming chunks the round has already decided to abandon.
-            chunks: for try await generation in stream {
-                try Task.checkCancellation()
-                switch generation {
-                case .chunk(let text):
-                    let step = assembler.consume(text)
-                    if !step.reasoning.isEmpty { stripperSpentItsBudget = true }
-                    answer += step.answer
-                    await report(
-                        ThinkingStripper.Segment(reasoning: step.reasoning, answer: step.answer))
-
-                    // Enforce the mode's ceiling. The stream is abandoned here: the pinned
-                    // MLX release has no budget-transition API, so there is no way to tell
-                    // the model to stop thinking and answer. The turn therefore has no
-                    // answer to come, and the notice below says so rather than pretending
-                    // the model answered from the cut-off.
-                    if step.ceilingReached {
-                        reasoningWasTruncated = true
-                        break chunks
+        let images = imageData
+        // `Chat.Message` is not Sendable (it can carry CIImage-backed media), so the text
+        // prompt crosses into the model's isolation as plain strings and is rebuilt inside
+        // `perform`.
+        let text = try await runTurn(
+            settings: settings,
+            messages: messages,
+            tools: tools,
+            images: images,
+            makeStream: { prompt in
+                await container.perform { context -> AsyncThrowingStream<Generation, Error> in
+                    // Decoded here, inside the model's isolation, from bytes that crossed it.
+                    let decodedImages: [UserInput.Image] = prompt.images.compactMap { data in
+                        CIImage(data: data).map { UserInput.Image.ciImage($0) }
                     }
-
-                    // A loop is a stop condition regardless of the token budget, which is
-                    // what keeps a bad sampler setting from producing 32k tokens of noise.
-                    if repetition.ingest(step.answer) {
-                        loopDetected = true
-                        break rounds
+                    var lastUserIndex: Int? = prompt.imageHostIndex
+                    let messagesForRound = prompt.entries.enumerated().map { index, entry in
+                        let isImageHost = lastUserIndex == index
+                        if isImageHost { lastUserIndex = nil }
+                        return Chat.Message(
+                            role: Chat.Message.Role(rawValue: entry.role) ?? .user,
+                            content: entry.content,
+                            images: isImageHost ? decodedImages : [],
+                            tool: entry.toolResultID.map { .result(id: $0) }
+                                ?? (entry.toolCalls.isEmpty ? nil : .calls(entry.toolCalls))
+                        )
                     }
-
-                case .toolCall(let call):
-                    toolCalls.append(call)
-
-                case .info(let info):
-                    stats = TurnStats(
-                        promptTokens: info.promptTokenCount,
-                        prefillSeconds: info.promptTime,
-                        generationTokens: info.generationTokenCount,
-                        cachedPromptTokens: 0,
-                        stopReason: Self.describe(info.stopReason),
-                        tokensPerSecond: info.generateTime > 0
-                            ? Double(info.generationTokenCount) / info.generateTime
-                            : 0,
-                        seconds: Date.now.timeIntervalSince(started)
+                    // No `toolDispatch`: we dispatch ourselves so the assistant message
+                    // that requested the tool is present in the transcript. Qwen 3.5's
+                    // template requires it (and requires a following user turn) before it
+                    // will render a tool response at all.
+                    let session = ChatSession(
+                        context,
+                        generateParameters: prompt.parameters,
+                        additionalContext: prompt.additionalContext,
+                        tools: prompt.toolSpecs
                     )
+                    return session.streamDetails(to: messagesForRound)
                 }
-            }
-
-            // A held-back partial delimiter must still be attributed to this round.
-            let tail = assembler.finish()
-            if !tail.reasoning.isEmpty { stripperSpentItsBudget = true }
-            answer += tail.answer
-            await report(ThinkingStripper.Segment(reasoning: tail.reasoning, answer: tail.answer))
-
-            // A round the ceiling abandoned ends the turn here, whatever fragments arrived
-            // while it was still inside reasoning. Dispatching a `.toolCall` collected in
-            // that round would run another round and spend more of the very budget the
-            // ceiling exists to bound. The decision is a pure function so the rule is
-            // testable without weights.
-            guard
-                Self.roundAdvance(
-                    reasoningWasTruncated: reasoningWasTruncated,
-                    toolCallCount: toolCalls.count,
-                    hasTools: toolSpecs != nil,
-                    round: round,
-                    maxToolRounds: maxToolRounds) == .dispatchTools
-            else { break rounds }
-            round += 1
-
-            // Assistant turn carrying the calls, then one tool result per call, then a
-            // user turn to continue. This is exactly the shape the Qwen template renders.
-            promptEntries.append(Entry(role: "assistant", content: "", toolCalls: toolCalls))
-            for call in toolCalls {
-                let name = call.function.name
-                let argument = Self.argumentString(of: call)
-                await reportToolCall(name, argument)
-
-                let outcome = await turnTools.run(name: name, argument: argument)
-                await onEvent(
-                    .toolResult(agentID: agentID, name: name, summary: outcome.summary, detail: outcome.text)
-                )
-                promptEntries.append(
-                    Entry(role: "tool", content: outcome.text, toolResultID: call.id))
-            }
-            promptEntries.append(
-                Entry(
-                    role: "user",
-                    content: """
-                    [Tool results above] Continue your message to the group. Use what the \
-                    results add, and drop any claim they contradict. If they did not settle \
-                    the point, say so and answer from what you know rather than searching again \
-                    with the same wording.
-                    """
-                )
-            )
-        }
-
-        let scrubbed = Self.stripFabricatedToolSyntax(answer)
-        if scrubbed.removedLines > 0 {
-            FileHandle.standardError.write(
-                Data(
-                    "[ChatBots] \(agentID) stripped \(scrubbed.removedLines) line(s) of fabricated tool syntax from the answer\n"
-                        .utf8))
-        }
-        let final = Self.clean(scrubbed.text, settings: settings)
-        if stats.generationTokens == 0 {
-            stats.seconds = Date.now.timeIntervalSince(started)
-        }
-        // A reasoning model can burn the entire budget inside `<think>` and emit no
-        // answer at all. That is legitimate behaviour, not an error, but the user must be
-        // told — otherwise the pane just stays empty with no explanation. When the ceiling
-        // is what ended the turn, the ceiling's own notice below is the truthful one.
-        if final.isEmpty, stripperSpentItsBudget, !reasoningWasTruncated {
-            await onEvent(
-                .toolFailure(
-                    agentID: agentID,
-                    name: "generation",
-                    message: "spent the whole \(generationCap)-token budget thinking and produced no answer — raise the thinking level's headroom or turn thinking off"
-                )
-            )
-        }
-
-        lastStats = stats
-        if loopDetected {
-            await onEvent(
-                .toolFailure(
-                    agentID: agentID,
-                    name: "generation",
-                    message: "the model fell into a repetition loop and the turn was ended — its sampler settings are too loose for this prompt"
-                )
-            )
-        }
-
-        if reasoningWasTruncated {
-            let producedAnswer = !final.isEmpty
-            await onEvent(
-                .toolFailure(
-                    agentID: agentID,
-                    name: "thinking",
-                    message: Self.reasoningCeilingNotice(
-                        mode: thinking, ceiling: reasoningCeiling ?? 0,
-                        producedAnswer: producedAnswer)
-                )
-            )
-            if !producedAnswer {
-                // The ceiling abandoned the stream, so the model never saw the delimiter
-                // and cannot answer from it. Fail rather than hand the caller an empty
-                // turn dressed up as a successful one, which is what this used to do.
-                throw ReasoningCeilingError(mode: thinking, ceiling: reasoningCeiling ?? 0)
-            }
-        }
-
-        await onEvent(.turnFinished(agentID: agentID, text: final, stats: stats))
+            },
+            onToolCall: onToolCall,
+            onEvent: onEvent)
         logConfigurationOnce(container: container, settings: settings)
-        return final
+        return text
     }
 
     private func logConfigurationOnce(container: ModelContainer, settings: TurnSettings) {
@@ -954,7 +697,7 @@ public actor MLXEngine: LLMEngine {
     }
 
     /// Drop a stray delimiter or an echoed speaker tag the model may have emitted.
-    private static func clean(_ text: String, settings: TurnSettings) -> String {
+    static func clean(_ text: String, settings: TurnSettings) -> String {
         var output = text.trimmingCharacters(in: .whitespacesAndNewlines)
         for marker in ["<think>", "</think>"] where output.hasPrefix(marker) {
             output.removeFirst(marker.count)
@@ -969,7 +712,7 @@ public actor MLXEngine: LLMEngine {
         return output
     }
 
-    private static func describe(_ reason: GenerateStopReason) -> String {
+    static func describe(_ reason: GenerateStopReason) -> String {
         switch reason {
         case .stop: "stop"
         case .length: "length"
@@ -977,7 +720,7 @@ public actor MLXEngine: LLMEngine {
         }
     }
 
-    private static func toolSpec(for tool: any ToolProvider) -> ToolSpec {
+    static func toolSpec(for tool: any ToolProvider) -> ToolSpec {
         [
             "type": "function",
             "function": [
