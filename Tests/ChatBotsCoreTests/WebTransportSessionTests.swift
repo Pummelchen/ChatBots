@@ -146,7 +146,8 @@ struct WebTransportSessionTests {
         #expect(snapshot.topic == "A transport test")
     }
 
-    /// The engine takes a new client after the last one has gone.
+    /// The engine takes a new client after the last one has gone, over and over, against a
+    /// ceiling far below the number of connections it is asked to serve.
     ///
     /// Sequentially, not simultaneously, and the difference is the point. Two *concurrently
     /// connected* WebTransport clients from one process is not something this transport or
@@ -156,19 +157,29 @@ struct WebTransportSessionTests {
     /// and the desktop app never does it — it holds one connection per engine, and the website
     /// does not use this transport at all.
     ///
-    /// What the app does do is reconnect, over and over, against an engine that outlives it. So
-    /// what has to hold is that the engine is still there afterwards, which is what the count
-    /// of connections below established was not: the engine went deaf after sixteen and never
-    /// came back.
+    /// So the ceiling is what makes this a regression test rather than a smoke test. Until
+    /// WebTransport 1.3.7, `maxConcurrentConnections` was a budget for the listener's *whole
+    /// life*: a ceiling of four served four connections and then refused everything forever, and
+    /// this project carried a 4096 ceiling to hide that. Twenty-four sequential connections
+    /// against a ceiling of four is the shape that proves the slot is now returned — nothing here
+    /// is concurrent, so all twenty-four have to be admitted.
     @Test("The engine serves a new client after the previous one has gone")
     func clientAfterClient() async throws {
-        let running = try await startEngine()
+        let ceiling = 4
+        let running = try await startEngine(maximumConnections: ceiling)
         defer { Task { await running.stop() } }
 
-        // More rounds than the transport's own default connection limit, so a listener that
-        // never releases one fails here rather than in the field. Sixteen is the library's
-        // default; this is deliberately past it.
         for round in 0..<24 {
+            // Let the previous session finish being torn down before the next arrives, so this
+            // tests the listener returning a slot rather than how fast a close propagates. The
+            // wait is bounded: if slots were never returned, `sessionCount` would stay pinned at
+            // the ceiling, the deadline would pass, and the connect below would fail — which is
+            // the failure this test exists for.
+            let settle = ContinuousClock.now.advanced(by: .seconds(5))
+            while running.server.sessionCount >= ceiling, ContinuousClock.now < settle {
+                try? await Task.sleep(for: .milliseconds(20))
+            }
+
             let client = makeClient(port: running.port)
             try await client.connect()
             let snapshot = try await client.state()

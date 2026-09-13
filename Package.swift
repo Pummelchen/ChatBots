@@ -29,7 +29,11 @@ let package = Package(
         .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0"),
         // The channel between the desktop app and the engine. Internal only: the website is
         // served by Caddy, which does not speak WebTransport.
-        .package(url: "https://github.com/Pummelchen/WebTransport.git", from: "1.3.6"),
+        //
+        // 1.3.7 is the floor rather than a preference: before it, the listener's connection
+        // limit was a budget for its whole life instead of a concurrency cap, so an engine
+        // stopped accepting after sixteen connects and never recovered. See the wiki tracker.
+        .package(url: "https://github.com/Pummelchen/WebTransport.git", from: "1.3.7"),
     ],
     targets: [
         // MARK: - Core

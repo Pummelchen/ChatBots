@@ -45,22 +45,22 @@ public final class WebTransportEngineServer {
         /// The QUIC port. Distinct from the HTTP port, because they are different protocols.
         public var port: UInt16 = 7790
         public var path = "/chatbots"
-        /// How many client connections the listener will accept before it stops accepting any.
+        /// How many client connections may be in flight at once.
         ///
-        /// Large on purpose, and the reason is a defect in the transport rather than a load
-        /// figure. A WebTransport session is a whole QUIC connection, and this library sets
-        /// `newConnectionLimit` on its listener and then never cancels a connection — there is
-        /// no cancellation anywhere in the runtime. So the limit is not a concurrency cap that
-        /// recovers: it is a lifetime count of how many times clients may ever connect to this
-        /// process. Measured: a fresh engine served exactly sixteen connects and then none,
-        /// permanently, while still answering on its other channel.
+        /// A real concurrency limit now, which it was not before. This library passed the value
+        /// to `NetworkListener.newConnectionLimit`, and on macOS 26 that is a budget for the
+        /// listener's whole life: a connection that ended never returned its slot, so a fresh
+        /// engine served exactly sixteen connects and then none, permanently, while still
+        /// answering on its other channel. This project carried 4096 here as headroom, and the
+        /// comment said plainly that it was a workaround rather than a load figure.
         ///
-        /// Sixteen is the library's default (`WebTransportAdmissionPolicy.default`) and it is
-        /// far too few when the count never falls — the desktop app alone spends one connection
-        /// per launch, plus one per startup probe. Raising it buys headroom; it does not fix the
-        /// leak. When the underlying defect is corrected this should come back down to a real
-        /// concurrency limit.
-        public var maximumConnections = 4_096
+        /// WebTransport 1.3.7 fixed it — the listener runs without that framework limit and the
+        /// runtime counts in-flight connections itself, returning the slot when a session ends or
+        /// an accept fails. So the number can be what it always claimed to be. Sixteen is the
+        /// library's default and is far above anything this app holds: the desktop app keeps one
+        /// connection for its lifetime, plus one more while the supervisor probes for an engine.
+        /// It is a ceiling against a runaway client, not a figure anything should approach.
+        public var maximumConnections = 16
 
         public init() {}
     }
