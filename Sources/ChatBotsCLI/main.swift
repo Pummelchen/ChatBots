@@ -40,7 +40,9 @@ struct Options {
     var seed = false
     var researchDepth: ResearchBudget.Depth?
     var listRoles = false
-    var port = 7788
+    /// The HTTP port. `UInt16` rather than `Int`, so an out-of-range value cannot reach the
+    /// listener through a second, trapping conversion (A62).
+    var port: UInt16 = 7788
     var contextWindow: Int?
     var keepRecent: Int?
     /// Cap on answer tokens per turn; `nil` keeps the seat's own budget.
@@ -105,7 +107,18 @@ struct Options {
             case "--prepare-identity": options.prepareIdentity = true
             case "--transport": options.transport = next() ?? "both"
             case "--transport-port":
-                if let value = UInt16(next() ?? "") { options.transportPort = value }
+                // Validated rather than swallowed: `UInt16(String)` returns nil for an
+                // out-of-range value, so this used to fall back silently to 7790 and the
+                // user's number was never mentioned again (A62).
+                let transportRaw = next() ?? ""
+                guard let value = UInt16(transportRaw), value != 0 else {
+                    FileHandle.standardError.write(
+                        Data(
+                            "invalid transport port: \(transportRaw.isEmpty ? "(nothing)" : transportRaw) — expected 1–65535\n"
+                                .utf8))
+                    exit(2)
+                }
+                options.transportPort = value
             case "--serve": options.serve = true
             case "--attach": options.attachments.append(next() ?? "")
             case "--seed": options.seed = true
@@ -130,7 +143,21 @@ struct Options {
                         Data("unknown mode: \(raw) — try entertainment or research\n".utf8))
                     exit(2)
                 }
-            case "--port": options.port = Int(next() ?? "") ?? options.port
+            case "--port":
+                // `Int` here and a trapping `UInt16` at the listener meant `--port -1` or
+                // `--port 70000` aborted the process instead of exiting 2 like every other
+                // bad value. Zero is refused as well: the server would bind an ephemeral
+                // port and then announce `http://127.0.0.1:0`, a URL that goes nowhere
+                // (A62).
+                let portRaw = next() ?? ""
+                guard let value = UInt16(portRaw), value != 0 else {
+                    FileHandle.standardError.write(
+                        Data(
+                            "invalid port: \(portRaw.isEmpty ? "(nothing)" : portRaw) — expected 1–65535\n"
+                                .utf8))
+                    exit(2)
+                }
+                options.port = value
             case "--compact-threshold": options.compactThreshold = Double(next() ?? "")
             case "--context-window": options.contextWindow = Int(next() ?? "")
             case "--compact-keep": options.keepRecent = Int(next() ?? "")
@@ -695,7 +722,7 @@ if !options.attachments.isEmpty {
     let runDirectory = RunDirectory.current
     let server = APIServer(
         engine: engine, store: ConversationStore(directory: runDirectory),
-        port: UInt16(options.port))
+        port: options.port)
     do {
         try server.start()
     } catch {
