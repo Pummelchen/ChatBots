@@ -17,10 +17,10 @@ does not advance without its artifact.
 
 | Metric | Count |
 | --- | --- |
-| Tasks enumerated | 13 |
-| DONE | 1 (A12 — AddressSanitizer clean) |
-| START (proven / reproduced, expected behaviour written) | 11 |
-| PROGRESS | 1 (A13 — ThreadSanitizer in flight) |
+| Tasks enumerated | 14 |
+| DONE | 2 (A12, A13 — both sanitizer baselines) |
+| START (proven / reproduced, expected behaviour written) | 12 |
+| PROGRESS | 0 |
 | BLOCKED | 0 |
 
 Phase B is **not finished**: L3, L5 and L7 have not been run, and the deeper §5 hunt continues.
@@ -44,7 +44,8 @@ Per §11, all findings are enumerated before any fix begins.
 | A10 | S3 | tooling | `tools/*.sh` (24 notes) | `shellcheck -S style` reports 24 notes, mostly SC2001 | style | START | this Mac | baseline |
 | A11 | S3 | docs/ops | `README.md`, wiki | Neither the README nor the wiki states that running the website exposes the API to the LAN | docs | START | this Mac | L4 pass (same evidence as A01) |
 | A12 | — | tests | `AUDIT/baseline/swift-test-asan.log` | AddressSanitizer over the whole suite: **clean** | test | DONE | this Mac | §1 tooling requirement |
-| A13 | — | tests | `AUDIT/baseline/swift-test-tsan.log` | ThreadSanitizer over the whole suite: in flight | test | PROGRESS | this Mac | §1 tooling requirement |
+| A13 | — | tests | `AUDIT/baseline/swift-test-tsan.log` | ThreadSanitizer over the whole suite: **one data race found** | test | DONE | this Mac | §1 tooling requirement |
+| A14 | **S1** | `HTTPServer` | `HTTPServer.swift:356` write vs `:380` read | `isRunning`/`lastError` are written from a Network.framework callback and read from `waitUntilReady` with no synchronisation | unsafe | START | this Mac | A13 (ThreadSanitizer) |
 
 ---
 
@@ -199,18 +200,71 @@ The scratch path is outside the Dropbox folder deliberately: instrumented builds
 
 ---
 
-## A13 — ThreadSanitizer over the whole suite — **PROGRESS**
+## A13 — ThreadSanitizer over the whole suite — **DONE (one data race found)**
 
-**PROGRESS** · test · discovered by §1's tooling requirement
+**DONE** · test · discovered by §1's tooling requirement
 
 ```bash
 swift test --sanitize=thread --scratch-path ~/Library/Caches/ChatBots/audit-tsan
+# TSAN_EXIT=1 · 555 tests passed · ThreadSanitizer: reported 1 warnings
 ```
 
-Running at the time of writing; `baseline/swift-test-tsan.log` will hold the result. The engine is
-actor-isolated throughout in Swift 6 mode and the transport is explicitly serialised, so the
-expectation is clean — but "expected" is not a result, and this project's own history includes a
-data race found by the compiler that a human had not seen.
+Evidence: [`baseline/swift-test-tsan.log`](baseline/swift-test-tsan.log). **The suite still passed**
+— which is the whole point of running it: TSan reported a race the tests could not see. It is
+opened as its own task, **A14**, rather than folded into this one.
 
-**Done when:** the run completes, the log is committed, and the result (clean, or findings) is
-recorded here and in the plan's baseline table.
+The expectation going in was clean, because the engine is actor-isolated throughout and the
+transport is serialised. It was wrong, and that is worth recording: "expected clean" is not a
+result.
+
+---
+
+## A14 — `isRunning` / `lastError` are raced between the listener callback and `waitUntilReady`
+
+**S1** · unsafe · START · discovered by A13 (ThreadSanitizer)
+
+**The report** (`baseline/swift-test-tsan.log:2541`):
+
+```
+WARNING: ThreadSanitizer: data race (pid=22050)
+  Write of size 1 at 0x00010a20ca60 by thread T1:
+    #0 closure #2 in HTTPServer.start()  HTTPServer.swift:356
+  Previous read of size 1 at 0x00010a20ca60 by thread T3:
+    #0 HTTPServer.waitUntilReady(timeout:)  HTTPServer.swift:380
+```
+
+**What it is.** `HTTPServer` holds `public private(set) var isRunning` (`:319`) and
+`lastError` (`:322`) as plain stored properties. The listener's `stateUpdateHandler` writes them
+from a Network.framework callback dispatched on `queue` (`:356`, `:358`, `:363`), while
+`waitUntilReady` reads them from a Swift concurrency task (`:380`, `:381`). Nothing synchronises
+the two.
+
+**It is a production path, not a test artefact.** The trace surfaces it through
+`SharedConversationTests` → `APIServer.start()`, but the same code runs whenever the engine starts:
+`chatbots-cli --serve` calls `APIServer.waitUntilReady()` (`main.swift:649`) and refuses to start if
+it returns false. This is the check that is supposed to turn "the port is held by somebody else"
+into a reported failure.
+
+**Impact.** On arm64 an aligned 1-byte load/store does not tear in practice, which is why the suite
+passes. The real risk is the compiler: a read of a racy non-atomic may legally be hoisted out of
+the poll loop in `waitUntilReady`, and then the loop spins to its deadline and reports a healthy
+server as not ready. That is a wrong result on the startup path — the engine refuses to start, or
+the installer's checks fail, with no obvious cause. It is also the second half of **A05**: this
+type is one of the four `@unchecked Sendable` declarations, and this is exactly the mutable state
+that conformance assumes does not need protecting.
+
+**Graded S1, with the S0 case stated.** §7 maps "unsafe concurrency" to S1. If the owner considers
+a startup path that can report the wrong answer to be a go-live blocker, this is S0; the evidence
+supports either reading, so the grade is recorded with its reasoning rather than asserted.
+
+**Expected-correct behaviour.** The two flags must be read and written under one lock, so that
+`waitUntilReady` observes the listener's actual state. The public API (`isRunning`, `lastError`,
+`waitUntilReady`) does not need to change.
+
+**Fix direction (Phase C).** Guard both fields with a lock — the codebase already uses
+`OSAllocatedUnfairLock` — and read them through accessors. That also lets `HTTPServer`'s
+`@unchecked Sendable` carry a written invariant instead of being an assertion, and the fix should
+be verified by re-running the TSan command above and getting exit 0 with no report. A test that
+fails before and passes after is required by §8's TEST gate; the race itself needs the sanitizer,
+so the test will assert the observable contract (the flags are coherent under concurrent access)
+and the sanitizer run is the evidence that the race is gone.

@@ -38,7 +38,7 @@ Nothing later may be worse on any of these without an explicit, numbered, justif
 | SAST (`semgrep --config auto`) | 3 findings, all in `tools/cdp.py` | `baseline/semgrep.json` |
 | §5 placeholder sweep | **0 markers** (TODO/FIXME/HACK/XXX/WIP/STUB) | `inventory.md` §2.3 note |
 | AddressSanitizer, full suite | **clean** — 555 tests, exit 0, no sanitizer report | `baseline/swift-test-asan.log` |
-| ThreadSanitizer, full suite | in flight — see A13 | `baseline/swift-test-tsan.log` |
+| ThreadSanitizer, full suite | **1 data race** — `HTTPServer.swift:356` write vs `:380` read (A14); suite still passed | `baseline/swift-test-tsan.log` |
 
 Three baseline results are worth stating plainly because they are *good* and should not
 regress: **no secret in the full history**, **no known CVE in the dependency set**, and
