@@ -152,8 +152,14 @@ public final class WebTransportEngineServer {
         // accept loop, not a child of it, so cancelling the accept task does nothing to them;
         // and `listener.shutdown()` severs nothing cleanly. Closing the session is what ends
         // the client's receive loop, releases its admission slot and stops it driving the
-        // engine. Copied out of the dictionaries first, because the serve tasks' own cleanup
-        // mutates them as they finish.
+        // engine.
+        //
+        // Removing the entries here, synchronously and before the first close, is also how the
+        // session gets exactly one closer: a serve task that ends on its own removes its own
+        // entry first and closes the session only if it still owned it, so `stop()` and the
+        // serve defer can never both close the same session. The library's `close()` sends a
+        // final capsule on a stream it has already finished, which is not something to do
+        // twice.
         let liveTasks = Array(sessionTasks.values)
         let liveSessions = Array(sessions.values)
         sessions.removeAll()
@@ -192,14 +198,19 @@ public final class WebTransportEngineServer {
     // MARK: - Sessions
 
     private func serve(_ session: WebTransportSession, id: UUID) async {
-        // Every exit from this method deregisters the session and closes it. That is the one
-        // path that lets go of an admission slot and ends the client's receive loop; without
-        // it a session outlived both the client and `stop()`.
+        // Every exit from this method deregisters the session, and closes it only if this task
+        // still owns it. That ownership test is what gives the session exactly one closer:
+        // `stop()` removes the entries before it closes anything, so a task ending during or
+        // after a stop finds its entry gone and leaves the close to `stop()`; a task ending on
+        // its own removes the entry itself and is the one that closes. Without it both would
+        // close, sending the final capsule twice.
         defer {
             subscribers[id] = nil
-            sessions[id] = nil
+            let stillOwned = sessions.removeValue(forKey: id) != nil
             sessionTasks[id] = nil
-            Task { try? await session.close() }
+            if stillOwned {
+                Task { try? await session.close() }
+            }
         }
 
         // One stream, and that is not a simplification for its own sake: the transport
