@@ -901,8 +901,10 @@ public final class ChatController: ObservableObject {
     ///
     /// Rebuilt from the state rather than kept separately, so the app and the engine cannot
     /// disagree about what is attached. The extracted text is the engine's and is not sent
-    /// back, so a rebuilt document carries its summary and token count but not its body —
-    /// which is all the interface shows.
+    /// back, so a rebuilt document carries the engine's own summary and token count rather than
+    /// recomputing them from fields this side never had — recomputing produced "0 words" on
+    /// every chip (audit A46). The body itself is not here, which is why the chip does not
+    /// offer to show it.
     public var attachments: [AttachedDocument] {
         (lastSnapshot?.attachments ?? []).map { attachment in
             AttachedDocument(
@@ -913,7 +915,9 @@ public final class ChatController: ObservableObject {
                 byteCount: 0,
                 pageCount: nil,
                 wasTruncated: attachment.wasTruncated,
-                imageData: attachment.imageBase64.flatMap { Data(base64Encoded: $0) })
+                imageData: attachment.imageBase64.flatMap { Data(base64Encoded: $0) },
+                engineSummary: attachment.summary,
+                engineTokens: attachment.tokens)
         }
     }
 

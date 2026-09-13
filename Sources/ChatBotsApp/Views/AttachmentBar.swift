@@ -96,6 +96,11 @@ struct AttachmentChip: View {
             .frame(maxWidth: 220, alignment: .leading)
 
             if !document.kind.isImage, !document.text.isEmpty {
+                // Shown only for a document whose extract is on this side of the wire. A
+                // document rebuilt from the engine has no body — the engine keeps it — so the
+                // affordance is absent rather than opening an empty popover, and the chip's
+                // figures come from the engine's own summary and token count instead of being
+                // recomputed from fields this side does not have (audit A46).
                 Button {
                     showingText = true
                 } label: {

@@ -107,6 +107,19 @@ public struct AttachedDocument: Identifiable, Sendable, Equatable, Codable {
     public var imageData: Data?
     public var addedAt: Date
 
+    /// The engine's own description of what it read, when this document was rebuilt from the
+    /// engine rather than extracted here.
+    ///
+    /// `summary` and `estimatedTokens` are computed from `text`, `byteCount` and `pageCount`,
+    /// and a client is deliberately not sent the extracted text — it is the engine's, it can be
+    /// huge, and sending it back would be a second copy that could disagree. So a rebuilt
+    /// document carries the engine's figures instead of recomputing them from fields it does
+    /// not have, which is what made every chip read "0 words" / "Zero bytes" (audit A46).
+    /// Extraction on this side leaves these nil and the computed values are used.
+    public var engineSummary: String?
+    /// The engine's own token estimate, for the same reason as `engineSummary`.
+    public var engineTokens: Int?
+
     public init(
         id: UUID = UUID(),
         name: String,
@@ -116,7 +129,9 @@ public struct AttachedDocument: Identifiable, Sendable, Equatable, Codable {
         pageCount: Int? = nil,
         wasTruncated: Bool = false,
         imageData: Data? = nil,
-        addedAt: Date = Date.now
+        addedAt: Date = Date.now,
+        engineSummary: String? = nil,
+        engineTokens: Int? = nil
     ) {
         self.id = id
         self.name = name
@@ -127,13 +142,23 @@ public struct AttachedDocument: Identifiable, Sendable, Equatable, Codable {
         self.wasTruncated = wasTruncated
         self.imageData = imageData
         self.addedAt = addedAt
+        self.engineSummary = engineSummary
+        self.engineTokens = engineTokens
     }
 
     /// Approximate tokens, at the four-characters-per-token rule used elsewhere.
-    public var estimatedTokens: Int { max(0, text.count / 4) }
+    ///
+    /// The engine's figure when it was measured there, because a rebuilt document has no
+    /// `text` to count here. See `engineTokens`.
+    public var estimatedTokens: Int { engineTokens ?? max(0, text.count / 4) }
 
     /// A short description for the chip: "12 pages · 4.2k words".
+    ///
+    /// The engine's own description when this document was rebuilt from it, for the reason in
+    /// `engineSummary`: without the text, byte count and pages there is nothing here to
+    /// describe.
     public var summary: String {
+        if let engineSummary { return engineSummary }
         var parts: [String] = []
         if let pageCount, pageCount > 1 { parts.append("\(pageCount) pages") }
         if kind.isImage {
