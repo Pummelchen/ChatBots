@@ -148,7 +148,14 @@ stop_all() {
     fi
   done
 
-  [ "$stopped" -eq 1 ] && ok "Stopped." || dim "Nothing was running."
+  # An explicit if, not `[ … ] && ok … || dim …`: the `||` branch runs whenever `ok` fails,
+  # not only when `stopped` is 0. Both helpers are printf calls that do not fail today, but
+  # the intent is a two-way choice and the code should say so.
+  if [ "$stopped" -eq 1 ]; then
+    ok "Stopped."
+  else
+    dim "Nothing was running."
+  fi
   return 0
 }
 

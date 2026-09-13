@@ -12,6 +12,17 @@ ROOT="$PWD"
 CONFIG="${CONFIG:-release}"
 APP="$ROOT/dist/ChatBots.app"
 
+# Indent captured multi-line output so it reads as part of the warning above it.
+#
+# What SC2001 suggests — `${variable//search/replace}` — does not apply here: a parameter
+# expansion can only prefix the *first* line of a multi-line value, so
+# `${out//$'\n'/$'\n'      }` would leave every later line unindented. The previous form,
+# `echo "$out" | sed 's/^/      /'`, hands the whole value to sed, which is what does the
+# per-line work. Feeding sed from a here-string is flagged by SC2001 as well, so the value
+# goes to awk instead. That also keeps `echo`'s option parsing out of the path: `echo "$out"`
+# silently drops a value that begins with `-n`.
+indent_output() { awk '{ print "      " $0 }'; }
+
 echo "==> Building ($CONFIG)"
 # All three products, not only the app. The bundle carries the engine and the transport probe,
 # and a bundle without them is broken in a way the user finds at launch: the window opens, says
@@ -164,10 +175,10 @@ done
 # problem above stayed hidden.
 if ! sign_output="$(codesign --force --sign - "$APP" 2>&1)"; then
   echo "    ! the app could not be signed; a downloaded copy would be refused" >&2
-  echo "$sign_output" | sed 's/^/      /' >&2
+  indent_output <<< "$sign_output" >&2
 elif ! verify_output="$(codesign --verify --strict "$APP" 2>&1)"; then
   echo "    ! the app is signed but does not verify:" >&2
-  echo "$verify_output" | sed 's/^/      /' >&2
+  indent_output <<< "$verify_output" >&2
 fi
 
 echo

@@ -26,7 +26,6 @@ ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT" || exit 1
 
 APP="$ROOT/dist/ChatBots.app"
-PYTHON=python3
 START_ENGINE=1
 ENGINE_PORT=7789
 ACTION=run
