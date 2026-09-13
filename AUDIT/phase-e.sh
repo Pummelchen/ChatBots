@@ -193,15 +193,33 @@ fi
 
 section "9/12  SAST, shell, Python and Swift style"
 if command -v semgrep >/dev/null 2>&1; then
-    # --error so a finding fails the gate instead of being advisory. Metrics are required by
-    # `--config auto`; the scan does not send source, only the rule registry request.
-    if semgrep scan --config auto --error --quiet --metrics=on Sources tools web \
-        > "$out/semgrep.txt" 2>&1
-    then
-        pass "semgrep: no findings in Sources, tools, web"
+    # A09 waived two findings in tools/cdp.py in writing: the plaintext websocket and the
+    # run-time URL are both correct for a loopback-only Chrome DevTools client, and the code now
+    # ENFORCES what the scanner cannot see (a host check that refuses anything but loopback, a
+    # pinned scheme, a bounded read). The findings stay visible - there is no nosemgrep - so the
+    # gate has to distinguish "a finding this audit has justified" from "a new one", which a
+    # count cannot do: swapping one for another would keep the count the same. Hence an
+    # allowlist read from plan.md, matched on rule id and path suffix.
+    semgrep scan --config auto --quiet --json --output "$out/semgrep.json" \
+        Sources tools web > "$out/semgrep.log" 2>&1
+    semgrep_waivers="$(sed -n 's/^semgrep waiver: \([^ ]*\) \(.*\)$/\1\t\2/p' AUDIT/plan.md)"
+    unwaived=0
+    while IFS=$'\t' read -r rule path; do
+        [ -n "$rule" ] || continue
+        if printf '%s\n' "$semgrep_waivers" | awk -F'\t' -v r="$rule" -v p="$path" \
+            '$1 == r && index(p, $2) == length(p) - length($2) + 1 { found = 1 } END { exit !found }'
+        then
+            printf '        waived:  %s  %s\n' "$rule" "$path"
+        else
+            printf '        UNWAIVED: %s  %s\n' "$rule" "$path"
+            unwaived=$((unwaived + 1))
+        fi
+    done <<< "$(jq -r '.results[] | "\(.check_id)\t\(.path)"' "$out/semgrep.json" 2>/dev/null)"
+    total_findings="$(jq '.results | length' "$out/semgrep.json" 2>/dev/null || echo unknown)"
+    if [ "$unwaived" = "0" ]; then
+        pass "semgrep: $total_findings finding(s), all covered by a recorded waiver"
     else
-        fail "semgrep reported findings; see $out/semgrep.txt"
-        grep -E '^(Sources|tools|web)/' "$out/semgrep.txt" | head -10 | sed 's/^/        /'
+        fail "semgrep: $unwaived finding(s) not covered by any waiver — see $out/semgrep.json"
     fi
 else
     fail "semgrep is not installed"

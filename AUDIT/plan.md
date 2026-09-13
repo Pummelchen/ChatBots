@@ -67,8 +67,26 @@ swiftlint waiver: 222
 swift-format waiver: 3003
 ```
 
-`shellcheck -S style`, `ruff check`, `ruff format --check` and `pyright` are **not** waived: those
-are clean targets, and A09 and A10 exist to get them there.
+**Semgrep waivers.** A09's findings in `tools/cdp.py` are waived in writing - three findings
+across two rules: `insecure-websocket` fires twice (at `:108` and `:110`) and `dynamic-urllib`
+once. The lines below are what `AUDIT/phase-e.sh` matches on. They are matched by rule id **and** path, not by
+count, because a count cannot tell a justified finding from a new one: fixing one and introducing
+another would leave the total unchanged.
+
+```
+semgrep waiver: javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket tools/cdp.py
+semgrep waiver: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected tools/cdp.py
+```
+
+Both are correct for a client that drives a headless Chrome on loopback and nothing else, and
+after A09 the code **enforces** what the scanner cannot see: `require_loopback_host` refuses any
+endpoint that is not `127.0.0.1`, `localhost` or `::1` before a socket is opened, the URL scheme
+is pinned to `http` and built only from validated values, and the reply is read with a bound. The
+findings stay visible — there is no `nosemgrep` — and each site carries a comment saying what the
+rule cannot know.
+
+`shellcheck -S style` (4 findings, A10), `ruff check`, `ruff format --check` and `pyright` are
+**not** waived: those are clean targets or owned by a named task.
 
 ## Phase B — audit passes (in progress)
 

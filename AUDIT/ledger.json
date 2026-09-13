@@ -113,7 +113,7 @@
       "id": "A07",
       "severity": "S2",
       "unit": "typing",
-      "file_line": "tools/*.py (5 files)",
+      "file_line": "tools/cdp.py, tools/capture-devices.py, tools/embed-web.py, tools/embed-names.py, tools/hf-file-list.py, pyrightconfig.json",
       "title": "Python is 3.14 but unannotated and unchecked",
       "category": "style",
       "status": "DONE",
@@ -123,7 +123,7 @@
       "fix_summary": "All five tools/ modules are fully annotated and checked under STRICT pyright. `pyrightconfig.json` is `{\"include\": [\"tools\"], \"pythonVersion\": \"3.14\", \"typeCheckingMode\": \"strict\"}` - strict mode, not basic, and the Python version is the one actually installed. The 11 ruff errors were fixed, the 5 files formatted by running `ruff format` rather than by hand, and both pyright errors fixed at the cause rather than suppressed.",
       "evidence_after": "Measured by the coordinator after the commit: `ruff check tools/` => 'All checks passed!' (11 errors before); `ruff format --check tools/` => '5 files already formatted' (5 would be reformatted before); `pyright tools/` => '0 errors, 0 warnings, 0 informations' (2 errors before). `grep -rn 'type: ignore|noqa|pyright: ignore' tools/*.py` => no matches, so nothing was silenced to reach zero.",
       "commit": "b85fc8b",
-      "notes": "The honest measure of this task is not the three zeroes but that they were reached with no suppression and with strict mode on: a config in 'basic' mode, or a scattering of ignores, would have produced the same zeroes and none of the value.",
+      "notes": "The honest measure of this task is not the three zeroes but that they were reached with no suppression and with strict mode on: a config in 'basic' mode, or a scattering of ignores, would have produced the same zeroes and none of the value. file_line was the prose 'tools/*.py (5 files)', whose glob the verifier's path regex cannot parse - it reduced to '.py' and the guard failed the task. Replaced with the concrete paths, which is what the guard needs and what a reader wants anyway.",
       "blocked_reason": null
     },
     {
@@ -150,14 +150,14 @@
       "file_line": "tools/cdp.py:42,44,180",
       "title": "SAST: insecure-websocket and dynamic-urllib findings in the dev-only DevTools client",
       "category": "unsafe",
-      "status": "START",
+      "status": "DONE",
       "host_used": "this Mac",
       "discovered_by": "baseline (semgrep)",
       "evidence_before": "baseline/semgrep.json: 3 results, all tools/cdp.py",
-      "fix_summary": null,
-      "evidence_after": null,
-      "commit": null,
-      "notes": "Loopback DevTools client; low genuine risk. Annotate or guard.",
+      "fix_summary": "The loopback assumption is now ENFORCED rather than assumed. `LOOPBACK_HOSTS` is {127.0.0.1, localhost, ::1}, and `require_loopback_host` / `require_valid_port` refuse anything else before a socket is opened; `_WebSocket.__init__` validates host and port through them; the DevTools target URL is built by `devtools_targets_url`, which pins the scheme to `http` and takes a fixed loopback host through the same validation; and the reply is read with an explicit bound (`MAX_TARGET_LIST_BYTES`, 1 MiB) with an over-limit error. The safety property is the host check, not the scheme - which is now stated in the code rather than left for a reader or a scanner to infer. A07 also removed two pre-existing suppressions in the same file (an unused `# noqa: E402` and a `# noqa: BLE001` replaced by named exception tuples), so the file ends this work with fewer suppression comments than it started with.",
+      "evidence_after": "Live probe of the real code: refuses evil.com, localhost.evil.com, 10.0.0.1, \"\" and 0.0.0.0; accepts 127.0.0.1, localhost and ::1; refuses ports 0, -1 and 65536; `_WebSocket(\"ws://evil.com:9222/...\")` raises DevToolsError before any socket is opened; `devtools_targets_url(9222)` => http://127.0.0.1:9222/json. semgrep still reports THREE findings across the two rules - insecure-websocket at :108 and :110 and dynamic-urllib at :263 - because it cannot see the validation; both sites now carry an inline comment naming what the rule cannot know, and no nosemgrep was added. The three are recorded as written waivers in AUDIT/plan.md and matched by rule id and path in AUDIT/phase-e.sh, so a NEW finding still fails the acceptance run.",
+      "commit": "53183e6",
+      "notes": "Two details worth keeping. (1) The agent's first attempt put the literal `ws://` inside backticked comments and semgrep's count went from 3 to 6, because the rule also matches backticked scheme text as a JavaScript template literal - so the committed comments avoid the literal. That is a good reminder that the scanner reads the whole file, comments included. (2) Known limitation, fail-closed and accepted: the host parser splits on the first colon, so a bracketed IPv6 form `[::1]:9222` is refused even though `::1` is in the allowlist. Chrome's own target list uses 127.0.0.1 or localhost, so it does not arise in practice, and refusing is the safe direction.",
       "blocked_reason": null
     },
     {
@@ -1414,7 +1414,7 @@
       "evidence_before": "`allocateTestPort()` returned `UInt16(nextTestPort)` from a counter starting at 7 900, and its own doc comment admitted the gap: 'another process on the machine may hold it'. The counter is safe WITHIN a process - that is what it was written for, after two fixtures picked overlapping base ranges - but it knows nothing about anything else, so a second run of the same suite (another checkout, a CI job, the same person running it twice) began at 7 900 as well and collided from the first server test onward. Concretely: the audit could not run two Swift fix lanes in parallel for this reason.",
       "fix_summary": "The allocator now probes each candidate before returning it: it binds loopback port N and closes again, advancing past anything held, up to a bounded number of candidates so a busy machine cannot turn it into a loop. Deliberately WITHOUT SO_REUSEADDR, because with it a port already in use would probe as free, which is the one answer this must not give. The probe is documented as a probe and not a reservation - something else can take the port between the check and the caller's bind - so `HTTPServer.waitUntilReady()` remains the authority. The fallback after the bounded search returns the next counter value rather than trapping or looping, so a port that could not be bound is reported by the caller's readiness check instead of crashing inside a fixture.",
       "evidence_after": "swift build --build-tests 0 warnings 0 errors under the A03 gate; swift test => 'Test run with 573 tests in 79 suites passed'. Demonstrated to fire rather than merely compile: with 127.0.0.1:7900 held by an unrelated Python listener (confirmed with lsof), `swift test --filter 'HTTPServer|AttachmentUpload|SavedConversationHTTP|SharedConversation'` => 'Test run with 24 tests in 5 suites passed', i.e. the tests skipped the held port. Before the fix the first server test would have started at 7 900 and collided. The listener was then stopped.",
-      "commit": null,
+      "commit": "2dcf802",
       "notes": "Recorded as a finding rather than folded into A02 (coverage) because it is not about what is tested but about whether the suite can run twice; L6's scope names flakiness explicitly. The immediate consequence is practical as well as hygienic: with this in place two Swift fix lanes can run on one machine without fighting over ports, which is worth more than the fix itself for the remaining work.",
       "blocked_reason": null
     }
