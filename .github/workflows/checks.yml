@@ -122,6 +122,13 @@ jobs:
           mkdir -p "$tools/bin"
           echo "$tools/bin" >> "$GITHUB_PATH"
           echo "$tools/venv/bin" >> "$GITHUB_PATH"
+          # `GITHUB_PATH` takes effect for the *next* step, not this one, so the version lines at the
+          # bottom of this step resolved against whatever the runner already had: it printed the
+          # runner's ShellCheck 0.9.0 rather than the pinned 0.11.0, and then died on
+          # `gitleaks: command not found` — exit 127, the first time the job ever ran (A131).
+          # Exporting here makes the step use the tools it just installed, which is the whole point of
+          # those lines: they are meant to prove the pin, not the image.
+          export PATH="$tools/bin:$tools/venv/bin:$PATH"
 
           curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
             | tar -xJ -C "$tools"
