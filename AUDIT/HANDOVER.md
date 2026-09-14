@@ -11,7 +11,7 @@ the then-116 tasks and stopped at A89, which is recorded as A118.
 
 | | |
 | --- | --- |
-| Branch | `audit/2026-09-13`, cut from `main@a6d6999`. **Landed on `main` as a fast-forward** once the audit was complete and Phase E was green; the branch is kept unmerged-looking only in the sense that it is now an ancestor of `main`, not deleted — it is the audit's own record |
+| Branch | `audit/2026-09-13`, cut from `main@a6d6999`. **Landed on `main` as a fast-forward**, and kept **in step with it** afterwards: not deleted, not frozen, pointing at the same commit as `main`, so there is one state to reason about rather than two that drift. Its own history — the 218 commits with their measured messages — is `main`'s history |
 | Tasks | **127 enumerated: 127 DONE, 0 open, 0 BLOCKED** |
 | Severity | Every S0 and every S1 is fixed. The last five (A123–A127) were defects in the Phase E gates, found by running them |
 | Tests | **824 tests in 139 suites**, green, 0 compiler warnings (`Package.swift` sets `.treatAllWarnings(as: .error)`, so no build command can bypass it) |

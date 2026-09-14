@@ -4,7 +4,8 @@ Machine-readable twin: `ledger.json` (same ids; carries every field of §8's sch
 **This file wins on conflict with the wiki.**
 
 Branch `audit/2026-09-13` from `main` @ `a6d6999`, fast-forwarded into `main` when the audit was
-complete. Baseline and evidence: [`plan.md`](plan.md),
+complete and kept in step with it since — both names point at the same commit. Baseline and evidence:
+[`plan.md`](plan.md),
 [`baseline/`](baseline). Fleet and toolchain: [`environment.md`](environment.md).
 Scope and trust boundaries: [`inventory.md`](inventory.md).
 

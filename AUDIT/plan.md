@@ -221,9 +221,15 @@ being marked DONE without a commit that backs it.
 | Command | Purpose | Rollback |
 | --- | --- | --- |
 | `git switch -c audit/2026-09-13` (from `main` @ `a6d6999`) | create the audit branch | `git switch main && git branch -D audit/2026-09-13` — but the branch is never deleted, per §0; if abandoned it is simply left unmerged |
+| `git push origin main:audit/2026-09-13` after each push to `main` | keep the branch in step with `main` rather than frozen at the landing | none needed — it is a fast-forward, so there is no history to lose; to stop, simply stop pushing it |
 | `git merge --ff-only audit/2026-09-13` on `main`, then push | land the audited code on the repository's only supported branch | `git push --force-with-lease origin a6d6999:main` — a force-push, which §0 otherwise forbids, and which is safe here only because `main` had not moved since the branch was cut. The branch is left in place either way, so nothing is lost. |
 
 No force-push, no history rewrite, no branch or tag deletion, no `reset`. Until the landing above,
 `main` had not been committed to since the branch was created — which is what made the fast-forward
 possible and why it was chosen over a squash: a squash would delete the per-task commits that
 `verify-done-commits.sh` checks, so the audit's own gate would fail on `main`.
+
+After the landing the branch is **kept in step with `main`** rather than frozen at the landing commit.
+Two branches holding the same tree at different commits is one state too many: a reader has to work out
+which is newer, and a fix pushed to one silently misses the other. The audit's value is its *history*,
+which `main` now carries; the branch name remains a convenient pointer to it.
