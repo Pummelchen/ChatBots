@@ -300,18 +300,13 @@ public actor OpenAIResponsesEngine: LLMEngine {
 
         let seconds = Date.now.timeIntervalSince(started)
         let final = answer.trimmingCharacters(in: .whitespacesAndNewlines)
-        let stats = TurnStats(
-            promptTokens: usage.inputTokens,
-            prefillSeconds: 0,
-            generationTokens: usage.outputTokens,
-            cachedPromptTokens: usage.cachedTokens,
-            stopReason: final.isEmpty ? "empty" : "stop",
-            tokensPerSecond: seconds > 0 ? Double(usage.outputTokens) / seconds : 0,
-            seconds: seconds
-        )
-        lastStatsValue = stats
 
-        if final.isEmpty {
+        // An empty answer is a failed turn, not a finished one. This emitted `turnFailed` and then
+        // `turnFinished` unconditionally, and the orchestrator records what these events say — so the
+        // turn was recorded as completed with no text and `record(.turnFinished)` cleared the failure,
+        // which is a wrong result rather than a missing one. The MLX path throws for the same case, so
+        // this does too, and statistics are not recorded for a turn that failed (A202).
+        guard !final.isEmpty else {
             await onEvent(
                 .turnFailed(
                     agentID: agentID,
@@ -319,7 +314,19 @@ public actor OpenAIResponsesEngine: LLMEngine {
                         "the server returned no text (reasoning tokens: \(usage.reasoningTokens)) — raise the output limit or turn thinking off"
                 )
             )
+            throw OpenAIResponsesError.noOutput
         }
+
+        let stats = TurnStats(
+            promptTokens: usage.inputTokens,
+            prefillSeconds: 0,
+            generationTokens: usage.outputTokens,
+            cachedPromptTokens: usage.cachedTokens,
+            stopReason: "stop",
+            tokensPerSecond: seconds > 0 ? Double(usage.outputTokens) / seconds : 0,
+            seconds: seconds
+        )
+        lastStatsValue = stats
 
         await onEvent(.turnFinished(agentID: agentID, text: final, stats: stats))
         return final

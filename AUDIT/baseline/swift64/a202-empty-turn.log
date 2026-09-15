@@ -1,0 +1,42 @@
+# A202 — an empty answer recorded as a finished turn (2026-09-15T14:39:08Z)
+
+## 1. before: turnFailed emitted, then turnFinished unconditionally
+$ git show HEAD:Sources/ChatBotsCore/OpenAIResponsesEngine.swift | grep -n 'final.isEmpty' -A 12
+  314:        if final.isEmpty {
+  315-            await onEvent(
+  316-                .turnFailed(
+  317-                    agentID: agentID,
+  318-                    message:
+  319-                        "the server returned no text (reasoning tokens: \(usage.reasoningTokens)) — raise the output limit or turn thinking off"
+  320-                )
+  321-            )
+  322-        }
+  323-
+  324-        await onEvent(.turnFinished(agentID: agentID, text: final, stats: stats))
+  325-        return final
+  326-    }
+
+$ swift test --filter AuditClientsStreamTests   # before
+  ✘ Test "An empty answer fails the turn instead of finishing it" recorded an issue at AuditClientsStreamTests.swift:154:9: Expectation failed: thrown != nil
+  ✘ Test "An empty answer fails the turn instead of finishing it" recorded an issue at AuditClientsStreamTests.swift:155:9: Expectation failed: events == ["failed"]
+  ✘ Test "An empty answer fails the turn instead of finishing it" recorded an issue at AuditClientsStreamTests.swift:157:9: Expectation failed: stats == nil
+  ✘ Test "An empty answer fails the turn instead of finishing it" failed after 0.061 seconds with 3 issues.
+  ✘ Test run with 6 tests in 1 suite failed after 0.062 seconds with 3 issues.
+
+## 2. after
+$ grep -n 'guard !final.isEmpty' -A 12 Sources/ChatBotsCore/OpenAIResponsesEngine.swift
+  309:        guard !final.isEmpty else {
+  310-            await onEvent(
+  311-                .turnFailed(
+  312-                    agentID: agentID,
+  313-                    message:
+  314-                        "the server returned no text (reasoning tokens: \(usage.reasoningTokens)) — raise the output limit or turn thinking off"
+  315-                )
+  316-            )
+  317-            throw OpenAIResponsesError.noOutput
+  318-        }
+  319-
+  320-        let stats = TurnStats(
+  321-            promptTokens: usage.inputTokens,
+$ swift test --filter AuditClientsStreamTests   # after
+  ✔ Test run with 6 tests in 1 suite passed after 0.055 seconds.
