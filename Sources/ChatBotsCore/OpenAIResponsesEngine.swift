@@ -22,19 +22,41 @@ public actor OpenAIResponsesEngine: LLMEngine {
 
     public let spec: AgentSpec
     private let onStateChange: @Sendable (EngineState) -> Void
+    /// How this engine's client is made. Injectable so a test can see that one engine makes one.
+    private let makeClient: @Sendable (OpenAIEndpoint) -> OpenAIResponsesClient
+    /// The client this engine sends through, built the first time a turn needs it.
+    ///
+    /// It used to be built inside `generate`, so **every turn** created a `URLSession`: a fresh
+    /// connection and TLS handshake for each turn of a conversation, and a session that is never
+    /// invalidated, because `URLSession` keeps itself alive until it is. One engine drives one endpoint
+    /// — `spec` is immutable and its endpoint is fixed for the engine's life — so one client lasts as
+    /// long as the engine does, which is what makes the connection pool reusable (A201).
+    private var cachedClient: OpenAIResponsesClient?
     private var ready = false
     private var lastError: String?
     private var lastStatsValue: TurnStats?
 
     public init(
         spec: AgentSpec,
-        onStateChange: @escaping @Sendable (EngineState) -> Void = { _ in }
+        onStateChange: @escaping @Sendable (EngineState) -> Void = { _ in },
+        makeClient: @escaping @Sendable (OpenAIEndpoint) -> OpenAIResponsesClient = {
+            OpenAIResponsesClient(endpoint: $0)
+        }
     ) {
         self.spec = spec
         self.currentDisplayName = spec.displayName
         self.currentThinking = spec.thinking
         self.currentPersona = spec.personaID
         self.onStateChange = onStateChange
+        self.makeClient = makeClient
+    }
+
+    /// The client for this engine's endpoint, made once and kept.
+    private func responsesClient() -> OpenAIResponsesClient {
+        if let cachedClient { return cachedClient }
+        let client = makeClient(spec.openAI)
+        cachedClient = client
+        return client
     }
 
     public var isLoaded: Bool { ready }
@@ -270,12 +292,11 @@ public actor OpenAIResponsesEngine: LLMEngine {
             images: spec.visionSupport.allowsImages ? images : []
         )
 
-        let client = OpenAIResponsesClient(endpoint: spec.openAI)
         var answer = ""
         var usage = OpenAIUsage()
         var failed: String?
 
-        for try await event in client.stream(request) {
+        for try await event in responsesClient().stream(request) {
             try Task.checkCancellation()
             switch event {
             case .text(let delta):

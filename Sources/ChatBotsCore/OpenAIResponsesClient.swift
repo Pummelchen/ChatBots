@@ -412,9 +412,34 @@ private final class NoRedirects: NSObject, URLSessionTaskDelegate, Sendable {
     }
 }
 
+/// The client's session, held by the one thing here that can clean up after itself.
+///
+/// `URLSession` is not released when the last reference to it goes. It stays alive — with its delegate
+/// and its connection pool — until it is invalidated, which was measured while this finding was fixed:
+/// a session dropped without invalidating is still alive afterwards, and the same session invalidated
+/// first is not (`AUDIT/baseline/swift64/a201-session-lifetime.log`). A struct cannot do anything when
+/// it is deallocated, so the session lives in a class whose `deinit` is the invalidate (A201).
+final class ResponseSession: Sendable {
+    let session: URLSession
+
+    init(configuration: URLSessionConfiguration, delegate: URLSessionDelegate) {
+        self.session = URLSession(
+            configuration: configuration, delegate: delegate, delegateQueue: nil)
+    }
+
+    deinit {
+        // `finishTasksAndInvalidate` rather than `invalidateAndCancel`: a session released after a turn
+        // has already finished has nothing in flight to cancel, and cancelling is for the caller that is
+        // deliberately giving up on a request it started.
+        session.finishTasksAndInvalidate()
+    }
+}
+
 public struct OpenAIResponsesClient: Sendable {
     private let endpoint: OpenAIEndpoint
-    private let session: URLSession
+    /// The session this client owns. Internal, not private, because the lifetime test holds a weak
+    /// reference to it — the only way to observe that a released client closes it (A201).
+    let responseSession: ResponseSession
 
     public init(endpoint: OpenAIEndpoint) {
         self.endpoint = endpoint
@@ -425,8 +450,8 @@ public struct OpenAIResponsesClient: Sendable {
         // No redirects. The endpoint is validated before the request (`endpointRefusal`), and following
         // a redirect is how a URL that passed that check reaches a host that never did — a cloud
         // endpoint answering 302 to a metadata address, with the body echoed into the snapshot (A141).
-        self.session = URLSession(
-            configuration: configuration, delegate: NoRedirects(), delegateQueue: nil)
+        self.responseSession = ResponseSession(
+            configuration: configuration, delegate: NoRedirects())
     }
 
     /// Everything a request can set. Mirrors the app's seat configuration; fields the
@@ -634,7 +659,7 @@ public struct OpenAIResponsesClient: Sendable {
         urlRequest.httpBody = try JSONSerialization.data(
             withJSONObject: body(for: request), options: [])
 
-        let (bytes, response) = try await session.bytes(for: urlRequest)
+        let (bytes, response) = try await responseSession.session.bytes(for: urlRequest)
         // `flush()` is applied after the loop, below.
 
         guard let http = response as? HTTPURLResponse else {
