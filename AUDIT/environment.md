@@ -25,8 +25,8 @@ below are recorded rather than chosen.
 
 | Tool | Version | Method | Used for |
 | --- | --- | --- | --- |
-| Swift | 6.3.3 (swiftlang-6.3.3.1.3, clang-2100.1.1.101) | Xcode 26.6 (17F113) | build, tests, strict concurrency |
-| SDK | macOS 26.5 | Xcode 26.6 | target platform (package requires `.macOS(.v26)`) |
+| Swift | 6.4 (swiftlang-6.4.0.34.1) | Xcode 27.0 (27A266a) | build, tests, strict concurrency |
+| SDK | macOS 27.0 | Xcode 27.0 | target platform (package requires `.macOS(.v26)`) |
 | `swift-format` | 603.0.0 | brew | formatter + `lint` |
 | `swiftlint` | 0.65.1 | brew | linter |
 | `llvm-cov` | Xcode 21.0.0 toolchain, Homebrew LLVM **23.1.1** | Xcode / brew `llvm` | coverage |
@@ -57,9 +57,9 @@ than this project, those belong to the projects that contain them.
 ## Reproducing this environment
 
 ```sh
-# Xcode 26.6 (Swift 6.3.3) — App Store or developer.apple.com, then:
+# Xcode 27.0 (Swift 6.4) — App Store or developer.apple.com, then:
 sudo xcode-select -s /Applications/Xcode.app
-swift --version                     # expect 6.3.3
+swift --version                     # expect 6.4
 
 brew install swift-format swiftlint llvm gitleaks osv-scanner semgrep ruff pyright shellcheck jq
 ```
