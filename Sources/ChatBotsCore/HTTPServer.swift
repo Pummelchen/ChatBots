@@ -121,9 +121,26 @@ public struct HTTPResponse: Sendable {
 
     /// The bytes to put on the wire, headers included.
     public func serialised(keepAlive: Bool) -> Data {
+        var data = head(keepAlive: keepAlive, contentLength: body.count)
+        data.append(body)
+        return data
+    }
+
+    /// The head for a response whose body is not known when the head is written.
+    ///
+    /// Server-sent events are the one response this server leaves open, so it has no `Content-Length` and
+    /// nothing is appended to the head. It is built by the same code as every other head, which is the
+    /// point: assembling it by hand is how the stream path came to carry none of the security headers
+    /// every other response carries, for a whole class of response (A150).
+    public func streamingHead(keepAlive: Bool = true) -> Data {
+        head(keepAlive: keepAlive, contentLength: nil)
+    }
+
+    /// The head, with a length only when the whole body is in hand.
+    private func head(keepAlive: Bool, contentLength: Int?) -> Data {
         var head = "HTTP/1.1 \(status) \(reason)\r\n"
         head += "Content-Type: \(contentType)\r\n"
-        head += "Content-Length: \(body.count)\r\n"
+        if let contentLength { head += "Content-Length: \(contentLength)\r\n" }
         head += "Cache-Control: no-store\r\n"
         head += "Connection: \(keepAlive ? "keep-alive" : "close")\r\n"
         // The security headers first, then anything the response set itself, so a page that
@@ -134,9 +151,19 @@ public struct HTTPResponse: Sendable {
             head += "\(name): \(value)\r\n"
         }
         head += "\r\n"
-        var data = Data(head.utf8)
-        data.append(body)
-        return data
+        return Data(head.utf8)
+    }
+
+    /// The response that opens a server-sent event stream.
+    ///
+    /// No body and no length: the head is written on its own and the socket stays open, which is what
+    /// makes server-sent events work. It is an `HTTPResponse` so that the stream path is not a second,
+    /// hand-written header assembler — that is the whole of A150 — and `X-Accel-Buffering` is set here
+    /// rather than in the head so that it takes the same route as every other response's own headers.
+    public static func eventStream() -> HTTPResponse {
+        HTTPResponse(
+            contentType: "text/event-stream; charset=utf-8",
+            headers: ["X-Accel-Buffering": "no"])
     }
 
     /// The headers every response carries, with the policy chosen from its content type.
@@ -848,15 +875,12 @@ public final class HTTPServer: @unchecked Sendable {
                     // kind that corrupts or crashes rather than merely reporting a stale value.
                     self.addStream(stream)
                     // Head first, then the opening events, then the socket is left open —
-                    // which is what makes server-sent events work.
-                    let head =
-                        "HTTP/1.1 200 OK\r\n"
-                        + "Content-Type: text/event-stream; charset=utf-8\r\n"
-                        + "Cache-Control: no-store\r\n"
-                        + "X-Accel-Buffering: no\r\n"
-                        + "Connection: keep-alive\r\n"
-                        + "\r\n"
-                    connection.send(content: Data(head.utf8), completion: .contentProcessed { _ in })
+                    // which is what makes server-sent events work. The head comes from the same
+                    // response type every other route answers with, so it carries the same security
+                    // headers; it used to be assembled here by hand, without any of them (A150).
+                    connection.send(
+                        content: HTTPResponse.eventStream().streamingHead(),
+                        completion: .contentProcessed { _ in })
                     for payload in initial { stream.send(payload, event: "snapshot") }
                     // The connection stays open, so it still has to be watched: this is the
                     // only place that learns the client has gone, and `finish` is the only code
