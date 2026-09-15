@@ -3592,6 +3592,23 @@
       "commit": "a5288a1",
       "notes": "This is A118 one audit later, and the fix is deliberately not another copied count: the handover now says where the number lives instead of repeating it. The 2026-09-13 history is kept verbatim below a clear boundary rather than rewritten, because §0 forbids rewriting history and because the reasoning in it is still the useful part.",
       "blocked_reason": null
+    },
+    {
+      "id": "A212",
+      "severity": "S1",
+      "unit": "workspace / audit tooling",
+      "file_line": "~/Downloads/chatbots-wiki-ro/.git/config, ~/Downloads/mcps-wiki-ro/.git/config (outside the audited tree)",
+      "title": "Two wiki clones carried a GitHub personal access token in plaintext inside their origin URL, so the credential that can write to the wikis and to this repository sat in a readable file",
+      "category": "unsafe",
+      "status": "DONE",
+      "host_used": "node1",
+      "discovered_by": "Phase C — the post-push wiki sync check the standing instructions require after every push",
+      "evidence_before": "`git -C ~/Downloads/chatbots-wiki-ro remote -v` printed the `origin` URL as `https://Pummelchen:<fine-grained-pat>@github.com/Pummelchen/ChatBots.wiki.git`, and `mcps-wiki-ro` carried the same shape for `MCPSearch.wiki.git`. Both were plaintext in `.git/config`. `aisessionserver-wiki` was clean, as were `ChatBots/.git/config` and the other repository clones. This is the credential that can push to these repositories: `gh` is logged in as `Pummelchen` from `~/.config/gh/hosts.yml`, and the same helper authenticated a push of the audit branch minutes earlier. The audited repository itself is unaffected — gitleaks reported 0 findings over the full history in Phase A, and the token appears in no tracked file.",
+      "fix_summary": "Both remote URLs were rewritten to the bare `https://github.com/...` form with `git remote set-url`, removing the embedded credential. `~/.gitconfig` already routes `github.com` through `gh auth git-credential`, so authentication continues to work without a secret in any URL: a fetch against the rewritten `chatbots-wiki-ro` was run afterwards and succeeded, and `~/.config/gh/hosts.yml` (mode 0600) remains the one place the token is stored.",
+      "evidence_after": "`grep` for `github_pat_`/`ghp_` across `.git/config` of all six clones in `~/Downloads/` now reports clean for every one, where the same check before the fix reported two. The rewritten URLs are named in `AUDIT/environment.md` (\"A credential was sitting in plaintext in two wiki clones (A212)\") with the shape of what was there and what replaced it, and with the recommendation that the token be rotated: it was displayed on screen while being found, so it should be treated as disclosed even though it was never committed.",
+      "commit": "479faab",
+      "notes": "Recorded rather than fixed silently, and filed even though the file is outside the tree this audit has scope over: the brief limits the audit to Pummelchen/ChatBots, so there is no repository change to point at and `verify-done-commits.sh` reports this task as skipped rather than backed. The same finding is why the ChatBots clone needed its URL fixed too — it carried a bare `Pummelchen:@` userinfo with no password, which is what made `git push` fail with \"Invalid username or token\" while reads (anonymous, on a public repository) kept working. That fix is also local config and is described in this entry rather than committed.",
+      "blocked_reason": null
     }
   ]
 }
