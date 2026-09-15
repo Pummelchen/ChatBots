@@ -24,7 +24,8 @@ struct ContentView: View {
         // Minimums only — no maximum — so the window can be dragged to any size. The floor
         // rises with the text size, since a window that fits at 100% clips at 200%.
         .frame(
-            minWidth: 700 * zoom.scale, idealWidth: 1280, minHeight: 460, idealHeight: 780
+            minWidth: zoom.minimumWindowSize.width, idealWidth: 1280,
+            minHeight: zoom.minimumWindowSize.height, idealHeight: 780
         )
         .safeAreaInset(edge: .top, spacing: 0) {
             // The connection state is shown here too. It was set on every failure and never

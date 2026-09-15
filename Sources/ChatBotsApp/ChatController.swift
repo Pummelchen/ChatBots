@@ -601,12 +601,6 @@ public final class ChatController: ObservableObject {
         pacer.backlog(agentID: agentID) > 0
     }
 
-    /// True while any seat is still revealing text.
-    public var isDisplayingAnything: Bool { pacer.isDraining }
-
-    /// Characters per second this conversation's models actually produce, for display.
-    public private(set) var measuredGenerationRate: Double = 0
-
     /// Applies buffered *non-text* deltas to the panes.
     ///
     /// Streamed text no longer passes through here: it goes into the pacer, which releases
@@ -640,7 +634,8 @@ public final class ChatController: ObservableObject {
         }
         let rate = Double(sample.characters) / elapsed
         rateSamples[agentID] = (0, now)
-        measuredGenerationRate = rate
+        // The rate the reveal is paced at, and the only thing the measurement is for: it was also
+        // assigned to a `measuredGenerationRate` that no view read (A177).
         pacer.observe(agentID: agentID, charactersPerSecond: rate)
     }
 

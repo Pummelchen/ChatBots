@@ -177,10 +177,6 @@ final class ThemeStore: ObservableObject {
     @AppStorage("windowMode") var windowMode: WindowMode = .split
 
     var palette: AppPalette { AppPalette.resolve(mode) }
-
-    func toggle() {
-        mode = mode == .original ? .black : .original
-    }
 }
 
 enum AgentTheme {

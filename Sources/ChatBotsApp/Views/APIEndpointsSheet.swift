@@ -53,7 +53,7 @@ struct APIEndpointsSheet: View {
 
     private func seatForm(_ seat: Int) -> some View {
         let pane = controller.panes[seat]
-        let usesAPI = pane.spec.backend == .openAIResponses
+        let usesAPI = store.isAPI(pane.spec)
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
@@ -147,7 +147,7 @@ struct APIEndpointsSheet: View {
     private func useAPIBinding(_ seat: Int) -> Binding<Bool> {
         Binding(
             get: { controller.panes.indices.contains(seat)
-                && controller.panes[seat].spec.backend == .openAIResponses },
+                && store.isAPI(controller.panes[seat].spec) },
             set: { useAPI in
                 let backend: AgentSpec.Backend = useAPI ? .openAIResponses : .mlx
                 controller.setBackend(backend, for: controller.panes[seat].id)

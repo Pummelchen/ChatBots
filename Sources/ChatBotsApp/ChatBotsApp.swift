@@ -86,12 +86,6 @@ struct ChatBotsApp: App {
     @StateObject private var theme = ThemeStore()
     @StateObject private var zoom = ZoomStore()
 
-    /// Below this the two panes stop being usable side by side. Scaled with the text size:
-    /// at 200% text the same 720 points would clip every label, so the floor rises with it.
-    private var minimumWindowSize: NSSize {
-        NSSize(width: 720 * zoom.scale, height: 480 * (1 + (zoom.scale - 1) * 0.5))
-    }
-
     var body: some Scene {
         // The title bar is left fully standard: close / minimize / zoom, double-click to
         // zoom, drag to move, drag edges to resize. `WindowConfigurator` only sets the
@@ -135,7 +129,9 @@ struct ChatBotsApp: App {
                 // The black theme is dark-only regardless of the Mac's setting; the
                 // original theme follows the system.
                 .preferredColorScheme(theme.mode == .black ? .dark : nil)
-                .background(WindowConfigurator(palette: theme.palette))
+                .background(
+                    WindowConfigurator(
+                        palette: theme.palette, minimumSize: zoom.minimumWindowSize))
         }
         .defaultSize(width: 1280, height: 780)
         // `.contentMinSize` would cap the window at the content's maximum size — with a
@@ -200,12 +196,19 @@ struct ChatBotsApp: App {
 
                 Divider()
 
-                Button("Bigger Text") { zoom.step(larger: true) }
-                    .keyboardShortcut("+", modifiers: .command)
-                    .disabled(!zoom.canEnlarge)
-                Button("Smaller Text") { zoom.step(larger: false) }
-                    .keyboardShortcut("-", modifiers: .command)
-                    .disabled(!zoom.canReduce)
+                // The label says where the step goes, which is what the property beside it was
+                // written for and nothing read (A177). It falls back to the plain name at the end of
+                // the range, which is also where the item is disabled.
+                Button(zoom.nextLargerPercent.map { "Bigger Text (\($0)%)" } ?? "Bigger Text") {
+                    zoom.step(larger: true)
+                }
+                .keyboardShortcut("+", modifiers: .command)
+                .disabled(!zoom.canEnlarge)
+                Button(zoom.nextSmallerPercent.map { "Smaller Text (\($0)%)" } ?? "Smaller Text") {
+                    zoom.step(larger: false)
+                }
+                .keyboardShortcut("-", modifiers: .command)
+                .disabled(!zoom.canReduce)
                 Button("Actual Text Size") { zoom.reset() }
                     .keyboardShortcut("0", modifiers: .command)
                     .disabled(zoom.percent == zoom.resetPercent)
@@ -304,13 +307,15 @@ enum HelpWindow {
 /// handles frame autosave so the size and position survive relaunch.
 struct WindowConfigurator: NSViewRepresentable {
     let palette: AppPalette
+    /// The floor for a drag, from the one rule in `ZoomStore` rather than a number of its own (A177).
+    let minimumSize: CGSize
 
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async {
             guard let window = view.window else { return }
             window.title = "ChatBots"
-            window.contentMinSize = NSSize(width: 720, height: 480)
+            window.contentMinSize = NSSize(width: minimumSize.width, height: minimumSize.height)
             window.collectionBehavior.insert(.fullScreenPrimary)
             // Traffic lights are only hidden by `.fullSizeContentView`; make sure nothing
             // has turned them off.
@@ -327,7 +332,11 @@ struct WindowConfigurator: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {
         guard let window = nsView.window else { return }
-        DispatchQueue.main.async { applyAppearance(to: window) }
+        DispatchQueue.main.async {
+            // A text size can change while the window is open, and the floor moves with it.
+            window.contentMinSize = NSSize(width: minimumSize.width, height: minimumSize.height)
+            applyAppearance(to: window)
+        }
     }
 
     /// Sizes and centres the window so it always fits the screen it opens on.
