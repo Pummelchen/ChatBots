@@ -30,12 +30,12 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 216 |
-| DONE | 181 |
-| START | 35 |
+| DONE | 182 |
+| START | 34 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 35
+### Open — 34
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -61,7 +61,6 @@ been run.
 | A178 | S3 | START | — | docs / false user-facing text | Two user-facing strings say the models run in-process, which stopped being true when the engine became a separate process |
 | A179 | S3 | START | — | style / dead injection | Duplicated and mid-sentence-truncated comments, and an @EnvironmentObject with no @Published property and no reader |
 | A180 | S3 | START | — | deps / deprecated API | `NSApp.activate(ignoringOtherApps:)` is API_TO_BE_DEPRECATED in the macOS 27 SDK |
-| A187 | S2 | START | — | supply chain / CI | The CI downloads shellcheck, gitleaks and osv-scanner and never verifies them, while the file's header claims pinned tools |
 | A188 | S3 | START | — | tools / injection | --port and --engine are interpolated into sed programs with no validation, so a crafted value injects into the generated Caddyfile that is then run |
 | A189 | S3 | START | — | tools / process safety | The pid-ownership check is a substring match, so a recycled pid belonging to an unrelated process can be signalled |
 | A190 | S3 | START | — | tools / process safety | The stop path kills by name directly beneath a comment that says it kills by pid |
@@ -184,7 +183,7 @@ been run.
 | A184 | S2 | DONE | 40a9982 | tools / packaging | A missing SwiftPM bin path silently skips the metallib copy and the script still exits 0, so a bundle can ship that fails at runtime |
 | A185 | S2 | DONE | 52804c0 | audit tooling / scanner | The waiver checker ignores semgrep's `errors` array and treats a missing `results` key as zero findings, so a failed scan reports a clean pass |
 | A186 | S2 | DONE | 6524b3c | installer / model download | A checkpoint file whose repository name contains a directory uses it verbatim, so the download fails and the install dies |
-| A187 | S2 | START | — | supply chain / CI | The CI downloads shellcheck, gitleaks and osv-scanner and never verifies them, while the file's header claims pinned tools |
+| A187 | S2 | DONE | d01c937 | supply chain / CI | The CI downloads shellcheck, gitleaks and osv-scanner and never verifies them, while the file's header claims pinned tools |
 | A188 | S3 | START | — | tools / injection | --port and --engine are interpolated into sed programs with no validation, so a crafted value injects into the generated Caddyfile that is then run |
 | A189 | S3 | START | — | tools / process safety | The pid-ownership check is a substring match, so a recycled pid belonging to an unrelated process can be signalled |
 | A19 | S2 | DONE | 0de3123 | process / git history | A DONE task was committed with its evidence and its ledger entry but without its fix: 948ea29 claims A14 and A17 and contains no source change |
