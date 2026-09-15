@@ -133,3 +133,14 @@ A99 by measurement rather than by reading — the shipped `Caddyfile` in front o
 an unknown conversation id so that the response body identifies which server answered. `caddy` is not
 required to build or run the project; the packaged app and the installer do not use it.
 
+## Toolchain move to Swift 6.4 (2026-09-15)
+
+The package now declares `swift-tools-version: 6.4` and the Mac gates run on Swift 6.4 / Xcode 27.
+Verified locally: `swift build` clean (warnings are errors in the manifest) and the full suite green
+— 824 tests in 139 suites.
+
+GitHub's CodeQL *default setup* could not follow: its autobuild image ships Swift 6.3.3 and cannot
+parse a 6.4 manifest (`package 'sources' is using Swift tools version 6.4.0 but the installed version
+is 6.3.3`), so `swift` was removed from this repository's CodeQL default setup. Advanced setup on the
+`xcode-27` image with `build-mode: manual`, as MCPSearch uses, is the way to bring Swift CodeQL back;
+until then the Swift gates remain the local/CI ones above.
