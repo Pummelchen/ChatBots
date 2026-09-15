@@ -30,12 +30,12 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 214 |
-| DONE | 166 |
-| START | 48 |
+| DONE | 167 |
+| START | 47 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 48
+### Open — 47
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -60,7 +60,6 @@ been run.
 | A163 | S3 | START | — | docs / correctness | The Caddyfile says the engine uses the passed Host to build the page's own links, but the replay script never reads the shareBase field it is written into |
 | A164 | S3 | START | — | unsafe / tooling | The DevTools client uses a fixed shared temporary profile path, so a second run or a hostile local process can interfere with it |
 | A170 | S2 | START | — | test coverage | Near-zero coverage on three paths the product depends on, including the web-search tool the research mode is built around |
-| A172 | S2 | START | — | dead UI | The device-profile badge is hidden in markup and never unhidden, so the detected profile and viewport are computed and discarded |
 | A173 | S2 | START | — | divergent duplicate rule | The web disables removing an attachment once a conversation runs while the app and the engine both allow it, so the two front ends disagree |
 | A174 | S2 | START | — | data loss / UX | Both front ends clear the moderator's draft before the send is confirmed, so a refused send silently discards what was typed |
 | A175 | S2 | START | — | error handling | The client is stored before its connection is verified, so the specific 'could not reach the engine' reason is overwritten by a generic transport error |
@@ -181,7 +180,7 @@ been run.
 | A17 | S1 | DONE | 0de3123 | HTTPServer | streams is appended on the main actor without the lock that every other access takes |
 | A170 | S2 | START | — | test coverage | Near-zero coverage on three paths the product depends on, including the web-search tool the research mode is built around |
 | A171 | S2 | DONE | c836585 | logic / ordering | The web client applies snapshots unconditionally while the Swift client guards with the monotonic revision, so a late reply regresses the page |
-| A172 | S2 | START | — | dead UI | The device-profile badge is hidden in markup and never unhidden, so the detected profile and viewport are computed and discarded |
+| A172 | S2 | DONE | 501c521 | dead UI | The device-profile badge is hidden in markup and never unhidden, so the detected profile and viewport are computed and discarded |
 | A173 | S2 | START | — | divergent duplicate rule | The web disables removing an attachment once a conversation runs while the app and the engine both allow it, so the two front ends disagree |
 | A174 | S2 | START | — | data loss / UX | Both front ends clear the moderator's draft before the send is confirmed, so a refused send silently discards what was typed |
 | A175 | S2 | START | — | error handling | The client is stored before its connection is verified, so the specific 'could not reach the engine' reason is overwritten by a generic transport error |
