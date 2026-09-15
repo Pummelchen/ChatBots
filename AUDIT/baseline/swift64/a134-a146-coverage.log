@@ -43,11 +43,15 @@ $ bash tools/audit-checks.sh
   
   All 6 Mac-only gates passed.
 
+
 ## 3. what the larger file set is: the report split by target
 
-$ (the same coverage.log, summed per target)
-  ChatBotsCore       lines   1501   80.5% covered
-  ChatBotsApp        lines    870    3.3% covered
+$ (the same coverage.log, summed per target, lines covered)
+  target                lines   covered
+  ChatBotsCore          10994    83.6%
+  ChatBotsApp            8425     1.6%
 
-  ChatBotsCore is unchanged at 83.61%, which is the baseline's 83.59% within rounding:
-  the drop in the TOTAL is the application target entering the report, not a regression.
+  ChatBotsCore is unchanged at 83.61%, which is the baseline's 83.59% within rounding, so the
+  move in the TOTAL is the application target entering the report rather than a regression.
+  The first version of this table read the function columns instead of the line columns and
+  printed 1 501 and 870; corrected in the commit that follows it.
