@@ -30,12 +30,12 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 214 |
-| DONE | 170 |
-| START | 44 |
+| DONE | 171 |
+| START | 43 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 44
+### Open — 43
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -76,7 +76,6 @@ been run.
 | A193 | S3 | START | — | tools / network robustness | Model and Metal downloads have no transfer deadline, so a stalled connection hangs the installer indefinitely |
 | A194 | S3 | START | — | docs / drift | Several tool comments and help texts describe behaviour that changed or never existed |
 | A195 | S3 | START | — | docs / TLS trust | The client never enforces the pinned fingerprint while another comment claims pinning is meaningful |
-| A199 | S2 | START | — | prompts / identity | The social engine keys and words itself by seat id while every other prompt surface uses display names |
 | A201 | S2 | START | — | resource lifecycle | A new client and a never-invalidated URLSession are created for every turn |
 | A205 | S3 | START | — | dead code / wrong label | The .richText case is unreachable and an RTF file is labelled 'Word' |
 | A206 | S3 | START | — | dead code | Six declarations are written or named but never used, one with a documented rule the code does not implement |
@@ -206,7 +205,7 @@ been run.
 | A196 | S1 | DONE | e4a8e16 | inference / arithmetic | The reasoning ceiling under-counts tokens, so the thinking level the UI promises is not the one enforced |
 | A197 | S1 | DONE | a2d5b80 | untrusted input / resource | Child output is unbounded and the conversion timeout cannot fire while output flows |
 | A198 | S1 | DONE | 2918d0b | concurrency / lifecycle | A session accepted during stop() is orphaned and keeps serving |
-| A199 | S2 | START | — | prompts / identity | The social engine keys and words itself by seat id while every other prompt surface uses display names |
+| A199 | S2 | DONE | 1a331f5 | prompts / identity | The social engine keys and words itself by seat id while every other prompt surface uses display names |
 | A20 | S1 | DONE | e9d45ef | web front end | Stored DOM XSS: the live-pane header interpolates the moderator-supplied seat name into innerHTML |
 | A200 | S2 | DONE | daa6227 | model reporting | The MLX model label is a constant, so another checkpoint is misreported to the user and to the model |
 | A201 | S2 | START | — | resource lifecycle | A new client and a never-invalidated URLSession are created for every turn |
