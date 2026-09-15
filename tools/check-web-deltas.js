@@ -169,6 +169,15 @@ console.log("web/deltas.js");
   // checked is that the page both reads `?profile` and applies it to the badge.
   check("the debug label reads ?profile", /has\("profile"\)/.test(appJS));
   check("and the badge is shown only when it is asked for", /badge\.hidden = !profileRequested\(\)/.test(appJS));
+
+  // A173: the page disables removing an attachment on `canAttach`, which turned out to be *right* —
+  // `ConversationEngine.setAttachments` refuses once `turnsCompleted > 0`, so the engine's rule is the
+  // page's. What was wrong was the other two sides: `EngineService` discarded that refusal and
+  // reported success, and the Mac app's ✕ was `.disabled(false)`. The case below pins the page's side
+  // of the agreement so a future edit cannot quietly disagree again.
+  check(
+    "the page gates removing an attachment on the same flag the engine uses",
+    /remove\.disabled = !state\.snapshot\.canAttach/.test(appJS));
 }
 
 if (failures === 0) {

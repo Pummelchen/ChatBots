@@ -179,11 +179,20 @@ public final class EngineService {
             return await addAttachment(filename: filename, contents: contents)
 
         case .removeAttachment(let id):
-            engine.setAttachments(engine.attachments.filter { $0.id.uuidString != id })
+            // The result is checked. `ConversationEngine.setAttachments` refuses once a turn has
+            // completed, and this discarded the `false`: the reply was a state identical to the one the
+            // caller already had, so a removal that did not happen was reported as one that did — and
+            // the Mac app's ✕ is always enabled, so a user could click it and see nothing at all
+            // (A173). The rule the engine enforces is the one the web page already gates on.
+            guard engine.setAttachments(engine.attachments.filter { $0.id.uuidString != id }) else {
+                return .refused(Self.sourceMaterialIsFixed)
+            }
             return .state(snapshot())
 
         case .clearAttachments:
-            engine.setAttachments([])
+            guard engine.setAttachments([]) else {
+                return .refused(Self.sourceMaterialIsFixed)
+            }
             return .state(snapshot())
 
         // ── Reads ────────────────────────────────────────────────────────────────────
@@ -393,6 +402,13 @@ public final class EngineService {
     /// The `defer` still removes the staging directory, and it is still correct across the
     /// move: `Task.value` is awaited before it runs, so the file outlives the read and not the
     /// request. A conversion that throws is reported as the same refusal it was before.
+    /// Why an attachment change was refused, in the words the app and the page both use.
+    ///
+    /// One string rather than two, because the app's disabled ✕, the page's disabled ✕ and this
+    /// refusal are the same rule (A173).
+    static let sourceMaterialIsFixed =
+        "Source material cannot be changed once the conversation has started"
+
     /// How much user-supplied text one field may carry.
     ///
     /// Every value bounded by this enters the conversation and is re-sent inside every `APISnapshot` to
@@ -465,7 +481,9 @@ public final class EngineService {
             guard !document.kind.isImage || engine.allSeatsSupportVision else {
                 return .refused("images need every seat to support vision")
             }
-            engine.setAttachments(engine.attachments + [document])
+            guard engine.setAttachments(engine.attachments + [document]) else {
+                return .refused(Self.sourceMaterialIsFixed)
+            }
             return .state(snapshot())
         }
     }

@@ -52,7 +52,8 @@ struct AttachmentBar: View {
                         ForEach(controller.attachments) { document in
                             AttachmentChip(
                                 document: document,
-                                isLoaded: !controller.attachmentsNotLoaded.contains(document.id)
+                                isLoaded: !controller.attachmentsNotLoaded.contains(document.id),
+                                canRemove: controller.canAttachFiles
                             ) {
                                 controller.removeAttachment(document.id)
                             }
@@ -83,6 +84,10 @@ struct AttachmentChip: View {
     /// notice is dismissable, and once it is gone an ordinary-looking chip implies the models
     /// can read material they cannot (audit A112).
     let isLoaded: Bool
+    /// Whether removing is allowed at all. The engine refuses a change once a turn has completed, the
+    /// page gates its ✕ on the same flag, and this is that flag passed down rather than the chip having
+    /// to know where it comes from (A173).
+    let canRemove: Bool
     let onRemove: () -> Void
 
     @Environment(\.themePalette) private var palette
@@ -154,8 +159,15 @@ struct AttachmentChip: View {
                     .foregroundStyle(palette.textTertiary)
             }
             .buttonStyle(.plain)
-            .disabled(false)
-            .help("Remove \(document.name)")
+            // The same rule the engine enforces and the page gates on (A173): the ✕ used to be
+            // `.disabled(false)`, so a click during a running conversation did nothing at all — the
+            // engine refused the change and the service reported success.
+            .disabled(!canRemove)
+            .help(
+                canRemove
+                    ? "Remove \(document.name)"
+                    : "Source material cannot be changed once the conversation has started"
+            )
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
