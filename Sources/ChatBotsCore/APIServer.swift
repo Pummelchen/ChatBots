@@ -495,7 +495,8 @@ public final class APIServer {
         // because the path is a prefix rather than a fixed route, and transport-specific rather
         // than an engine command: it is a page, and the engine does not render pages.
         if request.method == "GET", request.path.hasPrefix("/s/") {
-            return sharedPage(id: String(request.path.dropFirst(3)), host: request.headers["host"])
+            return await sharedPage(
+                id: String(request.path.dropFirst(3)), host: request.headers["host"])
         }
 
         // Transport-specific, and none of it is the engine's business.
@@ -583,27 +584,17 @@ public final class APIServer {
     /// 404 rather than a blank page for an id that names nothing: a shared link that opens an
     /// empty conversation is indistinguishable from one whose transcript was lost, and the
     /// reader has no way to tell which happened.
-    private func sharedPage(id: String, host: String?) -> HTTPResponse {
-        guard let uuid = UUID(uuidString: id), let record = service.store.conversation(id: uuid)
-        else {
-            // A page that says so, rather than a bare 404 body: the reader followed a link
-            // somebody sent them, and "no conversation with that link" is the answer they need.
-            let missing = [
-                "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">",
-                "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
-                "<title>No conversation with that link</title></head>",
-                "<body style=\"font:15px/1.5 -apple-system,system-ui,sans-serif;max-width:640px;"
-                    + "margin:60px auto;padding:0 16px\">",
-                "<h1 style=\"font-size:19px\">No conversation with that link</h1>",
-                "<p>It may have been deleted, or the link may have been copied incompletely.</p>",
-                "</body></html>",
-            ].joined(separator: "\n")
-            return HTTPResponse(
-                status: 404, contentType: "text/html; charset=utf-8",
-                body: Data(missing.utf8),
-                // The default page policy refuses inline style, and this page carries one on
-                // its body. It carries no script, so the replacement grants style only.
-                headers: ["Content-Security-Policy": HTTPResponse.inlineStylePagePolicy])
+    /// The replay page for a shared link.
+    ///
+    /// The lookup reads the whole conversation index, because that is one file (A137), and it happens
+    /// off the main actor: this handler is on the main actor and so is the engine's turn loop, so an
+    /// index read while a conversation was streaming stalled the stream (A147). A malformed id never
+    /// reaches the store at all, which is what it did before as well — the difference is that a
+    /// well-formed id nobody has heard of no longer decodes the history to find that out.
+    private func sharedPage(id: String, host: String?) async -> HTTPResponse {
+        guard let uuid = UUID(uuidString: id) else { return sharedPageNotFound() }
+        guard let record = await service.store.conversationOffMainActor(id: uuid) else {
+            return sharedPageNotFound()
         }
         // The page's own links go back to the origin that served it, so a phone that reached the
         // page through Caddy gets Caddy's address rather than the engine's loopback port — which is
@@ -617,6 +608,27 @@ public final class APIServer {
             // The share page carries its own inline stylesheet and replay script, so it says so
             // rather than inheriting the interface's policy, which has no inline grant.
             headers: ["Content-Security-Policy": HTTPResponse.inlinePagePolicy])
+    }
+
+    /// A page that says the link does not work, rather than a bare 404 body: the reader followed a
+    /// link somebody sent them, and "no conversation with that link" is the answer they need.
+    private func sharedPageNotFound() -> HTTPResponse {
+        let missing = [
+            "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">",
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+            "<title>No conversation with that link</title></head>",
+            "<body style=\"font:15px/1.5 -apple-system,system-ui,sans-serif;max-width:640px;"
+                + "margin:60px auto;padding:0 16px\">",
+            "<h1 style=\"font-size:19px\">No conversation with that link</h1>",
+            "<p>It may have been deleted, or the link may have been copied incompletely.</p>",
+            "</body></html>",
+        ].joined(separator: "\n")
+        return HTTPResponse(
+            status: 404, contentType: "text/html; charset=utf-8",
+            body: Data(missing.utf8),
+            // The default page policy refuses inline style, and this page carries one on its body.
+            // It carries no script, so the replacement grants style only.
+            headers: ["Content-Security-Policy": HTTPResponse.inlineStylePagePolicy])
     }
 
     /// The mode a query asks about, defaulting to entertainment.

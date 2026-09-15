@@ -261,10 +261,13 @@ public final class EngineService {
 
         // ── Saved conversations ──────────────────────────────────────────────────────
         case .listSavedConversations:
-            return .savedConversations(store.list().map(Self.summary))
+            // Off the main actor: this decodes the whole index, and the engine's turn loop is on
+            // the same actor (A147).
+            return .savedConversations(await store.listOffMainActor().map(Self.summary))
 
         case .loadSavedConversation(let id):
-            guard let uuid = UUID(uuidString: id), let record = store.conversation(id: uuid)
+            guard let uuid = UUID(uuidString: id),
+                let record = await store.conversationOffMainActor(id: uuid)
             else {
                 return .refused("no saved conversation with that id")
             }
@@ -278,7 +281,9 @@ public final class EngineService {
                 return .refused("that is not a valid id")
             }
             _ = store.delete(id: uuid)
-            return .savedConversations(store.list().map(Self.summary))
+            // Off the main actor: this decodes the whole index, and the engine's turn loop is on
+            // the same actor (A147).
+            return .savedConversations(await store.listOffMainActor().map(Self.summary))
 
         case .newConversation:
             engine.startNewConversation()

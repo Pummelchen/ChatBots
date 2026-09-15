@@ -100,6 +100,13 @@ public struct ConversationStore: Sendable {
     /// conversation is not accidentally committed — they are private by nature.
     public var directory: URL
 
+    /// How the index file's bytes are read.
+    ///
+    /// Injected for one test (A147): proving that the decode happens off the main actor needs the read
+    /// to be *in flight* while the question is asked, and a read the test controls is the difference
+    /// between measuring that and racing it. Nothing in the app sets it; the default is the real read.
+    var readIndex: @Sendable (URL) -> Data? = { try? Data(contentsOf: $0) }
+
     public init(directory: URL) {
         self.directory = directory
     }
@@ -208,6 +215,32 @@ public struct ConversationStore: Sendable {
     /// Just the summaries, which is what a list needs.
     public func list() -> [StoredConversation] { load() }
 
+    /// The same read as `list()`, off the main actor.
+    ///
+    /// The index is one JSON file holding every kept conversation, so reading it decodes them all —
+    /// that is the store's shape (a single atomically-replaced file, A137) and this does not change
+    /// it. What it changes is *where* the decode happens. Everything that serves a request is on the
+    /// main actor, and so is the engine's turn loop, so a share link or a **Kept** list opened while a
+    /// conversation was streaming stalled the stream for the length of the decode — hundreds of
+    /// milliseconds for a full history. A15 fixed document conversion the same way, for the same
+    /// reason.
+    ///
+    /// The synchronous `list()` and `conversation(id:)` stay: a caller that already runs off the main
+    /// actor, and every test, can keep using them.
+    public func listOffMainActor() async -> [StoredConversation] {
+        await Task.detached(priority: .userInitiated) { self.list() }.value
+    }
+
+    /// The conversation with this id, read off the main actor.
+    ///
+    /// See `listOffMainActor()` for why the read is the expensive part and why it matters which actor
+    /// it runs on (A147).
+    public func conversationOffMainActor(id: UUID) async -> StoredConversation? {
+        await Task.detached(priority: .userInitiated) {
+            self.load().first { $0.id == id }
+        }.value
+    }
+
     /// Every record in the file, including those this build cannot read.
     ///
     /// `nil` means the file exists but cannot be decoded at all. That is deliberately not the
@@ -219,7 +252,7 @@ public struct ConversationStore: Sendable {
             // reporting an empty history, so the repair is automatic for anyone already affected.
             return readTemporary()
         }
-        guard let data = try? Data(contentsOf: indexURL) else { return nil }
+        guard let data = readIndex(indexURL) else { return nil }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return try? decoder.decode([StoredConversation].self, from: data)
@@ -231,7 +264,7 @@ public struct ConversationStore: Sendable {
     private func readTemporary() -> [StoredConversation]? {
         let temporary = directory.appending(path: "conversations.json.tmp")
         guard FileManager.default.fileExists(atPath: temporary.path),
-            let data = try? Data(contentsOf: temporary)
+            let data = readIndex(temporary)
         else { return [] }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
