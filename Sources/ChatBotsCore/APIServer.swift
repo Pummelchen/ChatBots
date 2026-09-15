@@ -342,6 +342,48 @@ public final class APIServer {
         self.service.shareBase = shareBase ?? "http://127.0.0.1:\(port)"
     }
 
+    /// Why a state-changing request must be refused, or nil when it may proceed.
+    ///
+    /// Two headers do the work, and each closes a different hole (A136).
+    ///
+    /// * **`Content-Type` must be `application/json`.** The engine only ever reads JSON, and a
+    ///   browser cannot send that cross-origin without a preflight — which this server does not
+    ///   answer with an allow-origin (A75), so the preflight fails and the request never arrives.
+    ///   A cross-origin `text/plain` POST is a *simple request* that skips the preflight entirely,
+    ///   which is how a page the user merely visited could drive the engine, and (through
+    ///   `/api/seat`) repoint a cloud seat at a host the attacker controlled.
+    /// * **When `Origin` is present it must be the host the request was addressed to.** Caddy
+    ///   overwrites `Host` with the upstream, so the original is read from `X-Forwarded-Host` when
+    ///   it is there. Ports are ignored on purpose: the engine's port is not Caddy's.
+    ///
+    /// A client that sends neither header — `curl`, the CLI, a script — is unaffected, and a
+    /// *same-origin* browser request carries an `Origin` matching `X-Forwarded-Host`.
+    nonisolated static func crossOriginRefusal(for request: HTTPRequest) -> HTTPResponse? {
+        guard request.method != "GET", request.method != "HEAD" else { return nil }
+
+        // Origin first: a cross-origin request is refused *as* cross-origin whatever its body, so
+        // the answer says what was wrong. A preflight carries no body at all, and answering it 415
+        // would name the wrong reason.
+        if let origin = request.headers["origin"], !origin.isEmpty {
+            let addressed = request.headers["x-forwarded-host"] ?? request.headers["host"] ?? ""
+            let originHost = URL(string: origin)?.host ?? ""
+            let addressedHost = addressed.split(separator: ":").first.map(String.init) ?? addressed
+            guard !originHost.isEmpty, originHost == addressedHost else {
+                return .error("cross-origin request refused", status: 403)
+            }
+        }
+
+        if request.headers["sec-fetch-site"]?.lowercased() == "cross-site" {
+            return .error("cross-origin request refused", status: 403)
+        }
+
+        let contentType = request.headers["content-type"]?.lowercased() ?? ""
+        guard contentType.hasPrefix("application/json") else {
+            return .error("this endpoint accepts application/json only", status: 415)
+        }
+        return nil
+    }
+
     /// A `Host` header that is safe to reflect into a URL, or nil.
     ///
     /// Reflecting the header is how a share link comes back to the origin that actually served the
@@ -410,6 +452,8 @@ public final class APIServer {
     // MARK: - Routing
 
     func handle(_ request: HTTPRequest) async -> HTTPResponse {
+        // Anything that could change state has to be a same-origin JSON request (A136).
+        if let refusal = Self.crossOriginRefusal(for: request) { return refusal }
         let response = await route(request)
         // Anything that is not an API route may be a static asset, which is how the web
         // interface is served when Caddy is not in front.

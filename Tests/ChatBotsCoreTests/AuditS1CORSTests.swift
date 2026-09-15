@@ -107,7 +107,11 @@ struct AuditS1CORSTests {
         let http = try #require(response as? HTTPURLResponse)
 
         #expect(http.statusCode != 204, "a preflight was answered as though it were allowed")
-        #expect(http.statusCode == 404, "there is no OPTIONS route; the honest answer is 404")
+        // This asserted 404 — "there is no OPTIONS route" — which was the pre-A136 mechanism's
+        // byproduct: the request fell through to the default. A136 refuses a cross-origin request
+        // explicitly instead, so the honest answer is now 403 and it names the reason. The property
+        // under test is unchanged: a cross-origin write gains nothing (A209).
+        #expect(http.statusCode == 403, "a cross-origin preflight must be refused as cross-origin")
         for header in crossOriginHeaders {
             #expect(http.value(forHTTPHeaderField: header) == nil)
         }

@@ -180,8 +180,16 @@ public struct ConversationStore: Sendable {
         // truncated file where a conversation used to be.
         let temporary = directory.appending(path: "conversations.json.tmp")
         try data.write(to: temporary, options: .atomic)
-        _ = try? FileManager.default.removeItem(at: indexURL)
-        try FileManager.default.moveItem(at: temporary, to: indexURL)
+        // One atomic step. This used to remove the index and then move the replacement into its
+        // place, which left a window in which there was no index at all: a crash or a failed move
+        // there lost every kept conversation, and the complete `.tmp` was never read back — so the
+        // history appeared empty rather than damaged (A137). `replaceItemAt` is a rename on APFS,
+        // and the branch below only runs on the first save, when there is nothing to replace.
+        if FileManager.default.fileExists(atPath: indexURL.path) {
+            _ = try FileManager.default.replaceItemAt(indexURL, withItemAt: temporary)
+        } else {
+            try FileManager.default.moveItem(at: temporary, to: indexURL)
+        }
     }
 
     // MARK: - Reading
@@ -205,8 +213,26 @@ public struct ConversationStore: Sendable {
     /// `nil` means the file exists but cannot be decoded at all. That is deliberately not the
     /// same as `[]`: a save that treated it as empty would overwrite bytes it never read.
     private func readAll() -> [StoredConversation]? {
-        guard FileManager.default.fileExists(atPath: indexURL.path) else { return [] }
+        guard FileManager.default.fileExists(atPath: indexURL.path) else {
+            // A store damaged by the pre-A137 write path can be holding the only complete copy of
+            // the history in its temporary file, with no index beside it. Read it rather than
+            // reporting an empty history, so the repair is automatic for anyone already affected.
+            return readTemporary()
+        }
         guard let data = try? Data(contentsOf: indexURL) else { return nil }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try? decoder.decode([StoredConversation].self, from: data)
+    }
+
+    /// The leftover temporary file from an interrupted save, if it decodes and there is no index.
+    ///
+    /// `nil` means there is nothing usable there, which is the same as there being no file.
+    private func readTemporary() -> [StoredConversation]? {
+        let temporary = directory.appending(path: "conversations.json.tmp")
+        guard FileManager.default.fileExists(atPath: temporary.path),
+            let data = try? Data(contentsOf: temporary)
+        else { return [] }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return try? decoder.decode([StoredConversation].self, from: data)
