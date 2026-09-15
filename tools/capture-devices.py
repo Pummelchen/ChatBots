@@ -180,16 +180,33 @@ def start_servers() -> subprocess.Popen[bytes] | None:
     return engine
 
 
-def caddy_process() -> subprocess.Popen[bytes] | None:
-    if not shutil.which("caddy"):
-        return None
-    config = run_directory() / "Caddyfile.capture"
-    config.write_text(
+def capture_caddyfile() -> str:
+    """The Caddyfile a capture run uses.
+
+    The repository's own, on the capture ports, plus one directive the repository's does not carry.
+
+    The site address is host-less on purpose — that is what lets a phone reach the page — and a
+    host-less address makes Caddy bind **every** interface, so this used to publish the whole
+    unauthenticated `/api/*` surface to the network for the duration of a screenshot run. A capture run
+    is not somebody choosing to share; it is a developer taking pictures on their own machine.
+    `start.sh` inserts the same directive for `--local-only`, and the reason is the same one the
+    Caddyfile documents: the site address names the Host a request must carry, it does not pick the
+    listener, so `bind` is what chooses the interface (A183).
+    """
+    text = (
         (ROOT / "Caddyfile")
         .read_text()
         .replace("http://:7788", f"http://:{PORT}")
         .replace("127.0.0.1:7789", f"127.0.0.1:{ENGINE_PORT}")
     )
+    return text.replace(f"http://:{PORT} {{", f"http://:{PORT} {{\n\tbind 127.0.0.1", 1)
+
+
+def caddy_process() -> subprocess.Popen[bytes] | None:
+    if not shutil.which("caddy"):
+        return None
+    config = run_directory() / "Caddyfile.capture"
+    config.write_text(capture_caddyfile())
     process = subprocess.Popen(
         ["caddy", "run", "--config", str(config), "--adapter", "caddyfile"],
         cwd=ROOT,

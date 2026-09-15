@@ -1,0 +1,39 @@
+# A183 — the capture run's Caddyfile, and which interface it binds (2026-09-15T15:50:20Z)
+
+## 1. before: the repository's host-less site address, copied verbatim
+$ git show HEAD:tools/capture-devices.py | grep -n "replace(\"http://:7788\"" -B 4 -A 2
+  186-    config = run_directory() / "Caddyfile.capture"
+  187-    config.write_text(
+  188-        (ROOT / "Caddyfile")
+  189-        .read_text()
+  190:        .replace("http://:7788", f"http://:{PORT}")
+  191-        .replace("127.0.0.1:7789", f"127.0.0.1:{ENGINE_PORT}")
+  192-    )
+$ git show HEAD:Caddyfile | grep -n "To bind this Mac only" -A 4
+  36:# To bind this Mac only, run `tools/start.sh --local-only`. It generates a copy of this file
+  37-# with `bind 127.0.0.1` inserted inside the site block below, which is the directive that
+  38-# actually picks the listening interface — a site address of `127.0.0.1:7788` would not, it
+  39-# would still listen on ":7788". See "Using the website" in the wiki.
+  40-http://:7788 {
+
+## 2. what Caddy actually derives, which is the measurement start.sh's own comment names
+$ caddy adapt --config <before> --adapter caddyfile   # the generated config without bind
+  listen: [':7791']  <- every interface
+$ caddy adapt --config <after> --adapter caddyfile    # the fix
+  listen: ['127.0.0.1:7791']  <- this Mac only
+
+## 3. the fix, and the tools that check it
+$ grep -n "bind 127.0.0.1" tools/capture-devices.py
+  202:    return text.replace(f"http://:{PORT} {{", f"http://:{PORT} {{\n\tbind 127.0.0.1", 1)
+$ python3 -c "... capture_caddyfile() ..." | grep bind
+  http://:7791 {
+  	bind 127.0.0.1
+$ pyright tools/capture-devices.py
+  0 errors, 0 warnings, 0 informations
+$ ruff check tools/capture-devices.py && ruff format --check tools/capture-devices.py
+  All checks passed!
+  1 file already formatted
+
+  Limit, stated: the capture run itself is not executed — it drives a real browser over the
+  Chrome DevTools Protocol — so what is proven is the config it will hand to Caddy, which is the
+  thing that decides the interface, and that proof is Caddy's own adapter rather than a regex.
