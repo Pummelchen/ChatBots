@@ -16,7 +16,7 @@
 # Options:
 #   --no-engine    just open the app, without also serving the web interface
 #   --port <n>     port for the web interface and API (default 7789)
-#   --stop         stop the API server this script started
+#   --stop         stop the API server this script started, and quit the app if it is open
 
 set -u
 set -o pipefail
@@ -80,12 +80,24 @@ pid_from() {
 
 if [ "$ACTION" = "stop" ]; then
   step "Stopping"
-  # By PID, never by name: a name-based kill would take out a browser or an editor.
+  # The engine, by the pid this script wrote when it started it. Nothing else is touched: a name-based
+  # kill would take out a browser or an editor.
   if pid="$(pid_from "$ENGINE_PID")"; then
     kill -TERM "$pid" 2>/dev/null && dim "stopped the API server (pid $pid)"
     rm -f "$ENGINE_PID"
   fi
-  pkill -f "ChatBots.app/Contents/MacOS/ChatBots" 2>/dev/null || true
+  # The app, by exact process *name* — `pgrep -x ChatBots`, not `pkill -f <path>`: the pattern matched any
+  # process whose command line merely mentions the bundle, which is how a `tail -f` on the app's log, a
+  # second checkout, or an editor with the bundle open comes to be killed by a script that promises in the
+  # line above not to touch anything but its own (A190). This is the same rule A189 applied to the engine:
+  # the executable decides, never an argument. The name is all there is to go on here because the app was
+  # opened with `open`, which gives the script no pid to record.
+  app_pids="$(pgrep -x ChatBots 2>/dev/null || true)"
+  if [ -n "$app_pids" ]; then
+    for pid in $app_pids; do
+      kill -TERM "$pid" 2>/dev/null && dim "asked the app to quit (pid $pid)"
+    done
+  fi
   echo "    If the app is still open, quit it with ⌘Q."
   exit 0
 fi
