@@ -196,8 +196,11 @@ Apple metal version 32023.921 (metalfe-32023.921.6)
 
 **`metal` must be *executed* to know it works, not merely resolved.** `xcrun --find metal` returns a
 path on a host where the component is absent, so a check built on `--find` reports success on all four
-nodes while three of them cannot build. Measured by execution: node1 works; node2, node3 and node4 do
-not, and node2 has a stale `com_apple_MobileAsset_MetalToolchain` asset directory that is unusable.
+nodes while three of them cannot build. Measured by execution when the fleet was recorded: node1 worked
+and node2, node3 and node4 did not, with a stale `com_apple_MobileAsset_MetalToolchain` asset directory
+on node2 that was unusable. **node2's component was installed later the same day**, for Phase E, and
+then verified by compiling a real kernel rather than by reading a version string — see *How the Metal
+component is checked* at the end of this file. node3 and node4 are still without it.
 
 ## Toolchain, re-measured
 
