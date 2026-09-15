@@ -90,8 +90,13 @@ public struct TurnSettings: Sendable, Equatable {
 public struct ReasoningCeiling: Sendable, Equatable {
     public let mode: ThinkingMode
     public let ceiling: Int?
-    public private(set) var tokens = 0
+    /// Characters of reasoning seen so far. `tokens` is derived from this rather than accumulated
+    /// per chunk, so the remainder is carried instead of discarded.
+    private var characters = 0
     public private(set) var wasReached = false
+
+    /// The reasoning counted so far, in the roughly-4-characters-per-token units the budget uses.
+    public var tokens: Int { characters / 4 }
 
     public init(mode: ThinkingMode) {
         self.mode = mode
@@ -100,9 +105,16 @@ public struct ReasoningCeiling: Sendable, Equatable {
 
     /// Account for one reasoning segment. Returns `true` the first time the ceiling is
     /// reached, and `false` on every later call, so the caller acts exactly once.
+    ///
+    /// Characters are accumulated and converted once. This used to add `reasoning.count / 4` per
+    /// call, which is **zero for any segment shorter than four characters** — and a generation
+    /// stream emits one token per call, most of them one to three characters — so `tokens` never
+    /// grew, the ceiling never fired, and `.minimal`/`.low`/`.medium` behaved as if they were
+    /// unlimited. The old behaviour was invisible to the tests because they feed 200-character
+    /// segments, for which `/4` happens to be non-zero (A196).
     public mutating func account(reasoning: String) -> Bool {
         guard !wasReached, let ceiling, ceiling > 0, !reasoning.isEmpty else { return false }
-        tokens += reasoning.count / 4
+        characters += reasoning.count
         guard tokens >= ceiling else { return false }
         wasReached = true
         return true
