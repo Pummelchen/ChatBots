@@ -30,19 +30,18 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 213 |
-| DONE | 158 |
-| START | 55 |
+| DONE | 159 |
+| START | 54 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 55
+### Open — 54
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
 | A135 | S2 | START | — | packaging / dependencies | The repository states that mlx-swift's SwiftPM build does not compile the Metal kernels; under Xcode 27 it does, so the 190 MB separate metallib download is of unverified necessity and the stated reason for it is now false |
 | A139 | S2 | START | — | security / credentials | The per-seat cloud API key is copied into Codable settings and written to the preferences plist in cleartext, contradicting the app's own Keychain claim |
 | A144 | S2 | START | — | performance / payload | Every attached image is re-base64-encoded into every snapshot pushed to every client |
-| A145 | S2 | START | — | safety / HTTP parsing | The HTTP request head has no size cap and is re-scanned for the header terminator on every read, so 32 connections can pin gigabytes and cost O(n^2) |
 | A147 | S3 | START | — | performance / main actor | Every /s/<id> request, including for unknown ids, reads and JSON-decodes the whole conversation index on the main actor |
 | A148 | S3 | START | — | safety / image intake | An image is fully decoded before any dimension or size check, so a small crafted TIFF/BMP/HEIC can expand hugely |
 | A149 | S3 | START | — | safety / TOCTOU | The attachment byte cap degrades to zero on a failed stat, the file is re-read after the stat, and a non-regular file is never rejected |
@@ -158,7 +157,7 @@ been run.
 | A142 | S2 | DONE | b08203c | logic / API | A body that fails to decode silently mutates state through defaults: an unknown mode becomes entertainment, an unknown budget becomes standard, a malformed topic clears it |
 | A143 | S2 | DONE | e37238b | safety / input bounds | Topic, moderator name and steering text are uncapped and echoed in every snapshot, although the same file caps seat names and attachment counts |
 | A144 | S2 | START | — | performance / payload | Every attached image is re-base64-encoded into every snapshot pushed to every client |
-| A145 | S2 | START | — | safety / HTTP parsing | The HTTP request head has no size cap and is re-scanned for the header terminator on every read, so 32 connections can pin gigabytes and cost O(n^2) |
+| A145 | S2 | DONE | f1fe0f0 | safety / HTTP parsing | The HTTP request head has no size cap and is re-scanned for the header terminator on every read, so 32 connections can pin gigabytes and cost O(n^2) |
 | A146 | S2 | DONE | 487108d | audit tooling / acceptance | Second instance of A134: the documented Mac gate hardcodes the pre-Swift-6.4 test-bundle path, so its coverage step fails on the new toolchain |
 | A147 | S3 | START | — | performance / main actor | Every /s/<id> request, including for unknown ids, reads and JSON-decodes the whole conversation index on the main actor |
 | A148 | S3 | START | — | safety / image intake | An image is fully decoded before any dimension or size check, so a small crafted TIFF/BMP/HEIC can expand hugely |
