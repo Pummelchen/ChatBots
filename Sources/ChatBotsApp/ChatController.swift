@@ -233,7 +233,6 @@ public final class ChatController: ObservableObject {
         configuration.host = host
         configuration.port = port
         let client = WebTransportEngineClient(configuration: configuration)
-        self.client = client
 
         // The event stream delivers states and output fragments; it is started before the
         // first request so nothing that happens in between is missed.
@@ -249,9 +248,15 @@ public final class ChatController: ObservableObject {
             }
         }
         guard client.isConnected else {
-            engineConnection = lastError ?? "Could not reach the engine."
+            // A client that never connected is not a connection, so it is not stored: `client != nil`
+            // has to keep meaning "there is an engine to talk to". Storing it meant the seat endpoints
+            // were pushed through it, every one of those commands answered with a transport failure,
+            // and each failure replaced the reason the connection had actually failed with a symptom
+            // of it — before the banner that shows the reason was ever read (A175).
+            noteConnectionFailed(lastError ?? "Could not reach the engine.")
             return
         }
+        self.client = client
         engineConnection = nil
 
         // The current state first, so the interface is correct before any event arrives.
@@ -759,7 +764,7 @@ public final class ChatController: ObservableObject {
     @discardableResult
     private func deliver(_ request: EngineRequest) async -> Bool {
         guard let client else {
-            engineConnection = "Not connected to the engine."
+            reportNoClient()
             return false
         }
         do {
@@ -796,7 +801,7 @@ public final class ChatController: ObservableObject {
     /// failure, which the `catch` below does for a command and the poll does for itself.
     private func run(_ body: @escaping (WebTransportEngineClient) async throws -> Void) {
         guard let client else {
-            engineConnection = "Not connected to the engine."
+            reportNoClient()
             return
         }
         Task { [weak self] in
@@ -806,6 +811,29 @@ public final class ChatController: ObservableObject {
                 self?.engineConnection = error.localizedDescription
             }
         }
+    }
+
+    /// Say that a command had nowhere to go, without covering a reason that is already there.
+    ///
+    /// A control pressed while nothing is connected has to say something, and "Not connected to the
+    /// engine." is the right thing to say when nothing else explains it. When something else does —
+    /// `connect` failing with "Could not reach the engine: …" — that reason is more specific and
+    /// still true, and the controls `applyAPIEndpoints` fires one after another must not overwrite it
+    /// with a symptom (A175). `connect` clears the message when a connection is actually made, so a
+    /// message that is present is always about the connection that is not.
+    private func reportNoClient() {
+        if engineConnection == nil { engineConnection = "Not connected to the engine." }
+    }
+
+    /// Record a connection that could not be made: the reason, and no client.
+    ///
+    /// The failure half of `connect`, in one place so that "a client that never connected is not a
+    /// connection" is stated once rather than implied by the order of two assignments (A175). Being a
+    /// method also means the failure path — which the whole finding is about — can be driven without
+    /// waiting out eight real connect attempts.
+    func noteConnectionFailed(_ reason: String) {
+        client = nil
+        engineConnection = reason
     }
 
     /// The whole conversation as plain text.
