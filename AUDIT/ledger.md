@@ -30,16 +30,15 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 216 |
-| DONE | 196 |
-| START | 20 |
+| DONE | 197 |
+| START | 19 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 20
+### Open — 19
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
-| A161 | S3 | START | — | docs / security | SECURITY.md still says a share link is local and served only by the engine, while the shipped Caddy configuration proxies /s/* on every interface |
 | A162 | S3 | START | — | docs / reproducibility | environment.md records swift-format as Xcode-provided via xcrun while both gates invoke a bare `swift-format` from PATH |
 | A163 | S3 | START | — | docs / correctness | The Caddyfile says the engine uses the passed Host to build the page's own links, but the replay script never reads the shareBase field it is written into |
 | A164 | S3 | START | — | unsafe / tooling | The DevTools client uses a fixed shared temporary profile path, so a second run or a hostile local process can interfere with it |
@@ -141,7 +140,7 @@ been run.
 | A159 | S3 | DONE | 8e31033 | validation / web tools | URL validation accepts any scheme starting with 'http' and requires no host, on model-controlled input |
 | A16 | S3 | DONE | 9c53771 | ChatBotsCLI | --serve has no signal handling, so the listener is never shut down and nothing is flushed on exit |
 | A160 | S3 | DONE | 399f735 | logic / web front end | A vote verdict is captured when the row is built, so clicking an already-cast verdict never withdraws it |
-| A161 | S3 | START | — | docs / security | SECURITY.md still says a share link is local and served only by the engine, while the shipped Caddy configuration proxies /s/* on every interface |
+| A161 | S3 | DONE | 4fc5500 | docs / security | SECURITY.md still says a share link is local and served only by the engine, while the shipped Caddy configuration proxies /s/* on every interface |
 | A162 | S3 | START | — | docs / reproducibility | environment.md records swift-format as Xcode-provided via xcrun while both gates invoke a bare `swift-format` from PATH |
 | A163 | S3 | START | — | docs / correctness | The Caddyfile says the engine uses the passed Host to build the page's own links, but the replay script never reads the shareBase field it is written into |
 | A164 | S3 | START | — | unsafe / tooling | The DevTools client uses a fixed shared temporary profile path, so a second run or a hostile local process can interfere with it |
