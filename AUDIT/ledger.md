@@ -30,16 +30,15 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 216 |
-| DONE | 183 |
-| START | 33 |
+| DONE | 184 |
+| START | 32 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 33
+### Open — 32
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
-| A148 | S3 | START | — | safety / image intake | An image is fully decoded before any dimension or size check, so a small crafted TIFF/BMP/HEIC can expand hugely |
 | A149 | S3 | START | — | safety / TOCTOU | The attachment byte cap degrades to zero on a failed stat, the file is re-read after the stat, and a non-regular file is never rejected |
 | A150 | S3 | START | — | security headers | The hand-written SSE response head bypasses the shared serialiser and therefore carries none of A76's security headers |
 | A151 | S3 | START | — | operations / logging | There is no request or error logging: connection errors are discarded and the counters are exposed nowhere |
@@ -139,7 +138,7 @@ been run.
 | A145 | S2 | DONE | f1fe0f0 | safety / HTTP parsing | The HTTP request head has no size cap and is re-scanned for the header terminator on every read, so 32 connections can pin gigabytes and cost O(n^2) |
 | A146 | S2 | DONE | 487108d | audit tooling / acceptance | Second instance of A134: the documented Mac gate hardcodes the pre-Swift-6.4 test-bundle path, so its coverage step fails on the new toolchain |
 | A147 | S3 | DONE | 7d60374 | performance / main actor | Every /s/<id> request, including for unknown ids, reads and JSON-decodes the whole conversation index on the main actor |
-| A148 | S3 | START | — | safety / image intake | An image is fully decoded before any dimension or size check, so a small crafted TIFF/BMP/HEIC can expand hugely |
+| A148 | S3 | DONE | 904f300 | safety / image intake | An image is fully decoded before any dimension or size check, so a small crafted TIFF/BMP/HEIC can expand hugely |
 | A149 | S3 | START | — | safety / TOCTOU | The attachment byte cap degrades to zero on a failed stat, the file is re-read after the stat, and a non-regular file is never rejected |
 | A15 | S1 | DONE | 8ece1d3 | EngineService/DocumentImport | Attaching a document blocks the engine main actor for the whole conversion, subprocess wait included |
 | A150 | S3 | START | — | security headers | The hand-written SSE response head bypasses the shared serialiser and therefore carries none of A76's security headers |
