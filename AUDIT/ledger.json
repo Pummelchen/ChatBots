@@ -3626,6 +3626,23 @@
       "commit": "0960c86",
       "notes": "The temptation was to narrow the guard again so A165 passed, which would have made the check report success by looking away — the failure mode A83 and A117 both are. The list was widened instead, and the one genuine record error it exposed was corrected in the record rather than in the guard. Making the guard read only structured fields was the other option, but `file_line` is the structured field the ledger has, and its being free prose is what lets a task name a line number; the cost is that a prose mention counts, so a wrong verdict here is resolved by making the record accurate.",
       "blocked_reason": null
+    },
+    {
+      "id": "A214",
+      "severity": "S2",
+      "unit": "API / snapshot payload",
+      "file_line": "Sources/ChatBotsCore/EngineService.swift:546-556; EngineProtocol.swift:250-262",
+      "title": "A snapshot that carries an attached image can exceed the transport's own message cap, so the state push is not delivered at all",
+      "category": "defect",
+      "status": "START",
+      "host_used": "node1",
+      "discovered_by": "Phase C/D — found while working A144 on the cost of re-encoding images into every snapshot",
+      "evidence_before": "`ProtocolLimits.maximumMessageBytes` is derived from the attachment limit as `(64 MiB * 4 + 2) / 3 + envelopeOverheadBytes` = 89 478 486 bytes, which is 85.3 MiB: exactly the base64 form of one maximum-size attachment plus the envelope allowance. `EngineService.snapshot()` puts every attachment's image into the same snapshot as `imageBase64: document.imageData?.base64EncodedString()` (EngineService.swift:554-555), and that snapshot is the payload of every state push — the SSE `snapshot` event and the WebTransport state message — so a single 64 MiB image leaves no room for the rest of the snapshot and **two of them need 178 956 972 bytes, twice the cap**. The consequence is not a slow push but no push: the transmitter refuses to frame a message over the cap, so the state update is dropped and the client keeps the previous state. Measured arithmetic, not a guess: the cap and the expansion are the same three numbers. Distinct from A144 (which is about the cost of re-encoding) because this fails regardless of how fast the encoding is, and it is reachable today by attaching a large scan and a second image.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "Recorded rather than fixed in the same round, because the fix is a design change and a half-done one would be worse than none: an attachment image has to be served by reference — an `/api/attachments/<id>/image` route (the HTTP server already serves the interface's own assets that way) with the snapshot carrying the metadata and the client fetching the bytes once — and that touches the HTTP routes, the WebTransport client, the app's `Attachments` reconstruction (`ChatController.swift:973` decodes `imageBase64` back into `imageData`) and the page, which never uses the field at all. A memoised base64 would remove the encoding cost and leave the delivery failure exactly where it is, so it would close A144's wording while leaving the defect that matters.",
+      "blocked_reason": null
     }
   ]
 }

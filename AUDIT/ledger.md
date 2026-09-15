@@ -29,13 +29,13 @@ been run.
 <!-- BEGIN GENERATED: ledger status — rendered from ledger.json by AUDIT/render-ledger.sh -->
 | Metric | Count |
 | --- | --- |
-| Tasks enumerated | 213 |
+| Tasks enumerated | 214 |
 | DONE | 162 |
-| START | 51 |
+| START | 52 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 51
+### Open — 52
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -90,8 +90,9 @@ been run.
 | A206 | S3 | START | — | dead code | Six declarations are written or named but never used, one with a documented rule the code does not implement |
 | A207 | S3 | START | — | docs / correctness | Three comments say the document extractors live in the app target and that the core cannot read a PDF or Word file; all three are false |
 | A208 | S3 | START | — | installer / dependencies | The checkpoint the installer downloads is a hand-copied duplicate of AgentSpec.defaultModelID and nothing keeps the two in step |
+| A214 | S2 | START | — | API / snapshot payload | A snapshot that carries an attached image can exceed the transport's own message cap, so the state push is not delivered at all |
 
-### Every task — 213
+### Every task — 214
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -230,6 +231,7 @@ been run.
 | A211 | S2 | DONE | a5288a1 | audit documentation / session entry point | The session entry point still says the audit is complete and names the landed 2026-09-13 branch, while 73 findings are open on a different, unmerged branch |
 | A212 | S1 | DONE | 479faab | workspace / audit tooling | Two wiki clones carried a GitHub personal access token in plaintext inside their origin URL, so the credential that can write to the wikis and to this repository sat in a readable file |
 | A213 | S2 | DONE | 0960c86 | audit tooling / DONE-commit guard | The DONE-commit guard recognised only .swift, .py and .sh paths, so a task fixed in the web interface or a CI workflow could be reported unbacked while its commit contained the fix |
+| A214 | S2 | START | — | API / snapshot payload | A snapshot that carries an attached image can exceed the transport's own message cap, so the state push is not delivered at all |
 | A22 | S2 | DONE | 18100dd | start script | stop_all kills a stale PID from a pid file without checking the process is ours |
 | A23 | S2 | DONE | 38fbe08 | device capture tool | capture-devices.py prints a viewport mismatch but cannot fail the run |
 | A24 | S2 | DONE | b803b3c | installer | A native binary artifact is downloaded with no integrity check and embedded in the signed app |
