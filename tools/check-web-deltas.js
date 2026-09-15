@@ -13,8 +13,9 @@
 
 "use strict";
 
+const fs = require("fs");
 const path = require("path");
-const { applyDelta, emptyLive } = require(path.join(__dirname, "..", "web", "deltas.js"));
+const { applyDelta, emptyLive, isStale } = require(path.join(__dirname, "..", "web", "deltas.js"));
 
 let failures = 0;
 
@@ -106,6 +107,61 @@ console.log("web/deltas.js");
   const snap = snapshot();
   applyDelta(snap, { agentID: "Agent 1", kind: "token", text: "" });
   check("an empty fragment leaves the text a string", typeof liveOf(snap, "Agent 1").text === "string");
+}
+
+// ── which of two snapshots is newer (A171) ────────────────────────────────────────────────────────
+//
+// The page applied whatever arrived last, so the `GET /api/state` at load could race the first pushed
+// snapshot and leave the older one on screen until the next turn. The app-side client has refused
+// stale snapshots since A110; this is the same rule, and the same fallback when a snapshot carries no
+// revision.
+
+{
+  const older = { revision: 4, serverTime: "2026-09-15T10:00:00Z" };
+  const newer = { revision: 5, serverTime: "2026-09-15T10:00:00Z" };
+
+  check("a snapshot with a lower revision is stale", isStale(older, newer) === true);
+  check("a snapshot with a higher revision is not", isStale(newer, older) === false);
+  check("the same revision is not stale", isStale(newer, { ...newer }) === false);
+  check("nothing to compare against is never stale", isStale(older, null) === false);
+
+  // Same second, which is what the revision exists for: the clock cannot order these two.
+  const sameSecondOlder = { revision: 7, serverTime: "2026-09-15T10:00:00Z" };
+  const sameSecondNewer = { revision: 8, serverTime: "2026-09-15T10:00:00Z" };
+  check(
+    "the revision orders two snapshots inside the same second",
+    isStale(sameSecondOlder, sameSecondNewer) === true &&
+      isStale(sameSecondNewer, sameSecondOlder) === false);
+
+  // An older engine sends no revision, so the clock is the only ordering there is.
+  const clockOlder = { serverTime: "2026-09-15T09:59:59Z" };
+  const clockNewer = { serverTime: "2026-09-15T10:00:00Z" };
+  check("without a revision the clock decides", isStale(clockOlder, clockNewer) === true);
+  check("and it does not call a later clock stale", isStale(clockNewer, clockOlder) === false);
+  check(
+    "a revision on one side only falls back to the clock",
+    isStale(clockOlder, { revision: 3, serverTime: "2026-09-15T10:00:00Z" }) === true);
+
+  // The revision decides even when there is no clock to fall back to.
+  check(
+    "a revision orders without any serverTime",
+    isStale({ revision: 1 }, { revision: 2 }) === true);
+
+  // Neither orders: refuse rather than guess, so a malformed snapshot cannot blank the page.
+  check("an unorderable pair is not treated as stale", isStale({}, {}) === false);
+}
+
+// ── and the page actually uses it ─────────────────────────────────────────────────────────────────
+//
+// The defect was not a missing rule — `APISnapshot.isOlder(than:)` has existed since A110 and the app
+// uses it — but a page that applied whatever arrived last. A rule nothing calls is the thing this
+// file's tests would otherwise pass on, so the call is checked too.
+
+{
+  const appJS = fs.readFileSync(path.join(__dirname, "..", "web", "app.js"), "utf8");
+  check(
+    "every snapshot the page applies goes through the guard",
+    /isStale\(next, state\.snapshot\)/.test(appJS));
 }
 
 if (failures === 0) {

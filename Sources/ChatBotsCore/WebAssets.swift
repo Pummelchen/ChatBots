@@ -1135,7 +1135,12 @@ body[data-view="phone"] {
 """
 
     static let deltasJS = """
-// ChatBots — folding the engine's per-token events into the state the page draws.
+// ChatBots — what the page does with the state the engine sends it.
+//
+// Two pure rules, both about incoming state rather than about drawing: how a per-token fragment is
+// folded into the live entries (`applyDelta`), and which of two snapshots is newer (`isStale`). They
+// live here rather than in `app.js` because they are the parts that are easy to get wrong and
+// impossible to run inside a page — `tools/check-web-deltas.js` exercises both in Node.
 //
 // The engine publishes each fragment as it is produced, as `delta` on the event stream, and the
 // server sends a whole snapshot once per turn. The page draws the reply being written from
@@ -1201,7 +1206,33 @@ body[data-view="phone"] {
     return true;
   }
 
-  const api = { applyDelta: applyDelta, emptyLive: emptyLive };
+  /**
+   * Whether `next` was produced before `current`, and must therefore not replace it.
+   *
+   * The engine stamps every snapshot with a monotonic revision, which orders two produced inside the
+   * same second — its wall clock cannot, because `serverTime` is ISO-8601 to the second — and keeps
+   * ordering them when the clock moves backwards. The app has had this guard since A110; the page
+   * applied whatever arrived last, so a `GET /api/state` racing the first pushed snapshot could put
+   * the older one on screen and leave it there until the next turn (A171).
+   *
+   * A snapshot from an engine that predates the field carries no revision, and then the clock is the
+   * only ordering available — the same fallback `APISnapshot.isOlder(than:)` makes, so the two front
+   * ends cannot disagree about which state is newer.
+   */
+  function isStale(next, current) {
+    if (!current) return false;
+    const nextRevision = next && next.revision;
+    const currentRevision = current.revision;
+    if (typeof nextRevision === "number" && typeof currentRevision === "number") {
+      return nextRevision < currentRevision;
+    }
+    const nextTime = Date.parse((next && next.serverTime) || "");
+    const currentTime = Date.parse(current.serverTime || "");
+    if (Number.isNaN(nextTime) || Number.isNaN(currentTime)) return false;
+    return nextTime < currentTime;
+  }
+
+  const api = { applyDelta: applyDelta, emptyLive: emptyLive, isStale: isStale };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else global.ChatBotsDeltas = api;
 })(typeof window !== "undefined" ? window : globalThis);
@@ -1761,6 +1792,10 @@ body[data-view="phone"] {
   // ── State → interface ─────────────────────────────────────────────────────────────
 
   function apply(next) {
+    // One guard for every path a snapshot arrives by. `GET /api/state` at load races the first pushed
+    // snapshot, and before this the older of the two could be applied last and stay on screen until the
+    // next turn — the app-side client has refused stale snapshots since A110 (A171).
+    if (window.ChatBotsDeltas.isStale(next, state.snapshot)) return;
     const first = state.snapshot === null;
     state.snapshot = next;
     // A seat count change replaces the panes, so it is handled before anything draws.

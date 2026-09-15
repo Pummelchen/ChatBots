@@ -550,6 +550,10 @@
   // ── State → interface ─────────────────────────────────────────────────────────────
 
   function apply(next) {
+    // One guard for every path a snapshot arrives by. `GET /api/state` at load races the first pushed
+    // snapshot, and before this the older of the two could be applied last and stay on screen until the
+    // next turn — the app-side client has refused stale snapshots since A110 (A171).
+    if (window.ChatBotsDeltas.isStale(next, state.snapshot)) return;
     const first = state.snapshot === null;
     state.snapshot = next;
     // A seat count change replaces the panes, so it is handled before anything draws.
