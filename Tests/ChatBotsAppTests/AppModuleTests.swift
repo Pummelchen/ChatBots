@@ -66,6 +66,30 @@ struct SettingsStoreTests {
         #expect(second == nil, "…and not every time the view redraws")
     }
 
+    @Test("A key an older build left in the preferences plist is removed when it is loaded")
+    func staleKeyIsScrubbedOnLoad() throws {
+        // What A139 is about: the key was written to the plist, so the fix has to remove one that is
+        // already there, not only stop writing new ones.
+        let defaults = scratchDefaults()
+        var spec = AgentSpec.seat(index: 0)
+        spec.openAI.apiKey = "sk-left-over-from-an-older-build"
+        let stored = UserSettings.defaults(topic: "A topic", seats: [spec])
+
+        // Written the way the old build wrote it: the whole struct, key included.
+        let raw = try JSONEncoder().encode(stored)
+        defaults.set(raw, forKey: "userSettings")
+        #expect(
+            String(data: raw, encoding: .utf8)?.contains("sk-left-over") == true,
+            "the fixture has to contain the key for this to mean anything")
+
+        let store = UserSettingsStore(defaults: defaults, fallbackTopic: "fallback")
+        #expect(store.settings.topic == "A topic", "the settings themselves are kept")
+
+        let rewritten = defaults.data(forKey: "userSettings") ?? Data()
+        let text = String(data: rewritten, encoding: .utf8) ?? ""
+        #expect(!text.contains("sk-left-over"), "and the key is gone from the plist")
+    }
+
     @Test("The storage description says something about where settings live")
     func storageDescriptionIsUseful() {
         #expect(!UserSettingsStore.storageDescription.isEmpty)
