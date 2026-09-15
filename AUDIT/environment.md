@@ -231,6 +231,15 @@ brew install swiftlint llvm gitleaks osv-scanner semgrep ruff pyright shellcheck
 # swift-format comes from Xcode 27 (xcrun swift-format); it is not installed from brew for this audit.
 ```
 
+**The same versions on the CI runner, verified.** GitHub's Linux runner installs shellcheck,
+gitleaks and osv-scanner as release binaries and the rest from PyPI and npm. The three binaries are
+fetched by `tools/fetch-audit-tools.sh`, which pins each asset's SHA-256 and checks it before
+unpacking (A187), and a step in `.github/workflows/checks.yml` fails if the versions in that script
+and the versions in the table above disagree — the record is what the audit ran, so a version bumped
+in only one of the two would make it untrue. The digests themselves are in
+`AUDIT/baseline/swift64/a187-audit-tools.log`, alongside the figures GitHub publishes for the same
+assets.
+
 ## What this re-audit installed
 
 | Host | Installed | Why | Removal |

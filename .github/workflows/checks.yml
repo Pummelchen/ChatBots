@@ -12,6 +12,14 @@
 #     advisory: a finding fails the job, and the tools are installed at the exact versions
 #     recorded in `AUDIT/environment.md`.
 #
+#     The three that arrive as release binaries — shellcheck, gitleaks and osv-scanner — are
+#     each checked against a pinned SHA-256 before they are unpacked, which is `A187`:
+#     a version-pinned *URL* is not integrity, because a release asset can be replaced by
+#     anyone with release rights on the repository, and the job would then run whatever is
+#     there. `tools/fetch-audit-tools.sh` holds the versions and the digests. The Python and
+#     Node tools are not in that script on purpose: PyPI and npm refuse to publish a version
+#     twice, so for them the version is the pin.
+#
 # Not on the push, and why: the Swift gates. The package requires macOS 26 and Apple-silicon
 # MLX, and no hosted runner image is either and none has a GPU, so a Swift job here would be
 # a red build that says nothing about the code. Those gates run on a Mac instead, in one
@@ -27,8 +35,9 @@
 # Pinning: `actions/checkout` is pinned to a commit SHA below, because a tag can be moved and
 # a check that runs someone else's code should say exactly which code it ran. No other action
 # is used — each analysis tool is installed from a version-pinned release or package, which is
-# a stricter pin than an action tag and keeps third-party code out of the job. Any action
-# added here later must be pinned the same way, with its version in a trailing comment.
+# a stricter pin than an action tag and keeps third-party code out of the job, and the three
+# release binaries are additionally verified against a pinned digest (A187). Any action added
+# here later must be pinned the same way, with its version in a trailing comment.
 name: checks
 
 on:
@@ -80,6 +89,27 @@ jobs:
             echo "::error::make-app.sh declares macOS $bundle but Package.swift requires $package"
             exit 1
           }
+      # One fact in two places: the versions this workflow installs and the versions
+      # `AUDIT/environment.md` records as the audit's toolchain. They are read from each other rather
+      # than trusted to agree, which is the same shape as the check above and for the same reason —
+      # the record says which tools the audit ran, and a version bumped in only one of them makes that
+      # untrue (A187, A121).
+      - name: The pinned tool versions match the recorded toolchain
+        run: |
+          set -eu
+          failed=0
+          for tool in shellcheck gitleaks osv-scanner; do
+            variable="$(printf '%s' "$tool" | tr 'a-z-' 'A-Z_')_VERSION"
+            pinned="$(sed -n "s/^${variable}=//p" tools/fetch-audit-tools.sh)"
+            recorded="$(awk -F'|' -v t="$tool" '$2 ~ "`" t "`" {gsub(/ /, "", $3); print $3; exit}' AUDIT/environment.md)"
+            printf '%-12s script %-8s environment.md %s\n' "$tool" "${pinned:-missing}" "${recorded:-missing}"
+            if [ -z "$pinned" ] || [ "$pinned" != "$recorded" ]; then failed=1; fi
+          done
+          [ "$failed" -eq 0 ] || {
+            echo "::error::tools/fetch-audit-tools.sh and AUDIT/environment.md disagree about a tool version"
+            exit 1
+          }
+
       # The installer declared the minimum a third time, as 14, so a Sonoma user downloaded the
       # checkpoint and built the app before the bundle's own minimum refused to launch it (A121). It
       # now reads the requirement from Package.swift; this catches a literal creeping back in.
@@ -104,15 +134,14 @@ jobs:
           # checkout needs all of it.
           fetch-depth: 0
 
-      # No third-party action installs these; each version is pinned here and matches the
-      # toolchain recorded in AUDIT/environment.md. If a repository configuration for one of
-      # these tools is added later, the tool discovers it from the working directory and this
-      # step needs no change.
+      # No third-party action installs these. The three release binaries come from
+      # `tools/fetch-audit-tools.sh`, which holds their versions and digests in one place; the Python
+      # and Node tools are pinned here, and the step above has already checked every version against
+      # the toolchain `AUDIT/environment.md` records. If a repository configuration for one of these
+      # tools is added later, the tool discovers it from the working directory and this step needs no
+      # change.
       - name: Install the pinned analysis tools
         env:
-          SHELLCHECK_VERSION: 0.11.0
-          GITLEAKS_VERSION: 8.30.1
-          OSV_SCANNER_VERSION: 2.5.1
           RUFF_VERSION: 0.16.7
           SEMGREP_VERSION: 1.176.0
           PYRIGHT_VERSION: 1.1.414
@@ -130,16 +159,11 @@ jobs:
           # those lines: they are meant to prove the pin, not the image.
           export PATH="$tools/bin:$tools/venv/bin:$PATH"
 
-          curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
-            | tar -xJ -C "$tools"
-          mv "$tools/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" "$tools/bin/"
-
-          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
-            | tar -xz -C "$tools/bin" gitleaks
-
-          curl -fsSL -o "$tools/bin/osv-scanner" \
-            "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64"
-          chmod +x "$tools/bin/osv-scanner"
+          # The three release binaries, each verified against its pinned SHA-256 before it is
+          # unpacked (A187). The versions and the digests live in the script, so the only copy of a pin
+          # is the one that is checked; the step above fails if they disagree with the recorded
+          # toolchain.
+          bash tools/fetch-audit-tools.sh --into "$tools/bin"
 
           python3 -m venv "$tools/venv"
           "$tools/venv/bin/pip" install --quiet --disable-pip-version-check \
