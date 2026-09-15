@@ -20,51 +20,41 @@ final class ZoomStore: ObservableObject {
 
     /// The steps ⌘+ and ⌘− move through.
     ///
-    /// Discrete steps rather than a free multiplier: a text size that lands on 1.07× serves
-    /// nobody, and steps make ⌘0 predictable.
-    static let levels: [Double] = [0.85, 1.0, 1.15, 1.3, 1.5, 1.75, 2.0]
-    static let `default` = 1.0
+    /// The list and every comparison over it live in `ChatBotsCore.TextZoom`, so the suite that
+    /// covers them asserts the code the app runs rather than a copy of it (A167). These are aliases
+    /// kept so the views that read them read the same values.
+    static let levels = TextZoom.levels
+    static let `default` = TextZoom.default
+    static var minimumScale: Double { TextZoom.minimumScale }
+    static var maximumScale: Double { TextZoom.maximumScale }
 
-    /// The smallest and largest steps.
-    ///
-    /// `levels` is an ascending literal, so these are its ends; the fallback to `default` is
-    /// what a caller would see if that ever stopped being true, rather than a trap (audit A28).
-    static var minimumScale: Double { levels.min() ?? `default` }
-    static var maximumScale: Double { levels.max() ?? `default` }
-
-    @AppStorage("textScale") private var storedScale: Double = ZoomStore.default
+    @AppStorage("textScale") private var storedScale: Double = TextZoom.default
 
     var scale: Double {
         get { storedScale }
-        set { storedScale = min(max(newValue, Self.minimumScale), Self.maximumScale) }
+        set { storedScale = TextZoom.clamped(newValue) }
     }
 
-    var percent: Int { Int((scale * 100).rounded()) }
+    var percent: Int { TextZoom.percent(of: scale) }
     /// 100, for comparing against `percent`.
-    var resetPercent: Int { Int((Self.default * 100).rounded()) }
-    var canEnlarge: Bool { scale < Self.maximumScale - 0.001 }
-    var canReduce: Bool { scale > Self.minimumScale + 0.001 }
+    var resetPercent: Int { TextZoom.percent(of: TextZoom.default) }
+    var canEnlarge: Bool { scale < Self.maximumScale - TextZoom.tolerance }
+    var canReduce: Bool { scale > Self.minimumScale + TextZoom.tolerance }
 
     /// Move one step, in the direction of `larger`.
     func step(larger: Bool) {
-        if larger {
-            scale = Self.levels.first { $0 > scale + 0.001 } ?? Self.maximumScale
-        } else {
-            scale = Self.levels.last { $0 < scale - 0.001 } ?? Self.minimumScale
-        }
+        scale = TextZoom.stepped(from: scale, larger: larger)
     }
 
-    func reset() { scale = Self.default }
+    func reset() { scale = TextZoom.default }
 
     /// The next step's label, so a menu can say what ⌘+ will do.
     var nextLargerPercent: Int? {
-        guard let next = Self.levels.first(where: { $0 > scale + 0.001 }) else { return nil }
-        return Int((next * 100).rounded())
+        TextZoom.next(from: scale, larger: true).map(TextZoom.percent(of:))
     }
 
     var nextSmallerPercent: Int? {
-        guard let next = Self.levels.last(where: { $0 < scale - 0.001 }) else { return nil }
-        return Int((next * 100).rounded())
+        TextZoom.next(from: scale, larger: false).map(TextZoom.percent(of:))
     }
 }
 
