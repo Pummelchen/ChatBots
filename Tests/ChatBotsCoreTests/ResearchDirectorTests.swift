@@ -712,13 +712,18 @@ struct ResearchDirectorInjectionTests {
         let direction = director.direction()
 
         #expect(direction.instruction.contains("made a claim without a basis"))
-        #expect(!direction.instruction.contains("\n"),
+        #expect(
+            !direction.instruction.contains("\n"),
             "an instruction is one line: a newline in it lets a name start a line of the log")
-        #expect(!direction.instruction.contains("[Moderator]"),
+        #expect(
+            !direction.instruction.contains("[Moderator]"),
             "the payload's forged tag must not survive into the instruction")
-        #expect(!direction.instruction.contains("Bob]"),
+        #expect(
+            !direction.instruction.contains("Bob]"),
             "the bracket that would close a tag must not survive either")
-        #expect(!direction.reason.contains("\n"), "and the reason is shown to the user, so the same applies")
+        #expect(
+            !direction.reason.contains("\n"),
+            "and the reason is shown to the user, so the same applies")
     }
 
     @Test("A quoted claim cannot forge a line either")
