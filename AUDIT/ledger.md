@@ -31,8 +31,8 @@ been run.
 | --- | --- |
 | Tasks enumerated | 214 |
 | DONE | 172 |
-| START | 42 |
-| PROGRESS | 0 |
+| START | 41 |
+| PROGRESS | 1 |
 | BLOCKED | 0 |
 
 ### Open — 42
@@ -59,7 +59,7 @@ been run.
 | A162 | S3 | START | — | docs / reproducibility | environment.md records swift-format as Xcode-provided via xcrun while both gates invoke a bare `swift-format` from PATH |
 | A163 | S3 | START | — | docs / correctness | The Caddyfile says the engine uses the passed Host to build the page's own links, but the replay script never reads the shareBase field it is written into |
 | A164 | S3 | START | — | unsafe / tooling | The DevTools client uses a fixed shared temporary profile path, so a second run or a hostile local process can interfere with it |
-| A170 | S2 | START | — | test coverage | Near-zero coverage on three paths the product depends on, including the web-search tool the research mode is built around |
+| A170 | S2 | PROGRESS | 079ec2c | test coverage | Near-zero coverage on three paths the product depends on, including the web-search tool the research mode is built around |
 | A174 | S2 | START | — | data loss / UX | Both front ends clear the moderator's draft before the send is confirmed, so a refused send silently discards what was typed |
 | A175 | S2 | START | — | error handling | The client is stored before its connection is verified, so the specific 'could not reach the engine' reason is overwritten by a generic transport error |
 | A177 | S3 | START | — | dead declarations, false comments | Nine app-layer declarations are unread, and one of them describes a window minimum the code does not enforce in three different ways |
@@ -173,7 +173,7 @@ been run.
 | A168 | S1 | DONE | 18d4017 | test harness deadlock | The transport gate leaks on cancellation, so a cancelled test permanently blocks every later transport suite |
 | A169 | S1 | DONE | 1c6cb9f | test harness / real concurrency | Twenty-one teardowns are fire-and-forget tasks, so the serialising gate is released before QUIC teardown finishes and the A102 collision is reduced rather than removed |
 | A17 | S1 | DONE | 0de3123 | HTTPServer | streams is appended on the main actor without the lock that every other access takes |
-| A170 | S2 | START | — | test coverage | Near-zero coverage on three paths the product depends on, including the web-search tool the research mode is built around |
+| A170 | S2 | PROGRESS | 079ec2c | test coverage | Near-zero coverage on three paths the product depends on, including the web-search tool the research mode is built around |
 | A171 | S2 | DONE | c836585 | logic / ordering | The web client applies snapshots unconditionally while the Swift client guards with the monotonic revision, so a late reply regresses the page |
 | A172 | S2 | DONE | 501c521 | dead UI | The device-profile badge is hidden in markup and never unhidden, so the detected profile and viewport are computed and discarded |
 | A173 | S2 | DONE | 6a2c3ba | divergent duplicate rule | The web disables removing an attachment once a conversation runs while the app and the engine both allow it, so the two front ends disagree |

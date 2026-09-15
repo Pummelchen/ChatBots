@@ -2886,14 +2886,14 @@
       "file_line": "AUDIT/baseline/swift64/coverage.log (WebTools.swift 11.36 %, TransportCheck.swift 24.33 %, TavilyClient.swift 61.35 %)",
       "title": "Near-zero coverage on three paths the product depends on, including the web-search tool the research mode is built around",
       "category": "test",
-      "status": "START",
+      "status": "PROGRESS",
       "host_used": "node1",
       "discovered_by": "Phase B audit pass (Swift 6.4 re-audit)",
       "evidence_before": "`WebSearchTool.run` (WebTools.swift:28-40) has three branches — empty-query throw, no-results outcome, formatted hits — of which only trivial properties execute; TransportCheck is the installer's own smoke test and TavilyClient is the only network egress.",
       "fix_summary": null,
       "evidence_after": null,
-      "commit": null,
-      "notes": "",
+      "commit": "079ec2c",
+      "notes": "**First path covered, two left, so this stays open.** `WebSearchTool.run`'s three branches are now tested — `AuditClientsSearchTests.swift` gained `WebSearchToolTests`, which uses the scripted Tavily server already private to that file — and `WebTools.swift` went from **11.36%** of lines to **57.95%** in the same llvm-cov report the baseline used (`AUDIT/baseline/swift64/a170-webtools-coverage.log`, which shows the baseline line and the new one side by side). What the finding calls near-zero is WebTools and TransportCheck; `TavilyClient` was already 61.35% and is unchanged by this, and `TransportCheck` is still **24.33%**. TransportCheck is the installer's own smoke test and drives a real transport, so a test for it needs the harness the transport suites use (a real listener and a real client) rather than a fixture, which is why it is left as the remaining work rather than half-done here. Commit 079ec2c.",
       "blocked_reason": null
     },
     {
