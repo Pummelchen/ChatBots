@@ -27,13 +27,13 @@ been run.
 <!-- BEGIN GENERATED: ledger status — rendered from ledger.json by AUDIT/render-ledger.sh -->
 | Metric | Count |
 | --- | --- |
-| Tasks enumerated | 195 |
+| Tasks enumerated | 209 |
 | DONE | 132 |
-| START | 63 |
+| START | 77 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 63
+### Open — 77
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -100,8 +100,22 @@ been run.
 | A193 | S3 | START | — | tools / network robustness | Model and Metal downloads have no transfer deadline, so a stalled connection hangs the installer indefinitely |
 | A194 | S3 | START | — | docs / drift | Several tool comments and help texts describe behaviour that changed or never existed |
 | A195 | S3 | START | — | docs / TLS trust | The client never enforces the pinned fingerprint while another comment claims pinning is meaningful |
+| A196 | S1 | START | — | inference / arithmetic | The reasoning ceiling under-counts tokens, so the thinking level the UI promises is not the one enforced |
+| A197 | S1 | START | — | untrusted input / resource | Child output is unbounded and the conversion timeout cannot fire while output flows |
+| A198 | S1 | START | — | concurrency / lifecycle | A session accepted during stop() is orphaned and keeps serving |
+| A199 | S2 | START | — | prompts / identity | The social engine keys and words itself by seat id while every other prompt surface uses display names |
+| A200 | S2 | START | — | model reporting | The MLX model label is a constant, so another checkpoint is misreported to the user and to the model |
+| A201 | S2 | START | — | resource lifecycle | A new client and a never-invalidated URLSession are created for every turn |
+| A202 | S2 | START | — | terminal event | An empty server answer emits turnFailed and then turnFinished, so a failed turn is recorded as a successful empty one |
+| A203 | S2 | START | — | research / direction | The author of an unsupported claim can be directed to substantiate their own claim |
+| A204 | S2 | START | — | prompt injection (A69 recurrence) | Raw display names are interpolated into the moderator instruction, bypassing the sanitiser A69 added |
+| A205 | S3 | START | — | dead code / wrong label | The .richText case is unreachable and an RTF file is labelled 'Word' |
+| A206 | S3 | START | — | dead code | Six declarations are written or named but never used, one with a documented rule the code does not implement |
+| A207 | S3 | START | — | docs / correctness | Three comments say the document extractors live in the app target and that the core cannot read a PDF or Word file; all three are false |
+| A208 | S3 | START | — | installer / dependencies | The checkpoint the installer downloads is a hand-copied duplicate of AgentSpec.defaultModelID and nothing keeps the two in step |
+| A209 | S3 | START | — | tests / CORS | A75's CORS test asserted 404 because there was no OPTIONS route; A136 refuses the request explicitly, so the assertion named the old mechanism rather than the property |
 
-### Every task — 195
+### Every task — 209
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -220,7 +234,21 @@ been run.
 | A193 | S3 | START | — | tools / network robustness | Model and Metal downloads have no transfer deadline, so a stalled connection hangs the installer indefinitely |
 | A194 | S3 | START | — | docs / drift | Several tool comments and help texts describe behaviour that changed or never existed |
 | A195 | S3 | START | — | docs / TLS trust | The client never enforces the pinned fingerprint while another comment claims pinning is meaningful |
+| A196 | S1 | START | — | inference / arithmetic | The reasoning ceiling under-counts tokens, so the thinking level the UI promises is not the one enforced |
+| A197 | S1 | START | — | untrusted input / resource | Child output is unbounded and the conversion timeout cannot fire while output flows |
+| A198 | S1 | START | — | concurrency / lifecycle | A session accepted during stop() is orphaned and keeps serving |
+| A199 | S2 | START | — | prompts / identity | The social engine keys and words itself by seat id while every other prompt surface uses display names |
 | A20 | S1 | DONE | e9d45ef | web front end | Stored DOM XSS: the live-pane header interpolates the moderator-supplied seat name into innerHTML |
+| A200 | S2 | START | — | model reporting | The MLX model label is a constant, so another checkpoint is misreported to the user and to the model |
+| A201 | S2 | START | — | resource lifecycle | A new client and a never-invalidated URLSession are created for every turn |
+| A202 | S2 | START | — | terminal event | An empty server answer emits turnFailed and then turnFinished, so a failed turn is recorded as a successful empty one |
+| A203 | S2 | START | — | research / direction | The author of an unsupported claim can be directed to substantiate their own claim |
+| A204 | S2 | START | — | prompt injection (A69 recurrence) | Raw display names are interpolated into the moderator instruction, bypassing the sanitiser A69 added |
+| A205 | S3 | START | — | dead code / wrong label | The .richText case is unreachable and an RTF file is labelled 'Word' |
+| A206 | S3 | START | — | dead code | Six declarations are written or named but never used, one with a documented rule the code does not implement |
+| A207 | S3 | START | — | docs / correctness | Three comments say the document extractors live in the app target and that the core cannot read a PDF or Word file; all three are false |
+| A208 | S3 | START | — | installer / dependencies | The checkpoint the installer downloads is a hand-copied duplicate of AgentSpec.defaultModelID and nothing keeps the two in step |
+| A209 | S3 | START | — | tests / CORS | A75's CORS test asserted 404 because there was no OPTIONS route; A136 refuses the request explicitly, so the assertion named the old mechanism rather than the property |
 | A21 | S2 | DONE | 8111b1a | installer | The model-download integrity check silently degrades to 'accept any size' when the HEAD request yields nothing |
 | A22 | S2 | DONE | 18100dd | start script | stop_all kills a stale PID from a pid file without checking the process is ours |
 | A23 | S2 | DONE | 38fbe08 | device capture tool | capture-devices.py prints a viewport mismatch but cannot fail the run |

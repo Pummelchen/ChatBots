@@ -5,10 +5,10 @@
 // and the complete temporary file the previous line had just written was never read back, which made
 // the loss look like an empty history rather than like damage.
 
+import Foundation
 import Testing
 
 @testable import ChatBotsCore
-import Foundation
 
 private func storedRecord(topic: String) -> StoredConversation {
     var seat = AgentSpec.makeSeats(count: 1)[0]

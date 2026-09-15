@@ -8,10 +8,10 @@
 // These tests name the refusals, and the two cases that must keep working: a same-origin JSON POST
 // (what the web interface sends) and a plain GET.
 
+import Foundation
 import Testing
 
 @testable import ChatBotsCore
-import Foundation
 
 private actor SilentStub: LLMEngine {
     nonisolated let spec: AgentSpec
@@ -31,8 +31,15 @@ private actor SilentStub: LLMEngine {
 
 private enum XOriginTestError: Error { case noPort }
 
+private struct XOriginTestServer {
+    let server: APIServer
+    let engine: ConversationEngine
+    let session: URLSession
+    let base: String
+}
+
 @MainActor
-private func crossOriginServer() async throws -> (APIServer, ConversationEngine, URLSession, String) {
+private func crossOriginServer() async throws -> XOriginTestServer {
     let specs = AgentSpec.makeSeats(count: 1)
     let seats = specs.map { ConversationEngine.Seat(spec: $0, engine: SilentStub(spec: $0)) }
     var configuration = ConversationEngine.Configuration()
@@ -47,7 +54,9 @@ private func crossOriginServer() async throws -> (APIServer, ConversationEngine,
         let server = APIServer(engine: engine, store: store, port: port)
         try server.start()
         if await server.waitUntilReady() {
-            return (server, engine, session, "http://127.0.0.1:\(port)")
+            return XOriginTestServer(
+                server: server, engine: engine, session: session,
+                base: "http://127.0.0.1:\(port)")
         }
         server.stop()
     }
@@ -71,7 +80,11 @@ struct AuditS0CrossOriginTests {
 
     @Test("A cross-origin simple request cannot change state")
     func textPlainIsRefused() async throws {
-        let (server, engine, session, base) = try await crossOriginServer()
+        let fixture = try await crossOriginServer()
+        let server = fixture.server
+        let engine = fixture.engine
+        let session = fixture.session
+        let base = fixture.base
         defer { server.stop() }
 
         let status = try await post(
@@ -84,7 +97,11 @@ struct AuditS0CrossOriginTests {
 
     @Test("An Origin that is not the addressed host is refused")
     func foreignOriginIsRefused() async throws {
-        let (server, engine, session, base) = try await crossOriginServer()
+        let fixture = try await crossOriginServer()
+        let server = fixture.server
+        let engine = fixture.engine
+        let session = fixture.session
+        let base = fixture.base
         defer { server.stop() }
 
         let status = try await post(
@@ -97,7 +114,11 @@ struct AuditS0CrossOriginTests {
 
     @Test("A request the browser marks cross-site is refused")
     func crossSiteFetchIsRefused() async throws {
-        let (server, engine, session, base) = try await crossOriginServer()
+        let fixture = try await crossOriginServer()
+        let server = fixture.server
+        let engine = fixture.engine
+        let session = fixture.session
+        let base = fixture.base
         defer { server.stop() }
 
         let status = try await post(
@@ -113,7 +134,10 @@ struct AuditS0CrossOriginTests {
     // answers 409), which would make the test about the engine rather than about the boundary.
     @Test("A same-origin JSON request still reaches the engine")
     func sameOriginJSONIsAccepted() async throws {
-        let (server, _, session, base) = try await crossOriginServer()
+        let fixture = try await crossOriginServer()
+        let server = fixture.server
+        let session = fixture.session
+        let base = fixture.base
         defer { server.stop() }
 
         // The shape the web interface sends: JSON, and an Origin matching the host it addressed.
@@ -128,7 +152,10 @@ struct AuditS0CrossOriginTests {
 
     @Test("A client that sends no Origin is unaffected, and GET is untouched")
     func plainClientAndGetAreUnaffected() async throws {
-        let (server, _, session, base) = try await crossOriginServer()
+        let fixture = try await crossOriginServer()
+        let server = fixture.server
+        let session = fixture.session
+        let base = fixture.base
         defer { server.stop() }
 
         // curl, the CLI and scripts send no Origin; requiring one would break them.
