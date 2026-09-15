@@ -476,7 +476,9 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
             id: seatID(forIndex: index),
             displayName: seatID(forIndex: index),
             modelID: modelID,
-            modelShortName: "Qwen3.5-4B-4bit",
+            // From the identifier, not a constant: this said "Qwen3.5-4B-4bit" for every checkpoint a
+            // caller asked for (A200).
+            modelShortName: ModelNames.shortName(modelID),
             backend: backend,
             temperature: QwenSampling.temperature,
             topP: QwenSampling.topP,

@@ -118,6 +118,20 @@ public enum ModelNames {
         return prettify(slug)
     }
 
+    /// The compact label a seat shows for an MLX checkpoint.
+    ///
+    /// Derived from the identifier rather than stored beside it: `AgentSpec.seat(index:modelID:)` set
+    /// `modelShortName` to the *default* checkpoint's name whatever it was asked for, so
+    /// `chatbots-cli --model-a <another checkpoint>` told every seat's prompt — "running
+    /// Qwen3.5-4B-4bit on the moderator's Mac" — and every badge that it was running the default
+    /// (A200). The `-MLX` marker comes out because it names the runtime rather than the model, and the
+    /// engine here is always MLX; that leaves the default checkpoint reading exactly as it did.
+    public static func shortName(_ modelID: String) -> String {
+        let slug = modelID.split(separator: "/").last.map(String.init) ?? modelID
+        let trimmed = slug.replacingOccurrences(of: "-MLX", with: "")
+        return trimmed.isEmpty ? slug : trimmed
+    }
+
     /// Turn a slug into something readable without pretending to know what it is.
     static func prettify(_ slug: String) -> String {
         let words = slug.split(whereSeparator: { $0 == "-" || $0 == "_" || $0 == "." })
