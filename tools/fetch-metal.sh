@@ -107,7 +107,12 @@ if [[ ! -f "$LIB" ]]; then
   if [[ ! -f "$ZIP" ]]; then
     URL="https://github.com/ml-explore/mlx-swift/releases/download/$VERSION/Cmlx.xcframework.zip"
     echo "==> Downloading Metal kernels for mlx-swift $VERSION (≈190 MB, one time)"
-    curl -fL --retry 3 --progress-bar -o "$ZIP.partial" "$URL"
+    # A stalled transfer fails and is retried instead of waiting forever: curl aborts a connection
+    # that has stopped moving (`--speed-limit`/`--speed-time`), `--retry` also covers a handshake
+    # that never completes, and each retry starts the archive again so there is no partial file to
+    # resume from (A193).
+    curl -fL --connect-timeout 20 --speed-limit 1024 --speed-time 30 \
+      --retry 3 --progress-bar -o "$ZIP.partial" "$URL"
     mv "$ZIP.partial" "$ZIP"
   fi
 

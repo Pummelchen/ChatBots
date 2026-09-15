@@ -30,6 +30,17 @@ BUILD_LOG="$ROOT/.install-build.log"
 MODEL_ID="mlx-community/Qwen3.5-4B-MLX-4bit"
 MODEL_DIR_NAME="Qwen3.5-4B-MLX-4bit"
 
+# A connection that stalls *once established* is the failure `--retry` cannot see: curl keeps waiting
+# for the next byte and the install looks hung — the outcome the model-loading step below calls the
+# worst for someone who just wants the app, and guards against with its own timeout (A193).
+# `--max-time` is not the answer: a 3 GB checkpoint on a slow line is slow, not stalled,
+# and a total-time cap would abort a download that is still making progress. `--speed-limit` and
+# `--speed-time` abort only a transfer that has stopped moving — curl's own definition, slower than
+# the limit for that many seconds — which `--retry` then retries and the resume path continues from
+# the bytes already on disk. `--connect-timeout` bounds the handshake, which a stall mid-transfer
+# does not cover.
+CURL_TRANSFER_OPTIONS=(--connect-timeout 20 --speed-limit 1024 --speed-time 30)
+
 # ── Output ──────────────────────────────────────────────────────────────────────────
 if [ -t 1 ]; then
   BOLD=$'\033[1m'; DIM=$'\033[2m'; RED=$'\033[31m'; GREEN=$'\033[32m'
@@ -303,8 +314,10 @@ download_file() {
     fi
     dim "$name is incomplete ($actual of $expected bytes) — continuing it"
     # `-C -` resumes from where it stopped, which matters for a 3 GB file. `--fail` keeps an
-    # error response out of the file, so a 404 page is never resumed into model bytes.
-    if curl -fsSL -C - --retry 5 --retry-delay 3 --retry-all-errors \
+    # error response out of the file, so a 404 page is never resumed into model bytes. The deadline
+    # options are `CURL_TRANSFER_OPTIONS` above: a stall fails here instead of hanging, and the
+    # retry resumes it.
+    if curl -fsSL -C - "${CURL_TRANSFER_OPTIONS[@]}" --retry 5 --retry-delay 3 --retry-all-errors \
         -o "$target" "$url"; then
       actual="$(stat -f%z "$target" 2>/dev/null || echo 0)"
       if [ "$actual" = "$expected" ]; then
@@ -321,7 +334,7 @@ download_file() {
   local human
   human="$(awk -v b="$expected" 'BEGIN { printf "%.0f MB", b/1048576 }')"
   info "$name ($human)"
-  if ! curl -fL --retry 5 --retry-delay 3 --retry-all-errors --progress-bar \
+  if ! curl -fL "${CURL_TRANSFER_OPTIONS[@]}" --retry 5 --retry-delay 3 --retry-all-errors --progress-bar \
       -o "$target" "$url"; then
     fail "$name did not finish downloading"
     return 1

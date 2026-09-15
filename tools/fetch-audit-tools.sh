@@ -97,7 +97,10 @@ verify() {
 }
 
 fetch() {
-    curl -fsSL -o "$2" "$1"
+    # Bounded the way the installer's downloads are (A193): a connection that stalls once established
+    # must fail this step — visibly, with the digest check never reached — rather than hold the job
+    # until its own timeout, and a handshake that never completes is bounded separately.
+    curl -fsSL --connect-timeout 20 --speed-limit 1024 --speed-time 30 -o "$2" "$1"
 }
 
 shellcheck_archive="$work/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
