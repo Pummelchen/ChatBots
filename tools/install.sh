@@ -168,6 +168,22 @@ for tool in iconutil sips plutil textutil; do
   fi
 done
 
+# Xcode 27 ships the Metal compiler as a separate downloadable component, and without it the build
+# stops on the first `.metal` kernel mlx-swift compiles — an error that names the file rather than the
+# cause, three minutes after the download started. The check *runs* the compiler instead of looking for
+# it, because `xcrun --find metal` prints a path on a machine where the component is absent, so a
+# path check reports success on a Mac that cannot build (A133).
+step "Checking for the Metal compiler"
+if metal_version="$(bash "$SCRIPT_DIR/check-metal.sh" --quiet 2>&1)"; then
+  ok "$metal_version"
+else
+  warn "The Metal compiler is not usable on this Mac, so the app cannot be built."
+  printf '%s\n' "$metal_version" | sed 's/^/    /'
+  die "Install the Metal toolchain component and run this script again:
+
+  xcodebuild -downloadComponent MetalToolchain"
+fi
+
 # ── Models ──────────────────────────────────────────────────────────────────────────
 # Resumable and verified: each file is checked against the size the server reports, so an
 # interrupted download is detected and continued rather than silently accepted. A file whose

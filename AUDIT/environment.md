@@ -157,7 +157,7 @@ re-audit was required rather than a spot check.
 | Host | Class | macOS | Xcode | Swift | Metal toolchain | Role |
 | --- | --- | --- | --- | --- | --- | --- |
 | `node1` (`Node1.local`) | Mac Mini M2, 8 GB | 27.0 | 27.0 | 6.4 | **installed by this audit** | development |
-| `node2` (`Node2.local`) | Mac Mini M2, 8 GB | 27.0 | 27.0 | 6.4 | **missing** | Phase E |
+| `node2` (`Node2.local`) | Mac Mini M2, 8 GB | 27.0 | 27.0 | 6.4 | **installed by this audit** | Phase E |
 | `node3` (`Node3.local`) | Mac Mini M2, 8 GB | 27.0 | 27.0 | 6.4 | **missing** | spare |
 | `node4` (`Node4.local`) | Mac Mini M2, 8 GB | 27.0 | 27.0 | 6.4 | **missing** | spare |
 
@@ -233,7 +233,7 @@ brew install swiftlint llvm gitleaks osv-scanner semgrep ruff pyright shellcheck
 | Host | Installed | Why | Removal |
 | --- | --- | --- | --- |
 | `node1` | Xcode 27 Metal Toolchain component (27A266a, 839 MB) | A133 — without it this package cannot build | Xcode ▸ Settings ▸ Components |
-| `node2` | *(pending — required before Phase E)* | Phase E must build on node2 | Xcode ▸ Settings ▸ Components |
+| `node2` | Xcode 27 Metal Toolchain component (27A266a, 839 MB) | A133 and Phase E: node2 is the acceptance host and cannot build without it | Xcode ▸ Settings ▸ Components |
 
 ## A credential was sitting in plaintext in two wiki clones (A212)
 
@@ -265,3 +265,19 @@ it, because the credential helper supplies whatever `gh` holds.
 **Why it is recorded here rather than as a source fix.** The file it lived in is not in the tree this
 audit has scope over (the brief limits it to `Pummelchen/ChatBots`), so there is no repository change
 that removes it and no commit to point at. Recording it is the alternative to fixing it silently.
+
+### How the Metal component is checked (A133)
+
+`tools/check-metal.sh` runs the compiler and exits non-zero with the install command when it cannot,
+because a machine without the component still answers `xcrun --find metal` with a path:
+
+| Host | `xcrun --find metal` | `tools/check-metal.sh` |
+| --- | --- | --- |
+| `node1` | cryptex path | **passes** — Apple metal version 32023.921 |
+| `node2` (after the install) | cryptex path | **passes** — and a real `.metal` file compiles to a 3 296-byte `.air` |
+| `node3` | `/Applications/Xcode.app/.../metal`, exit 0 | **fails** with `cannot execute tool 'metal' due to missing Metal Toolchain` |
+| `node4` | not re-measured | not re-measured — both spare hosts were missing it when the fleet was recorded |
+
+`tools/install.sh` calls that script before it downloads anything, so a machine that cannot build now
+stops in the first minute instead of failing three minutes into the build. Raw output:
+`AUDIT/baseline/swift64/a133-metal.log`.
