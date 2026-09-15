@@ -30,16 +30,15 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 217 |
-| DONE | 201 |
-| START | 16 |
+| DONE | 202 |
+| START | 15 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 16
+### Open — 15
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
-| A178 | S3 | START | — | docs / false user-facing text | Two user-facing strings say the models run in-process, which stopped being true when the engine became a separate process |
 | A179 | S3 | START | — | style / dead injection | Duplicated and mid-sentence-truncated comments, and an @EnvironmentObject with no @Published property and no reader |
 | A180 | S3 | START | — | deps / deprecated API | `NSApp.activate(ignoringOtherApps:)` is API_TO_BE_DEPRECATED in the macOS 27 SDK |
 | A188 | S3 | START | — | tools / injection | --port and --engine are interpolated into sed programs with no validation, so a crafted value injects into the generated Caddyfile that is then run |
@@ -155,7 +154,7 @@ been run.
 | A175 | S2 | DONE | a25f69c | error handling | The client is stored before its connection is verified, so the specific 'could not reach the engine' reason is overwritten by a generic transport error |
 | A176 | S2 | DONE | 98fe56d | dead code | EndpointBar is unreferenced and carries an action nothing invokes, plus state nothing reads and an environment object that would trap if it were instantiated |
 | A177 | S3 | DONE | f9d1351 | dead declarations, false comments | Nine app-layer declarations are unread, and one of them describes a window minimum the code does not enforce in three different ways |
-| A178 | S3 | START | — | docs / false user-facing text | Two user-facing strings say the models run in-process, which stopped being true when the engine became a separate process |
+| A178 | S3 | DONE | 2334d79 | docs / false user-facing text | Two user-facing strings say the models run in-process, which stopped being true when the engine became a separate process |
 | A179 | S3 | START | — | style / dead injection | Duplicated and mid-sentence-truncated comments, and an @EnvironmentObject with no @Published property and no reader |
 | A18 | S1 | DONE | 0de3123 | tests | The suite is not hermetic: three tests need the developer's private models/ and .secrets.env and fail on a fresh clone |
 | A180 | S3 | START | — | deps / deprecated API | `NSApp.activate(ignoringOtherApps:)` is API_TO_BE_DEPRECATED in the macOS 27 SDK |
