@@ -27,13 +27,13 @@ been run.
 <!-- BEGIN GENERATED: ledger status — rendered from ledger.json by AUDIT/render-ledger.sh -->
 | Metric | Count |
 | --- | --- |
-| Tasks enumerated | 209 |
+| Tasks enumerated | 211 |
 | DONE | 136 |
-| START | 73 |
+| START | 75 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 73
+### Open — 75
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -110,8 +110,10 @@ been run.
 | A206 | S3 | START | — | dead code | Six declarations are written or named but never used, one with a documented rule the code does not implement |
 | A207 | S3 | START | — | docs / correctness | Three comments say the document extractors live in the app target and that the core cannot read a PDF or Word file; all three are false |
 | A208 | S3 | START | — | installer / dependencies | The checkpoint the installer downloads is a hand-copied duplicate of AgentSpec.defaultModelID and nothing keeps the two in step |
+| A210 | S2 | START | — | audit tooling / Phase E gate | The Phase E gate accepts only audit/2026-09-13 or main, so it fails on the branch this re-audit is developed on and the acceptance run cannot pass |
+| A211 | S2 | START | — | audit documentation / session entry point | The session entry point still says the audit is complete and names the landed 2026-09-13 branch, while 73 findings are open on a different, unmerged branch |
 
-### Every task — 209
+### Every task — 211
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -246,6 +248,8 @@ been run.
 | A208 | S3 | START | — | installer / dependencies | The checkpoint the installer downloads is a hand-copied duplicate of AgentSpec.defaultModelID and nothing keeps the two in step |
 | A209 | S3 | DONE | 8d3fa2b | tests / CORS | A75's CORS test asserted 404 because there was no OPTIONS route; A136 refuses the request explicitly, so the assertion named the old mechanism rather than the property |
 | A21 | S2 | DONE | 8111b1a | installer | The model-download integrity check silently degrades to 'accept any size' when the HEAD request yields nothing |
+| A210 | S2 | START | — | audit tooling / Phase E gate | The Phase E gate accepts only audit/2026-09-13 or main, so it fails on the branch this re-audit is developed on and the acceptance run cannot pass |
+| A211 | S2 | START | — | audit documentation / session entry point | The session entry point still says the audit is complete and names the landed 2026-09-13 branch, while 73 findings are open on a different, unmerged branch |
 | A22 | S2 | DONE | 18100dd | start script | stop_all kills a stale PID from a pid file without checking the process is ours |
 | A23 | S2 | DONE | 38fbe08 | device capture tool | capture-devices.py prints a viewport mismatch but cannot fail the run |
 | A24 | S2 | DONE | b803b3c | installer | A native binary artifact is downloaded with no integrity check and embedded in the signed app |

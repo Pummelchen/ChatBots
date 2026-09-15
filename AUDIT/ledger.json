@@ -3558,6 +3558,40 @@
       "commit": "8d3fa2b",
       "notes": "",
       "blocked_reason": null
+    },
+    {
+      "id": "A210",
+      "severity": "S2",
+      "unit": "audit tooling / Phase E gate",
+      "file_line": "AUDIT/phase-e.sh:74-79",
+      "title": "The Phase E gate accepts only audit/2026-09-13 or main, so it fails on the branch this re-audit is developed on and the acceptance run cannot pass",
+      "category": "process",
+      "status": "START",
+      "host_used": "node1",
+      "discovered_by": "Phase C — found by running the re-audit branch against its own gates, not by reading the ledger",
+      "evidence_before": "`AUDIT/phase-e.sh:76-79` is `case \"$branch\" in audit/2026-09-13) pass ... ;; main) pass ... ;; *) fail \"on branch '$branch', which is neither the audit branch nor main\" ;; esac`. The current branch is `audit/2026-09-15` (user decision: main stays untouched until Phase E passes), so the identity check fails before any other section runs and the script exits non-zero. This is the same file and the same case arm as A132, which added `main` for exactly this reason one audit earlier — the list of acceptable branches was updated for the landing but not for the next audit, so the gate is once again wrong about the branch the audit is developed on.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "",
+      "blocked_reason": null
+    },
+    {
+      "id": "A211",
+      "severity": "S2",
+      "unit": "audit documentation / session entry point",
+      "file_line": "AUDIT/HANDOVER.md:3,14,20; AUDIT/ledger.md:6; AUDIT/plan.md:6,144; AUDIT/inventory.md:3",
+      "title": "The session entry point still says the audit is complete and names the landed 2026-09-13 branch, while 73 findings are open on a different, unmerged branch",
+      "category": "docs",
+      "status": "START",
+      "host_used": "node1",
+      "discovered_by": "Phase C — noticed while checking the branch references the new findings turned up",
+      "evidence_before": "`HANDOVER.md:3` says \"**The audit is complete.**\" and its state table says \"127 enumerated: 127 DONE, 0 open, 0 BLOCKED\" with \"Phases E green\". `HANDOVER.md:14` and `ledger.md:6` both say the branch is `audit/2026-09-13`, cut from `main@a6d6999`, and that branch and `main` \"point at the same commit\". The state on disk is: 209 tasks with 136 DONE and 73 open (9 S1), on `audit/2026-09-15` cut from `main@02ddd4e`, with `main` at `349fefe` — so the two do not point at the same commit, Phase E has not been run for this audit, and the branch is deliberately unmerged. `plan.md:144` still states the commit convention as being on `audit/2026-09-13`. A118 recorded this same defect class for `ledger.md` (it was called the source of truth and stopped at A89); the prose was fixed then but the header and the handover were not, and the re-audit re-created the condition because `HANDOVER.md` describes the previous audit as if it were the current one.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "",
+      "blocked_reason": null
     }
   ]
 }
