@@ -90,6 +90,15 @@ private func waitForSignal(_ semaphore: DispatchSemaphore, timeout: DispatchTime
     }
 }
 
+/// Wait until `flag` is set, or `timeout` passes. Off the main actor, so the task that sets it can run.
+private func waitForSignal(_ flag: borrowing Atomic<Bool>, timeout: DispatchTime) async -> Bool {
+    while DispatchTime.now() < timeout {
+        if flag.load(ordering: .relaxed) { return true }
+        try? await Task.sleep(for: .milliseconds(20))
+    }
+    return flag.load(ordering: .relaxed)
+}
+
 @MainActor
 private func makeService(ingestor: DocumentIngestor) -> EngineService {
     let specs = (0..<2).map { index -> AgentSpec in
@@ -148,8 +157,10 @@ struct AuditDocumentConversionTests {
             _ = await service.handle(.fetchState)
             answered.store(true, ordering: .relaxed)
         }
-        try? await Task.sleep(for: .milliseconds(600))
-        let responsive = answered.load(ordering: .relaxed)
+        // Bounded rather than a single 600 ms sample, for the reason the share-page test gives: the
+        // question is whether the main actor can answer at all while the conversion is held open, and on
+        // the old code it cannot — the release comes after this wait either way.
+        let responsive = await waitForSignal(answered, timeout: .now() + 5)
 
         // Release before asserting: a failure on the old code must still finish rather than
         // leave the conversion and the actor blocked.

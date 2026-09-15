@@ -54,6 +54,15 @@ private func waitForSignal(_ semaphore: DispatchSemaphore, timeout: DispatchTime
     }
 }
 
+/// Wait until `flag` is set, or `timeout` passes. Off the main actor, so the task that sets it can run.
+private func waitForSignal(_ flag: borrowing Atomic<Bool>, timeout: DispatchTime) async -> Bool {
+    while DispatchTime.now() < timeout {
+        if flag.load(ordering: .relaxed) { return true }
+        try? await Task.sleep(for: .milliseconds(20))
+    }
+    return flag.load(ordering: .relaxed)
+}
+
 /// Not on the main actor: waiting for a read that is supposed to have left the main actor must not
 /// itself depend on that actor.
 @Suite("A share link and the conversation index (A147)")
@@ -185,8 +194,12 @@ struct SharePageIndexTests {
         let probe = Task { @MainActor in
             answered.store(true, ordering: .relaxed)
         }
-        try? await Task.sleep(for: .milliseconds(200))
-        let responsive = answered.load(ordering: .relaxed)
+        // Waiting with a bound rather than sampling once at 200 ms. The property is whether the main
+        // actor can run *at all* while the read is held open, and on the old code it cannot: the read is
+        // inside a synchronous main-actor call and the semaphore is released only below. A single sample
+        // measured the machine's load as much as the code — it has failed in a busy gate while the code
+        // was correct — so the wait is generous and the release still comes after it.
+        let responsive = await waitForSignal(answered, timeout: .now() + 5)
 
         // Release before asserting: a failure on the old code must finish the request rather than leave
         // the main actor holding a semaphore.

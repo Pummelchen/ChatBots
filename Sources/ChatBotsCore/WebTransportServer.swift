@@ -62,6 +62,21 @@ public final class WebTransportEngineServer {
         /// It is a ceiling against a runaway client, not a figure anything should approach.
         public var maximumConnections = 16
 
+        /// How long a new session has to open its stream and say something.
+        ///
+        /// The HTTP listener answers a connection that has not completed its request within
+        /// `requestTimeout` with a 408 and closes it (A37). This is the transport's half of that rule, and
+        /// it exists for the same reason: a client that connects and then says nothing holds one of
+        /// `maximumConnections` slots, a subscriber and a session for as long as its connection ticks, so
+        /// sixteen silent clients are the whole budget and the engine serves nobody else (A157).
+        ///
+        /// What it deliberately is **not** is an idle timeout for a working session. A client that has
+        /// spoken is a conversation, and it is routinely silent for minutes at a time — it is *receiving*
+        /// events, which is what the connection is for — so a deadline on quiet would end healthy sessions.
+        /// The HTTP path draws the line in the same place: the deadline covers reading the request, not the
+        /// conversation the connection is kept for.
+        public var sessionStartupTimeout: TimeInterval = 30
+
         public init() {}
     }
 
@@ -85,6 +100,9 @@ public final class WebTransportEngineServer {
     /// what lets `stop()` end them.
     private var sessions: [UUID: WebTransportSession] = [:]
     private var sessionTasks: [UUID: Task<Void, Never>] = [:]
+    /// The sessions that have said something, so the startup deadline knows which ones have not. Main-actor
+    /// state like the tables above: the serve loop and the watchdog that reads it are both on this actor.
+    private var spokenSessions: Set<UUID> = []
     /// Bumped by every `stop()`, and captured by each accept loop.
     ///
     /// The loop spends most of its life suspended inside `acceptSession()`, so cancelling it does not
@@ -110,6 +128,13 @@ public final class WebTransportEngineServer {
     // MARK: - Lifecycle
 
     public func start() async throws {
+        // A second start replaces the first, so the first is stopped rather than overwritten. `listener`
+        // and `acceptTask` were assigned without that, so a server started twice could leave the first
+        // listener bound with its accept loop still running and writing into the same tables — and nothing
+        // could ever shut it down, because the reference that would have was gone (A157). On a fresh server
+        // this is a no-op.
+        await stop()
+
         let serverConfiguration = WebTransportServerConfiguration(
             authority: "localhost",
             path: configuration.path,
@@ -230,12 +255,28 @@ public final class WebTransportEngineServer {
         // close, sending the final capsule twice.
         defer {
             subscribers[id] = nil
+            spokenSessions.remove(id)
             let stillOwned = sessions.removeValue(forKey: id) != nil
             sessionTasks[id] = nil
             if stillOwned {
                 Task { try? await session.close() }
             }
         }
+
+        // The deadline for a session to become one. It covers the stream being opened *and* the first frame
+        // arriving, because a client that does neither has never asked for anything and is holding a slot
+        // the engine could be using (A157). `spokenSessions` is what the watchdog reads, and both it and
+        // this loop are on the main actor, so there is no lock between them.
+        let startupTimeout = Duration.seconds(configuration.sessionStartupTimeout)
+        let watchdog = Task { [weak self] in
+            try? await Task.sleep(for: startupTimeout)
+            guard !Task.isCancelled, let self, !self.spokenSessions.contains(id) else { return }
+            let seconds = Int(self.configuration.sessionStartupTimeout)
+            let reason = "the session did not finish a frame within \(seconds) seconds"
+            self.note(reason)
+            try? await session.close(reason: reason)
+        }
+        defer { watchdog.cancel() }
 
         // One stream, and that is not a simplification for its own sake: the transport
         // serialises stream operations on a session, and a second bidirectional stream does
@@ -276,7 +317,7 @@ public final class WebTransportEngineServer {
             do {
                 chunk = try await stream.receive()
             } catch {
-                lastSessionError = error.localizedDescription
+                note("the session ended: \(error.localizedDescription)")
                 return
             }
             if chunk.isEmpty { return }
@@ -288,38 +329,73 @@ public final class WebTransportEngineServer {
                 let result: LengthFraming.ReadResult
                 do {
                     result = try LengthFraming.read(from: buffer)
-                } catch let error as ProtocolError {
-                    // A frame the framing refuses cannot be skipped: the length prefix is the
-                    // only thing that says where the next frame begins, so every later frame is
-                    // unreachable. Say why and close, rather than leaving a session that
-                    // answers nothing for the rest of its life. This was `try?`, which
-                    // discarded the error and did exactly that — and the cap was low enough
-                    // that a legitimate large attachment reached it.
-                    let reason = error.errorDescription ?? "the frame was refused"
-                    lastSessionError = reason
-                    await send(.reply(.failed(reason)), on: stream)
-                    try? await session.close(reason: reason)
-                    return
                 } catch {
-                    lastSessionError = error.localizedDescription
-                    try? await session.close(reason: error.localizedDescription)
+                    // A frame the framing refuses cannot be skipped, so this ends the session; the reasons
+                    // are unwound in `refuseFraming` because this function is at its complexity budget.
+                    await refuseFraming(error, on: stream, session: session)
                     return
                 }
                 guard case .message(let payload, let remainder) = result else { break }
                 buffer = remainder
-                if let request = try? ProtocolCodec.decodeRequest(payload) {
-                    let reply = await service.handle(request)
-                    await send(.reply(reply), on: stream)
-                } else if let frame = try? ProtocolCodec.decodeFrame(payload) {
-                    // A client may tag its frames too; accept both spellings so the encoder is
-                    // not something a caller has to get exactly right.
-                    if let request = frame.asRequest {
-                        let reply = await service.handle(request)
-                        await send(.reply(reply), on: stream)
-                    }
-                }
+                // A whole frame, so the session is a conversation rather than a client that sent a byte and
+                // stopped: the startup deadline no longer applies to it. It is *bytes* that make the server
+                // serve a session — measured, one byte is enough to hold an admission slot and receive the
+                // state pushes — so the deadline has to cover the frame being finished, not the first byte
+                // arriving (A157).
+                spokenSessions.insert(id)
+                await answer(payload, on: stream)
             }
         }
+    }
+
+    /// Answer one decoded payload.
+    ///
+    /// Extracted from `serve`, which is at its complexity and length budgets: three of its four branches are
+    /// about a payload the server cannot read, and they read better together than inside the read loop.
+    private func answer(_ payload: Data, on stream: WebTransportBidirectionalStream) async {
+        do {
+            let request = try ProtocolCodec.decodeRequest(payload)
+            let reply = await service.handle(request)
+            await send(.reply(reply), on: stream)
+        } catch let error as ProtocolError {
+            // A client may tag its frames too; accept both spellings so the encoder is not something a caller
+            // has to get exactly right.
+            if let request = (try? ProtocolCodec.decodeFrame(payload))?.asRequest {
+                let reply = await service.handle(request)
+                await send(.reply(reply), on: stream)
+                return
+            }
+            // Neither spelling read it. Unlike the framing refusal above, the length prefix is intact, so
+            // later frames are still reachable and the session is still usable — but a client waiting for a
+            // reply must not be left waiting for one that will never come. This was a `try?` that dropped the
+            // payload and said nothing at all (A157).
+            let reason = error.errorDescription ?? "the frame could not be read"
+            note(reason)
+            await send(.reply(.failed(reason)), on: stream)
+        } catch {
+            // `decodeRequest` reports a refusal as `ProtocolError`; anything else is a defect, and it is named
+            // rather than dropped, which is the whole of this branch's reason for existing.
+            let reason = "the frame could not be read: \(error.localizedDescription)"
+            note(reason)
+            await send(.reply(.failed(reason)), on: stream)
+        }
+    }
+
+    /// Refuse a frame the framing would not read, and end the session.
+    ///
+    /// The length prefix is the only thing that says where the next frame begins, so every later frame is
+    /// unreachable: the session cannot be left running, and it is answered first so the client is told why.
+    /// This was a `try?`, which discarded the error and left a session that answered nothing for the rest of
+    /// its life — and the cap was low enough that a legitimate large attachment reached it (A151 era, A157).
+    private func refuseFraming(
+        _ error: Error, on stream: WebTransportBidirectionalStream, session: WebTransportSession
+    ) async {
+        let reason =
+            (error as? ProtocolError)?.errorDescription
+            ?? "the frame could not be read: \(error.localizedDescription)"
+        note(reason)
+        await send(.reply(.failed(reason)), on: stream)
+        try? await session.close(reason: reason)
     }
 
     /// Write one frame. Every write goes through here so there is one place that serialises
@@ -334,14 +410,14 @@ public final class WebTransportEngineServer {
         do {
             encoded = try ProtocolCodec.encode(frame)
         } catch {
-            lastSessionError = "could not encode a frame: \(error.localizedDescription)"
+            note("could not encode a frame: \(error.localizedDescription)")
             return
         }
         let framed: Data
         do {
             framed = try LengthFraming.frameChecked(encoded)
         } catch {
-            lastSessionError = error.localizedDescription
+            note("could not frame a reply: \(error.localizedDescription)")
             return
         }
         do {
@@ -351,8 +427,43 @@ public final class WebTransportEngineServer {
         }
     }
 
+    /// One thing that ended a session, kept so a client that keeps failing can be diagnosed.
+    public struct SessionError: Sendable, Equatable {
+        /// What happened, in a sentence: a framing refusal, a session that never spoke, an encode failure.
+        public var reason: String
+        public var at: Date
+    }
+
     /// Why the most recent session ended, for diagnostics.
-    public private(set) var lastSessionError: String?
+    ///
+    /// Derived from `recentSessionErrors` rather than kept as its own slot. It *was* a slot, and concurrent
+    /// sessions overwrote one another's reasons, so a client that disconnected for two different reasons
+    /// left only the second (A157) — and nothing read it at all.
+    public var lastSessionError: String? { sessionErrors.first?.reason }
+
+    /// The reasons recent sessions ended, newest first, bounded by `sessionErrorHistoryLimit`.
+    ///
+    /// A ring rather than a slot, which is what the HTTP listener does with its own failures (A151) and for
+    /// the same reason: a diagnostic that remembers only the most recent event cannot describe a pattern,
+    /// and "the app keeps disconnecting" is a pattern.
+    public var recentSessionErrors: [SessionError] { sessionErrors }
+
+    /// How many session endings are kept. Small: the reasons are a handful of sentences, and a session that
+    /// fails in a loop must not grow the list.
+    static let sessionErrorHistoryLimit = 8
+
+    private var sessionErrors: [SessionError] = []
+
+    /// Record why a session ended, keeping the newest `sessionErrorHistoryLimit`.
+    ///
+    /// Internal rather than private so the tests can drive the ring without a socket, which is how the HTTP
+    /// listener's ring is tested too.
+    func note(_ reason: String) {
+        sessionErrors.insert(SessionError(reason: reason, at: .now), at: 0)
+        if sessionErrors.count > Self.sessionErrorHistoryLimit {
+            sessionErrors.removeLast(sessionErrors.count - Self.sessionErrorHistoryLimit)
+        }
+    }
 
     // MARK: - Events
 

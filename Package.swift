@@ -124,7 +124,14 @@ let package = Package(
 
         .testTarget(
             name: "ChatBotsCoreTests",
-            dependencies: ["ChatBotsCore"],
+            // The transport product as well as the core, since A157: two of the behaviours a transport
+            // server has to have are about a *misbehaving* client — one that connects and says nothing, and
+            // one that sends a frame no decoder can read — and `ChatBotsCore`'s own client cannot
+            // misbehave on purpose. The tests that need it speak the library's own protocol.
+            dependencies: [
+                "ChatBotsCore",
+                .product(name: "WebTransport", package: "WebTransport"),
+            ],
             path: "Tests/ChatBotsCoreTests",
             swiftSettings: ownedTargetSettings
         ),
