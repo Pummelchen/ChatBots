@@ -30,10 +30,26 @@ START_ENGINE=1
 ENGINE_PORT=7789
 ACTION=run
 
+# The value an option was given, or a message and an exit.
+#
+# `--port "${2:-}"; shift 2` with the option last shifted nothing — `shift 2` fails when only one
+# argument remains — so the case was re-entered with the same argument and the loop ran for ever
+# without printing anything (A181). A missing value is a usage error, and saying so is what a caller
+# needs; every option that takes one goes through here.
+require_value() {
+  if [ $# -ge 2 ] && [ -n "$2" ]; then
+    return 0
+  fi
+  echo "$1 needs a value" >&2
+  exit 2
+}
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-engine) START_ENGINE=0; shift ;;
-    --port) ENGINE_PORT="${2:-7789}"; shift 2 ;;
+    --port)
+      require_value "$1" "${2:-}"
+      ENGINE_PORT="${2:-7789}"; shift 2 ;;
     --stop) ACTION=stop; shift ;;
     -h|--help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;

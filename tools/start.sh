@@ -54,13 +54,35 @@ CADDY_LOG="$LOG_DIR/caddy.log"
 ENGINE_PID="$LOG_DIR/engine.pid"
 CADDY_PID="$LOG_DIR/caddy.pid"
 
+# The value an option was given, or a message and an exit.
+#
+# `--port "${2:-}"; shift 2` with the option last shifted nothing — `shift 2` fails when only one
+# argument remains — so the case was re-entered with the same argument and the loop ran for ever
+# without printing anything (A181). A missing value is a usage error, and saying so is what a caller
+# needs; every option that takes one goes through here.
+require_value() {
+  if [ $# -ge 2 ] && [ -n "$2" ]; then
+    return 0
+  fi
+  echo "$1 needs a value" >&2
+  exit 2
+}
+
 while [ $# -gt 0 ]; do
   case "$1" in
-    --port) PORT="${2:-}"; shift 2 ;;
-    --engine) ENGINE_PORT="${2:-}"; shift 2 ;;
+    --port)
+      require_value "$1" "${2:-}"
+      PORT="$2"; shift 2 ;;
+    --engine)
+      require_value "$1" "${2:-}"
+      ENGINE_PORT="$2"; shift 2 ;;
     --foreground) ACTION=run; shift ;;
-    --open) OPEN_WHERE="${2:-none}"; shift 2 ;;
-    --view) VIEW_MODE="${2:-auto}"; shift 2 ;;
+    --open)
+      require_value "$1" "${2:-}"
+      OPEN_WHERE="${2:-none}"; shift 2 ;;
+    --view)
+      require_value "$1" "${2:-}"
+      VIEW_MODE="${2:-auto}"; shift 2 ;;
     --local-only) LOCAL_ONLY=1; shift ;;
     --stop) ACTION=stop; shift ;;
     --status) ACTION=status; shift ;;
