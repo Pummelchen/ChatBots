@@ -95,7 +95,6 @@ struct ChatBotsApp: App {
                 .themePalette(theme.palette)
                 .environmentObject(theme)
                 .environmentObject(endpoints)
-                .environmentObject(settings)
                 .environmentObject(zoom)
                 // Start the engine, attach to it, and only then restore the seats' saved
                 // endpoints.

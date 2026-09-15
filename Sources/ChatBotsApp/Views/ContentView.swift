@@ -20,8 +20,7 @@ struct ContentView: View {
             Divider()
             ModeratorBar(controller: controller)
         }
-        // Minimums only — no maximum — so the window can be dragged to any size.
-        // Minimums only — no maximum — so the window can be dragged to any size. The floor
+        // Minimums only — no maximum — so the window can be dragged to any size, and the floor
         // rises with the text size, since a window that fits at 100% clips at 200%.
         .frame(
             minWidth: zoom.minimumWindowSize.width, idealWidth: 1280,
