@@ -3,8 +3,10 @@
 Machine-readable twin: `ledger.json` (same ids; carries every field of §8's schema).
 **This file wins on conflict with the wiki.**
 
-Branch `audit/2026-09-13` from `main` @ `a6d6999`, fast-forwarded into `main` when the audit was
-complete and kept in step with it since — both names point at the same commit. Baseline and evidence:
+Branch `audit/2026-09-15`, cut from `main` @ `02ddd4e`: the Swift 6.4 / Xcode 27 / macOS 27 re-audit.
+By decision `main` stays untouched until Phase E passes and the branch goes back by pull request;
+`main` has since moved on its own (to `349fefe`), so this branch and `main` are **not** the same
+commit. The previous `audit/2026-09-13` work is already in `main`. Baseline and evidence:
 [`plan.md`](plan.md),
 [`baseline/`](baseline). Fleet and toolchain: [`environment.md`](environment.md).
 Scope and trust boundaries: [`inventory.md`](inventory.md).

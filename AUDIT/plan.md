@@ -3,12 +3,20 @@
 Companion files: [`environment.md`](environment.md) (fleet/toolchain), [`inventory.md`](inventory.md)
 (scope, §2), [`ledger.md`](ledger.md) + `ledger.json` (tasks), [`baseline/`](baseline) (raw evidence).
 
-Branch `audit/2026-09-13` from `main` @ `a6d6999`. `main` was untouched for the whole audit, and the
-branch was landed on it as a fast-forward once Phase E was green. Nothing is force-pushed.
+Branch `audit/2026-09-15`, cut from `main` @ `02ddd4e`, for the Swift 6.4 / Xcode 27 / macOS 27
+re-audit. `main` is deliberately untouched until Phase E is green; the branch then goes back by pull
+request. The previous `audit/2026-09-13` audit was landed on `main` as a fast-forward and is history;
+`main` has moved on since (`349fefe`), so the two are not the same commit. Nothing is force-pushed.
 
 > **Scope.** This project only, for the reason recorded at the top of `inventory.md`: the
 > workspace is a set of sibling repositories, not a monorepo, and `Converter` (Phase A) and
 > `MCPSearch` (Phase B, session still active) are owned by other audit sessions.
+
+> **Reading the phase sections below.** They are the 2026-09-13 audit's own plan and status, kept as
+> the record of how that audit ran. The 2026-09-15 re-audit re-ran Phase A and Phase B against the
+> Swift 6.4 toolchain and those results are appended to [`environment.md`](environment.md) and
+> [`inventory.md`](inventory.md); it is **in Phase C**, and its Phase E has not been run. Where the
+> two disagree about counts, `ledger.json` decides and nothing hand-written here does.
 
 ## Phase A — inventory, baseline, environment ✅ complete
 
@@ -140,8 +148,11 @@ and marked L1, L2, L4 and L6 "in progress". The table was the stale artifact, no
 
 ## Phase C — fix → test → audit
 
-**Complete: 127 of 127 tasks DONE, 0 open, 0 blocked.** Work order: S0, then S1, then S2, then S3. One task = one commit,
-`audit(<id>): <title>`, on `audit/2026-09-13`.
+The 2026-09-13 audit ran this phase to completion: 127 of 127 tasks DONE, 0 open, 0 blocked. The
+2026-09-15 re-audit is **in** this phase — for its live counts read the generated table in
+[`ledger.md`](ledger.md), which is rendered from `ledger.json`, not any number written here. Work
+order: S0, then S1, then S2, then S3. One task = one commit,
+`audit(<id>): <title>`, on `audit/2026-09-15`.
 
 A DONE status is a claim about the tree, so it is checked against the tree and not against the
 ledger: **`AUDIT/verify-done-commits.sh` must exit 0** before a fix task is called DONE. It takes

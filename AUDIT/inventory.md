@@ -1,6 +1,8 @@
 # AUDIT — scope inventory (§2)
 
-Produced before any audit pass, as §2 requires. Branch `audit/2026-09-13` from `main` @ `a6d6999`.
+Produced before any audit pass, as §2 requires, for the 2026-09-13 audit: branch `audit/2026-09-13`
+from `main` @ `a6d6999`. The 2026-09-15 re-audit re-derived the scope against Swift 6.4 and Xcode 27
+in the section at the end of this file; its branch is `audit/2026-09-15` from `main` @ `02ddd4e`.
 
 > **Scope note, stated before anything else.** The brief describes "a monorepo with 20+
 > increasingly interdependent projects". The working tree is **not** a monorepo: it is a

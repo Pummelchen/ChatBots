@@ -1,13 +1,32 @@
 # AUDIT — handover: where this stands and what to do next
 
-**The audit is complete.** Everything below the state table is the history of how it got there, kept
-because the reasoning is the useful part. **`ledger.json` carries the authoritative enumeration and
-status — it is what every gate reads** — and `ledger.md` renders its status tables from it
-(`AUDIT/render-ledger.sh --check`) while carrying the prose record of each fix. The earlier claim
-that `ledger.md` "is the source of truth and wins on any conflict" was wrong: it enumerated 28 of
-the then-116 tasks and stopped at A89, which is recorded as A118.
+**The 2026-09-13 audit is complete and landed. The 2026-09-15 re-audit is not.** Read the current
+state first, below; everything under *the 2026-09-13 audit, as it landed* is the history of how the
+previous audit got where it did, kept because the reasoning is the useful part. **`ledger.json`
+carries the authoritative enumeration and status — it is what every gate reads** — and `ledger.md`
+renders its status tables from it (`AUDIT/render-ledger.sh --check`) while carrying the prose record
+of each fix. The earlier claim that `ledger.md` "is the source of truth and wins on any conflict"
+was wrong: it enumerated 28 of the then-116 tasks and stopped at A89, which is recorded as A118.
 
-## Where it stands, in one table
+## Where it stands — the 2026-09-15 re-audit
+
+| | |
+| --- | --- |
+| Branch | `audit/2026-09-15`, cut from `main@02ddd4e`, for the Swift 6.4 / Xcode 27 / macOS 27 re-audit. **Deliberately unmerged**: by decision, `main` is untouched until Phase E is green and the branch goes back by pull request. `main` has since moved on its own (to `349fefe`), so the branch and `main` are **not** the same commit and must not be described as though they were |
+| Tasks | **No count is written here on purpose.** The authoritative counts are the generated table at the top of [`ledger.md`](ledger.md), which `AUDIT/render-ledger.sh --check` keeps in step with `ledger.json` and Phase E re-checks. A hand-copied count going stale is exactly what A118 and A211 record |
+| Severity | Every S0 is fixed — A136 (cross-origin drive-by on the HTTP API) and A137 (a non-atomic index write that could lose a conversation). The S1s are the current work |
+| Toolchain | Swift 6.4, Xcode 27.0, macOS 27.0, SDK 27.0, uniform across the four nodes. The Metal toolchain component is installed on `node1` only (A133) |
+| Phases | A ✅ (this toolchain) · B ✅ · C in progress · D continuous · **E not started** |
+| Entry point | `ledger.md`, then [`environment.md`](environment.md), then resume from the highest-severity task that is not DONE or BLOCKED. Do not restart |
+
+## The 2026-09-13 audit, as it landed — history
+
+Everything from here down describes **that** audit, not the current one. Its "0 open" and its green
+Phase E are statements about its own 127 tasks. The sections that follow to the end of this file are
+that audit's history; the one exception is *Environment facts the next session needs*, which still
+describes the fleet.
+
+### Where the 2026-09-13 audit stood, in one table
 
 | | |
 | --- | --- |
@@ -25,9 +44,9 @@ baselines with their methods, gates, and the re-recorded style waivers) · `inve
 `environment.md` (hosts, toolchain, contention) · `baseline/README.md` (which baseline numbers were
 wrong and why) · `baseline/phaseE/` (the acceptance run's own logs and summary).
 
-## What is left
+### What was left when that audit landed
 
-**Nothing in the audit.** What remains is a decision and two stated residuals:
+**Nothing in that audit.** What remained was a decision and two stated residuals:
 
 1. ~~**Merge `audit/2026-09-13` into `main`, or review it first.**~~ **Done** — the branch was
    strictly ahead of `main` (0 behind, fast-forwardable) and was fast-forwarded into it. A squash was
