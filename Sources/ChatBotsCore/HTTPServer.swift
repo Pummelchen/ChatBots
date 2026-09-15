@@ -511,6 +511,48 @@ public final class HTTPServer: @unchecked Sendable {
     /// the connection it was armed for.
     private var idleDeadlines: [ObjectIdentifier: UUID] = [:]
 
+    /// One thing that went wrong on this listener, kept so a live engine can be diagnosed.
+    public struct ConnectionFailure: Sendable, Equatable, Codable {
+        /// What happened, in a sentence: a connection error, a request the parser refused, a connection
+        /// refused for being over the limit.
+        public var reason: String
+        public var at: Date
+    }
+
+    /// How many failures are kept.
+    ///
+    /// Bounded, because anyone who can reach the port can produce one: an unbounded log of a server that
+    /// listens on every interface is a memory leak wearing a diagnostics label (A151).
+    public static let failureHistoryLimit = 20
+
+    /// The most recent failures, newest first.
+    ///
+    /// This is the other half of A151: the counters below existed and were reachable from no endpoint, and
+    /// a client that walked away mid-request was `_ = error`'d out of existence, so diagnosing a running
+    /// engine meant reading source. `APIServer` serves this on `/api/health`.
+    public var recentFailures: [ConnectionFailure] {
+        failureLock.lock()
+        defer { failureLock.unlock() }
+        return failures
+    }
+    /// Its own lock rather than `stateLock`, so that recording a failure is safe on every path —
+    /// including the ones that already hold `stateLock` — without nesting one lock inside another.
+    private let failureLock = NSLock()
+    private var failures: [ConnectionFailure] = []
+
+    /// Record one failure, keeping the newest `failureHistoryLimit`.
+    ///
+    /// Internal rather than private so the tests can drive the ring without a socket, and because the
+    /// network queue and the main actor both call it: the lock is the whole of the synchronisation.
+    func note(_ reason: String) {
+        failureLock.lock()
+        defer { failureLock.unlock() }
+        failures.insert(ConnectionFailure(reason: reason, at: .now), at: 0)
+        if failures.count > Self.failureHistoryLimit {
+            failures.removeLast(failures.count - Self.failureHistoryLimit)
+        }
+    }
+
     /// How many connections have been refused for being over `maximumConnections`.
     ///
     /// Counted and answerable because the finding's other half was that nothing reported this
@@ -748,6 +790,7 @@ public final class HTTPServer: @unchecked Sendable {
 
         connection.start(queue: queue)
         guard !atCapacity else {
+            note("refused: \(maximumConnections) connections already open")
             // Refused rather than queued, and refused with an answer rather than silence: a
             // peer over the cap is told, and the connection is not entered in the table.
             write(
@@ -793,6 +836,7 @@ public final class HTTPServer: @unchecked Sendable {
 
         // Stale token, or the connection has already been answered or reaped: nothing to do.
         guard isCurrent, isLive else { return }
+        note("request: not completed in time")
         write(
             .error("the request was not completed in time", status: 408), to: connection,
             thenClose: true)
@@ -827,12 +871,14 @@ public final class HTTPServer: @unchecked Sendable {
             } catch is HTTPParser.Incomplete {
                 if isComplete {
                     // The peer closed mid-request; nothing useful to send.
+                    self.note("request: the peer closed before the request was complete")
                     self.finish(connection, error: nil)
                 } else if accumulated.count > HTTPParser.maximumHeadBytes
                     + HTTPParser.maximumBodyBytes
                 {
                     // Head plus body, because a head that has not terminated is counted here too and the
                     // head has its own cap inside `parse` (A145).
+                    self.note("request: larger than the head and body limits")
                     self.write(
                         .error("Request body is too large", status: 413), to: connection,
                         thenClose: true)
@@ -842,10 +888,16 @@ public final class HTTPServer: @unchecked Sendable {
                     self.receive(on: connection, buffer: accumulated)
                 }
             } catch let error as HTTPError {
+                // The parser refused it: a malformed head, a head or body past its cap, a request line it
+                // cannot read. Answered with its own status and, now, remembered (A151).
+                self.note("request: \(error.localizedDescription)")
                 self.write(
                     .error(error.localizedDescription, status: error.statusCode), to: connection,
                     thenClose: true)
             } catch {
+                // Anything else, which the caller sees as a 400. Recorded too: the failures worth reading are
+                // the ones nobody wrote a status code for.
+                self.note("request: \(error.localizedDescription)")
                 self.write(
                     .error(error.localizedDescription, status: 400), to: connection, thenClose: true)
             }
@@ -931,7 +983,10 @@ public final class HTTPServer: @unchecked Sendable {
 
     private func finish(_ connection: NWConnection, error: NWError?) {
         if let error {
-            _ = error  // A client that walks away mid-request is not worth reporting.
+            // Not worth *showing* anyone — a client that walks away mid-request is routine — but worth
+            // recording once, because "the connection keeps dropping" is not diagnosable otherwise. The
+            // ring is bounded, so routine noise cannot grow (A151).
+            note("connection: \(error)")
         }
         stateLock.lock()
         connections[ObjectIdentifier(connection)] = nil

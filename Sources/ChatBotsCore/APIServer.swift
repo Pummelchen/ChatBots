@@ -224,6 +224,25 @@ public struct APIAttachment: Codable, Sendable {
     // them should ask for one by id rather than be sent all of them again and again.
 }
 
+/// What `/api/health` answers with.
+///
+/// Its own type rather than a dictionary of strings, because a diagnostics report has numbers and a list
+/// in it (A151).
+public struct APIHealth: Codable, Sendable {
+    public var status: String
+    /// A number, like every other counter here: this type exists so a report carries numbers rather than
+    /// strings a reader has to parse.
+    public var port: Int
+    /// Connections the listener is holding, streams it is holding open, and connections it has refused.
+    public var connections: Int
+    public var openStreams: Int
+    public var refusedConnections: Int
+    /// Why the listener stopped, when it did.
+    public var listenerError: String?
+    /// The most recent failures, newest first, bounded by `HTTPServer.failureHistoryLimit`.
+    public var recentFailures: [HTTPServer.ConnectionFailure]
+}
+
 public struct APIModelOption: Codable, Sendable {
     public var id: String
     public var name: String
@@ -346,6 +365,13 @@ public final class APIServer {
     /// command cannot work here and fail over WebTransport.
     private let service: EngineService
     private var server: HTTPServer?
+
+    /// The listener itself, for the tests that inspect what it recorded (A151).
+    ///
+    /// Internal rather than public: nothing outside this module needs the socket, and every counter it
+    /// holds is already answered over `/api/health`.
+    var httpServer: HTTPServer? { server }
+
     private var feedTask: Task<Void, Never>?
     private var tokenObserver: UUID?
     private var streams: [HTTPServer.EventStream] = []
@@ -502,7 +528,21 @@ public final class APIServer {
         // Transport-specific, and none of it is the engine's business.
         switch (request.method, request.path) {
         case ("GET", "/api/health"):
-            return .json(["status": "ok", "port": "\(port)"])
+            // What the listener is doing, not just "ok". The counters existed and were reachable from no
+            // endpoint, and a dropped connection or a refused request left no trace anywhere, so
+            // diagnosing a running engine meant reading source (A151). The strings are operational — a
+            // connection error, the listener's own failure, a request the parser refused — and carry no
+            // conversation data; `/api` is unauthenticated and LAN-reachable, which is why the history is
+            // bounded at the source rather than here.
+            return .json(
+                APIHealth(
+                    status: "ok",
+                    port: Int(port),
+                    connections: server?.connectionCount ?? 0,
+                    openStreams: server?.openStreamCount ?? 0,
+                    refusedConnections: server?.refusedConnectionCount ?? 0,
+                    listenerError: server?.lastError,
+                    recentFailures: server?.recentFailures ?? []))
 
         case ("GET", "/api/devices"):
             return .json(
