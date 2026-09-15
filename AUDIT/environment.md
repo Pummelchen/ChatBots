@@ -208,15 +208,18 @@ component is checked* at the end of this file. node3 and node4 are still without
 | --- | --- | --- | --- |
 | Swift | 6.3.3 | **6.4** | Xcode 27.0 |
 | SDK | macOS 26.5 | **macOS 27.0** | Xcode 27.0 |
-| `swift-format` | 603.0.0 (brew) | **`xcrun swift-format`** — Xcode 27's, reports `main` — plus 603.0.0 (brew) | Xcode toolchain / brew |
+| `swift-format` | 603.0.0 (brew) | 603.0.0 (brew), which is the one on `PATH` and the one both gates run; Xcode 27's `xcrun swift-format` (reports `main`) reports the same diagnostics | brew |
 | `swiftlint` | 0.65.1 | 0.65.1 | brew |
 | `llvm-cov` | Homebrew LLVM 23.1.1 | **`xcrun llvm-cov`** (Xcode 27) | Xcode |
 | `gitleaks` / `osv-scanner` / `semgrep` / `ruff` / `pyright` / `shellcheck` | 8.30.1 / 2.5.1 / 1.176.0 / 0.16.7 / 1.1.414 / 0.11.0 | unchanged | brew |
 | Python | 3.14.7 | 3.14.7 | brew |
 | Metal toolchain | *(bundled)* | **component 27A266a, separate download (A133)** | `xcodebuild -downloadComponent` |
 
-Both `swift-format` builds report **the same 744 diagnostics** on the same tree, so the toolchain move
-did not change the formatter's verdict.
+Both `swift-format` builds report the same diagnostics on the same tree — **744** when the toolchain
+moved, which is where the recorded waiver comes from, and **739** measured 2026-09-16 — so the move did
+not change the formatter's verdict and the waiver never had to be raised. It is the **brew** build the
+gates run, because they invoke `swift-format` from `PATH`; Xcode's is reachable only through `xcrun` and
+is what the comparison was made with.
 
 ## Reproducing this environment (2026-09-15)
 
@@ -227,8 +230,12 @@ xcodebuild -downloadComponent MetalToolchain     # A133: required, or nothing bu
 xcodebuild -runFirstLaunch
 swift --version                                  # expect 6.4
 
-brew install swiftlint llvm gitleaks osv-scanner semgrep ruff pyright shellcheck jq
-# swift-format comes from Xcode 27 (xcrun swift-format); it is not installed from brew for this audit.
+brew install swiftlint swift-format llvm gitleaks osv-scanner semgrep ruff pyright shellcheck jq
+# `swift-format` is installed from brew on purpose: both gates invoke it from PATH and check it with
+# `command -v`, which `xcrun` does not satisfy. Xcode 27 ships one too, and `xcrun --find` reports a path
+# for it on a host where nothing else is installed — the lesson the Metal component above taught — so the
+# gate must not rest on `xcrun` finding it. The two builds agree on the diagnostics; the recorded waiver
+# is from the brew one.
 ```
 
 **The same versions on the CI runner, verified.** GitHub's Linux runner installs shellcheck,
