@@ -17,6 +17,7 @@ was wrong: it enumerated 28 of the then-116 tasks and stopped at A89, which is r
 | Severity | Every S0 is fixed — A136 (cross-origin drive-by on the HTTP API) and A137 (a non-atomic index write that could lose a conversation). The S1s are the current work |
 | Toolchain | Swift 6.4, Xcode 27.0, macOS 27.0, SDK 27.0, uniform across the four nodes. The Metal toolchain component is installed on `node1` only (A133) |
 | Phases | A ✅ (this toolchain) · B ✅ · C in progress · D continuous · **E not started** |
+| Wiki | §9's tracker is updated for the re-audit: `Audit-tracker.md` and `What-is-left-to-do.md` lead with this audit and keep the 2026-09-13 result below a boundary (wiki commit `d3c3866`) |
 | Entry point | `ledger.md`, then [`environment.md`](environment.md), then resume from the highest-severity task that is not DONE or BLOCKED. Do not restart |
 
 ## The 2026-09-13 audit, as it landed — history
