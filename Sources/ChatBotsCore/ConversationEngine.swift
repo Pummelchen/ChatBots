@@ -165,6 +165,17 @@ public final class ConversationEngine {
     public private(set) var notices: [String] = []
     private var noticeContinuation: AsyncStream<[String]>.Continuation?
 
+    /// Why a seat's model could not be loaded, by seat id, from the last attempt to load it.
+    ///
+    /// A failed load was a notice in the room and nothing else, so a listener could answer
+    /// `/api/health` with "ok" while every seat was unusable — the checkpoint deleted, the Metal
+    /// library missing. This is what the health check reads (A152). Written from the load group, which
+    /// is why it lives on the main actor with the rest of the observable state.
+    ///
+    /// Cleared by the next successful load and by pointing a seat at a different checkpoint, so a
+    /// failure that has been dealt with is not reported for the rest of the session.
+    public private(set) var modelLoadFailures: [String: String] = [:]
+
     /// Notices as they happen.
     public private(set) lazy var noticeUpdates: AsyncStream<[String]> = {
         AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
@@ -457,7 +468,18 @@ public final class ConversationEngine {
     private func rebuildMLXEngine(at index: Int) {
         let old = seats[index].mlx
         seats[index].mlx = configuration.makeMLXEngine(seats[index].spec)
+        // The new checkpoint has not been tried yet, so the old model's failure is not this one's
+        // (A152). What it does get is a clean slate: the next load either clears it or sets its own.
+        modelLoadFailures[seats[index].spec.id] = nil
         Task { await old.unload() }
+    }
+
+    /// Record whether a seat's model loaded, for the health check (A152).
+    ///
+    /// Called from the load group next to the notice, so the room and the endpoint cannot disagree
+    /// about what happened.
+    private func recordModelLoad(of seatID: String, failure: String?) {
+        modelLoadFailures[seatID] = failure
     }
 
     /// Every seat, in speaking order.
@@ -551,9 +573,11 @@ public final class ConversationEngine {
                     group.addTask {
                         do {
                             try await seat.engine.load()
+                            await self?.recordModelLoad(of: seat.spec.id, failure: nil)
                         } catch {
-                            await self?.note(
-                                "\(seat.spec.id) failed to load: \(error.localizedDescription)")
+                            let reason = error.localizedDescription
+                            await self?.note("\(seat.spec.id) failed to load: \(reason)")
+                            await self?.recordModelLoad(of: seat.spec.id, failure: reason)
                         }
                     }
                 }

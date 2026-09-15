@@ -229,7 +229,17 @@ public struct APIAttachment: Codable, Sendable {
 /// Its own type rather than a dictionary of strings, because a diagnostics report has numbers and a list
 /// in it (A151).
 public struct APIHealth: Codable, Sendable {
+    /// `"ok"`, or `"unavailable"` when the engine cannot serve a conversation (A152).
     public var status: String
+    /// The same fact as a boolean, for a client that would rather not read the word.
+    public var ready: Bool
+    /// How many seats the engine has.
+    public var seats: Int
+    /// Why the engine cannot serve a conversation, in a sentence. Nil when it can.
+    public var reason: String?
+    /// The seats whose model could not be loaded, and why, by seat id. A seat here is degradation
+    /// rather than an outage while another seat still works.
+    public var failedSeats: [String: String]
     /// A number, like every other counter here: this type exists so a report carries numbers rather than
     /// strings a reader has to parse.
     public var port: Int
@@ -534,15 +544,27 @@ public final class APIServer {
             // connection error, the listener's own failure, a request the parser refused — and carry no
             // conversation data; `/api` is unauthenticated and LAN-reachable, which is why the history is
             // bounded at the source rather than here.
-            return .json(
+            //
+            // And the status code answers the other question: whether the engine behind the listener can
+            // serve a conversation at all. It used to be a hardcoded 200, so a client could not tell the
+            // two apart (A152). 503 is what `tools/start.sh` already treats as "not ready" — it probes
+            // this route with `curl -sf` — and it is the answer an orchestrator needs.
+            let readiness = service.readiness
+            var response = HTTPResponse.json(
                 APIHealth(
-                    status: "ok",
+                    status: readiness.isReady ? "ok" : "unavailable",
+                    ready: readiness.isReady,
+                    seats: readiness.seats,
+                    reason: readiness.reason,
+                    failedSeats: readiness.failedSeats,
                     port: Int(port),
                     connections: server?.connectionCount ?? 0,
                     openStreams: server?.openStreamCount ?? 0,
                     refusedConnections: server?.refusedConnectionCount ?? 0,
                     listenerError: server?.lastError,
                     recentFailures: server?.recentFailures ?? []))
+            response.status = readiness.isReady ? 200 : 503
+            return response
 
         case ("GET", "/api/devices"):
             return .json(
