@@ -183,6 +183,45 @@ public struct ImageExtractor: DocumentExtracting {
         )
     }
 
+    /// Refuse an image before it is decoded: not a format ImageIO knows, no size it will report, or
+    /// more pixels than the cap allows (A148).
+    ///
+    /// A byte cap cannot bound a decode, because the formats that need converting are compressed: a
+    /// 663 KB TIFF can declare a canvas that decodes to 127 MB, and the same trick at the 64 MB byte cap
+    /// is tens of gigabytes. ImageIO reports the declared size from the file's own metadata, so this is
+    /// where the numbers are read and the answer is no — before `CreateImageAtIndex` allocates
+    /// anything.
+    ///
+    /// Its own function rather than a block inside `wireRepresentation`, which was at swiftlint's
+    /// complexity budget with these guards inline.
+    static func validateImage(
+        _ source: CGImageSource, properties: [CFString: Any]?, name: String,
+        limits: AttachmentLimits
+    ) throws {
+        // A format ImageIO does not recognise at all is the file somebody's picker offered because of
+        // its extension; a format it recognises but cannot measure is a damaged header. The two read
+        // differently to whoever attached the file, so they are refused with different sentences.
+        guard CGImageSourceGetType(source) != nil else {
+            throw DocumentError.unreadable(
+                "\(name) is not an image format a model can be given, and it could not be "
+                    + "converted")
+        }
+        let width = (properties?[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue ?? 0
+        let height = (properties?[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue ?? 0
+        guard width > 0, height > 0 else {
+            throw DocumentError.unreadable(
+                "\(name) reports no usable dimensions, so it cannot be converted safely")
+        }
+        // `multipliedReportingOverflow` rather than `width * height`: a header may declare two enormous
+        // numbers, and the product of those traps before any comparison can refuse it.
+        let product = width.multipliedReportingOverflow(by: height)
+        guard !product.overflow, product.partialValue <= limits.maximumImagePixels else {
+            throw DocumentError.imageTooManyPixels(
+                name, pixels: product.overflow ? Int.max : product.partialValue,
+                limit: limits.maximumImagePixels)
+        }
+    }
+
     /// The image bytes as a type a model can be given, converting when the bytes are not one.
     ///
     /// Everything `AttachedDocument.mediaType(of:)` recognises is passed through untouched, so
@@ -197,15 +236,20 @@ public struct ImageExtractor: DocumentExtracting {
         if AttachedDocument.mediaType(of: data) != nil { return data }
 
         let name = filename.isEmpty ? "the image" : filename
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-            let decoded = CGImageSourceCreateImageAtIndex(source, 0, nil)
-        else {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
             throw DocumentError.unreadable(
                 "\(name) is not an image format a model can be given, and it could not be "
                     + "converted")
         }
 
         let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        try validateImage(source, properties: properties, name: name, limits: limits)
+
+        guard let decoded = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            throw DocumentError.unreadable(
+                "\(name) is not an image format a model can be given, and it could not be "
+                    + "converted")
+        }
 
         // Orientation is carried in the file, not in the pixels, and a re-encode that ignores
         // it hands the model a sideways picture. That is the normal iPhone case, not an edge

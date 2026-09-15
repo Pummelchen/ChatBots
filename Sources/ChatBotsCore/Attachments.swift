@@ -239,6 +239,8 @@ public enum DocumentError: LocalizedError, Equatable {
     case emptyText(String)
     case needsOCR(String)
     case tooLarge(String, limit: Int)
+    /// An image whose own metadata declares more pixels than this app will decode (A148).
+    case imageTooManyPixels(String, pixels: Int, limit: Int)
     case imageNotAllowed
 
     public var errorDescription: String? {
@@ -253,6 +255,9 @@ public enum DocumentError: LocalizedError, Equatable {
             "\(name) has no text layer — it looks like a scan, so its text cannot be extracted."
         case .tooLarge(let name, let limit):
             "\(name) is larger than \(limit / 1_000_000) MB."
+        case .imageTooManyPixels(let name, let pixels, let limit):
+            "\(name) is about \(pixels / 1_000_000) megapixels; images are limited to "
+                + "\(limit / 1_000_000) MP. Resize it first."
         case .imageNotAllowed:
             "Images need every participating seat to support vision."
         }
@@ -270,6 +275,19 @@ public struct AttachmentLimits: Sendable {
     /// Refuse files larger than this outright, since reading them is the slow part.
     public var maximumFileBytes: Int = AttachmentLimits.defaultMaximumFileBytes
 
+    /// The largest image, in pixels, that will be decoded while being converted.
+    ///
+    /// A byte cap cannot bound a decode, because the formats that need converting are compressed: PNG
+    /// and TIFF are, and a 663 KB file can declare a 6 500 × 6 500 canvas that decodes to 127 MB —
+    /// measured, with the numbers in `AUDIT/baseline/swift64/a148-image-decode-bomb.log`. At the 64 MB
+    /// byte cap that is tens of gigabytes, which is why the dimensions are read from the file's own
+    /// metadata and refused before anything is decoded.
+    ///
+    /// 40 MP is more than twice a 20 MP camera, and a vision model downscales to a small fraction of
+    /// it anyway. Images that need no conversion are not decoded here at all — they are passed through
+    /// as they arrived, and the byte cap is what bounds them.
+    public var maximumImagePixels: Int = AttachmentLimits.defaultMaximumImagePixels
+
     /// The shipped per-file ceiling, and the figure the wire limits are derived from.
     ///
     /// A named constant rather than a literal repeated in the initialiser, because
@@ -278,12 +296,17 @@ public struct AttachmentLimits: Sendable {
     /// agree did not agree, and the documented limit was unreachable over both transports.
     public static let defaultMaximumFileBytes = 64 * 1024 * 1024
 
+    /// The shipped ceiling on how many pixels an image may declare before it is decoded.
+    public static let defaultMaximumImagePixels = 40 * 1_000_000
+
     public init(
         maximumTextCharacters: Int = 120_000,
-        maximumFileBytes: Int = AttachmentLimits.defaultMaximumFileBytes
+        maximumFileBytes: Int = AttachmentLimits.defaultMaximumFileBytes,
+        maximumImagePixels: Int = AttachmentLimits.defaultMaximumImagePixels
     ) {
         self.maximumTextCharacters = maximumTextCharacters
         self.maximumFileBytes = maximumFileBytes
+        self.maximumImagePixels = maximumImagePixels
     }
 
     public static let standard = AttachmentLimits()
