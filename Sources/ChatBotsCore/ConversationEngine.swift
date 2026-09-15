@@ -997,6 +997,9 @@ public final class ConversationEngine {
                         in: clean,
                         from: id,
                         others: everyone,
+                        // Names to match the text against, ids to key the state by: the models write the
+                        // name, and the social state is keyed by the id (A199).
+                        names: Self.nameIndex(seats.map(\.spec)),
                         // Aimed at whoever spoke last, which is who the message is answering.
                         addressing: conversation.turns.dropLast().last { $0.kind == .chat }?.speakerID
                     )
@@ -1342,6 +1345,20 @@ public final class ConversationEngine {
         note(
             "Condensed \(older.count) entries into \(digest.count / 4) tokens; context is now about \(contextUsage.tokens) tokens.")
         return true
+    }
+
+    /// A lowercased display name to seat id map, for the social reader.
+    ///
+    /// A name shorter than three characters is dropped, because `ConflictReader` ignores those — a
+    /// one-letter name would match by accident — and a duplicated name keeps the first seat, since two
+    /// participants with one name cannot be told apart by text anyway.
+    static func nameIndex(_ specs: [AgentSpec]) -> [String: String] {
+        var index: [String: String] = [:]
+        for spec in specs where spec.displayName.count >= 3 {
+            let key = spec.displayName.lowercased()
+            if index[key] == nil { index[key] = spec.id }
+        }
+        return index
     }
 
     private func publishTranscript() {

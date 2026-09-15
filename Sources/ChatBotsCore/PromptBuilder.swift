@@ -313,7 +313,10 @@ public enum PromptBuilder {
         conversation: Conversation
     ) -> String? {
         let briefing = conversation.conflict.briefing(
-            for: spec.id, others: others.map(\.id))
+            for: spec.id, others: others.map(\.id),
+            // Names for what is written, ids for what the state is keyed by (A199).
+            names: Dictionary(
+                others.map { ($0.id, $0.displayName) }, uniquingKeysWith: { first, _ in first }))
         guard !briefing.isEmpty else { return nil }
 
         var text = "Where things stand between the participants:\n"

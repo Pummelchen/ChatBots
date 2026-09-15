@@ -27,10 +27,17 @@ public enum ConflictReader {
     /// Read one message, aimed at whoever spoke before.
     ///
     /// `others` is every other seat, used only for naming a target when the text names one.
+    /// `names` maps a lowercased display name to the seat id the state is keyed by.
+    ///
+    /// Two different strings are in play: the models write a person's name, and the social state is
+    /// keyed by seat id. Matching the text against the *ids* meant a peer addressed by name never
+    /// resolved as a named target — "Otto, that's rubbish" produced no target at all — so the signal
+    /// landed on whoever spoke last instead of on Otto (A199).
     public static func signals(
         in text: String,
         from speaker: String,
         others: [String],
+        names: [String: String] = [:],
         addressing previousSpeaker: String?
     ) -> [TurnSignal] {
         let lowered = text.lowercased()
@@ -38,7 +45,7 @@ public enum ConflictReader {
 
         // Named targets win over the previous speaker: "Otto, that's rubbish" is about Otto
         // even if someone else spoke in between.
-        let target = namedTarget(in: lowered, others: others) ?? previousSpeaker
+        let target = namedTarget(in: lowered, names: names) ?? previousSpeaker
 
         // ── Concession ────────────────────────────────────────────────────────────────
         // The strongest signal available, and the one that most changes a relationship, so it
@@ -181,20 +188,43 @@ public enum ConflictReader {
     /// Matched on a word boundary so "Otto" does not match "ottoman". A seat whose name is a
     /// single letter would be too easy to hit by accident, so names shorter than three
     /// characters are ignored — which is why the shipped names are longer.
+    /// The seat id named in the message, looked up by display name.
+    ///
+    /// Matching is on the name the models write, not on the id they never see; the answer is the id,
+    /// because that is what the social state is keyed by (A199).
+    public static func namedTarget(in lowered: String, names: [String: String]) -> String? {
+        // Longest name first, so "Ann" cannot shadow "Anna" when both are participants.
+        for name in names.keys.sorted(by: { $0.count > $1.count }) {
+            guard name.count >= 3 else { continue }
+            if matches(lowered, name) { return names[name] }
+        }
+        return nil
+    }
+
+    /// The name found in the message, matched on a word boundary.
+    private static func matches(_ lowered: String, _ needle: String) -> Bool {
+        var searchStart = lowered.startIndex
+        while let range = lowered.range(of: needle, range: searchStart..<lowered.endIndex) {
+            let before = range.lowerBound == lowered.startIndex
+                ? nil : lowered[lowered.index(before: range.lowerBound)]
+            let after = range.upperBound == lowered.endIndex
+                ? nil : lowered[range.upperBound]
+            let boundaryBefore = before.map { !$0.isLetter && !$0.isNumber } ?? true
+            let boundaryAfter = after.map { !$0.isLetter && !$0.isNumber } ?? true
+            if boundaryBefore && boundaryAfter { return true }
+            searchStart = range.upperBound
+        }
+        return false
+    }
+
     public static func namedTarget(in lowered: String, others: [String]) -> String? {
-        for other in others where other.count >= 3 {
-            let needle = other.lowercased()
-            var searchStart = lowered.startIndex
-            while let range = lowered.range(of: needle, range: searchStart..<lowered.endIndex) {
-                let before = range.lowerBound == lowered.startIndex
-                    ? nil : lowered[lowered.index(before: range.lowerBound)]
-                let after = range.upperBound == lowered.endIndex
-                    ? nil : lowered[range.upperBound]
-                let boundaryBefore = before.map { !$0.isLetter && !$0.isNumber } ?? true
-                let boundaryAfter = after.map { !$0.isLetter && !$0.isNumber } ?? true
-                if boundaryBefore && boundaryAfter { return other }
-                searchStart = range.upperBound
-            }
+        // The same matcher the name lookup uses, so the two cannot drift apart: this one searches the
+        // strings it is handed rather than a name-to-id map (A199).
+        // The three-character floor is this variant's own rule (a one-letter name matches by accident);
+        // `namedTarget(in:names:)` applies it when the index is built. An existing test caught its
+        // absence the moment the two were collapsed into one matcher.
+        for other in others where other.count >= 3 && matches(lowered, other.lowercased()) {
+            return other
         }
         return nil
     }

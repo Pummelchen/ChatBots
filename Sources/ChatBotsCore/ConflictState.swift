@@ -386,12 +386,17 @@ public struct ConflictState: Sendable, Hashable, Codable {
     ///
     /// Deliberately terse. The model is mid-conversation and does not need a report; it needs
     /// to know who it is annoyed with, who it owes something to, and what just happened.
-    public func briefing(for seat: String, others: [String], recentLimit: Int = 3) -> Briefing {
+    /// `names` maps a seat id to the name the models use, so the room is told about a person it has
+    /// seen rather than about an id it has not: the line used to read "Towards Agent 1: openly
+    /// hostile" while every other surface calls that participant Otto (A199).
+    public func briefing(
+        for seat: String, others: [String], names: [String: String] = [:], recentLimit: Int = 3
+    ) -> Briefing {
         var lines: [String] = []
         for other in others where other != seat {
             let feeling = relationship(from: seat, to: other)
             guard feeling.isNoteworthy else { continue }
-            var line = "Towards \(other): \(feeling.posture)"
+            var line = "Towards \(names[other] ?? other): \(feeling.posture)"
             if let grudge = feeling.grudge, grudge.intensity >= 0.25 {
                 line += " — since turn \(grudge.sinceSequence): \(grudge.reason)"
             }
