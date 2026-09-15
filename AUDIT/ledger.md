@@ -30,16 +30,15 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 216 |
-| DONE | 194 |
-| START | 22 |
+| DONE | 195 |
+| START | 21 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 22
+### Open — 21
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
-| A159 | S3 | START | — | validation / web tools | URL validation accepts any scheme starting with 'http' and requires no host, on model-controlled input |
 | A160 | S3 | START | — | logic / web front end | A vote verdict is captured when the row is built, so clicking an already-cast verdict never withdraws it |
 | A161 | S3 | START | — | docs / security | SECURITY.md still says a share link is local and served only by the engine, while the shipped Caddy configuration proxies /s/* on every interface |
 | A162 | S3 | START | — | docs / reproducibility | environment.md records swift-format as Xcode-provided via xcrun while both gates invoke a bare `swift-format` from PATH |
@@ -140,7 +139,7 @@ been run.
 | A156 | S3 | DONE | 03f7903 | logic / API consistency | removeAttachment answers 200 for an id that does not exist, and the concurrent-upload ceiling is counted before an await so simultaneous uploads all pass |
 | A157 | S3 | DONE | 511febd | concurrency / transport | Transport sessions have no idle deadline, the per-server error is clobbered across sessions, an undecodable frame is dropped in silence, and a second start() leaks the first listener |
 | A158 | S3 | DONE | e715db9 | concurrency / transport client | The client's event stream is unbounded while the server deliberately buffers 256, and an unreadable frame is swallowed by try? |
-| A159 | S3 | START | — | validation / web tools | URL validation accepts any scheme starting with 'http' and requires no host, on model-controlled input |
+| A159 | S3 | DONE | 8e31033 | validation / web tools | URL validation accepts any scheme starting with 'http' and requires no host, on model-controlled input |
 | A16 | S3 | DONE | 9c53771 | ChatBotsCLI | --serve has no signal handling, so the listener is never shut down and nothing is flushed on exit |
 | A160 | S3 | START | — | logic / web front end | A vote verdict is captured when the row is built, so clicking an already-cast verdict never withdraws it |
 | A161 | S3 | START | — | docs / security | SECURITY.md still says a share link is local and served only by the engine, while the shipped Caddy configuration proxies /s/* on every interface |
