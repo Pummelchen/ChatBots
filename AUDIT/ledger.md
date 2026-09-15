@@ -158,7 +158,7 @@ been run.
 | A130 | S3 | DONE | cf589e9 | CI / audit tooling | The CI dependency step scanned the whole tree with `-r .` — the same defect A124 fixed in phase-e.sh, in the second copy of the same check |
 | A131 | S2 | DONE | 8c4174f | CI / audit tooling | The CI install step verified its own installs before GITHUB_PATH applied, so the job died with exit 127 on its first real run |
 | A132 | S3 | DONE | 73eac3b | audit tooling / acceptance | The acceptance script refused to run on main, the branch the audit had just been landed on |
-| A133 | S1 | DONE | 3af0a3e | build / environment | Xcode 27 ships the Metal compiler as a separate downloadable component and nothing in the repository requires or checks it, so a clean Xcode 27 machine cannot build the package at all |
+| A133 | S1 | DONE | ea9f06b | build / environment | Xcode 27 ships the Metal compiler as a separate downloadable component and nothing in the repository requires or checks it, so a clean Xcode 27 machine cannot build the package at all |
 | A134 | S2 | START | — | audit tooling / acceptance | The acceptance script's coverage step hardcodes the pre-Swift-6.4 test-bundle path, which no longer exists, so Phase E's coverage gate fails on the new toolchain |
 | A135 | S2 | START | — | packaging / dependencies | The repository states that mlx-swift's SwiftPM build does not compile the Metal kernels; under Xcode 27 it does, so the 190 MB separate metallib download is of unverified necessity and the stated reason for it is now false |
 | A136 | S0 | DONE | 8d3fa2b | security / HTTP API | No Origin/Referer check and Content-Type is ignored, so any web page the user visits can drive the engine; /api/seat lets it repoint a cloud seat and exfiltrate a conversation |
