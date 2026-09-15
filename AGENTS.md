@@ -30,8 +30,8 @@ Swift 6.4 / SwiftPM, package floor macOS 26, Apple Silicon only.
 - `Sources/ChatBotsApp/` — SwiftUI views. `Sources/ChatBotsCLI/` and
   `Sources/ChatBotsProbe/` — terminal runners.
 - `Tests/ChatBotsCoreTests/` — mirrors the core; the suite is **swift-testing**.
-- `web/` (`index.html`, `app.js`, `style.css`) and `names/*.txt` (six lists, 275
-  names) are the **sources** for the two generated files.
+- `web/` (`index.html`, `app.js`, `style.css`) and the six `names/*.txt` lists are
+  the **sources** for the two generated files.
 - `tools/` — install/start scripts, `audit-checks.sh`, the embed scripts, notices and
   waiver tooling. `AUDIT/` — ledger, plan, environment, baseline.
 - `Caddyfile` fronts the engine on `:7788`.
