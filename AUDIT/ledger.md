@@ -30,16 +30,15 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 217 |
-| DONE | 199 |
-| START | 18 |
+| DONE | 200 |
+| START | 17 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 18
+### Open — 17
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
-| A164 | S3 | START | — | unsafe / tooling | The DevTools client uses a fixed shared temporary profile path, so a second run or a hostile local process can interfere with it |
 | A177 | S3 | START | — | dead declarations, false comments | Nine app-layer declarations are unread, and one of them describes a window minimum the code does not enforce in three different ways |
 | A178 | S3 | START | — | docs / false user-facing text | Two user-facing strings say the models run in-process, which stopped being true when the engine became a separate process |
 | A179 | S3 | START | — | style / dead injection | Duplicated and mid-sentence-truncated comments, and an @EnvironmentObject with no @Published property and no reader |
@@ -142,7 +141,7 @@ been run.
 | A161 | S3 | DONE | 4fc5500 | docs / security | SECURITY.md still says a share link is local and served only by the engine, while the shipped Caddy configuration proxies /s/* on every interface |
 | A162 | S3 | DONE | e89086d | docs / reproducibility | environment.md records swift-format as Xcode-provided via xcrun while both gates invoke a bare `swift-format` from PATH |
 | A163 | S3 | DONE | 4d56ad6 | docs / correctness | The Caddyfile says the engine uses the passed Host to build the page's own links, but the replay script never reads the shareBase field it is written into |
-| A164 | S3 | START | — | unsafe / tooling | The DevTools client uses a fixed shared temporary profile path, so a second run or a hostile local process can interfere with it |
+| A164 | S3 | DONE | b3337f1 | unsafe / tooling | The DevTools client uses a fixed shared temporary profile path, so a second run or a hostile local process can interfere with it |
 | A165 | S1 | DONE | 3445aee | web / API integration | The browser never consumes the engine's delta events, so a reply is invisible until the turn ends |
 | A166 | S1 | DONE | 9f2fbf0 | test coverage | The whole application target is untestable and untested: no test target depends on it, so its logic is outside every gate |
 | A167 | S1 | DONE | 00049e6 | test that cannot fail | The zoom suite asserts private copies of the logic, never the store, and its comment claiming they cannot diverge is false |
