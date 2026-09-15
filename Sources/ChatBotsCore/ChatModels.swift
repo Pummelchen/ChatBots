@@ -193,9 +193,9 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
     /// Which engine drives this seat.
     ///
     /// The two are equivalent from the orchestrator's point of view — both are `LLMEngine`
-    /// — but not from the app's: `mlx` runs the weights in-process on the GPU, while
-    /// `openAIResponses` talks HTTP to a server (LM Studio, or OpenAI itself). Tools are
-    /// dispatched in-process and so exist only on `mlx`.
+    /// — but not from the app's: `mlx` runs the weights on this Mac's GPU, in the engine process
+    /// the app starts, while `openAIResponses` talks HTTP to a server (LM Studio, or OpenAI
+    /// itself). Tools are dispatched by the engine and so exist only on `mlx`.
     public enum Backend: String, Sendable, Codable, CaseIterable, Identifiable {
         case mlx
         case openAIResponses
@@ -204,7 +204,7 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
 
         public var label: String {
             switch self {
-            case .mlx: "MLX (in-process)"
+            case .mlx: "MLX (local)"
             case .openAIResponses: "OpenAI Responses API"
             }
         }

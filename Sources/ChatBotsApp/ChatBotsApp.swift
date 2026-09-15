@@ -281,7 +281,7 @@ enum HelpWindow {
         let alert = NSAlert()
         alert.messageText = "ChatBots"
         alert.informativeText = """
-            Two local LLMs discuss a topic you set, with you as moderator.
+            Two models discuss a topic you set, with you as moderator.
 
             Start / Restart   ⌘↩
             Pause / Resume    ⇧⌘P
@@ -289,8 +289,9 @@ enum HelpWindow {
             Clear transcript  ⌘K
             Steer both models ⇧⌘↩
 
-            Both models run in-process on the GPU via MLX. Your moderator messages go \
-            into the shared log, so both models read them.
+            Each seat's model runs in the engine process the app starts: on this Mac's \
+            GPU through MLX, or against the endpoint you configured for that seat. Your \
+            moderator messages go into the shared log, so both read them.
             """
         alert.addButton(withTitle: "OK")
         alert.alertStyle = .informational
