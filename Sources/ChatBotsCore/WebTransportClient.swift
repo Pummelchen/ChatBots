@@ -68,6 +68,19 @@ public final class WebTransportEngineClient {
         /// dead channel.
         public var idleTimeoutMilliseconds: Int32 = 120_000
 
+        /// How long one *connect* may take, when that should differ from the request deadline.
+        ///
+        /// A connect that begins before the engine's listener exists does not fail — it waits, for
+        /// as long as it is allowed to. So an attempt given the whole request deadline spends the
+        /// whole deadline, and a caller that retries gets exactly one attempt instead of the several
+        /// it asked for. That is how the installer's smoke test reported "the transport does NOT
+        /// work" on a machine whose engine bound its port two seconds later (A215): the retry loop
+        /// was there, and the first attempt ate the budget.
+        ///
+        /// `nil` keeps the request deadline, which is right for a caller that connects once and is
+        /// content to wait. It is only a caller that retries that needs a shorter one.
+        public var connectTimeoutMilliseconds: Int32?
+
         public init() {}
     }
 
@@ -151,10 +164,12 @@ public final class WebTransportEngineClient {
             // Loopback only, and the identity is self-signed, so the platform trust path
             // cannot be used. See the note at the top of this file.
             let client = WebTransportQUICClient(trustPolicy: .localDevelopmentSelfSigned)
-            // The connect gets the *request* deadline. This is the same handshake the
-            // convenience wrapper performs, with the one difference that matters here: the
-            // session timeout is not the reader's idle deadline, because the stream below
-            // overrides it (A100).
+            // The connect gets the request deadline unless the caller asked for a separate one.
+            // This is the same handshake the convenience wrapper performs, with the one difference
+            // that matters here: the session timeout is not the reader's idle deadline, because the
+            // stream below overrides it (A100). A caller that retries sets
+            // `connectTimeoutMilliseconds`, so one attempt cannot spend the whole budget before the
+            // engine has bound its listener (A215).
             let session = try await client.connectSession(
                 to: WebTransportNetworkEndpoint(
                     host: configuration.host, port: configuration.port),
@@ -164,7 +179,8 @@ public final class WebTransportEngineClient {
                 protocols: [],
                 optimisticCapsules: [],
                 settingsValidation: .draft16Strict,
-                timeoutMilliseconds: configuration.timeoutMilliseconds)
+                timeoutMilliseconds: configuration.connectTimeoutMilliseconds
+                    ?? configuration.timeoutMilliseconds)
 
             do {
                 self.session = session

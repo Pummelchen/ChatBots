@@ -107,10 +107,28 @@ public enum TransportCheck {
         return max(1, Int32(milliseconds))
     }
 
+    /// How long one connect attempt may take before the next one is tried.
+    ///
+    /// Two seconds is far longer than a loopback handshake against a listener that is already up —
+    /// the whole check, five round trips included, finishes in about three — and far shorter than
+    /// the budget the run gets, so the six attempts the loop below allows are spread across the time
+    /// the engine needs to come up instead of the first one spending it all (A215).
+    static let connectAttemptBudgetMilliseconds: Int32 = 2_000
+
+    /// The connect deadline one attempt gets.
+    ///
+    /// The attempt budget, unless the caller asked for a run shorter than that — a one-second check
+    /// does not get a two-second attempt, because an attempt that outlives its own run reports a
+    /// connection failure for a run that was already over.
+    static func connectAttemptMilliseconds(_ timeout: Duration) -> Int32 {
+        min(connectAttemptBudgetMilliseconds, clientTimeoutMilliseconds(timeout))
+    }
+
     /// Run the whole channel end to end.
     ///
     /// - Parameter directory: where the certificate lives, so the check uses the same identity
-    ///   a real run would rather than creating another.
+    ///   a real run would rather than creating another. The engine it starts is told the same
+    ///   directory, so the fingerprint pinned here is the one on the other end of the socket.
     /// - Parameter timeout: the whole check's budget — the client's request deadline and the
     ///   connect retries are both taken from it.
     /// - Parameter executable: the engine to spawn, defaulting to the process's own executable.
@@ -172,6 +190,12 @@ public enum TransportCheck {
             // WebTransport only, so no HTTP listener is opened at all (A120). The unused port is
             // passed anyway, so that this stays harmless if that gating ever changes.
             "--port", String(port - 1),
+            // The identity and the conversations, named outright. Without this the child resolves
+            // its own run directory — the project's `.run`, or Application Support — and the
+            // fingerprint pinned above, taken from `directory`, is not the fingerprint the child
+            // serves with. The check then fails as "could not connect", which is a verdict about the
+            // caller's directory rather than about the transport (A215).
+            "--run-directory", directory.path,
         ]
         // The child's output goes to the null device rather than into pipes.
         //
@@ -194,6 +218,15 @@ public enum TransportCheck {
         var clientConfiguration = WebTransportEngineClient.Configuration()
         clientConfiguration.port = port
         clientConfiguration.timeoutMilliseconds = Self.clientTimeoutMilliseconds(timeout)
+        // One attempt gets a short connect deadline of its own, so the retries below are real.
+        //
+        // The comment under this loop always claimed the retry was for "not listening yet", and it
+        // was not: a connect that begins before the engine's listener exists does not fail, it
+        // *waits* — so the first attempt was given the whole thirty-second budget and spent it, and
+        // the check reported "the transport does NOT work" about an engine that bound its port two
+        // seconds later. Measured here: with a two-second wait before connecting it passed, which is
+        // what a wait is not allowed to be — a guess about the machine (A215).
+        clientConfiguration.connectTimeoutMilliseconds = Self.connectAttemptMilliseconds(timeout)
         let client = WebTransportEngineClient(configuration: clientConfiguration)
 
         // Retry briefly. Binding a QUIC listener is asynchronous on the library's side, and a

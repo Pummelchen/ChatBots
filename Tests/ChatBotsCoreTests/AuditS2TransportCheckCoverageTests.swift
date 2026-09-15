@@ -70,4 +70,18 @@ struct TransportCheckCoverageTests {
             "the refusal is named as a certificate problem: \(report.failures)")
         #expect(report.describe().contains("certificate"))
     }
+
+    @Test("The whole channel round-trips against a real engine process")
+    func theChannelRoundTrips() async throws {
+        let directory = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let executable = try #require(
+            engineExecutable(), "no chatbots-cli beside the test bundle to start")
+
+        let report = await TransportCheck.run(
+            in: directory, port: allocateTestPort(), timeout: .seconds(10), executable: executable)
+
+        #expect(report.connected, "not connected:\n\(report.describe())")
+        #expect(report.succeeded, "the check did not succeed:\n\(report.describe())")
+    }
 }

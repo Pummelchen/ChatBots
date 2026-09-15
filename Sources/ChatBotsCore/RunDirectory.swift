@@ -39,9 +39,33 @@ public enum RunDirectory {
         return applicationSupport
     }
 
+    /// The runtime directory a process should use, with an explicit choice taken first.
+    ///
+    /// Every mode of the CLI asks this one question, and the engine it starts asks it again as a
+    /// separate process — so there has to be exactly one answer. `--run-directory` is how a caller
+    /// gives that answer, which is what lets a second engine run beside the real one with its own
+    /// certificate rather than sharing `.run` with it. `TransportCheck` passes it to the engine it
+    /// spawns for the same reason: the identity the check pins has to be the identity that engine
+    /// serves with, or the check fails for a reason that is not the transport (A215).
+    ///
+    /// - Parameter override: the directory named on the command line, if any. Standardised, so a
+    ///   path with `..` in it, or one resolved against the working directory, comes out the same
+    ///   way in the parent and in the child.
+    public static func resolve(override: URL?, projectRoot: URL?) -> URL {
+        if let override {
+            // Rebuilt from the standardised path rather than returned as `standardizedFileURL`, so
+            // the answer has the same shape as `resolve(projectRoot:)` above: a URL that is known to
+            // be a directory keeps a trailing slash through standardisation, and two URLs that differ
+            // only by that trailing slash are unequal — which reads as "the parent and the child
+            // disagree" when they do not.
+            return URL(fileURLWithPath: override.standardizedFileURL.path, isDirectory: false)
+        }
+        return resolve(projectRoot: projectRoot)
+    }
+
     /// The runtime directory for this process.
     public static var current: URL {
-        resolve(projectRoot: ModelStore.projectRoot())
+        resolve(override: nil, projectRoot: ModelStore.projectRoot())
     }
 
     /// Whether this is a source checkout rather than an installed app.
