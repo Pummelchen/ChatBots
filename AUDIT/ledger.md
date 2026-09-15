@@ -30,16 +30,15 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 216 |
-| DONE | 185 |
-| START | 31 |
+| DONE | 186 |
+| START | 30 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 31
+### Open — 30
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
-| A150 | S3 | START | — | security headers | The hand-written SSE response head bypasses the shared serialiser and therefore carries none of A76's security headers |
 | A151 | S3 | START | — | operations / logging | There is no request or error logging: connection errors are discarded and the counters are exposed nowhere |
 | A152 | S3 | START | — | operations / health | /api/health is a hardcoded 200 that says nothing about readiness, and the readiness helper next to it is dead |
 | A153 | S3 | START | — | logic / HTTP | Transfer-Encoding is never read or rejected, so a chunked request is answered with an empty body while its route still runs |
@@ -140,7 +139,7 @@ been run.
 | A148 | S3 | DONE | 904f300 | safety / image intake | An image is fully decoded before any dimension or size check, so a small crafted TIFF/BMP/HEIC can expand hugely |
 | A149 | S3 | DONE | dd6e5e7 | safety / TOCTOU | The attachment byte cap degrades to zero on a failed stat, the file is re-read after the stat, and a non-regular file is never rejected |
 | A15 | S1 | DONE | 8ece1d3 | EngineService/DocumentImport | Attaching a document blocks the engine main actor for the whole conversion, subprocess wait included |
-| A150 | S3 | START | — | security headers | The hand-written SSE response head bypasses the shared serialiser and therefore carries none of A76's security headers |
+| A150 | S3 | DONE | 19e5374 | security headers | The hand-written SSE response head bypasses the shared serialiser and therefore carries none of A76's security headers |
 | A151 | S3 | START | — | operations / logging | There is no request or error logging: connection errors are discarded and the counters are exposed nowhere |
 | A152 | S3 | START | — | operations / health | /api/health is a hardcoded 200 that says nothing about readiness, and the readiness helper next to it is dead |
 | A153 | S3 | START | — | logic / HTTP | Transfer-Encoding is never read or rejected, so a chunked request is answered with an empty body while its route still runs |
