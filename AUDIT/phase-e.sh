@@ -177,9 +177,15 @@ section "6/12  coverage over Sources/"
 if swift test --enable-code-coverage > "$out/coverage-test.log" 2>&1; then
     bin="$(swift build --show-bin-path 2>/dev/null)"
     profile="$bin/codecov/default.profdata"
-    binary="$bin/ChatBotsPackageTests.xctest/Contents/MacOS/ChatBotsPackageTests"
-    if [ -f "$profile" ] && [ -f "$binary" ] \
-        && xcrun llvm-cov report "$binary" -instr-profile "$profile" --sources Sources \
+    # One test bundle per test target, named after the target; discovered rather than written down
+    # because the name changed with Xcode 27 and a second target was added (A134, A146).
+    test_bundles=()
+    for bundle in "$bin"/*.xctest; do
+        bundle_executable="$bundle/Contents/MacOS/$(basename "$bundle" .xctest)"
+        [ -x "$bundle_executable" ] && test_bundles+=("$bundle_executable")
+    done
+    if [ -f "$profile" ] && [ "${#test_bundles[@]}" -gt 0 ] \
+        && xcrun llvm-cov report "${test_bundles[@]}" -instr-profile "$profile" --sources Sources \
             > "$out/coverage.log" 2>&1
     then
         total="$(grep -E '^TOTAL' "$out/coverage.log" | tail -1)"

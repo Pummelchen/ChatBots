@@ -1,0 +1,53 @@
+# A134 / A146 — the coverage step's test bundle, before and after (2026-09-15T13:49:42Z)
+
+## 1. the name it used to hardcode
+$ bin=$(swift build --show-bin-path)
+$ ls -d $bin/ChatBotsPackageTests.xctest
+  ls: /Users/node1/Downloads/ChatBots/.build/out/Products/Debug/ChatBotsPackageTests.xctest: No such file or directory
+$ ls -d $bin/*.xctest        # what is there
+  ChatBotsAppTests.xctest
+  ChatBotsCoreTests.xctest
+
+## 2. after: tools/audit-checks.sh, gate 3 and the summary
+$ bash tools/audit-checks.sh
+  === 3/6  coverage: Sources/ ===
+        TOTAL                                                  6085              2696    55.69%        2371              1134    52.17%       19419             10088    48.05%           0                 0         -
+  PASS  coverage: TOTAL                                                  6085              2696    55.69%        2371              1134    52.17%       19419             10088    48.05%           0                 0         -
+  
+  === 4/6  swiftlint: Sources, Tests ===
+  PASS  swiftlint: 255 finding(s), within the recorded waiver of 255
+  
+  === 5/6  swift-format lint: Sources, Tests ===
+  PASS  swift-format: 744 diagnostic(s), within the recorded waiver of 744
+  
+  === 6/6  web: the merge that turns per-token events into live text ===
+  PASS  web: deltas merge (12 cases)
+  
+  === summary ===
+  PASS  build: swift build --build-tests
+  PASS  tests: 857 tests in 149 suites
+  PASS  coverage: TOTAL                                                  6085              2696    55.69%        2371              1134    52.17%       19419             10088    48.05%           0                 0         -
+  PASS  swiftlint: 255 finding(s), within the recorded waiver of 255
+  PASS  swift-format: 744 diagnostic(s), within the recorded waiver of 744
+  PASS  web: deltas merge (12 cases)
+  
+  All 6 Mac-only gates passed.
+
+  === summary ===
+  PASS  build: swift build --build-tests
+  PASS  tests: 857 tests in 149 suites
+  PASS  coverage: TOTAL                                                  6085              2696    55.69%        2371              1134    52.17%       19419             10088    48.05%           0                 0         -
+  PASS  swiftlint: 255 finding(s), within the recorded waiver of 255
+  PASS  swift-format: 744 diagnostic(s), within the recorded waiver of 744
+  PASS  web: deltas merge (12 cases)
+  
+  All 6 Mac-only gates passed.
+
+## 3. what the larger file set is: the report split by target
+
+$ (the same coverage.log, summed per target)
+  ChatBotsCore       lines   1501   80.5% covered
+  ChatBotsApp        lines    870    3.3% covered
+
+  ChatBotsCore is unchanged at 83.61%, which is the baseline's 83.59% within rounding:
+  the drop in the TOTAL is the application target entering the report, not a regression.

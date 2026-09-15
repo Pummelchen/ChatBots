@@ -91,9 +91,17 @@ fi
 printf '\n=== 3/6  coverage: Sources/ ===\n'
 bin_path="$(swift build --show-bin-path 2>/dev/null)"
 profile="$bin_path/codecov/default.profdata"
-test_binary="$bin_path/ChatBotsPackageTests.xctest/Contents/MacOS/ChatBotsPackageTests"
-if [ -f "$profile" ] && [ -f "$test_binary" ] \
-    && xcrun llvm-cov report "$test_binary" \
+    # One test bundle per test target, named after the target. The single bundle this used to name was
+    # `ChatBotsPackageTests.xctest`, which Xcode 27 renamed to `ChatBotsCoreTests.xctest`, and A166 added a
+    # second target — so the name is discovered rather than written down, and the next rename or target is
+    # not a silent failure (A134, A146, both fixed by this).
+    test_bundles=()
+    for bundle in "$bin_path"/*.xctest; do
+        bundle_executable="$bundle/Contents/MacOS/$(basename "$bundle" .xctest)"
+        [ -x "$bundle_executable" ] && test_bundles+=("$bundle_executable")
+    done
+if [ -f "$profile" ] && [ "${#test_bundles[@]}" -gt 0 ] \
+    && xcrun llvm-cov report "${test_bundles[@]}" \
         -instr-profile "$profile" \
         --sources Sources > "$logs/coverage.log" 2>&1
 then
@@ -105,7 +113,7 @@ else
         printf '      last 20 lines of %s:\n' "$logs/coverage.log"
         tail -n 20 "$logs/coverage.log" | sed 's/^/      /'
     else
-        printf '      no coverage profile at %s (did the test gate produce one?)\n' "$profile"
+        printf '      no coverage profile at %s, or no test bundle under %s (did the test gate run?)\n' "$profile" "$bin_path"
     fi
     fail "coverage: llvm-cov report over Sources/"
 fi
