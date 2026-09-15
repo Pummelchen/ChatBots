@@ -3583,14 +3583,14 @@
       "file_line": "AUDIT/HANDOVER.md:3,14,20; AUDIT/ledger.md:6; AUDIT/plan.md:6,144; AUDIT/inventory.md:3",
       "title": "The session entry point still says the audit is complete and names the landed 2026-09-13 branch, while 73 findings are open on a different, unmerged branch",
       "category": "docs",
-      "status": "START",
+      "status": "DONE",
       "host_used": "node1",
       "discovered_by": "Phase C — noticed while checking the branch references the new findings turned up",
       "evidence_before": "`HANDOVER.md:3` says \"**The audit is complete.**\" and its state table says \"127 enumerated: 127 DONE, 0 open, 0 BLOCKED\" with \"Phases E green\". `HANDOVER.md:14` and `ledger.md:6` both say the branch is `audit/2026-09-13`, cut from `main@a6d6999`, and that branch and `main` \"point at the same commit\". The state on disk is: 209 tasks with 136 DONE and 73 open (9 S1), on `audit/2026-09-15` cut from `main@02ddd4e`, with `main` at `349fefe` — so the two do not point at the same commit, Phase E has not been run for this audit, and the branch is deliberately unmerged. `plan.md:144` still states the commit convention as being on `audit/2026-09-13`. A118 recorded this same defect class for `ledger.md` (it was called the source of truth and stopped at A89); the prose was fixed then but the header and the handover were not, and the re-audit re-created the condition because `HANDOVER.md` describes the previous audit as if it were the current one.",
-      "fix_summary": null,
-      "evidence_after": null,
-      "commit": null,
-      "notes": "",
+      "fix_summary": "`HANDOVER.md` leads with the current re-audit (branch, severity, toolchain, phases, entry point) and labels everything below as the landed 2026-09-13 audit history; it carries no task count, pointing at the generated table in `ledger.md` instead. `ledger.md:6`, `plan.md:6,145` and `inventory.md:3` now state the branch this work is on and that it is not the same commit as `main`.",
+      "evidence_after": "Re-read the four documents against the repository state. `grep -rn` for the completion claims now matches only HANDOVER.md:3, which states the opposite (\\\"The 2026-09-13 audit is complete and landed. The 2026-09-15 re-audit is not.\\\"), plus the A211 row in the generated ledger tables. No tracked file still asserts that this branch and `main` are the same commit (`git grep -n \\\"same commit\\\" AUDIT/`), and `git rev-parse` agrees with what the documents now say: branch `audit/2026-09-15`, merge-base `02ddd4e`, `origin/main` `349fefe`. `AUDIT/render-ledger.sh --check` passes after the edit, so the hand-written header did not disturb the generated region. The counts the entry point used to carry are now pointed at rather than copied, which is the property that makes this not recur.",
+      "commit": "a5288a1",
+      "notes": "This is A118 one audit later, and the fix is deliberately not another copied count: the handover now says where the number lives instead of repeating it. The 2026-09-13 history is kept verbatim below a clear boundary rather than rewritten, because §0 forbids rewriting history and because the reasoning in it is still the useful part.",
       "blocked_reason": null
     }
   ]
