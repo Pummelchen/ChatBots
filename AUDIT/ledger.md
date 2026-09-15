@@ -28,20 +28,18 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 209 |
-| DONE | 132 |
-| START | 77 |
+| DONE | 135 |
+| START | 74 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 77
+### Open — 74
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
 | A133 | S1 | START | — | build / environment | Xcode 27 ships the Metal compiler as a separate downloadable component and nothing in the repository requires or checks it, so a clean Xcode 27 machine cannot build the package at all |
 | A134 | S2 | START | — | audit tooling / acceptance | The acceptance script's coverage step hardcodes the pre-Swift-6.4 test-bundle path, which no longer exists, so Phase E's coverage gate fails on the new toolchain |
 | A135 | S2 | START | — | packaging / dependencies | The repository states that mlx-swift's SwiftPM build does not compile the Metal kernels; under Xcode 27 it does, so the 190 MB separate metallib download is of unverified necessity and the stated reason for it is now false |
-| A136 | S0 | START | — | security / HTTP API | No Origin/Referer check and Content-Type is ignored, so any web page the user visits can drive the engine; /api/seat lets it repoint a cloud seat and exfiltrate a conversation |
-| A137 | S0 | START | — | persistence | The store deletes the index and then moves the new one into place, so a crash between the two loses every kept conversation, and the atomically written .tmp is never recovered |
 | A138 | S2 | START | — | security / TLS identity | The TLS private key's 0600 mode is applied with `try?` and never verified, so a failure leaves the engine key group/world-readable |
 | A139 | S2 | START | — | security / credentials | The per-seat cloud API key is copied into Codable settings and written to the preferences plist in cleartext, contradicting the app's own Keychain claim |
 | A140 | S2 | START | — | security / logging (L7) | An undocumented trace switch writes the entire request body — system instructions, whole conversation, base64 images — to stderr, unbounded |
@@ -113,7 +111,6 @@ been run.
 | A206 | S3 | START | — | dead code | Six declarations are written or named but never used, one with a documented rule the code does not implement |
 | A207 | S3 | START | — | docs / correctness | Three comments say the document extractors live in the app target and that the core cannot read a PDF or Word file; all three are false |
 | A208 | S3 | START | — | installer / dependencies | The checkpoint the installer downloads is a hand-copied duplicate of AgentSpec.defaultModelID and nothing keeps the two in step |
-| A209 | S3 | START | — | tests / CORS | A75's CORS test asserted 404 because there was no OPTIONS route; A136 refuses the request explicitly, so the assertion named the old mechanism rather than the property |
 
 ### Every task — 209
 
@@ -168,8 +165,8 @@ been run.
 | A133 | S1 | START | — | build / environment | Xcode 27 ships the Metal compiler as a separate downloadable component and nothing in the repository requires or checks it, so a clean Xcode 27 machine cannot build the package at all |
 | A134 | S2 | START | — | audit tooling / acceptance | The acceptance script's coverage step hardcodes the pre-Swift-6.4 test-bundle path, which no longer exists, so Phase E's coverage gate fails on the new toolchain |
 | A135 | S2 | START | — | packaging / dependencies | The repository states that mlx-swift's SwiftPM build does not compile the Metal kernels; under Xcode 27 it does, so the 190 MB separate metallib download is of unverified necessity and the stated reason for it is now false |
-| A136 | S0 | START | — | security / HTTP API | No Origin/Referer check and Content-Type is ignored, so any web page the user visits can drive the engine; /api/seat lets it repoint a cloud seat and exfiltrate a conversation |
-| A137 | S0 | START | — | persistence | The store deletes the index and then moves the new one into place, so a crash between the two loses every kept conversation, and the atomically written .tmp is never recovered |
+| A136 | S0 | DONE | 8d3fa2b | security / HTTP API | No Origin/Referer check and Content-Type is ignored, so any web page the user visits can drive the engine; /api/seat lets it repoint a cloud seat and exfiltrate a conversation |
+| A137 | S0 | DONE | 8d3fa2b | persistence | The store deletes the index and then moves the new one into place, so a crash between the two loses every kept conversation, and the atomically written .tmp is never recovered |
 | A138 | S2 | START | — | security / TLS identity | The TLS private key's 0600 mode is applied with `try?` and never verified, so a failure leaves the engine key group/world-readable |
 | A139 | S2 | START | — | security / credentials | The per-seat cloud API key is copied into Codable settings and written to the preferences plist in cleartext, contradicting the app's own Keychain claim |
 | A14 | S1 | DONE | 0de3123 | HTTPServer | isRunning/lastError are raced between the listener callback and waitUntilReady |
@@ -248,7 +245,7 @@ been run.
 | A206 | S3 | START | — | dead code | Six declarations are written or named but never used, one with a documented rule the code does not implement |
 | A207 | S3 | START | — | docs / correctness | Three comments say the document extractors live in the app target and that the core cannot read a PDF or Word file; all three are false |
 | A208 | S3 | START | — | installer / dependencies | The checkpoint the installer downloads is a hand-copied duplicate of AgentSpec.defaultModelID and nothing keeps the two in step |
-| A209 | S3 | START | — | tests / CORS | A75's CORS test asserted 404 because there was no OPTIONS route; A136 refuses the request explicitly, so the assertion named the old mechanism rather than the property |
+| A209 | S3 | DONE | 8d3fa2b | tests / CORS | A75's CORS test asserted 404 because there was no OPTIONS route; A136 refuses the request explicitly, so the assertion named the old mechanism rather than the property |
 | A21 | S2 | DONE | 8111b1a | installer | The model-download integrity check silently degrades to 'accept any size' when the HEAD request yields nothing |
 | A22 | S2 | DONE | 18100dd | start script | stop_all kills a stale PID from a pid file without checking the process is ours |
 | A23 | S2 | DONE | 38fbe08 | device capture tool | capture-devices.py prints a viewport mismatch but cannot fail the run |
