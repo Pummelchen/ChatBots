@@ -1033,6 +1033,11 @@ public final class ChatController: ObservableObject {
     /// recomputing them from fields this side never had — recomputing produced "0 words" on
     /// every chip (audit A46). The body itself is not here, which is why the chip does not
     /// offer to show it.
+    ///
+    /// An image's bytes are not among the fields the engine sends either (A144, A214): this used to
+    /// decode `imageBase64` back into `imageData`, and nothing in the app ever read it — the chip
+    /// draws the document's kind as a symbol, not the picture. The engine keeps the bytes; sending
+    /// them cost a base64 copy of every attached image in every state push.
     public var attachments: [AttachedDocument] {
         let held = (lastSnapshot?.attachments ?? []).map { attachment in
             AttachedDocument(
@@ -1043,7 +1048,7 @@ public final class ChatController: ObservableObject {
                 byteCount: 0,
                 pageCount: nil,
                 wasTruncated: attachment.wasTruncated,
-                imageData: attachment.imageBase64.flatMap { Data(base64Encoded: $0) },
+                imageData: nil,
                 engineSummary: attachment.summary,
                 engineTokens: attachment.tokens)
         }

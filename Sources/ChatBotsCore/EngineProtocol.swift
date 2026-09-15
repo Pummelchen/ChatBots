@@ -256,6 +256,12 @@ public enum ProtocolLimits {
 
     /// The largest single message either side will accept: the base64 form of the largest
     /// attachment the engine accepts, plus the envelope around it.
+    ///
+    /// The binding case is the *upload* — `addAttachment` carries the file's whole base64 form — and
+    /// deliberately not the state snapshot, which used to be the other one. A snapshot put a base64
+    /// copy of every attached image into every push, so two maximum-size images needed twice this cap
+    /// and the state update was refused rather than delivered; the snapshot now carries attachment
+    /// metadata only (A144, A214). `AuditS2AttachmentPayloadTests` measures both directions.
     public static let maximumMessageBytes =
         (AttachmentLimits.defaultMaximumFileBytes * base64Numerator + base64Denominator - 1)
         / base64Denominator

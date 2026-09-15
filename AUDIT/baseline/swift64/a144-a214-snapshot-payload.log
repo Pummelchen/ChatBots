@@ -1,0 +1,54 @@
+# A144 + A214 — the snapshot carries attachment metadata, not attachment bytes (2026-09-15)
+
+# The same four tests, run against the code before the change and after it. The "before" numbers come
+# from a `git worktree` of the parent commit (27e8f9e) with only the test file added, so the comparison
+# is the same measurement on the same machine rather than arithmetic from the finding.
+
+## BEFORE — `imageBase64: document.imageData?.base64EncodedString()` in `snapshot()`
+$ swift test --filter AttachmentPayloadTests          # in the worktree at 27e8f9e
+  ✔ Test "The bytes the model is sent are still the engine's own copy" passed
+  ✘ Test "The snapshot carries an attachment's metadata and not its bytes"
+      Expectation failed: data.count < image.count
+      the snapshot is 100133 bytes for a 65536-byte image, so it is carrying it
+  ✘ Test "One maximum-size attachment leaves the snapshot inside the transport's cap"
+      Expectation failed: data.count < 1_000_000
+      the snapshot is 89489877 bytes for a 67108864-byte attachment
+  ✘ Test "Two maximum-size attachments still leave it inside the cap"
+      Expectation failed: data.count < ProtocolLimits.maximumMessageBytes
+      the snapshot is 178968510 bytes against a 89544022-byte cap, so the engine cannot send it at all
+  ✘ Test run with 4 tests in 1 suite failed after 0.802 seconds with 3 issues.
+
+# The two-attachment line is A214 exactly: 178 968 510 bytes against the 89 544 022-byte cap, which is
+# `(64 MiB * 4 + 2) / 3 + 64 KiB`. An over-cap message is not a slow push — the transmitter refuses to
+# frame it, so the state update is dropped and the client keeps the previous state.
+
+## AFTER — the snapshot carries the id, name, kind, summary, tokens and truncation flag
+$ swift test --filter AttachmentPayloadTests
+MEASURE small-image snapshot:     11366 bytes
+MEASURE one-max-attachment:       11372 bytes
+MEASURE two-max-attachment:       11500 bytes, cap: 89544022
+  ✔ Test run with 4 tests in 1 suite passed after 0.033 seconds.
+
+# 178 968 510 -> 11 500 bytes for the case that was refused, and the snapshot's size no longer depends
+# on what is attached: 64 KiB and 2 x 64 MiB land 134 bytes apart. Four tests, three of which fail
+# against the old shape, and the fourth — the engine still holding the bytes for the model request —
+# passes on both sides, which is what says the change removed a copy rather than the capability.
+
+# Two notes for whoever reads this next. The first version of the "not its bytes" test searched the
+# encoded snapshot for the image's base64 text and **passed against the old code**: Foundation's JSON
+# encoder writes `/` as `\/`, so a needle containing a slash is not found in the haystack it is in. The
+# assertion is a size comparison now, which cannot be fooled that way. And one maximum-size image did
+# fit the cap before the change — the cap *is* one attachment plus its envelope — so that test asserts
+# what actually changed: the snapshot no longer scales with the attachments.
+
+## The full gate, with the fix
+$ bash tools/audit-checks.sh
+PASS  build: swift build --build-tests
+PASS  tests: 935 tests in 166 suites
+PASS  coverage: TOTAL 6255 2573 58.86% (regions) · 19748 9692 50.92% (lines)
+PASS  swiftlint: 254 finding(s), within the recorded waiver of 255
+PASS  swift-format: 739 diagnostic(s), within the recorded waiver of 744
+PASS  web: deltas merge (31 cases)
+All 6 Mac-only gates passed.
+
+# 931 tests in 165 suites before this task; the four added are the payload tests.

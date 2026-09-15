@@ -562,15 +562,15 @@ public final class EngineService {
             contextFraction: usage.fraction,
             compactThreshold: engine.configuration.compactThreshold,
             attachments: engine.attachments.map { document in
+                // Metadata only: the bytes stay in the engine, which is where the model request
+                // reads them from (A144, A214). They used to be re-encoded into every snapshot.
                 APIAttachment(
                     id: document.id.uuidString,
                     name: document.name,
                     kind: document.kind.rawValue,
                     summary: document.summary,
                     tokens: document.estimatedTokens,
-                    wasTruncated: document.wasTruncated,
-                    imageBase64: document.kind.isImage
-                        ? document.imageData?.base64EncodedString() : nil)
+                    wasTruncated: document.wasTruncated)
             },
             canAttach: engine.canAttachFiles,
             imagesAllowed: engine.allSeatsSupportVision,

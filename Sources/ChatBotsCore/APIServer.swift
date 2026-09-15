@@ -205,8 +205,17 @@ public struct APIAttachment: Codable, Sendable {
     public var summary: String
     public var tokens: Int
     public var wasTruncated: Bool
-    /// Only for images, and only so a front end can show a thumbnail.
-    public var imageBase64: String?
+    // The image's bytes are deliberately absent (A144, A214).
+    //
+    // This carried `imageBase64` — the whole encoded image, re-encoded on every snapshot — so that a
+    // front end *could* show a thumbnail. No front end ever did: the page's chip is a name and a
+    // summary, and the Mac app's chip is an SF Symbol. What it did do was put a base64 copy of every
+    // attached image into every state push, to every connected client, on every turn — up to 24 files
+    // of up to 64 MB each, re-encoded per snapshot. It also let the snapshot exceed the transport's
+    // own message cap, which is derived from one maximum-size attachment: two of them need twice the
+    // cap, so the state push was refused and the client silently kept the previous state. The engine
+    // holds the bytes, which is where the model request reads them from; a front end that ever needs
+    // them should ask for one by id rather than be sent all of them again and again.
 }
 
 public struct APIPersona: Codable, Sendable {
