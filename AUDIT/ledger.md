@@ -30,16 +30,15 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 216 |
-| DONE | 180 |
-| START | 36 |
+| DONE | 181 |
+| START | 35 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 36
+### Open — 35
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
-| A135 | S2 | START | — | packaging / dependencies | The repository states that mlx-swift's SwiftPM build does not compile the Metal kernels; under Xcode 27 it does, so the 190 MB separate metallib download is of unverified necessity and the stated reason for it is now false |
 | A147 | S3 | START | — | performance / main actor | Every /s/<id> request, including for unknown ids, reads and JSON-decodes the whole conversation index on the main actor |
 | A148 | S3 | START | — | safety / image intake | An image is fully decoded before any dimension or size check, so a small crafted TIFF/BMP/HEIC can expand hugely |
 | A149 | S3 | START | — | safety / TOCTOU | The attachment byte cap degrades to zero on a failed stat, the file is re-read after the stat, and a non-regular file is never rejected |
@@ -128,7 +127,7 @@ been run.
 | A132 | S3 | DONE | 73eac3b | audit tooling / acceptance | The acceptance script refused to run on main, the branch the audit had just been landed on |
 | A133 | S1 | DONE | ea9f06b | build / environment | Xcode 27 ships the Metal compiler as a separate downloadable component and nothing in the repository requires or checks it, so a clean Xcode 27 machine cannot build the package at all |
 | A134 | S2 | DONE | 487108d | audit tooling / acceptance | The acceptance script's coverage step hardcodes the pre-Swift-6.4 test-bundle path, which no longer exists, so Phase E's coverage gate fails on the new toolchain |
-| A135 | S2 | START | — | packaging / dependencies | The repository states that mlx-swift's SwiftPM build does not compile the Metal kernels; under Xcode 27 it does, so the 190 MB separate metallib download is of unverified necessity and the stated reason for it is now false |
+| A135 | S2 | DONE | 819a694 | packaging / dependencies | The repository states that mlx-swift's SwiftPM build does not compile the Metal kernels; under Xcode 27 it does, so the 190 MB separate metallib download is of unverified necessity and the stated reason for it is now false |
 | A136 | S0 | DONE | 8d3fa2b | security / HTTP API | No Origin/Referer check and Content-Type is ignored, so any web page the user visits can drive the engine; /api/seat lets it repoint a cloud seat and exfiltrate a conversation |
 | A137 | S0 | DONE | 8d3fa2b | persistence | The store deletes the index and then moves the new one into place, so a crash between the two loses every kept conversation, and the atomically written .tmp is never recovered |
 | A138 | S2 | DONE | d6f9ca6 | security / TLS identity | The TLS private key's 0600 mode is applied with `try?` and never verified, so a failure leaves the engine key group/world-readable |
