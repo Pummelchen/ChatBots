@@ -286,41 +286,6 @@ struct BackendControl: View {
     }
 }
 
-/// Shows where an API-backed seat is pointed, and warns that its tools are gone.
-struct EndpointBar: View {
-    let spec: AgentSpec
-    let palette: AppPalette
-    let onEdit: () -> Void
-
-    @EnvironmentObject private var theme: ThemeStore
-    @State private var draft = ""
-    @State private var showingEditor = false
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "network")
-                .scaledFont(size: 9)
-                .foregroundStyle(palette.textTertiary)
-
-            Text("\(spec.openAI.baseURL) · \(spec.openAI.model)")
-                .scaledFont(size: 9.5, design: .monospaced)
-                .foregroundStyle(palette.textTertiary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-
-            if spec.webSearchEnabled {
-                Label("web tools unavailable on this backend", systemImage: "exclamationmark.triangle")
-                    .scaledFont(size: 9.5, design: .rounded)
-                    .foregroundStyle(AgentTheme.warning)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .help("This seat uses the OpenAI Responses API at \(spec.openAI.baseURL)")
-    }
-}
-
-
 /// A seat's name, renamed by double-clicking it.
 ///
 /// Double-click to edit and Return (or clicking away) to commit, which is the convention

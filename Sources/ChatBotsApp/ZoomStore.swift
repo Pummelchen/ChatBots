@@ -101,14 +101,3 @@ struct ScaledPadding: ViewModifier {
         content.padding(edges, length * zoom.scale)
     }
 }
-
-/// A dimension that follows the text size — for icon columns and similar fixed widths that
-/// would otherwise clip once the labels beside them grow.
-struct ScaledLength: ViewModifier {
-    @EnvironmentObject private var zoom: ZoomStore
-    let base: Double
-
-    func body(content: Content) -> some View {
-        content.frame(width: base * zoom.scale)
-    }
-}
