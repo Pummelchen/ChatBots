@@ -239,7 +239,7 @@ public final class WebTransportEngineClient {
                 throw error
             }
         } catch {
-            throw ClientError.cannotConnect(error.localizedDescription)
+            throw ClientError.cannotConnect(ErrorText.describe(error))
         }
     }
 
