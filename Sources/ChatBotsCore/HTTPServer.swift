@@ -115,6 +115,7 @@ public struct HTTPResponse: Sendable {
         case 413: "Payload Too Large"
         case 500: "Internal Server Error"
         case 501: "Not Implemented"
+        case 505: "HTTP Version Not Supported"
         case 503: "Service Unavailable"
         default: "OK"
         }
@@ -255,6 +256,76 @@ public enum HTTPParser {
 
     public struct Incomplete: Error {}
 
+    /// The versions this server speaks, checked against the request line.
+    ///
+    /// Only HTTP/1.1: every response declares 1.1 framing, the clients are the page, the CLI, the app
+    /// and Caddy's upstream, and a version this server does not speak is the case 505 exists for. The
+    /// version used to go unread entirely, so `GET / HTTP/9.9` parsed as if it had said 1.1 (A154).
+    static let supportedVersions: Set<String> = ["HTTP/1.1"]
+
+    /// Whether every character of `text` is a token character (RFC 9110 §5.6.2), which is what a method
+    /// and a field name must be.
+    ///
+    /// ASCII on purpose: `CharacterSet.alphanumerics` is the whole of Unicode, so it would accept a
+    /// field name with a letter in it that no parser on the other side of a proxy would agree with.
+    static func isToken(_ text: Substring) -> Bool {
+        !text.isEmpty && text.unicodeScalars.allSatisfy { tokenCharacters.contains($0) }
+    }
+
+    private static let tokenCharacters: CharacterSet = {
+        var set = CharacterSet(charactersIn: "!#$%&'*+-.^_`|~")
+        set.insert(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+        return set
+    }()
+
+    /// The method and target from a request line, which must have exactly three parts.
+    ///
+    /// `split(omittingEmptySubsequences: true)` and a `count >= 2` guard accepted a line with no version
+    /// — it went unread — and a line with four parts, and collapsed runs of spaces with them, so a
+    /// request line no parser upstream would agree with was read as if it were ordinary (A154). The
+    /// method keeps the upper-casing the router compares against, which is pinned by `HTTPTests`; what
+    /// is new is that it has to be a token at all.
+    static func requestParts(_ line: String) throws -> (method: String, target: String) {
+        let parts = line.split(separator: " ", omittingEmptySubsequences: false)
+        guard parts.count == 3 else {
+            throw HTTPError.malformed("the request line must be a method, a target and a version")
+        }
+        guard isToken(parts[0]) else {
+            throw HTTPError.malformed("the method was not a token")
+        }
+        guard supportedVersions.contains(String(parts[2])) else {
+            throw HTTPError.unsupportedVersion(String(parts[2]))
+        }
+        return (String(parts[0]).uppercased(), String(parts[1]))
+    }
+
+    /// The header fields, refusing the two shapes RFC 9112 requires a server to reject.
+    ///
+    /// A field name was trimmed before the colon, so `Host : x` — the whitespace §5.1 says a server MUST
+    /// reject — was read as `Host`; and a line with no colon was skipped, which is exactly how an
+    /// obs-fold continuation line arrives, so a folded field was dropped rather than rejected (§5.2).
+    /// The value keeps the optional whitespace the standard allows around it.
+    static func headerFields(_ lines: [String]) throws -> [String: String] {
+        var headers: [String: String] = [:]
+        for line in lines {
+            guard line.first != " ", line.first != "\t" else {
+                throw HTTPError.malformed("a header line was a continuation of the previous one")
+            }
+            guard let colon = line.firstIndex(of: ":") else {
+                throw HTTPError.malformed("a header line had no field name")
+            }
+            let name = line[line.startIndex..<colon]
+            guard isToken(name) else {
+                throw HTTPError.malformed("a header field name was not a token: \"\(name)\"")
+            }
+            let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            let key = name.lowercased()
+            // Repeated headers are joined, which is harmless for the ones we read.
+            headers[key] = headers[key].map { "\($0), \(value)" } ?? value
+        }
+        return headers
+    }
+
     /// Where the request head ends, or why there is not one yet.
     ///
     /// Only the first `maximumHeadBytes` are searched, so the work per read is bounded by the cap
@@ -285,22 +356,10 @@ public enum HTTPParser {
         }
 
         var lines = head.components(separatedBy: "\r\n")
-        guard !lines.isEmpty else { throw HTTPError.malformed("empty request") }
-        let requestLine = lines.removeFirst().split(separator: " ", omittingEmptySubsequences: true)
-        guard requestLine.count >= 2 else {
-            throw HTTPError.malformed("could not read the request line")
-        }
-        let method = String(requestLine[0]).uppercased()
-        let target = String(requestLine[1])
-
-        var headers: [String: String] = [:]
-        for line in lines where !line.isEmpty {
-            guard let colon = line.firstIndex(of: ":") else { continue }
-            let name = line[line.startIndex..<colon].trimmingCharacters(in: .whitespaces)
-            let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
-            // Repeated headers are joined, which is harmless for the ones we read.
-            headers[name.lowercased()] = headers[name.lowercased()].map { "\($0), \(value)" } ?? value
-        }
+        guard let requestLine = lines.first else { throw HTTPError.malformed("empty request") }
+        lines.removeFirst()
+        let (method, target) = try requestParts(requestLine)
+        let headers = try headerFields(lines)
 
         try refuseUnframedBody(headers)
 
@@ -317,13 +376,13 @@ public enum HTTPParser {
         // Split the path from the query, and decode percent escapes so a topic with
         // spaces or non-ASCII can travel in a URL.
         let parts = target.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
-        let path = percentDecoded(String(parts.first ?? ""))
+        let path = pathDecoded(String(parts.first ?? ""))
         var query: [String: String] = [:]
         if parts.count > 1 {
             for pair in parts[1].split(separator: "&") {
                 let kv = pair.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
-                query[percentDecoded(String(kv.first ?? ""))] =
-                    kv.count > 1 ? percentDecoded(String(kv[1])) : ""
+                query[formDecoded(String(kv.first ?? ""))] =
+                    kv.count > 1 ? formDecoded(String(kv[1])) : ""
             }
         }
 
@@ -378,9 +437,23 @@ public enum HTTPParser {
         return value
     }
 
-    /// Percent-decoding that leaves a malformed escape alone rather than dropping it.
-    static func percentDecoded(_ value: String) -> String {
-        value.replacingOccurrences(of: "+", with: " ").removingPercentEncoding ?? value
+    /// Percent-decoding for a path, where `+` is a plus.
+    ///
+    /// A URL path is not a form: RFC 3986 gives `+` no special meaning there, and this used to decode a
+    /// path with the query's rule, so `/s/a+b` became `/s/a b` — a different resource from the one the
+    /// client asked for, and a kept conversation whose id contained a plus could not be opened at all
+    /// (A154). A malformed escape is left alone rather than dropped.
+    static func pathDecoded(_ value: String) -> String {
+        value.removingPercentEncoding ?? value
+    }
+
+    /// Percent-decoding for a query, where `+` is a space.
+    ///
+    /// `application/x-www-form-urlencoded` is what a browser form and `URLSearchParams` send, and this
+    /// is the one place that convention applies. The replacement comes before the percent-decoding so
+    /// that an encoded plus (`%2B`) survives as a plus while a literal one becomes a space.
+    static func formDecoded(_ value: String) -> String {
+        pathDecoded(value.replacingOccurrences(of: "+", with: " "))
     }
 }
 
@@ -391,6 +464,8 @@ public enum HTTPError: LocalizedError {
     case portInUse(UInt16)
     /// A body the server cannot frame because it does not implement the coding asked for (A153).
     case unsupportedTransferEncoding(String)
+    /// An HTTP version this server does not speak (A154).
+    case unsupportedVersion(String)
 
     public var errorDescription: String? {
         switch self {
@@ -400,6 +475,8 @@ public enum HTTPError: LocalizedError {
         case .portInUse(let port): "Port \(port) is already in use"
         case .unsupportedTransferEncoding(let coding):
             "Transfer-Encoding is not supported: \(coding). Send a Content-Length instead."
+        case .unsupportedVersion(let version):
+            "HTTP version is not supported: \(version). This server speaks HTTP/1.1."
         }
     }
 
@@ -411,6 +488,7 @@ public enum HTTPError: LocalizedError {
         case .headTooLarge: 431
         case .tooLarge: 413
         case .unsupportedTransferEncoding: 501
+        case .unsupportedVersion: 505
         case .malformed, .portInUse: 400
         }
     }
