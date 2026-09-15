@@ -30,12 +30,12 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 211 |
-| DONE | 138 |
-| START | 73 |
+| DONE | 139 |
+| START | 72 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 73
+### Open — 72
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -72,7 +72,6 @@ been run.
 | A165 | S1 | START | — | web / API integration | The browser never consumes the engine's delta events, so a reply is invisible until the turn ends |
 | A166 | S1 | START | — | test coverage | The whole application target is untestable and untested: no test target depends on it, so its logic is outside every gate |
 | A167 | S1 | START | — | test that cannot fail | The zoom suite asserts private copies of the logic, never the store, and its comment claiming they cannot diverge is false |
-| A168 | S1 | START | — | test harness deadlock | The transport gate leaks on cancellation, so a cancelled test permanently blocks every later transport suite |
 | A169 | S1 | START | — | test harness / real concurrency | Twenty-one teardowns are fire-and-forget tasks, so the serialising gate is released before QUIC teardown finishes and the A102 collision is reduced rather than removed |
 | A170 | S2 | START | — | test coverage | Near-zero coverage on three paths the product depends on, including the web-search tool the research mode is built around |
 | A171 | S2 | START | — | logic / ordering | The web client applies snapshots unconditionally while the Swift client guards with the monotonic revision, so a late reply regresses the page |
@@ -201,7 +200,7 @@ been run.
 | A165 | S1 | START | — | web / API integration | The browser never consumes the engine's delta events, so a reply is invisible until the turn ends |
 | A166 | S1 | START | — | test coverage | The whole application target is untestable and untested: no test target depends on it, so its logic is outside every gate |
 | A167 | S1 | START | — | test that cannot fail | The zoom suite asserts private copies of the logic, never the store, and its comment claiming they cannot diverge is false |
-| A168 | S1 | START | — | test harness deadlock | The transport gate leaks on cancellation, so a cancelled test permanently blocks every later transport suite |
+| A168 | S1 | DONE | 18d4017 | test harness deadlock | The transport gate leaks on cancellation, so a cancelled test permanently blocks every later transport suite |
 | A169 | S1 | START | — | test harness / real concurrency | Twenty-one teardowns are fire-and-forget tasks, so the serialising gate is released before QUIC teardown finishes and the A102 collision is reduced rather than removed |
 | A17 | S1 | DONE | 0de3123 | HTTPServer | streams is appended on the main actor without the lock that every other access takes |
 | A170 | S2 | START | — | test coverage | Near-zero coverage on three paths the product depends on, including the web-search tool the research mode is built around |
