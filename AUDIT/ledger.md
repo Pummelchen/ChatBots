@@ -27,21 +27,81 @@ been run.
 <!-- BEGIN GENERATED: ledger status — rendered from ledger.json by AUDIT/render-ledger.sh -->
 | Metric | Count |
 | --- | --- |
-| Tasks enumerated | 135 |
+| Tasks enumerated | 195 |
 | DONE | 132 |
-| START | 3 |
+| START | 63 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 3
+### Open — 63
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
 | A133 | S1 | START | — | build / environment | Xcode 27 ships the Metal compiler as a separate downloadable component and nothing in the repository requires or checks it, so a clean Xcode 27 machine cannot build the package at all |
 | A134 | S2 | START | — | audit tooling / acceptance | The acceptance script's coverage step hardcodes the pre-Swift-6.4 test-bundle path, which no longer exists, so Phase E's coverage gate fails on the new toolchain |
 | A135 | S2 | START | — | packaging / dependencies | The repository states that mlx-swift's SwiftPM build does not compile the Metal kernels; under Xcode 27 it does, so the 190 MB separate metallib download is of unverified necessity and the stated reason for it is now false |
+| A136 | S0 | START | — | security / HTTP API | No Origin/Referer check and Content-Type is ignored, so any web page the user visits can drive the engine; /api/seat lets it repoint a cloud seat and exfiltrate a conversation |
+| A137 | S0 | START | — | persistence | The store deletes the index and then moves the new one into place, so a crash between the two loses every kept conversation, and the atomically written .tmp is never recovered |
+| A138 | S2 | START | — | security / TLS identity | The TLS private key's 0600 mode is applied with `try?` and never verified, so a failure leaves the engine key group/world-readable |
+| A139 | S2 | START | — | security / credentials | The per-seat cloud API key is copied into Codable settings and written to the preferences plist in cleartext, contradicting the app's own Keychain claim |
+| A140 | S2 | START | — | security / logging (L7) | An undocumented trace switch writes the entire request body — system instructions, whole conversation, base64 images — to stderr, unbounded |
+| A141 | S2 | START | — | security / SSRF | A seat's baseURL is interpolated into a URL and fetched with no scheme/host check and no redirect policy, so file://, link-local and loopback targets are reachable and internal error bodies are echoed |
+| A142 | S2 | START | — | logic / API | A body that fails to decode silently mutates state through defaults: an unknown mode becomes entertainment, an unknown budget becomes standard, a malformed topic clears it |
+| A143 | S2 | START | — | safety / input bounds | Topic, moderator name and steering text are uncapped and echoed in every snapshot, although the same file caps seat names and attachment counts |
+| A144 | S2 | START | — | performance / payload | Every attached image is re-base64-encoded into every snapshot pushed to every client |
+| A145 | S2 | START | — | safety / HTTP parsing | The HTTP request head has no size cap and is re-scanned for the header terminator on every read, so 32 connections can pin gigabytes and cost O(n^2) |
+| A146 | S2 | START | — | audit tooling / acceptance | Second instance of A134: the documented Mac gate hardcodes the pre-Swift-6.4 test-bundle path, so its coverage step fails on the new toolchain |
+| A147 | S3 | START | — | performance / main actor | Every /s/<id> request, including for unknown ids, reads and JSON-decodes the whole conversation index on the main actor |
+| A148 | S3 | START | — | safety / image intake | An image is fully decoded before any dimension or size check, so a small crafted TIFF/BMP/HEIC can expand hugely |
+| A149 | S3 | START | — | safety / TOCTOU | The attachment byte cap degrades to zero on a failed stat, the file is re-read after the stat, and a non-regular file is never rejected |
+| A150 | S3 | START | — | security headers | The hand-written SSE response head bypasses the shared serialiser and therefore carries none of A76's security headers |
+| A151 | S3 | START | — | operations / logging | There is no request or error logging: connection errors are discarded and the counters are exposed nowhere |
+| A152 | S3 | START | — | operations / health | /api/health is a hardcoded 200 that says nothing about readiness, and the readiness helper next to it is dead |
+| A153 | S3 | START | — | logic / HTTP | Transfer-Encoding is never read or rejected, so a chunked request is answered with an empty body while its route still runs |
+| A154 | S3 | START | — | logic / HTTP parsing | Head parsing is lenient: 'Host : x' is accepted, obs-fold lines are dropped, methods and versions are unvalidated, and '+' becomes a space in the path |
+| A155 | S3 | START | — | security / TLS identity | The certificate store treats any read failure as first run, hardcodes RSA-2048 without checking the pair, executes user-writable openssl paths, and drains pipes in an order that can deadlock |
+| A156 | S3 | START | — | logic / API consistency | removeAttachment answers 200 for an id that does not exist, and the concurrent-upload ceiling is counted before an await so simultaneous uploads all pass |
+| A157 | S3 | START | — | concurrency / transport | Transport sessions have no idle deadline, the per-server error is clobbered across sessions, an undecodable frame is dropped in silence, and a second start() leaks the first listener |
+| A158 | S3 | START | — | concurrency / transport client | The client's event stream is unbounded while the server deliberately buffers 256, and an unreadable frame is swallowed by try? |
+| A159 | S3 | START | — | validation / web tools | URL validation accepts any scheme starting with 'http' and requires no host, on model-controlled input |
+| A160 | S3 | START | — | logic / web front end | A vote verdict is captured when the row is built, so clicking an already-cast verdict never withdraws it |
+| A161 | S3 | START | — | docs / security | SECURITY.md still says a share link is local and served only by the engine, while the shipped Caddy configuration proxies /s/* on every interface |
+| A162 | S3 | START | — | docs / reproducibility | environment.md records swift-format as Xcode-provided via xcrun while both gates invoke a bare `swift-format` from PATH |
+| A163 | S3 | START | — | docs / correctness | The Caddyfile says the engine uses the passed Host to build the page's own links, but the replay script never reads the shareBase field it is written into |
+| A164 | S3 | START | — | unsafe / tooling | The DevTools client uses a fixed shared temporary profile path, so a second run or a hostile local process can interfere with it |
+| A165 | S1 | START | — | web / API integration | The browser never consumes the engine's delta events, so a reply is invisible until the turn ends |
+| A166 | S1 | START | — | test coverage | The whole application target is untestable and untested: no test target depends on it, so its logic is outside every gate |
+| A167 | S1 | START | — | test that cannot fail | The zoom suite asserts private copies of the logic, never the store, and its comment claiming they cannot diverge is false |
+| A168 | S1 | START | — | test harness deadlock | The transport gate leaks on cancellation, so a cancelled test permanently blocks every later transport suite |
+| A169 | S1 | START | — | test harness / real concurrency | Twenty-one teardowns are fire-and-forget tasks, so the serialising gate is released before QUIC teardown finishes and the A102 collision is reduced rather than removed |
+| A170 | S2 | START | — | test coverage | Near-zero coverage on three paths the product depends on, including the web-search tool the research mode is built around |
+| A171 | S2 | START | — | logic / ordering | The web client applies snapshots unconditionally while the Swift client guards with the monotonic revision, so a late reply regresses the page |
+| A172 | S2 | START | — | dead UI | The device-profile badge is hidden in markup and never unhidden, so the detected profile and viewport are computed and discarded |
+| A173 | S2 | START | — | divergent duplicate rule | The web disables removing an attachment once a conversation runs while the app and the engine both allow it, so the two front ends disagree |
+| A174 | S2 | START | — | data loss / UX | Both front ends clear the moderator's draft before the send is confirmed, so a refused send silently discards what was typed |
+| A175 | S2 | START | — | error handling | The client is stored before its connection is verified, so the specific 'could not reach the engine' reason is overwritten by a generic transport error |
+| A176 | S2 | START | — | dead code | EndpointBar is unreferenced and carries an action nothing invokes, plus state nothing reads and an environment object that would trap if it were instantiated |
+| A177 | S3 | START | — | dead declarations, false comments | Nine app-layer declarations are unread, and one of them describes a window minimum the code does not enforce in three different ways |
+| A178 | S3 | START | — | docs / false user-facing text | Two user-facing strings say the models run in-process, which stopped being true when the engine became a separate process |
+| A179 | S3 | START | — | style / dead injection | Duplicated and mid-sentence-truncated comments, and an @EnvironmentObject with no @Published property and no reader |
+| A180 | S3 | START | — | deps / deprecated API | `NSApp.activate(ignoringOtherApps:)` is API_TO_BE_DEPRECATED in the macOS 27 SDK |
+| A181 | S2 | START | — | tools / argument parsing | An option given without a value loops forever instead of failing |
+| A182 | S2 | START | — | tools / build staleness | The rebuild guard compares directory mtimes, so editing a source file never triggers a rebuild and a stale binary or embed is served |
+| A183 | S2 | START | — | tools / exposure | The device-capture run publishes the unauthenticated API on every interface, unlike the start scripts which warn and offer --local-only |
+| A184 | S2 | START | — | tools / packaging | A missing SwiftPM bin path silently skips the metallib copy and the script still exits 0, so a bundle can ship that fails at runtime |
+| A185 | S2 | START | — | audit tooling / scanner | The waiver checker ignores semgrep's `errors` array and treats a missing `results` key as zero findings, so a failed scan reports a clean pass |
+| A186 | S2 | START | — | installer / model download | A checkpoint file whose repository name contains a directory uses it verbatim, so the download fails and the install dies |
+| A187 | S2 | START | — | supply chain / CI | The CI downloads shellcheck, gitleaks and osv-scanner and never verifies them, while the file's header claims pinned tools |
+| A188 | S3 | START | — | tools / injection | --port and --engine are interpolated into sed programs with no validation, so a crafted value injects into the generated Caddyfile that is then run |
+| A189 | S3 | START | — | tools / process safety | The pid-ownership check is a substring match, so a recycled pid belonging to an unrelated process can be signalled |
+| A190 | S3 | START | — | tools / process safety | The stop path kills by name directly beneath a comment that says it kills by pid |
+| A191 | S3 | START | — | generated sources / escaping | Name-list entries are interpolated into Swift string literals unescaped, so a quote or backslash in names/*.txt produces Swift that does not compile |
+| A192 | S3 | START | — | CI / coverage of the gates | The shell lint covers only tools/*.sh so the audit scripts are never linted, and semgrep fetches a mutable live rule set despite the pinning claim |
+| A193 | S3 | START | — | tools / network robustness | Model and Metal downloads have no transfer deadline, so a stalled connection hangs the installer indefinitely |
+| A194 | S3 | START | — | docs / drift | Several tool comments and help texts describe behaviour that changed or never existed |
+| A195 | S3 | START | — | docs / TLS trust | The client never enforces the pinned fingerprint while another comment claims pinning is meaningful |
 
-### Every task — 135
+### Every task — 195
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -94,12 +154,72 @@ been run.
 | A133 | S1 | START | — | build / environment | Xcode 27 ships the Metal compiler as a separate downloadable component and nothing in the repository requires or checks it, so a clean Xcode 27 machine cannot build the package at all |
 | A134 | S2 | START | — | audit tooling / acceptance | The acceptance script's coverage step hardcodes the pre-Swift-6.4 test-bundle path, which no longer exists, so Phase E's coverage gate fails on the new toolchain |
 | A135 | S2 | START | — | packaging / dependencies | The repository states that mlx-swift's SwiftPM build does not compile the Metal kernels; under Xcode 27 it does, so the 190 MB separate metallib download is of unverified necessity and the stated reason for it is now false |
+| A136 | S0 | START | — | security / HTTP API | No Origin/Referer check and Content-Type is ignored, so any web page the user visits can drive the engine; /api/seat lets it repoint a cloud seat and exfiltrate a conversation |
+| A137 | S0 | START | — | persistence | The store deletes the index and then moves the new one into place, so a crash between the two loses every kept conversation, and the atomically written .tmp is never recovered |
+| A138 | S2 | START | — | security / TLS identity | The TLS private key's 0600 mode is applied with `try?` and never verified, so a failure leaves the engine key group/world-readable |
+| A139 | S2 | START | — | security / credentials | The per-seat cloud API key is copied into Codable settings and written to the preferences plist in cleartext, contradicting the app's own Keychain claim |
 | A14 | S1 | DONE | 0de3123 | HTTPServer | isRunning/lastError are raced between the listener callback and waitUntilReady |
+| A140 | S2 | START | — | security / logging (L7) | An undocumented trace switch writes the entire request body — system instructions, whole conversation, base64 images — to stderr, unbounded |
+| A141 | S2 | START | — | security / SSRF | A seat's baseURL is interpolated into a URL and fetched with no scheme/host check and no redirect policy, so file://, link-local and loopback targets are reachable and internal error bodies are echoed |
+| A142 | S2 | START | — | logic / API | A body that fails to decode silently mutates state through defaults: an unknown mode becomes entertainment, an unknown budget becomes standard, a malformed topic clears it |
+| A143 | S2 | START | — | safety / input bounds | Topic, moderator name and steering text are uncapped and echoed in every snapshot, although the same file caps seat names and attachment counts |
+| A144 | S2 | START | — | performance / payload | Every attached image is re-base64-encoded into every snapshot pushed to every client |
+| A145 | S2 | START | — | safety / HTTP parsing | The HTTP request head has no size cap and is re-scanned for the header terminator on every read, so 32 connections can pin gigabytes and cost O(n^2) |
+| A146 | S2 | START | — | audit tooling / acceptance | Second instance of A134: the documented Mac gate hardcodes the pre-Swift-6.4 test-bundle path, so its coverage step fails on the new toolchain |
+| A147 | S3 | START | — | performance / main actor | Every /s/<id> request, including for unknown ids, reads and JSON-decodes the whole conversation index on the main actor |
+| A148 | S3 | START | — | safety / image intake | An image is fully decoded before any dimension or size check, so a small crafted TIFF/BMP/HEIC can expand hugely |
+| A149 | S3 | START | — | safety / TOCTOU | The attachment byte cap degrades to zero on a failed stat, the file is re-read after the stat, and a non-regular file is never rejected |
 | A15 | S1 | DONE | 8ece1d3 | EngineService/DocumentImport | Attaching a document blocks the engine main actor for the whole conversion, subprocess wait included |
+| A150 | S3 | START | — | security headers | The hand-written SSE response head bypasses the shared serialiser and therefore carries none of A76's security headers |
+| A151 | S3 | START | — | operations / logging | There is no request or error logging: connection errors are discarded and the counters are exposed nowhere |
+| A152 | S3 | START | — | operations / health | /api/health is a hardcoded 200 that says nothing about readiness, and the readiness helper next to it is dead |
+| A153 | S3 | START | — | logic / HTTP | Transfer-Encoding is never read or rejected, so a chunked request is answered with an empty body while its route still runs |
+| A154 | S3 | START | — | logic / HTTP parsing | Head parsing is lenient: 'Host : x' is accepted, obs-fold lines are dropped, methods and versions are unvalidated, and '+' becomes a space in the path |
+| A155 | S3 | START | — | security / TLS identity | The certificate store treats any read failure as first run, hardcodes RSA-2048 without checking the pair, executes user-writable openssl paths, and drains pipes in an order that can deadlock |
+| A156 | S3 | START | — | logic / API consistency | removeAttachment answers 200 for an id that does not exist, and the concurrent-upload ceiling is counted before an await so simultaneous uploads all pass |
+| A157 | S3 | START | — | concurrency / transport | Transport sessions have no idle deadline, the per-server error is clobbered across sessions, an undecodable frame is dropped in silence, and a second start() leaks the first listener |
+| A158 | S3 | START | — | concurrency / transport client | The client's event stream is unbounded while the server deliberately buffers 256, and an unreadable frame is swallowed by try? |
+| A159 | S3 | START | — | validation / web tools | URL validation accepts any scheme starting with 'http' and requires no host, on model-controlled input |
 | A16 | S3 | DONE | 9c53771 | ChatBotsCLI | --serve has no signal handling, so the listener is never shut down and nothing is flushed on exit |
+| A160 | S3 | START | — | logic / web front end | A vote verdict is captured when the row is built, so clicking an already-cast verdict never withdraws it |
+| A161 | S3 | START | — | docs / security | SECURITY.md still says a share link is local and served only by the engine, while the shipped Caddy configuration proxies /s/* on every interface |
+| A162 | S3 | START | — | docs / reproducibility | environment.md records swift-format as Xcode-provided via xcrun while both gates invoke a bare `swift-format` from PATH |
+| A163 | S3 | START | — | docs / correctness | The Caddyfile says the engine uses the passed Host to build the page's own links, but the replay script never reads the shareBase field it is written into |
+| A164 | S3 | START | — | unsafe / tooling | The DevTools client uses a fixed shared temporary profile path, so a second run or a hostile local process can interfere with it |
+| A165 | S1 | START | — | web / API integration | The browser never consumes the engine's delta events, so a reply is invisible until the turn ends |
+| A166 | S1 | START | — | test coverage | The whole application target is untestable and untested: no test target depends on it, so its logic is outside every gate |
+| A167 | S1 | START | — | test that cannot fail | The zoom suite asserts private copies of the logic, never the store, and its comment claiming they cannot diverge is false |
+| A168 | S1 | START | — | test harness deadlock | The transport gate leaks on cancellation, so a cancelled test permanently blocks every later transport suite |
+| A169 | S1 | START | — | test harness / real concurrency | Twenty-one teardowns are fire-and-forget tasks, so the serialising gate is released before QUIC teardown finishes and the A102 collision is reduced rather than removed |
 | A17 | S1 | DONE | 0de3123 | HTTPServer | streams is appended on the main actor without the lock that every other access takes |
+| A170 | S2 | START | — | test coverage | Near-zero coverage on three paths the product depends on, including the web-search tool the research mode is built around |
+| A171 | S2 | START | — | logic / ordering | The web client applies snapshots unconditionally while the Swift client guards with the monotonic revision, so a late reply regresses the page |
+| A172 | S2 | START | — | dead UI | The device-profile badge is hidden in markup and never unhidden, so the detected profile and viewport are computed and discarded |
+| A173 | S2 | START | — | divergent duplicate rule | The web disables removing an attachment once a conversation runs while the app and the engine both allow it, so the two front ends disagree |
+| A174 | S2 | START | — | data loss / UX | Both front ends clear the moderator's draft before the send is confirmed, so a refused send silently discards what was typed |
+| A175 | S2 | START | — | error handling | The client is stored before its connection is verified, so the specific 'could not reach the engine' reason is overwritten by a generic transport error |
+| A176 | S2 | START | — | dead code | EndpointBar is unreferenced and carries an action nothing invokes, plus state nothing reads and an environment object that would trap if it were instantiated |
+| A177 | S3 | START | — | dead declarations, false comments | Nine app-layer declarations are unread, and one of them describes a window minimum the code does not enforce in three different ways |
+| A178 | S3 | START | — | docs / false user-facing text | Two user-facing strings say the models run in-process, which stopped being true when the engine became a separate process |
+| A179 | S3 | START | — | style / dead injection | Duplicated and mid-sentence-truncated comments, and an @EnvironmentObject with no @Published property and no reader |
 | A18 | S1 | DONE | 0de3123 | tests | The suite is not hermetic: three tests need the developer's private models/ and .secrets.env and fail on a fresh clone |
+| A180 | S3 | START | — | deps / deprecated API | `NSApp.activate(ignoringOtherApps:)` is API_TO_BE_DEPRECATED in the macOS 27 SDK |
+| A181 | S2 | START | — | tools / argument parsing | An option given without a value loops forever instead of failing |
+| A182 | S2 | START | — | tools / build staleness | The rebuild guard compares directory mtimes, so editing a source file never triggers a rebuild and a stale binary or embed is served |
+| A183 | S2 | START | — | tools / exposure | The device-capture run publishes the unauthenticated API on every interface, unlike the start scripts which warn and offer --local-only |
+| A184 | S2 | START | — | tools / packaging | A missing SwiftPM bin path silently skips the metallib copy and the script still exits 0, so a bundle can ship that fails at runtime |
+| A185 | S2 | START | — | audit tooling / scanner | The waiver checker ignores semgrep's `errors` array and treats a missing `results` key as zero findings, so a failed scan reports a clean pass |
+| A186 | S2 | START | — | installer / model download | A checkpoint file whose repository name contains a directory uses it verbatim, so the download fails and the install dies |
+| A187 | S2 | START | — | supply chain / CI | The CI downloads shellcheck, gitleaks and osv-scanner and never verifies them, while the file's header claims pinned tools |
+| A188 | S3 | START | — | tools / injection | --port and --engine are interpolated into sed programs with no validation, so a crafted value injects into the generated Caddyfile that is then run |
+| A189 | S3 | START | — | tools / process safety | The pid-ownership check is a substring match, so a recycled pid belonging to an unrelated process can be signalled |
 | A19 | S2 | DONE | 0de3123 | process / git history | A DONE task was committed with its evidence and its ledger entry but without its fix: 948ea29 claims A14 and A17 and contains no source change |
+| A190 | S3 | START | — | tools / process safety | The stop path kills by name directly beneath a comment that says it kills by pid |
+| A191 | S3 | START | — | generated sources / escaping | Name-list entries are interpolated into Swift string literals unescaped, so a quote or backslash in names/*.txt produces Swift that does not compile |
+| A192 | S3 | START | — | CI / coverage of the gates | The shell lint covers only tools/*.sh so the audit scripts are never linted, and semgrep fetches a mutable live rule set despite the pinning claim |
+| A193 | S3 | START | — | tools / network robustness | Model and Metal downloads have no transfer deadline, so a stalled connection hangs the installer indefinitely |
+| A194 | S3 | START | — | docs / drift | Several tool comments and help texts describe behaviour that changed or never existed |
+| A195 | S3 | START | — | docs / TLS trust | The client never enforces the pinned fingerprint while another comment claims pinning is meaningful |
 | A20 | S1 | DONE | e9d45ef | web front end | Stored DOM XSS: the live-pane header interpolates the moderator-supplied seat name into innerHTML |
 | A21 | S2 | DONE | 8111b1a | installer | The model-download integrity check silently degrades to 'accept any size' when the HEAD request yields nothing |
 | A22 | S2 | DONE | 18100dd | start script | stop_all kills a stale PID from a pid file without checking the process is ours |
@@ -1340,3 +1460,31 @@ Numbered as found; all are enumerated before any is fixed (§11).
 | **A133 (S1)** | **Xcode 27 does not ship the Metal compiler.** It is a separate 839 MB component (`xcodebuild -downloadComponent MetalToolchain`), and without it this package cannot build at all — `mlx-swift` compiles generated Metal kernels. Nothing in `README.md`, `tools/install.sh` or the previous `environment.md` required or checked it. Measured by *executing* metal: node1 works, node2–4 do not. |
 | **A134 (S2)** | The acceptance script's coverage step hardcodes the pre-6.4 test-bundle path (`ChatBotsPackageTests.xctest`), which is now `ChatBotsCoreTests.xctest`, so Phase E's coverage gate fails for a reason that is not about the code. |
 | **A135 (S2)** | `make-app.sh` states that mlx-swift's SwiftPM build does not compile the Metal kernels and fetches a 190 MB prebuilt `mlx.metallib` (SHA-256 pinned, A24) for that reason. Under Xcode 27 the SwiftPM build **does** compile them and produces its own `default.metallib`, so the stated reason is false and the necessity of the separate download is unverified — a 190 MB supply-chain surface that may be redundant, and potentially two Metal libraries in one bundle. |
+
+## Phase B — the finding set, enumerated before any fix
+
+Sixty-three findings (A133–A195) from four read-only passes: toolchain/repository, core module
+(L2/L3/L5), security/operations (L4/L7) and tests/app/web (L6), plus a fifth pass over `tools/` and CI.
+They are enumerated here, and committed, **before anything is fixed**, as §11 requires. The two S0s
+come first.
+
+| sev | ids |
+| --- | --- |
+| **S0** | A136 (a visited web page can drive the engine and repoint a cloud seat), A137 (`ConversationStore` can lose every kept conversation) |
+| **S1** | A165 (browser never consumes `delta`, so replies are invisible until a turn ends), A166 (the whole app target is untestable), A167 (a test that asserts a copy of the logic), A168 (the transport gate deadlocks on cancellation), A169 (21 fire-and-forget teardowns defeat the serialisation) |
+| **S2** | A134, A135, A138–A146, A170–A176, A181–A187 |
+| **S3** | A133-adjacent environment notes, A147–A164, A177–A180, A188–A195 |
+
+Three findings are worth stating in prose because they change what the re-audit is for:
+
+* **A136 is a drive-by, not just a LAN exposure.** A01 was "the API is reachable from the network";
+  A75 was "any site can *read* the API". This is "any site can *make it act*": no Origin check, and a
+  `Content-Type` that is never inspected, so `text/plain` JSON from a page the user merely visited
+  executes `/api/start`, `/api/conversations/delete` and `/api/seat` — and `/api/seat` will repoint a
+  cloud seat at a host the attacker controls. The audit had treated the browser boundary as closed.
+* **A137 is the first S0 in this re-audit that is not about the new toolchain**: the store deletes the
+  index and then moves the replacement into place, so a crash in between leaves the atomically written
+  `.tmp` unread and the whole kept history reading as empty.
+* **A165 explains a symptom the previous audit never tested**: the engine has streamed per-token
+  `delta` events since `f0b71b2` and the browser has never listened for them, so the page the README
+  advertises for phones shows replies only once a turn completes.
