@@ -113,9 +113,16 @@ public enum TransportCheck {
     ///   a real run would rather than creating another.
     /// - Parameter timeout: the whole check's budget — the client's request deadline and the
     ///   connect retries are both taken from it.
+    /// - Parameter executable: the engine to spawn, defaulting to the process's own executable.
+    ///   That default is right for the installer, where this *is* `chatbots-cli`, and wrong for
+    ///   anything driving the check from inside another program: a test runner's
+    ///   `arguments.first` is the test binary, so the child that came up was a second test
+    ///   process and the client timed out against a listener nobody had started (A170). Naming
+    ///   the engine is what makes the check testable without pretending it is the installer.
     @MainActor
     public static func run(
-        in directory: URL, port: UInt16 = 7795, timeout: Duration = .seconds(30)
+        in directory: URL, port: UInt16 = 7795, timeout: Duration = .seconds(30),
+        executable: URL? = nil
     ) async -> TransportCheckReport {
         var report = TransportCheckReport(fingerprint: "not generated")
         // One deadline for the run, so `timeout` bounds the check rather than decorating the
@@ -148,12 +155,17 @@ public enum TransportCheck {
         // it passed — while a real client could not connect to a real engine at all. An
         // in-process pair takes a shortcut that does not exist across a process boundary, so
         // the check was proving nothing. It now spawns the engine the same way the app does.
-        guard let executable = ProcessInfo.processInfo.arguments.first else {
+        let engineURL: URL
+        if let executable {
+            engineURL = executable
+        } else if let first = ProcessInfo.processInfo.arguments.first {
+            engineURL = URL(fileURLWithPath: first)
+        } else {
             report.recordFailure("cannot locate the engine executable to start")
             return report
         }
         let engineProcess = Process()
-        engineProcess.executableURL = URL(fileURLWithPath: executable)
+        engineProcess.executableURL = engineURL
         engineProcess.arguments = [
             "--serve", "--transport", "webtransport",
             "--transport-port", String(port),

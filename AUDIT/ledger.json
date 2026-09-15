@@ -2893,7 +2893,7 @@
       "fix_summary": null,
       "evidence_after": null,
       "commit": "079ec2c",
-      "notes": "**First path covered, two left, so this stays open.** `WebSearchTool.run`'s three branches are now tested — `AuditClientsSearchTests.swift` gained `WebSearchToolTests`, which uses the scripted Tavily server already private to that file — and `WebTools.swift` went from **11.36%** of lines to **57.95%** in the same llvm-cov report the baseline used (`AUDIT/baseline/swift64/a170-webtools-coverage.log`, which shows the baseline line and the new one side by side). What the finding calls near-zero is WebTools and TransportCheck; `TavilyClient` was already 61.35% and is unchanged by this, and `TransportCheck` is still **24.33%**. TransportCheck is the installer's own smoke test and drives a real transport, so a test for it needs the harness the transport suites use (a real listener and a real client) rather than a fixture, which is why it is left as the remaining work rather than half-done here. Commit 079ec2c.",
+      "notes": "**First path covered, two left, so this stays open.** `WebSearchTool.run`'s three branches are now tested — `AuditClientsSearchTests.swift` gained `WebSearchToolTests`, which uses the scripted Tavily server already private to that file — and `WebTools.swift` went from **11.36%** of lines to **57.95%** in the same llvm-cov report the baseline used (`AUDIT/baseline/swift64/a170-webtools-coverage.log`, which shows the baseline line and the new one side by side). What the finding calls near-zero is WebTools and TransportCheck; `TavilyClient` was already 61.35% and is unchanged by this, and `TransportCheck` is still **24.33%**. TransportCheck is the installer's own smoke test and drives a real transport, so a test for it needs the harness the transport suites use (a real listener and a real client) rather than a fixture, which is why it is left as the remaining work rather than half-done here. Commit 079ec2c. **The second path is blocked, and the blocker is now its own finding (A215).** Covering TransportCheck end to end from a test revealed that the check pins an identity it never gives the engine it spawns, so the passing path cannot be exercised with a scratch certificate directory — the client retries for the whole 30-second budget and reports a connect failure. What this task did add is the certificate branch (a directory that cannot hold a key), which took its coverage from 24.33% to **29.10%**, and the injectable `executable:` parameter that made the attempt possible at all. The passing path waits on A215.",
       "blocked_reason": null
     },
     {
@@ -3642,6 +3642,23 @@
       "evidence_after": null,
       "commit": null,
       "notes": "Recorded rather than fixed in the same round, because the fix is a design change and a half-done one would be worse than none: an attachment image has to be served by reference — an `/api/attachments/<id>/image` route (the HTTP server already serves the interface's own assets that way) with the snapshot carrying the metadata and the client fetching the bytes once — and that touches the HTTP routes, the WebTransport client, the app's `Attachments` reconstruction (`ChatController.swift:973` decodes `imageBase64` back into `imageData`) and the page, which never uses the field at all. A memoised base64 would remove the encoding cost and leave the delivery failure exactly where it is, so it would close A144's wording while leaving the defect that matters.",
+      "blocked_reason": null
+    },
+    {
+      "id": "A215",
+      "severity": "S2",
+      "unit": "verification / installer smoke test",
+      "file_line": "Sources/ChatBotsCore/TransportCheck.swift:189-200,235-250",
+      "title": "The installer's transport check pins an identity it never gives the engine it starts, so it can fail for a reason that is not the transport",
+      "category": "defect",
+      "status": "START",
+      "host_used": "node1",
+      "discovered_by": "Phase C/D — found while covering TransportCheck for A170",
+      "evidence_before": "`TransportCheck.run(in:port:timeout:executable:)` loads or creates the engine identity in `directory` and pins its fingerprint on the client, then spawns the engine with `[\"--serve\", \"--transport\", \"webtransport\", \"--transport-port\", N, \"--port\", N-1]` — ports and a transport, and nothing that tells the child which certificate to use. The child therefore loads or creates its own, by default under the project's `.run`, and the pin cannot match it. Driven from the test target with a scratch directory the check reports `certificate 15:B2:…:AE:91` (its own, freshly generated), `connected NO`, `round trips 0`, and the failure `connect across processes: gave up after 30.0 seconds — Could not connect to the conversation engine` (`AUDIT/baseline/swift64/a215-transport-check-identity.log`). The check is correct only where `directory` happens to be the directory the child would choose anyway, which is the installer's case and not a property of the check — so a check meant to prove the channel works can fail, or pass, for a reason that has nothing to do with the channel.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "Found by trying to cover TransportCheck honestly for A170 rather than by reading it, which is the second time this audit has learned something sharper from the test gate than from the reading (A173 was the first). The fix is one of: pass the certificate directory to the child so both sides use the same identity, or have the client trust the identity the *child* reports — the first is smaller and matches how the installer already works. Two things are already true for whoever takes it: `run` takes an injectable `executable` (added while investigating, so a test can drive the check with the real `chatbots-cli` rather than the test binary), and a scratch identity is enough to reproduce this in a few seconds, so the fix can be demonstrated rather than argued.",
       "blocked_reason": null
     }
   ]
