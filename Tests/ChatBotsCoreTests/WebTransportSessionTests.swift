@@ -98,11 +98,11 @@ struct WebTransportSessionTests {
     @Test("A client can ask the engine for its state and get it")
     func stateRoundTrip() async throws {
         let running = try await startEngine()
-        defer { Task { await running.stop() } }
+        defer { TransportTeardown.register { await running.stop() } }
 
         let client = makeClient(port: running.port)
         try await client.connect()
-        defer { Task { await client.disconnect() } }
+        defer { TransportTeardown.register { await client.disconnect() } }
 
         let snapshot = try #require(await client.state())
         #expect(snapshot.seats.count == 2)
@@ -123,11 +123,11 @@ struct WebTransportSessionTests {
     @Test("A client is still served after sitting idle on its connection")
     func idleClientIsStillServed() async throws {
         let running = try await startEngine()
-        defer { Task { await running.stop() } }
+        defer { TransportTeardown.register { await running.stop() } }
 
         let client = makeClient(port: running.port)
         try await client.connect()
-        defer { Task { await client.disconnect() } }
+        defer { TransportTeardown.register { await client.disconnect() } }
 
         try? await Task.sleep(for: .seconds(1))
 
@@ -146,7 +146,7 @@ struct WebTransportSessionTests {
     @Test("After probing, the real client still reaches the engine")
     func probeThenConnect() async throws {
         let running = try await startEngine()
-        defer { Task { await running.stop() } }
+        defer { TransportTeardown.register { await running.stop() } }
 
         // Five rounds, each a connect and a clean close: what `isEngineAnswering` does over a
         // slow startup, plus the retries around it.
@@ -167,7 +167,7 @@ struct WebTransportSessionTests {
 
         let client = makeClient(port: running.port)
         try await client.connect()
-        defer { Task { await client.disconnect() } }
+        defer { TransportTeardown.register { await client.disconnect() } }
 
         let snapshot = try #require(await client.state())
         #expect(snapshot.topic == "A transport test")
@@ -194,7 +194,7 @@ struct WebTransportSessionTests {
     func clientAfterClient() async throws {
         let ceiling = 4
         let running = try await startEngine(maximumConnections: ceiling)
-        defer { Task { await running.stop() } }
+        defer { TransportTeardown.register { await running.stop() } }
 
         for round in 0..<24 {
             // Let the previous session finish being torn down before the next arrives, so this
@@ -227,11 +227,11 @@ struct WebTransportSessionTests {
     @Test("A command over the transport changes the engine state")
     func requestChangesState() async throws {
         let running = try await startEngine()
-        defer { Task { await running.stop() } }
+        defer { TransportTeardown.register { await running.stop() } }
 
         let client = makeClient(port: running.port)
         try await client.connect()
-        defer { Task { await client.disconnect() } }
+        defer { TransportTeardown.register { await client.disconnect() } }
 
         let reply = try await client.send(.setTopic("A new subject"))
         #expect(reply.snapshot?.topic == "A new subject")
@@ -249,11 +249,11 @@ struct WebTransportSessionTests {
     @Test("A change is pushed to an attached client")
     func changeIsPushed() async throws {
         let running = try await startEngine()
-        defer { Task { await running.stop() } }
+        defer { TransportTeardown.register { await running.stop() } }
 
         let client = makeClient(port: running.port)
         try await client.connect()
-        defer { Task { await client.disconnect() } }
+        defer { TransportTeardown.register { await client.disconnect() } }
 
         // Connect pushes the current state, so the stream is already carrying something. Take
         // that first, so the assertion below is about the change rather than the greeting.
@@ -281,11 +281,11 @@ struct WebTransportSessionTests {
     @Test("A request too large to frame fails at the sender and leaves the session usable")
     func oversizeRequestFailsFast() async throws {
         let running = try await startEngine()
-        defer { Task { await running.stop() } }
+        defer { TransportTeardown.register { await running.stop() } }
 
         let client = makeClient(port: running.port)
         try await client.connect()
-        defer { Task { await client.disconnect() } }
+        defer { TransportTeardown.register { await client.disconnect() } }
 
         // Over the cap once the bytes are base64-encoded into the request JSON.
         let contents = Data(repeating: 0x41, count: ProtocolLimits.maximumMessageBytes)

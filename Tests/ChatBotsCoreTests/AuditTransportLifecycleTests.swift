@@ -98,7 +98,7 @@ struct AuditTransportLifecycleTests {
     @Test("A client whose retry fails does not report itself connected")
     func failedRetryIsNotConnected() async throws {
         let running = try await startEngine()
-        defer { Task { await running.stop() } }
+        defer { TransportTeardown.register { await running.stop() } }
 
         let client = makeClient(port: running.port)
         try await client.connect()
