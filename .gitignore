@@ -47,3 +47,9 @@ __pycache__/
 # and those are committed as the acceptance evidence; the scratch directories are several GB of
 # `.build` copies and are not.
 AUDIT/baseline/phaseE/scratch-*/
+
+# `swift test --enable-code-coverage` makes every product in that build instrumented, so running one
+# by hand — `chatbots-cli --check --model-a …`, which is how a checkpoint is verified — writes this
+# profile into the working directory. It is build output, not evidence: the coverage the audit keeps is
+# the report `tools/audit-checks.sh` produces.
+*.profraw
