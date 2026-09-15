@@ -30,12 +30,12 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 214 |
-| DONE | 162 |
-| START | 52 |
+| DONE | 163 |
+| START | 51 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 52
+### Open — 51
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -69,7 +69,6 @@ been run.
 | A178 | S3 | START | — | docs / false user-facing text | Two user-facing strings say the models run in-process, which stopped being true when the engine became a separate process |
 | A179 | S3 | START | — | style / dead injection | Duplicated and mid-sentence-truncated comments, and an @EnvironmentObject with no @Published property and no reader |
 | A180 | S3 | START | — | deps / deprecated API | `NSApp.activate(ignoringOtherApps:)` is API_TO_BE_DEPRECATED in the macOS 27 SDK |
-| A181 | S2 | START | — | tools / argument parsing | An option given without a value loops forever instead of failing |
 | A182 | S2 | START | — | tools / build staleness | The rebuild guard compares directory mtimes, so editing a source file never triggers a rebuild and a stale binary or embed is served |
 | A183 | S2 | START | — | tools / exposure | The device-capture run publishes the unauthenticated API on every interface, unlike the start scripts which warn and offer --local-only |
 | A184 | S2 | START | — | tools / packaging | A missing SwiftPM bin path silently skips the metallib copy and the script still exits 0, so a bundle can ship that fails at runtime |
@@ -195,7 +194,7 @@ been run.
 | A179 | S3 | START | — | style / dead injection | Duplicated and mid-sentence-truncated comments, and an @EnvironmentObject with no @Published property and no reader |
 | A18 | S1 | DONE | 0de3123 | tests | The suite is not hermetic: three tests need the developer's private models/ and .secrets.env and fail on a fresh clone |
 | A180 | S3 | START | — | deps / deprecated API | `NSApp.activate(ignoringOtherApps:)` is API_TO_BE_DEPRECATED in the macOS 27 SDK |
-| A181 | S2 | START | — | tools / argument parsing | An option given without a value loops forever instead of failing |
+| A181 | S2 | DONE | d647954 | tools / argument parsing | An option given without a value loops forever instead of failing |
 | A182 | S2 | START | — | tools / build staleness | The rebuild guard compares directory mtimes, so editing a source file never triggers a rebuild and a stale binary or embed is served |
 | A183 | S2 | START | — | tools / exposure | The device-capture run publishes the unauthenticated API on every interface, unlike the start scripts which warn and offer --local-only |
 | A184 | S2 | START | — | tools / packaging | A missing SwiftPM bin path silently skips the metallib copy and the script still exits 0, so a bundle can ship that fails at runtime |
