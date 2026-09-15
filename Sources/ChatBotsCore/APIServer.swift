@@ -89,6 +89,12 @@ public struct APISnapshot: Codable, Sendable {
     public var canAttach: Bool
     public var imagesAllowed: Bool
     public var availablePersonas: [APIPersona]
+    /// The checkpoints this engine offers, so a front end can present the same list the app's own
+    /// picker shows without shipping a second copy of it.
+    ///
+    /// Optional because a snapshot from an engine that predates the field must still decode, the same
+    /// reason `revision` is (A110): a missing list is "nothing to offer here", not a broken state.
+    public var availableModels: [APIModelOption]?
     public var serverTime: Date
 
     /// A counter the engine increments for every snapshot it produces.
@@ -218,6 +224,14 @@ public struct APIAttachment: Codable, Sendable {
     // them should ask for one by id rather than be sent all of them again and again.
 }
 
+public struct APIModelOption: Codable, Sendable {
+    public var id: String
+    public var name: String
+    public var summary: String
+    /// The download size as text ("3.2 GB"), when it is known.
+    public var sizeLabel: String?
+}
+
 public struct APIPersona: Codable, Sendable {
     public var id: String
     public var name: String
@@ -303,6 +317,8 @@ public struct APICommand: Codable, Sendable {
     public var on: Bool?
     public var name: String?
     public var personaID: String?
+    /// The MLX checkpoint for a seat, as a repository id or a catalogue alias.
+    public var modelID: String?
     public var thinking: String?
     public var backend: String?
     public var showReasoning: Bool?
@@ -658,6 +674,7 @@ public final class APIServer {
             seatID: seatID, name: body.name, personaID: body.personaID,
             thinking: body.thinking.flatMap(ThinkingMode.init(rawValue:)),
             backend: body.backend.flatMap(AgentSpec.Backend.init(rawValue:)),
+            modelID: body.modelID,
             baseURL: body.baseURL, apiModel: body.apiModel, apiKey: body.apiKey)
     }
 

@@ -80,6 +80,13 @@ struct UnifiedConversation: View {
                         controller.setBackend(backend, for: pane.id)
                     }
 
+                    ModelControl(
+                        spec: pane.spec,
+                        isEnabled: !pane.isGenerating
+                    ) { modelID in
+                        controller.setModel(modelID, for: pane.id)
+                    }
+
                     PersonaControl(
                         persona: pane.spec.persona,
                         isEnabled: !pane.isGenerating

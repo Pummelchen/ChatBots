@@ -172,6 +172,17 @@ public final class EngineService {
             if let model = change.apiModel { spec.openAI.model = model }
             if let key = change.apiKey { spec.openAI.apiKey = key }
             engine.updateSeat(spec)
+            // The checkpoint last, because it is the one field that replaces an engine rather than
+            // editing one: `setModel` holds the rule about when that is allowed, so it is stated
+            // once. A refusal here is an answer — a change that could not be made is never reported
+            // as one that was (A173).
+            if let modelID = change.modelID {
+                let resolved = ModelCatalog.resolve(modelID)
+                guard !resolved.isEmpty else { return .refused("a model is required") }
+                if resolved != spec.modelID, !engine.setModel(resolved, for: spec.id) {
+                    return .refused("the model cannot be changed while a turn is in flight")
+                }
+            }
             return .state(snapshot())
 
         // ── Attachments ──────────────────────────────────────────────────────────────
@@ -578,6 +589,14 @@ public final class EngineService {
                 APIPersona(
                     id: $0.id, name: $0.name, category: $0.group, summary: $0.summary,
                     emoji: $0.emoji, isAnalyst: $0.isAnalyst)
+            },
+            // The checkpoint list travels with every state for the same reason the personas do: a
+            // front end offers what this engine can actually run, without a second copy of the
+            // catalogue to keep in step (ModelCatalog).
+            availableModels: ModelCatalog.choices.map { choice in
+                APIModelOption(
+                    id: choice.id, name: choice.name, summary: choice.summary,
+                    sizeLabel: choice.sizeLabel)
             },
             serverTime: .now,
             revision: snapshotRevision,

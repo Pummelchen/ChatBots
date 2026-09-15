@@ -41,6 +41,7 @@ struct PaneHeader: View {
     let onThinkingChange: (ThinkingMode) -> Void
     let onPersonaChange: (String) -> Void
     let onBackendChange: (AgentSpec.Backend) -> Void
+    let onModelChange: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -71,6 +72,12 @@ struct PaneHeader: View {
                     spec: spec,
                     isEnabled: canChangeBackend,
                     onSelect: onBackendChange
+                )
+
+                ModelControl(
+                    spec: spec,
+                    isEnabled: !isGenerating,
+                    onSelect: onModelChange
                 )
 
                 PersonaControl(
@@ -283,6 +290,72 @@ struct BackendControl: View {
 
     private var binding: Binding<AgentSpec.Backend> {
         Binding(get: { spec.backend }, set: { onSelect($0) })
+    }
+}
+
+/// Per-seat checkpoint picker.
+///
+/// The list is `ModelCatalog`, so what is offered is what has been run through this app's engine
+/// rather than whatever a hub search happens to return. The current checkpoint is always shown even
+/// when it is not in the catalogue — a seat can be pointed at any repository id from the command line,
+/// and a picker that could not display the model in use would be lying about it.
+///
+/// Same isolation as the other controls: plain values and a callback, never an observation of the
+/// streaming pane, because a `Menu` rebuilt on every token sends the hosting view into a transaction
+/// loop.
+struct ModelControl: View {
+    let spec: AgentSpec
+    let isEnabled: Bool
+    let onSelect: (String) -> Void
+
+    var body: some View {
+        Menu {
+            Picker("Model", selection: binding) {
+                ForEach(choices) { choice in
+                    Text(choice.name).tag(choice.id)
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "brain")
+                    .scaledFont(size: 9)
+                Text(spec.modelShortName)
+                    .scaledFont(size: 10, weight: .medium, design: .rounded)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .disabled(!isEnabled)
+        .help(helpText)
+    }
+
+    /// The catalogue, plus whatever this seat is running if the catalogue does not have it.
+    private var choices: [ModelChoice] {
+        let known = ModelCatalog.choices
+        guard !known.contains(where: { $0.id == spec.modelID }) else { return known }
+        // Built separately rather than inline in the array: a call whose last argument is an empty
+        // literal is where swiftlint and swift-format disagree about a trailing comma, and a named
+        // local reads better than either of them.
+        let current = ModelChoice(
+            id: spec.modelID,
+            name: spec.modelShortName,
+            summary: "Set outside this app; its size is not known here.",
+            aliases: []
+        )
+        return known + [current]
+    }
+
+    private var helpText: String {
+        guard isEnabled else { return "The model is fixed while this seat is generating" }
+        let current = ModelCatalog.choice(for: spec.modelID)?.summary
+        return current ?? "MLX checkpoint for this seat: \(spec.modelID)"
+    }
+
+    private var binding: Binding<String> {
+        Binding(get: { spec.modelID }, set: { onSelect($0) })
     }
 }
 

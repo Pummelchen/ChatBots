@@ -123,6 +123,9 @@ public enum WebAssets {
            who is speaking is the thing a viewer most wants to change. -->
       <div class="persona-row">
         <button class="persona-picker" title="Change who this participant is"></button>
+        <!-- The checkpoint this seat runs. A native select rather than a sheet: the list is short,
+             and it is the control a phone gets for free. Filled from the engine's own catalogue. -->
+        <select class="model-picker" title="Change the checkpoint this seat runs"></select>
       </div>
       <div class="params"></div>
       <div class="transcript"></div>
@@ -1036,6 +1039,23 @@ body[data-device="tablet"] .toggle-text { display: inline; }
 }
 
 .persona-picker:disabled { opacity: 0.6; }
+
+/* The checkpoint select, beside the persona picker and styled to match it. It sizes to its content
+   rather than the row, because a repository id is long and the persona picker is what the eye should
+   land on. */
+.model-picker {
+  font: inherit;
+  font-size: var(--font-small);
+  color: var(--text);
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: calc(2px * var(--scale)) calc(6px * var(--scale));
+  margin-left: calc(6px * var(--scale));
+  max-width: 46%;
+}
+
+.model-picker:disabled { opacity: 0.6; }
 
 /* The list itself. A native-feeling panel rather than a floating dropdown, because it can
    hold the whole cast and works the same with a finger and a mouse. */
@@ -1956,6 +1976,35 @@ body[data-view="phone"] {
         if (picker.dataset.wiredPersona !== "1") {
           picker.dataset.wiredPersona = "1";
           picker.addEventListener("click", () => openPersonaPicker(Number(picker.dataset.personaSeat)));
+        }
+      }
+
+      const modelPicker = pane.root.querySelector(".model-picker");
+      if (modelPicker) {
+        // The catalogue comes from the engine, so the page offers exactly what the app's own picker
+        // does. An engine too old to send one leaves the select empty rather than showing a list the
+        // page invented.
+        const models = s.availableModels || [];
+        if (modelPicker.dataset.filledModels !== String(models.length)) {
+          modelPicker.textContent = "";
+          for (const model of models) {
+            const option = document.createElement("option");
+            option.value = model.id;
+            option.textContent = model.sizeLabel ? `${model.name} · ${model.sizeLabel}` : model.name;
+            option.title = model.summary;
+            modelPicker.append(option);
+          }
+          modelPicker.dataset.filledModels = String(models.length);
+        }
+        modelPicker.value = seat.model;
+        // Fixed once the conversation has started, for the reason the engine refuses it: the seat's
+        // engine is the one a turn in flight is generating on.
+        modelPicker.disabled = !s.canAttach;
+        modelPicker.title = models.find((m) => m.id === seat.model)?.summary || seat.model;
+        if (modelPicker.dataset.wiredModel !== "1") {
+          modelPicker.dataset.wiredModel = "1";
+          modelPicker.addEventListener("change", () =>
+            run(() => api.post("/api/seat", { seat: seat.id, modelID: modelPicker.value })));
         }
       }
 

@@ -200,6 +200,16 @@ console.log("web/deltas.js");
     /box\.value\.trim\(\) === text/.test(sendBody));
   check("and a second Return cannot post the same text twice",
     /if \(!text \|\| sending\) return;/.test(sendBody));
+
+  // The checkpoint picker. The page offers the list the engine sends rather than a copy of the
+  // catalogue, posts the change to the same seat route the app uses, and locks the control on the same
+  // flag the engine refuses on.
+  check("the page fills the model picker from the engine's catalogue",
+    /const models = s\.availableModels \|\| \[\];/.test(appJS) && /modelPicker\.append\(option\)/.test(appJS));
+  check("the page posts the chosen checkpoint to the seat route",
+    /api\.post\("\/api\/seat", \{ seat: seat\.id, modelID: modelPicker\.value \}\)/.test(appJS));
+  check("and locks it on the same flag the engine refuses on",
+    /modelPicker\.disabled = !s\.canAttach;/.test(appJS));
 }
 
 if (failures === 0) {

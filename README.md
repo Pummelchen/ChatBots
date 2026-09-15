@@ -31,6 +31,13 @@ at random from English, French, German, Spanish (Latino), Brazilian Portuguese a
 lists — so a conversation reads as two people talking rather than as two seat numbers. The
 choice is saved with your settings and stays for that conversation.
 
+**Choose the models.** Each seat runs an MLX checkpoint, and which one is yours to pick: change it
+from the seat's **Model** menu in the app, from the checkpoint list in the website, or with
+`--model-a`/`--model-b` on the command line. `chatbots-cli --list-models` prints what the app offers —
+the shipped Qwen3.5 4B and two abliterated Huihui variants (4B and 9B) — and any Hugging Face
+repository id works in place of a name. A checkpoint that is not on disk yet is downloaded the first
+time it is used, so the list shows the size of each, and the choice is saved per seat.
+
 **Two front ends, one engine.** A macOS app with the models side by side, and a web interface
 at `http://localhost:7788` for any browser, including your phone. They are clients of the same
 conversation engine, so anything you can do in one you can do in the other.
@@ -102,6 +109,7 @@ Full guides are in the **[wiki](https://github.com/Pummelchen/ChatBots/wiki)**:
 | [Keeping and sharing](https://github.com/Pummelchen/ChatBots/wiki/Keeping-and-sharing) | reopening a past conversation, share links and replay, where the files are, exporting one |
 | [Line-ups and scenarios](https://github.com/Pummelchen/ChatBots/wiki/Lineups-and-scenarios) | choosing who is in the room, and what they are put in front of |
 | [Taking part](https://github.com/Pummelchen/ChatBots/wiki/Taking-part) | your own name and persona, cutting in, and scoring the argument |
+| [Choosing models](https://github.com/Pummelchen/ChatBots/wiki/Choosing-models) | which checkpoints are offered, what they cost in disk and memory, and how to use any other |
 | [Using cloud models](https://github.com/Pummelchen/ChatBots/wiki/Using-cloud-models) | DeepSeek, LM Studio, or any OpenAI-compatible server |
 | [Documents and images](https://github.com/Pummelchen/ChatBots/wiki/Documents-and-images) | giving the models something to read or look at |
 | [Troubleshooting](https://github.com/Pummelchen/ChatBots/wiki/Troubleshooting) | when it will not start, crashes, or is slow |

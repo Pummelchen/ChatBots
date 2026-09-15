@@ -110,8 +110,12 @@ struct Options {
                 }
                 options.turns = value
                 options.turnsSpecified = true
-            case "--model-a": options.modelA = next() ?? options.modelA
-            case "--model-b": options.modelB = next() ?? options.modelB
+            // A catalogue alias or a repository id. Resolution happens here so everything downstream
+            // — the spec, the log, the seat — sees the id that will actually be loaded, and a
+            // mistyped alias is passed through as the id it looks like rather than being refused,
+            // because any repository id is a legitimate value (ModelCatalog).
+            case "--model-a": options.modelA = ModelCatalog.resolve(next() ?? options.modelA)
+            case "--model-b": options.modelB = ModelCatalog.resolve(next() ?? options.modelB)
             case "--key": options.tavilyKey = next()
             case "--max-tokens":
                 // The same silent-default class: a nil from `Int(...)` left the seat's own budget in
@@ -128,6 +132,15 @@ struct Options {
             case "--api-key": options.apiKey = next()
             case "--persona-a": options.personaA = next()
             case "--persona-b": options.personaB = next()
+            case "--list-models":
+                for choice in ModelCatalog.choices {
+                    let size = choice.sizeLabel.map { "  (\($0))" } ?? ""
+                    print("\(choice.name)\(size)")
+                    print("  \(choice.id)")
+                    print("  \(choice.summary)")
+                    print("  aliases: \(choice.aliases.joined(separator: ", "))")
+                }
+                exit(0)
             case "--list-personas":
                 for category in Persona.Category.allCases {
                     print("\(category.rawValue):")
@@ -286,6 +299,8 @@ struct Options {
           -n, --turns <count>      Number of LLM turns to run (default: 4)
               --model-a <id>       MLX checkpoint for seat A (default: \(AgentSpec.defaultModelID))
               --model-b <id>       MLX checkpoint for seat B
+              --list-models        Print the checkpoints this app offers and exit
+                                   (--model-a also takes any Hugging Face repository id)
               --key <key>          Tavily API key (else env TAVILY_API_KEY or .secrets.env)
               --max-tokens <n>     Cap answer tokens per turn
               --thinking <mode>    off | minimal | low | medium | high | unlimited
@@ -813,6 +828,18 @@ if options.serve {
     // accepted and ignored (A66). `--turns` is applied only when it was actually given,
     // so `--serve` on its own keeps the engine's own default rather than the CLI's 4.
     var engineConfiguration = ConversationEngine.Configuration()
+    // A front end can point a seat at another checkpoint while this engine is serving, which builds a
+    // new MLX engine for it. That engine has to carry the same wiring as the seats built below —
+    // the tool registry, and the progress line this run's stdout is for — or a switched seat would
+    // silently lose both.
+    engineConfiguration.makeMLXEngine = { spec in
+        MLXEngine(spec: spec, toolRegistry: registry) { state in
+            if case .loading(let progress) = state, progress > 0, progress < 1 {
+                let percent = Int(progress * 100)
+                if percent % 25 == 0 { log("  \(spec.id): downloading \(percent)%") }
+            }
+        }
+    }
     if options.turnsSpecified { engineConfiguration.maxTurns = max(1, options.turns) }
     if let threshold = options.compactThreshold { engineConfiguration.compactThreshold = threshold }
     if let keep = options.keepRecent { engineConfiguration.compactKeepRecentTurns = keep }

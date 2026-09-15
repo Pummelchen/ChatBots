@@ -108,6 +108,12 @@ public final class ConversationEngine {
         public var compactKeepRecentTurns: Int = 8
         /// Token allowance for the digest itself.
         public var compactSummaryTokens: Int = 900
+        /// How an MLX engine is built for a seat.
+        ///
+        /// Injected because a seat's checkpoint can be changed while the engine is alive, and the
+        /// wiring around an engine is the caller's: the command line routes load progress to stdout,
+        /// the app reports it into a pane, and a test wants to see the swap without loading weights.
+        public var makeMLXEngine: @Sendable (AgentSpec) -> any LLMEngine = { MLXEngine(spec: $0) }
 
         public init() {}
     }
@@ -120,9 +126,12 @@ public final class ConversationEngine {
         public var spec: AgentSpec
         /// The MLX engine. Every seat has one — both initialisers install an engine here — so
         /// the fallback in `engine` below cannot be empty (audit A28).
-        public let mlx: any LLMEngine
+        ///
+        /// Replaceable, because the checkpoint a seat runs is a user choice: `setModel` builds a new
+        /// engine for the new weights and releases the old one.
+        public var mlx: any LLMEngine
         /// The API engine, present only when the seat was built for both backends.
-        public let openAI: (any LLMEngine)?
+        public var openAI: (any LLMEngine)?
 
         public init(spec: AgentSpec, engine: any LLMEngine) {
             self.spec = spec
@@ -398,7 +407,11 @@ public final class ConversationEngine {
     /// seat's next turn rather than only being recorded.
     public func updateSeat(_ spec: AgentSpec) {
         guard let index = seats.firstIndex(where: { $0.spec.id == spec.id }) else { return }
+        let changedModel = seats[index].spec.modelID != spec.modelID
         seats[index].spec = spec
+        if changedModel {
+            rebuildMLXEngine(at: index)
+        }
         if let engine = seatEngine(for: spec.id) {
             Task {
                 await engine.setDisplayName(spec.displayName)
@@ -406,6 +419,45 @@ public final class ConversationEngine {
                 await engine.setThinking(spec.thinking)
             }
         }
+    }
+
+    /// Whether a turn is in flight — generating, preparing, or parked by a pause.
+    ///
+    /// Not the same question as `isRunning`, which a paused room answers "no": the checkpoint cannot
+    /// be changed while a parked turn is waiting to resume on the engine it started with.
+    public var hasTurnInFlight: Bool { generationTask != nil }
+
+    /// Point one seat at a different checkpoint, and answer whether that changed anything.
+    ///
+    /// Refused while a turn is in flight: the engine being replaced is the one that turn is generating
+    /// on — or will resume on — and releasing its weights underneath it would fail the turn for a
+    /// reason the user did not ask for. A caller that wants to switch says so while the room is
+    /// stopped.
+    @discardableResult
+    public func setModel(_ modelID: String, for agentID: String) -> Bool {
+        let resolved = ModelCatalog.resolve(modelID)
+        guard !resolved.isEmpty, seats.contains(where: { $0.spec.id == agentID }) else { return false }
+        guard !hasTurnInFlight else { return false }
+        var spec = seats.first(where: { $0.spec.id == agentID })!.spec
+        guard spec.modelID != resolved else { return false }
+        spec.modelID = resolved
+        // From the identifier, as a seat built from scratch does: the label is what a front end shows
+        // for the seat, and leaving the old one would name the model that is no longer running (A200).
+        spec.modelShortName = ModelNames.shortName(resolved)
+        updateSeat(spec)
+        return true
+    }
+
+    /// Give a seat a new MLX engine for its new checkpoint, and let the old one go.
+    ///
+    /// The old engine is unloaded rather than merely replaced: it holds the whole checkpoint in
+    /// memory, and two of these — 3 GB each, or 6 GB for the larger one — do not fit on the machines
+    /// this app targets. `unload` is what releases the weights; the engine object itself is
+    /// unreachable from here afterwards, so nothing else can hold it alive.
+    private func rebuildMLXEngine(at index: Int) {
+        let old = seats[index].mlx
+        seats[index].mlx = configuration.makeMLXEngine(seats[index].spec)
+        Task { await old.unload() }
     }
 
     /// Every seat, in speaking order.

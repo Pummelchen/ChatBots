@@ -940,6 +940,32 @@ public final class ChatController: ObservableObject {
         pane(agentID)?.spec.backend = backend
     }
 
+    /// Point one seat at a different MLX checkpoint.
+    ///
+    /// The engine replaces the seat's MLX engine with one for the new weights and releases the old
+    /// one, so the pane is updated from what was asked for and the next turn loads the new
+    /// checkpoint. A refusal — the room is running, or the id is empty — comes back as a message and
+    /// the pane keeps the model it has, because a change that did not happen must not be shown as one
+    /// that did (A173).
+    public func setModel(_ modelID: String, for agentID: String) {
+        let resolved = ModelCatalog.resolve(modelID)
+        guard !resolved.isEmpty else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            // The pane follows the engine, not the click: the change is shown only once the engine has
+            // taken it, and a refusal — the room is running — arrives in `engineConnection` with the
+            // reason. Showing the new checkpoint on a seat that is still running the old one is the
+            // defect A173 records, and `deliver` is the awaiting send A174 added for exactly this.
+            guard await self.deliver(.updateSeat(.init(seatID: agentID, modelID: resolved))) else {
+                return
+            }
+            guard self.pane(agentID)?.spec.modelID != resolved else { return }
+            self.pane(agentID)?.spec.modelID = resolved
+            self.pane(agentID)?.spec.modelShortName = ModelNames.shortName(resolved)
+            self.saveSettings()
+        }
+    }
+
     /// Point one seat at a different server or model id.
     public func setEndpoint(_ endpoint: OpenAIEndpoint, for agentID: String) {
         run { client in

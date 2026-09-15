@@ -89,6 +89,11 @@ public enum EngineRequest: Sendable, Hashable, Codable {
         public var personaID: String?
         public var thinking: ThinkingMode?
         public var backend: AgentSpec.Backend?
+        /// The MLX checkpoint for this seat, as a repository id or one of `ModelCatalog`'s aliases.
+        ///
+        /// Its own field rather than reuse of `apiModel`, which names a model *on a server*: the two
+        /// are different things that happen to share the word, and the seat holds both at once.
+        public var modelID: String?
         public var baseURL: String?
         public var apiModel: String?
         public var apiKey: String?
@@ -99,6 +104,7 @@ public enum EngineRequest: Sendable, Hashable, Codable {
             personaID: String? = nil,
             thinking: ThinkingMode? = nil,
             backend: AgentSpec.Backend? = nil,
+            modelID: String? = nil,
             baseURL: String? = nil,
             apiModel: String? = nil,
             apiKey: String? = nil
@@ -108,6 +114,7 @@ public enum EngineRequest: Sendable, Hashable, Codable {
             self.personaID = personaID
             self.thinking = thinking
             self.backend = backend
+            self.modelID = modelID
             self.baseURL = baseURL
             self.apiModel = apiModel
             self.apiKey = apiKey

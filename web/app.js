@@ -717,6 +717,35 @@
         }
       }
 
+      const modelPicker = pane.root.querySelector(".model-picker");
+      if (modelPicker) {
+        // The catalogue comes from the engine, so the page offers exactly what the app's own picker
+        // does. An engine too old to send one leaves the select empty rather than showing a list the
+        // page invented.
+        const models = s.availableModels || [];
+        if (modelPicker.dataset.filledModels !== String(models.length)) {
+          modelPicker.textContent = "";
+          for (const model of models) {
+            const option = document.createElement("option");
+            option.value = model.id;
+            option.textContent = model.sizeLabel ? `${model.name} · ${model.sizeLabel}` : model.name;
+            option.title = model.summary;
+            modelPicker.append(option);
+          }
+          modelPicker.dataset.filledModels = String(models.length);
+        }
+        modelPicker.value = seat.model;
+        // Fixed once the conversation has started, for the reason the engine refuses it: the seat's
+        // engine is the one a turn in flight is generating on.
+        modelPicker.disabled = !s.canAttach;
+        modelPicker.title = models.find((m) => m.id === seat.model)?.summary || seat.model;
+        if (modelPicker.dataset.wiredModel !== "1") {
+          modelPicker.dataset.wiredModel = "1";
+          modelPicker.addEventListener("change", () =>
+            run(() => api.post("/api/seat", { seat: seat.id, modelID: modelPicker.value })));
+        }
+      }
+
       const live = s.live.find((l) => l.seatID === seat.id);
       const busy = live && live.isGenerating;
       const stateEl = pane.root.querySelector(".state");
