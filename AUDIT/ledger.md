@@ -29,13 +29,13 @@ been run.
 <!-- BEGIN GENERATED: ledger status — rendered from ledger.json by AUDIT/render-ledger.sh -->
 | Metric | Count |
 | --- | --- |
-| Tasks enumerated | 212 |
-| DONE | 144 |
-| START | 68 |
+| Tasks enumerated | 213 |
+| DONE | 146 |
+| START | 67 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 68
+### Open — 67
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -68,7 +68,6 @@ been run.
 | A162 | S3 | START | — | docs / reproducibility | environment.md records swift-format as Xcode-provided via xcrun while both gates invoke a bare `swift-format` from PATH |
 | A163 | S3 | START | — | docs / correctness | The Caddyfile says the engine uses the passed Host to build the page's own links, but the replay script never reads the shareBase field it is written into |
 | A164 | S3 | START | — | unsafe / tooling | The DevTools client uses a fixed shared temporary profile path, so a second run or a hostile local process can interfere with it |
-| A165 | S1 | START | — | web / API integration | The browser never consumes the engine's delta events, so a reply is invisible until the turn ends |
 | A166 | S1 | START | — | test coverage | The whole application target is untestable and untested: no test target depends on it, so its logic is outside every gate |
 | A169 | S1 | START | — | test harness / real concurrency | Twenty-one teardowns are fire-and-forget tasks, so the serialising gate is released before QUIC teardown finishes and the A102 collision is reduced rather than removed |
 | A170 | S2 | START | — | test coverage | Near-zero coverage on three paths the product depends on, including the web-search tool the research mode is built around |
@@ -108,7 +107,7 @@ been run.
 | A207 | S3 | START | — | docs / correctness | Three comments say the document extractors live in the app target and that the core cannot read a PDF or Word file; all three are false |
 | A208 | S3 | START | — | installer / dependencies | The checkpoint the installer downloads is a hand-copied duplicate of AgentSpec.defaultModelID and nothing keeps the two in step |
 
-### Every task — 212
+### Every task — 213
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -193,7 +192,7 @@ been run.
 | A162 | S3 | START | — | docs / reproducibility | environment.md records swift-format as Xcode-provided via xcrun while both gates invoke a bare `swift-format` from PATH |
 | A163 | S3 | START | — | docs / correctness | The Caddyfile says the engine uses the passed Host to build the page's own links, but the replay script never reads the shareBase field it is written into |
 | A164 | S3 | START | — | unsafe / tooling | The DevTools client uses a fixed shared temporary profile path, so a second run or a hostile local process can interfere with it |
-| A165 | S1 | START | — | web / API integration | The browser never consumes the engine's delta events, so a reply is invisible until the turn ends |
+| A165 | S1 | DONE | 3445aee | web / API integration | The browser never consumes the engine's delta events, so a reply is invisible until the turn ends |
 | A166 | S1 | START | — | test coverage | The whole application target is untestable and untested: no test target depends on it, so its logic is outside every gate |
 | A167 | S1 | DONE | 00049e6 | test that cannot fail | The zoom suite asserts private copies of the logic, never the store, and its comment claiming they cannot diverge is false |
 | A168 | S1 | DONE | 18d4017 | test harness deadlock | The transport gate leaks on cancellation, so a cancelled test permanently blocks every later transport suite |
@@ -246,6 +245,7 @@ been run.
 | A210 | S2 | DONE | 70ac721 | audit tooling / Phase E gate | The Phase E gate accepts only audit/2026-09-13 or main, so it fails on the branch this re-audit is developed on and the acceptance run cannot pass |
 | A211 | S2 | DONE | a5288a1 | audit documentation / session entry point | The session entry point still says the audit is complete and names the landed 2026-09-13 branch, while 73 findings are open on a different, unmerged branch |
 | A212 | S1 | DONE | 479faab | workspace / audit tooling | Two wiki clones carried a GitHub personal access token in plaintext inside their origin URL, so the credential that can write to the wikis and to this repository sat in a readable file |
+| A213 | S2 | DONE | 0960c86 | audit tooling / DONE-commit guard | The DONE-commit guard recognised only .swift, .py and .sh paths, so a task fixed in the web interface or a CI workflow could be reported unbacked while its commit contained the fix |
 | A22 | S2 | DONE | 18100dd | start script | stop_all kills a stale PID from a pid file without checking the process is ours |
 | A23 | S2 | DONE | 38fbe08 | device capture tool | capture-devices.py prints a viewport mismatch but cannot fail the run |
 | A24 | S2 | DONE | b803b3c | installer | A native binary artifact is downloaded with no integrity check and embedded in the signed app |

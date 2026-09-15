@@ -11,7 +11,7 @@
       "id": "A01",
       "severity": "S1",
       "unit": "deploy/APIServer",
-      "file_line": "Caddyfile:27, web/app.js",
+      "file_line": "Caddyfile:27, tools/start.sh, tools/start-web-mobile.sh",
       "title": "The website binds every interface and the whole API is unauthenticated",
       "category": "unsafe",
       "status": "DONE",
@@ -21,7 +21,7 @@
       "fix_summary": "A `--local-only` flag on tools/start.sh binds loopback only, reusing the runtime-config generation path that already existed for non-default ports rather than adding a second mechanism: the condition now includes the local-only case and the generated copy carries `bind 127.0.0.1` inside the site block. The DEFAULT IS UNCHANGED - phone access over the LAN is a deliberate feature and the owner chose to document the boundary rather than remove it - but the ready banner now names the bind scope and, in the default case, states the exposure and the opt-out. The Caddyfile documents that a host-less address binds every interface, that this is deliberate, and points at the flag. The Caddy-less fallback needs no flag because HTTPServer already sets requiredLocalEndpoint to 127.0.0.1, which is stated in a comment instead of adding a redundant option; start.sh's header, which wrongly said that path serves on 7788 rather than the engine port, was corrected.",
       "evidence_after": "Measured with Caddy 2.11.4 and lsof on a spare port (7991), not asserted. default: `caddy adapt` => [\":7991\"] and `lsof -nP -iTCP:7991 -sTCP:LISTEN` => `TCP *:7991 (LISTEN)`. With --local-only: `caddy adapt` => [\"127.0.0.1:7991\"] and lsof => `TCP 127.0.0.1:7991 (LISTEN)`. Both stopped afterwards; lsof then exits 1 and no Caddy process remains. bash -n clean on all three touched scripts; shellcheck unchanged at 4 findings.",
       "commit": "c91a310",
-      "notes": "A TRAP WORTH KEEPING, because the obvious fix does not work: a Caddy site address of `127.0.0.1:7991` does NOT bind loopback. `caddy adapt` still yields `listen: [\":7991\"]` because the host in a site address is a Host-header matcher, and the socket stayed `*:7991`. The agent's first cut did exactly that and the lsof measurement caught it; the committed fix uses the `bind 127.0.0.1` directive, which is what actually narrows the listener. The reason is recorded in both Caddyfile and start.sh. Anyone reviewing or re-doing this task should not accept a fix that only rewrites the site address - and the general point is the one this audit keeps making: the measurement, not the syntax, is what shows whether a binding changed.",
+      "notes": "A TRAP WORTH KEEPING, because the obvious fix does not work: a Caddy site address of `127.0.0.1:7991` does NOT bind loopback. `caddy adapt` still yields `listen: [\":7991\"]` because the host in a site address is a Host-header matcher, and the socket stayed `*:7991`. The agent's first cut did exactly that and the lsof measurement caught it; the committed fix uses the `bind 127.0.0.1` directive, which is what actually narrows the listener. The reason is recorded in both Caddyfile and start.sh. Anyone reviewing or re-doing this task should not accept a fix that only rewrites the site address - and the general point is the one this audit keeps making: the measurement, not the syntax, is what shows whether a binding changed. The recorded location used to read `Caddyfile:27, web/app.js` and `web/app.js` was only mentioned in the prose, not changed: the fix lives in the Caddyfile and the start scripts. The DONE-commit guard could not see that until A213 added `.js` to its path list, at which point it reported A01 as unbacked — correctly, because the one path it could see was one the commit does not touch. The record was corrected to the files the fix is in rather than the guard being narrowed.",
       "blocked_reason": null
     },
     {
@@ -2801,14 +2801,14 @@
       "file_line": "web/app.js:1426-1429; Sources/ChatBotsCore/APIServer.swift:730-746",
       "title": "The browser never consumes the engine's delta events, so a reply is invisible until the turn ends",
       "category": "logic",
-      "status": "START",
+      "status": "DONE",
       "host_used": "node1",
       "discovered_by": "Phase B audit pass (Swift 6.4 re-audit)",
       "evidence_before": "The engine broadcasts per-token deltas (`broadcast(…, event: \"delta\")`), but `listen()` registers only `snapshot` and `turn`; `git log -S'delta' -- web/app.js` is empty for the file's whole history. Snapshots fire once per turn (ConversationEngine.swift:1354-1358), so `drawLive`/`updateLiveElement` only ever see completed turns and a long research turn leaves the page frozen — on the surface the README advertises for phones.",
-      "fix_summary": null,
-      "evidence_after": null,
-      "commit": null,
-      "notes": "",
+      "fix_summary": "New `web/deltas.js` holds `applyDelta(snapshot, delta)`: it accumulates `token` and `reasoning` fragments into the `state.snapshot.live` entry for the seat, resets both on `started`, creates the entry with every field the renderer reads when there is none, and returns whether anything the page draws changed. `app.js` registers a `delta` listener that calls it and redraws. `tools/check-web-deltas.js` (Node) tests it and `tools/audit-checks.sh` gate 6 runs that.",
+      "evidence_after": "The page as it was had no `addEventListener(\"delta\")` at all (0 matches in `git show HEAD:web/app.js`; it registered `snapshot` and `turn` and nothing else) and now registers one, which is the defect and its removal in one measurement. `tools/check-web-deltas.js` passes 12 cases over the merge itself — accumulation in order, reasoning tracked apart from the answer, a new turn clearing what the previous one left, an unknown agent or kind ignored rather than invented, and a snapshot with no `live` array repaired instead of throwing — and the sixth gate in `tools/audit-checks.sh` runs it and reports `PASS web: deltas merge (12 cases)` (`AUDIT/baseline/swift64/a165-deltas.log`). Because a passing test proves little on its own, the same evidence file records a mutation: making `token` replace the text instead of appending fails `token fragments accumulate in order` with `got \"lo\"`, and reverting it passes. The full suite is 844 tests in 145 suites green (`test-after-a165.log`), `tools/embed-web.py --check` passes so the served bytes and `web/` agree, and swiftlint and authored swift-format are unchanged at their waivers. What this does **not** include is a browser: no headless page was driven, so what is proven is the merge and the wiring, not a rendered frame.",
+      "commit": "3445aee",
+      "notes": "The check was deliberately given a home in `tools/audit-checks.sh` rather than left as a script nobody runs — an unrun test is the defect A167 records, and adding it as gate 6 is what makes it a gate. That edit also renumbered the five existing gates from /5 to /6 and added `node` to the required tools, so the script now exits 2 rather than failing obscurely on a Mac without Node. The merge was put in its own file for the same reason `TextZoom` was in A167: logic inside a page is logic nothing can run. `web/index.html` loads it before `app.js`, the embedder carries it as `/deltas.js`, the Caddy comment that enumerates what that block serves now names it, and the byte-for-byte drift test covers it so the two copies cannot diverge.",
       "blocked_reason": null
     },
     {
@@ -3608,6 +3608,23 @@
       "evidence_after": "`grep` for `github_pat_`/`ghp_` across `.git/config` of all six clones in `~/Downloads/` now reports clean for every one, where the same check before the fix reported two. The rewritten URLs are named in `AUDIT/environment.md` (\"A credential was sitting in plaintext in two wiki clones (A212)\") with the shape of what was there and what replaced it, and with the recommendation that the token be rotated: it was displayed on screen while being found, so it should be treated as disclosed even though it was never committed.",
       "commit": "479faab",
       "notes": "Recorded rather than fixed silently, and filed even though the file is outside the tree this audit has scope over: the brief limits the audit to Pummelchen/ChatBots, so there is no repository change to point at and `verify-done-commits.sh` reports this task as skipped rather than backed. The same finding is why the ChatBots clone needed its URL fixed too — it carried a bare `Pummelchen:@` userinfo with no password, which is what made `git push` fail with \"Invalid username or token\" while reads (anonymous, on a public repository) kept working. That fix is also local config and is described in this entry rather than committed.",
+      "blocked_reason": null
+    },
+    {
+      "id": "A213",
+      "severity": "S2",
+      "unit": "audit tooling / DONE-commit guard",
+      "file_line": "AUDIT/verify-done-commits.sh:92",
+      "title": "The DONE-commit guard recognised only .swift, .py and .sh paths, so a task fixed in the web interface or a CI workflow could be reported unbacked while its commit contained the fix",
+      "category": "process",
+      "status": "DONE",
+      "host_used": "node1",
+      "discovered_by": "Phase C — the guard caught A165's ledger entry after its fix was committed, and the reason it gave was wrong",
+      "evidence_before": "A165 is DONE against 3445aee, a commit whose changes include `web/app.js`, `web/deltas.js`, `web/index.html` and `Caddyfile`. Its record names `web/app.js:1426-1429; Sources/ChatBotsCore/APIServer.swift:730-746`, and the guard reported `FAIL   A165  commit 3445aee touches none of: Sources/ChatBotsCore/APIServer.swift`, with totals `backed 127 · skipped 17 · unbacked 1`. Its path extraction was `grep -oE '[A-Za-z0-9_./-]*\\.(swift|py|sh)[^ ,;:)]*'`, so `web/app.js` was invisible: the guard could not see the file the fix is in, and the one path it could see is the end of the wire that did not need changing. This is the class A19, A83, A117 and A89 record — a control reporting on a claim it cannot see — and the direction matters: reporting *unbacked* rather than *unchecked* means a JavaScript-only fix had no way to be verified at all.",
+      "fix_summary": "The extension list becomes `swift|py|sh|js|html|css|yml`, with the reason written where it is used and in the header, which no longer claims a CI workflow is out of scope. Four more DONE tasks became checkable.",
+      "evidence_after": "`AUDIT/verify-done-commits.sh` now reports `ok     A165  3445aee touches web/app.js`, and the totals move from `backed 127 · skipped 17 · unbacked 1` to `backed 132 · skipped 13 · unbacked 0` (`AUDIT/baseline/swift64/a213-guard.log` records the old regex, the old verdict, the new regex and the new verdict). Widening it also surfaced one real record defect rather than only the false alarm it was opened for: A01 was reported unbacked because the single path the guard could see in its record, `web/app.js`, was a prose mention its commit does not touch — its fix is in the Caddyfile and the start scripts. A01's `file_line` now names `tools/start.sh` and `tools/start-web-mobile.sh`, the entry's notes record the correction, and A01 verifies as backed against `c91a310`.",
+      "commit": "0960c86",
+      "notes": "The temptation was to narrow the guard again so A165 passed, which would have made the check report success by looking away — the failure mode A83 and A117 both are. The list was widened instead, and the one genuine record error it exposed was corrected in the record rather than in the guard. Making the guard read only structured fields was the other option, but `file_line` is the structured field the ledger has, and its being free prose is what lets a task name a line number; the cost is that a prose mention counts, so a wrong verdict here is resolved by making the record accurate.",
       "blocked_reason": null
     }
   ]
