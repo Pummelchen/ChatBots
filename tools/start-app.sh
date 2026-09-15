@@ -102,7 +102,7 @@ fi
 
 # A stale build is the usual cause of "I fixed it and nothing changed".
 BINARY="$APP/Contents/MacOS/ChatBots"
-if [ -f "$BINARY" ] && [ "$ROOT/Sources" -nt "$BINARY" ]; then
+if [ -f "$BINARY" ] && "$SCRIPT_DIR/source-newer.sh" "$BINARY" "$ROOT/Sources"; then
   warn "The source is newer than the app; it is being rebuilt first."
   if ! CONFIG=release bash "$SCRIPT_DIR/make-app.sh" >"$ROOT/.run/build.log" 2>&1; then
     fail "The rebuild failed. See $ROOT/.run/build.log"

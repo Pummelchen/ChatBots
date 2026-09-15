@@ -276,7 +276,9 @@ if ! python3 "$SCRIPT_DIR/embed-web.py" --check >/dev/null 2>&1; then
 fi
 
 BINARY="$ROOT/.build/release/chatbots-cli"
-if [ ! -x "$BINARY" ] || [ "$ROOT/web" -nt "$BINARY" ] || [ "$ROOT/Sources" -nt "$BINARY" ]; then
+# `tools/source-newer.sh` walks the trees: the directory mtimes this compared changed only when a
+# file was added or removed, so an edited `web/app.js` left the stale build in place (A182).
+if "$SCRIPT_DIR/source-newer.sh" "$BINARY" "$ROOT/web" "$ROOT/Sources"; then
   step "Building the engine"
   dim "First build only — this takes a few minutes."
   if ! swift build -c release >"$LOG_DIR/build.log" 2>&1; then
