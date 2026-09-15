@@ -73,10 +73,16 @@ fi
 # out. There are two: the audit branch while the audit is in progress, and `main` once the audit has
 # been landed on. A gate that refuses to run on the branch the code actually ships from is a gate
 # that stops being run — which is how the acceptance script came to fail on its own `main` (A132).
+#
+# The audit branch is matched as `audit/*` rather than by the date it was cut, because the date is
+# not a property of the gate: A132 added `main` here after the landing, and the next audit opened
+# `audit/2026-09-15`, which this case then failed on for a whole audit-hop (A210). What the check
+# actually asserts is "an audit branch or main", and that is what it now says. The branch is named
+# in the result so the evidence still records which one it was.
 case "$branch" in
-    audit/2026-09-13) pass "on the audit branch, where the audit was developed" ;;
+    audit/*) pass "on the audit branch '$branch', where the audit was developed" ;;
     main) pass "on main, which the audit was landed on" ;;
-    *) fail "on branch '$branch', which is neither the audit branch nor main" ;;
+    *) fail "on branch '$branch', which is neither an audit branch nor main" ;;
 esac
 # §0, recorded rather than asserted, because the number means different things either side of the
 # landing: before it, `origin/main` is the base commit and this counts the branch's distance from it;
