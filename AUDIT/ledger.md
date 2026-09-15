@@ -30,16 +30,15 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 216 |
-| DONE | 187 |
-| START | 29 |
+| DONE | 188 |
+| START | 28 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 29
+### Open — 28
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
-| A152 | S3 | START | — | operations / health | /api/health is a hardcoded 200 that says nothing about readiness, and the readiness helper next to it is dead |
 | A153 | S3 | START | — | logic / HTTP | Transfer-Encoding is never read or rejected, so a chunked request is answered with an empty body while its route still runs |
 | A154 | S3 | START | — | logic / HTTP parsing | Head parsing is lenient: 'Host : x' is accepted, obs-fold lines are dropped, methods and versions are unvalidated, and '+' becomes a space in the path |
 | A155 | S3 | START | — | security / TLS identity | The certificate store treats any read failure as first run, hardcodes RSA-2048 without checking the pair, executes user-writable openssl paths, and drains pipes in an order that can deadlock |
@@ -140,7 +139,7 @@ been run.
 | A15 | S1 | DONE | 8ece1d3 | EngineService/DocumentImport | Attaching a document blocks the engine main actor for the whole conversion, subprocess wait included |
 | A150 | S3 | DONE | 19e5374 | security headers | The hand-written SSE response head bypasses the shared serialiser and therefore carries none of A76's security headers |
 | A151 | S3 | DONE | e0945da | operations / logging | There is no request or error logging: connection errors are discarded and the counters are exposed nowhere |
-| A152 | S3 | START | — | operations / health | /api/health is a hardcoded 200 that says nothing about readiness, and the readiness helper next to it is dead |
+| A152 | S3 | DONE | 71d72d2 | operations / health | /api/health is a hardcoded 200 that says nothing about readiness, and the readiness helper next to it is dead |
 | A153 | S3 | START | — | logic / HTTP | Transfer-Encoding is never read or rejected, so a chunked request is answered with an empty body while its route still runs |
 | A154 | S3 | START | — | logic / HTTP parsing | Head parsing is lenient: 'Host : x' is accepted, obs-fold lines are dropped, methods and versions are unvalidated, and '+' becomes a space in the path |
 | A155 | S3 | START | — | security / TLS identity | The certificate store treats any read failure as first run, hardcodes RSA-2048 without checking the pair, executes user-writable openssl paths, and drains pipes in an order that can deadlock |
