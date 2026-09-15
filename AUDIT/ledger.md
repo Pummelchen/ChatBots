@@ -28,12 +28,12 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 209 |
-| DONE | 135 |
-| START | 74 |
+| DONE | 136 |
+| START | 73 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 74
+### Open — 73
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -98,7 +98,6 @@ been run.
 | A193 | S3 | START | — | tools / network robustness | Model and Metal downloads have no transfer deadline, so a stalled connection hangs the installer indefinitely |
 | A194 | S3 | START | — | docs / drift | Several tool comments and help texts describe behaviour that changed or never existed |
 | A195 | S3 | START | — | docs / TLS trust | The client never enforces the pinned fingerprint while another comment claims pinning is meaningful |
-| A196 | S1 | START | — | inference / arithmetic | The reasoning ceiling under-counts tokens, so the thinking level the UI promises is not the one enforced |
 | A197 | S1 | START | — | untrusted input / resource | Child output is unbounded and the conversion timeout cannot fire while output flows |
 | A198 | S1 | START | — | concurrency / lifecycle | A session accepted during stop() is orphaned and keeps serving |
 | A199 | S2 | START | — | prompts / identity | The social engine keys and words itself by seat id while every other prompt surface uses display names |
@@ -231,7 +230,7 @@ been run.
 | A193 | S3 | START | — | tools / network robustness | Model and Metal downloads have no transfer deadline, so a stalled connection hangs the installer indefinitely |
 | A194 | S3 | START | — | docs / drift | Several tool comments and help texts describe behaviour that changed or never existed |
 | A195 | S3 | START | — | docs / TLS trust | The client never enforces the pinned fingerprint while another comment claims pinning is meaningful |
-| A196 | S1 | START | — | inference / arithmetic | The reasoning ceiling under-counts tokens, so the thinking level the UI promises is not the one enforced |
+| A196 | S1 | DONE | e4a8e16 | inference / arithmetic | The reasoning ceiling under-counts tokens, so the thinking level the UI promises is not the one enforced |
 | A197 | S1 | START | — | untrusted input / resource | Child output is unbounded and the conversion timeout cannot fire while output flows |
 | A198 | S1 | START | — | concurrency / lifecycle | A session accepted during stop() is orphaned and keeps serving |
 | A199 | S2 | START | — | prompts / identity | The social engine keys and words itself by seat id while every other prompt surface uses display names |
