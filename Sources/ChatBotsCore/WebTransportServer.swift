@@ -85,6 +85,16 @@ public final class WebTransportEngineServer {
     /// what lets `stop()` end them.
     private var sessions: [UUID: WebTransportSession] = [:]
     private var sessionTasks: [UUID: Task<Void, Never>] = [:]
+    /// Bumped by every `stop()`, and captured by each accept loop.
+    ///
+    /// The loop spends most of its life suspended inside `acceptSession()`, so cancelling it does not
+    /// stop an accept that is already in flight: the call can return a session after `stop()` has
+    /// cleared the tables and is awaiting `session.close()` further down. That session would be
+    /// registered with nothing left to cancel or close it — it would keep its admission slot and keep
+    /// driving the engine after the server was stopped (A198). Comparing the generation this loop was
+    /// started with against the current one is what tells it that its server went away, including the
+    /// case where `start()` has since run again and a *new* listener owns the tables.
+    private var generation = 0
 
     public init(
         service: EngineService, identity: EngineIdentity, configuration: Configuration = .init()
@@ -129,12 +139,17 @@ public final class WebTransportEngineServer {
 
         startEventPump()
         startTranscriptPump()
+        let generation = self.generation
         acceptTask = Task { [weak self] in
-            await self?.acceptLoop()
+            await self?.acceptLoop(generation: generation)
         }
     }
 
     public func stop() async {
+        // Before anything suspends. The close below does suspend, and every accept that is already
+        // in flight has to see this server as gone from the moment `stop()` begins, not from the
+        // moment it finishes.
+        generation &+= 1
         acceptTask?.cancel()
         acceptTask = nil
         if let eventObserver {
@@ -173,12 +188,21 @@ public final class WebTransportEngineServer {
         listener = nil
     }
 
-    /// Accept sessions until cancelled.
-    private func acceptLoop() async {
+    /// Accept sessions until cancelled, or until the server this loop belongs to is stopped.
+    private func acceptLoop(generation: Int) async {
         guard let listener else { return }
-        while !Task.isCancelled {
+        while !Task.isCancelled, generation == self.generation {
             do {
                 let session = try await listener.acceptSession()
+                // `stop()` may have run while this accept was suspended. It clears both tables
+                // before it closes anything, so a session registered now would be owned by nobody:
+                // never cancelled, never closed, still holding its admission slot and still driving
+                // the engine (A198). This loop is then the only thing that knows the session exists,
+                // so it is the one that closes it.
+                guard !Task.isCancelled, generation == self.generation else {
+                    try? await session.close()
+                    return
+                }
                 // Serving a session is not awaited: one client must not hold up the next. The
                 // task is tracked under the session's id so `stop()` can cancel and close it.
                 let id = UUID()
@@ -392,4 +416,8 @@ public final class WebTransportEngineServer {
     }
 
     public var sessionCount: Int { subscribers.count }
+
+    /// Sessions the server still owns. Used by the stop-race test (A198): after `stop()` returns this
+    /// must be zero, whatever arrived while it was closing.
+    var liveSessionCount: Int { sessions.count }
 }

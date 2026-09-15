@@ -10,9 +10,9 @@
 // The one test that wants a *push* reads `client.events`, because that stream is where the
 // reader puts what it was sent — and it takes a fresh connection, so it is the only consumer.
 
-import ChatBotsCore
 import Foundation
 import Testing
+@testable import ChatBotsCore
 
 /// An engine that does nothing, so these tests are about the transport rather than generation.
 private actor QuietStub: LLMEngine {
@@ -302,6 +302,50 @@ struct WebTransportSessionTests {
         // Not hung, and not desynced: the same connection still answers.
         let snapshot = try #require(await client.state())
         #expect(snapshot.topic == "A transport test")
+    }
+}
+
+/// A session accepted while `stop()` is closing the others must not survive it.
+///
+/// `acceptSession()` is where the accept loop spends its life. Cancelling the loop stops the *next*
+/// iteration, not an accept already in flight, and that accept returns its session **after** `stop()`
+/// has cleared both tables and while it is suspended in `session.close()` further down. The loop then
+/// registered the session and spawned a serve task that nothing cancelled and nothing closed: a
+/// client still being served, still holding its admission slot, on a server that had stopped (A198).
+///
+/// The window is widened on purpose — several sessions are live when `stop()` runs, so it spends
+/// longer in the close loop — and the late client connects into it.
+@Suite(
+    "A session accepted during stop() does not survive it (A198)", .serialized, TransportSerialized()
+)
+@MainActor
+struct AuditS1StopRaceTests {
+    @Test("A client that connects while the server is stopping is not left being served")
+    func connectsDuringStopAreNotOrphaned() async throws {
+        let running = try await startEngine()
+        var connected: [WebTransportEngineClient] = []
+        for _ in 0..<6 {
+            let client = makeClient(port: running.port)
+            try await client.connect()
+            _ = try? await client.state()
+            connected.append(client)
+        }
+
+        let late = makeClient(port: running.port)
+        let connecting = Task { try await late.connect() }
+        await running.stop()
+        _ = try? await connecting.value
+
+        let stillOwned = running.server.liveSessionCount
+        #expect(
+            stillOwned == 0,
+            "stop() leaves no session registered, whatever arrived while it was closing")
+
+        let served = try? await late.state()
+        #expect(served == nil, "a session accepted during stop() is closed, not served on")
+
+        for client in connected { await client.disconnect() }
+        await late.disconnect()
     }
 }
 
