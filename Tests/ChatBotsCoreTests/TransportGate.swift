@@ -23,18 +23,48 @@ import Testing
 /// A `CheckedContinuation` queue rather than a semaphore because the wait has to be `async`:
 /// blocking a cooperative thread while another test needs it to make progress is a deadlock, and
 /// under a bounded thread pool it is a reliable one.
+///
+/// A waiter cancelled while it is queued leaves the queue and never takes the gate (A168). It used to
+/// stay queued: the continuation was orphaned, `release()` handed the gate to a task that would never
+/// resume, and every later transport suite blocked forever — a hung suite that reads as a product
+/// hang rather than as a harness defect. Cancellation throws `CancellationError` instead of returning
+/// quietly, so a cancelled transport test is recorded as cancelled rather than passing unrun.
 actor TransportGate {
     static let shared = TransportGate()
 
     private var busy = false
-    private var waiting: [CheckedContinuation<Void, Never>] = []
+    private var nextWaiter = 0
+    private var waiting: [Int: CheckedContinuation<Bool, Never>] = [:]
+    private var order: [Int] = []
 
-    func acquire() async {
+    /// Take the gate, waiting for the current holder to release it.
+    ///
+    /// Throws `CancellationError` if this task is cancelled before it is admitted. The gate is left
+    /// free or handed on to the next live waiter — never held by a task that has gone away.
+    func acquire() async throws {
+        try Task.checkCancellation()
         if !busy {
             busy = true
             return
         }
-        await withCheckedContinuation { waiting.append($0) }
+        let id = nextWaiter
+        nextWaiter += 1
+        let admitted = await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+                waiting[id] = continuation
+                order.append(id)
+            }
+        } onCancel: {
+            Task { await self.abandon(id) }
+        }
+        guard admitted else { throw CancellationError() }
+        // `abandon` runs in its own task, so it races `release`: if the gate was handed over in the
+        // same instant the cancellation was delivered, that admission is real and has to be given
+        // back before throwing, or the gate is leaked by exactly the path this exists to close.
+        if Task.isCancelled {
+            release()
+            throw CancellationError()
+        }
     }
 
     /// Hands the gate to the next waiter, or frees it when there is none.
@@ -42,12 +72,31 @@ actor TransportGate {
     /// The waiter resumes holding the gate — `busy` stays true — so a test cannot slip in between
     /// the handover and the resumption.
     func release() {
-        if waiting.isEmpty {
-            busy = false
-        } else {
-            waiting.removeFirst().resume()
+        while let id = order.first {
+            order.removeFirst()
+            if let continuation = waiting.removeValue(forKey: id) {
+                continuation.resume(returning: true)
+                return
+            }
         }
+        busy = false
     }
+
+    /// Drops a queued waiter whose task was cancelled, so the gate is not handed to a task that is
+    /// gone. A waiter already handed the gate is left alone; `acquire` gives it back itself.
+    private func abandon(_ id: Int) {
+        guard let continuation = waiting.removeValue(forKey: id) else { return }
+        order.removeAll { $0 == id }
+        continuation.resume(returning: false)
+    }
+
+    // Read by this file's own tests, which is why they are not private.
+
+    /// Whether a caller currently holds the gate.
+    var isHeld: Bool { busy }
+
+    /// How many callers are queued behind the holder.
+    var waitingCount: Int { waiting.count }
 }
 
 /// Serialises every suite that drives a real QUIC listener or client.
@@ -61,7 +110,7 @@ struct TransportSerialized: SuiteTrait, TestScoping {
         testCase: Test.Case?,
         performing function: @Sendable () async throws -> Void
     ) async throws {
-        await TransportGate.shared.acquire()
+        try await TransportGate.shared.acquire()
         do {
             try await function()
         } catch {
