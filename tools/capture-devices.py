@@ -43,7 +43,6 @@ OUT: pathlib.Path = ROOT / "captures"
 PORT: int = 7791  # the interface
 ENGINE_PORT: int = 7792  # the engine behind it
 CHROME: str = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-CHROME_PORT: int = 9223
 
 # A phone profile is the strictest test, so landscape is worth checking too: it is where a
 # header can eat the whole screen.
@@ -401,7 +400,9 @@ def main() -> int:
         viewport_mismatches: list[tuple[Any, str, Any, Any]] = []
         empty_captures: list[tuple[Any, str]] = []
 
-        with Chrome(CHROME, port=CHROME_PORT) as browser:
+        # Each browser gets its own port and its own private profile, so two captures — or two people
+        # capturing at once — cannot collide or reach each other's browser (A164).
+        with Chrome(CHROME) as browser:
             for profile in selected:
                 orientations: list[str] = ["portrait"]
                 if args.include_landscape and profile["class"] == "phone":
@@ -471,7 +472,7 @@ def main() -> int:
         # tools/start-web-mobile.sh exists for.
         print("\nForced views, on a desktop-sized browser:")
         forced_failures: list[str] = []
-        with Chrome(CHROME, port=CHROME_PORT + 1) as browser:
+        with Chrome(CHROME) as browser:
             for view, expected_device, expected_layout, expected_max_width in [
                 ("phone", "phone", "thread", 440),
                 ("desktop", "desktop", "split", 2000),

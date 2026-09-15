@@ -29,6 +29,7 @@ import socket
 import struct
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 from typing import Self
@@ -90,6 +91,34 @@ def devtools_targets_url(port: int) -> str:
 
 class DevToolsError(RuntimeError):
     pass
+
+
+def chrome_devtools_port(profile: str, timeout: float = 30.0) -> int:
+    """The port Chrome bound to, read from the file it writes into its own profile.
+
+    `--remote-debugging-port=0` asks Chrome for a free port instead of naming one, and it records
+    what it chose in `<profile>/DevToolsActivePort` — first line the port, second the browser's
+    websocket path. The value is parsed and validated like any other port, so a file holding
+    anything else is a refusal rather than a URL (A164).
+    """
+    path = os.path.join(profile, "DevToolsActivePort")
+    deadline = time.time() + timeout
+    reason = "the file was never written"
+    while time.time() < deadline:
+        try:
+            with open(path, encoding="utf-8") as handle:
+                first = handle.readline().strip()
+        except OSError as error:
+            reason = str(error)
+        else:
+            try:
+                return require_valid_port(int(first))
+            except ValueError:
+                reason = f"the first line was not a number: {first!r}"
+            except DevToolsError as error:
+                reason = str(error)
+        time.sleep(0.1)
+    raise DevToolsError(f"Chrome never recorded a debugging port in {path}: {reason}")
 
 
 class _WebSocket:
@@ -207,16 +236,21 @@ class Chrome:
     binary: str
     port: int
     profile: str
+    private_profile: bool
     process: subprocess.Popen[bytes] | None
     socket: _WebSocket | None
     _next_id: int
 
-    def __init__(
-        self, binary: str, port: int = 9222, profile: str = "/tmp/chatbots-cdp"
-    ) -> None:
+    def __init__(self, binary: str, port: int = 0, profile: str | None = None) -> None:
         self.binary = binary
+        # Zero asks Chrome for a free port, and `start` reads back which one it got. A fixed default
+        # port is what let a second run either fail to start or — worse — reach the browser the first
+        # run had already opened, because the endpoint it waits for is just a port on loopback (A164).
         self.port = port
-        self.profile = profile
+        # `None` means "make this run a directory of its own", which `start` does with `mkdtemp`.
+        # A caller that names one keeps it, and this class never removes a directory it did not make.
+        self.private_profile = profile is None
+        self.profile = profile or ""
         self.process = None
         self.socket = None
         self._next_id = 1
@@ -229,24 +263,44 @@ class Chrome:
         self.stop()
 
     def start(self, url: str = "about:blank") -> None:
-        shutil.rmtree(self.profile, ignore_errors=True)
-        self.process = subprocess.Popen(
-            [
-                self.binary,
-                "--headless=new",
-                "--disable-gpu",
-                "--hide-scrollbars",
-                "--no-first-run",
-                "--no-default-browser-check",
-                "--disable-extensions",
-                "--disable-background-networking",
-                f"--user-data-dir={self.profile}",
-                f"--remote-debugging-port={self.port}",
-                url,
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        if self.private_profile:
+            # A directory of this run's own. `mkdtemp` creates it atomically, with mode 0700 and a
+            # name nothing can predict or pre-create; the fixed `/tmp/chatbots-cdp` this replaced was
+            # world-visible and shared, so a second run deleted the first run's profile and any local
+            # process could pre-create, seed or watch that path (A164).
+            self.profile = tempfile.mkdtemp(prefix="chatbots-cdp-")
+        try:
+            self.process = subprocess.Popen(
+                [
+                    self.binary,
+                    "--headless=new",
+                    "--disable-gpu",
+                    "--hide-scrollbars",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                    "--disable-extensions",
+                    "--disable-background-networking",
+                    f"--user-data-dir={self.profile}",
+                    f"--remote-debugging-port={self.port}",
+                    url,
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except OSError:
+            # The binary is not there or not runnable: remove the directory this run made rather than
+            # leaving it in the temporary directory for the next run to find (A164).
+            self.stop()
+            raise
+
+        if self.port == 0:
+            try:
+                self.port = chrome_devtools_port(self.profile)
+            except DevToolsError:
+                # Chrome never got as far as listening: stop it (and remove the profile we made)
+                # rather than leaving both behind.
+                self.stop()
+                raise
 
         # Wait for the debugging endpoint, then find the page target.
         target: JsonObject | None = None
@@ -322,6 +376,12 @@ class Chrome:
                     file=sys.stderr,
                 )
             self.process = None
+        # Only a directory this class made is removed. A caller that named a profile keeps it — a
+        # capture tool that deleted a directory it was pointed at would be the same collateral damage
+        # the pid check above exists to prevent (A164).
+        if self.private_profile and self.profile:
+            shutil.rmtree(self.profile, ignore_errors=True)
+            self.profile = ""
 
     def _is_our_headless_instance(self, pid: int) -> bool:
         """True only for a headless Chrome carrying this instance's private profile."""
