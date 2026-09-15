@@ -1,13 +1,26 @@
 #!/usr/bin/env bash
 # Fetches MLX's compiled Metal kernel library (mlx.metallib).
 #
-# Why this is needed: mlx-swift's SwiftPM build compiles the C/C++ core but NOT the
-# Metal kernels — those are produced by the CMake/Xcode build and shipped inside the
-# `Cmlx.xcframework` attached to each mlx-swift release. Without a metallib, MLX throws
-# "Failed to load the default metallib" the moment it touches the GPU.
+# Why this is needed — corrected under Xcode 27 (A135). This used to say that mlx-swift's
+# SwiftPM build does not compile the Metal kernels, and that is false: with the Metal toolchain
+# installed the build compiles every kernel into
+# `mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib`, and that file runs (measured:
+# `AUDIT/baseline/swift64/a135-metal-lib.log`). What is true, and what this script is for, is
+# that MLX needs a metallib it can *find*:
 #
-# MLX looks for the library next to the running binary (it tries `mlx.metallib` first),
-# so we place it in the SwiftPM bin directory and inside the .app bundle.
+#   `mlx/backend/metal/device.cpp:136-180` tries, in order, `mlx.metallib` beside the binary,
+#   `Resources/mlx.metallib`, a SwiftPM resource bundle, `Resources/default.metallib`, and
+#   finally the compile-time METAL_PATH. The SwiftPM bundle is reached through
+#   `Bundle.main.bundleURL` and `Bundle.allBundles()`, which a bare executable one level inside
+#   a .app — the app's engine is `ChatBots.app/Contents/MacOS/chatbots-cli` — does not resolve
+#   to, and `make-app.sh` copies the SwiftPM bundles into `Contents/Resources/`. Without a
+#   colocated metallib MLX throws "Failed to load the default metallib" the moment it touches
+#   the GPU.
+#
+# So the library has to be placed next to the running binary, which is what this does: into the
+# SwiftPM bin directory and into the .app's `Contents/MacOS/`. `make-app.sh` now copies the
+# build's own metallib when there is one and calls this only as the fallback, so a normal app
+# build no longer downloads ~190 MB — see the note there.
 #
 # Usage: tools/fetch-metal.sh [--bin <dir>] [--into <app>]...
 

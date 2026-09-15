@@ -86,8 +86,10 @@ fi
 cp "$BIN/chatbots-probe" "$APP/Contents/MacOS/chatbots-probe"
 
 # swift-transformers and swift-crypto ship resources as SwiftPM bundles next to the
-# binary. MLX's default.metallib is fetched separately, because mlx-swift's SwiftPM
-# build does not compile the Metal kernels (see tools/fetch-metal.sh).
+# binary. MLX's own kernels are in one of those bundles too — under Xcode 27 with the Metal
+# toolchain installed the SwiftPM build compiles them — and the loop below is what puts them in
+# the app. What that does **not** do is put a metallib where MLX looks for one: see the note at
+# the `mlx.metallib` step further down (A135).
 shopt -s nullglob
 for bundle in "$BIN"/*.bundle; do
   cp -R "$bundle" "$APP/Contents/Resources/"
@@ -138,7 +140,30 @@ else
   echo "warning: no icon artwork found; the app will use the generic icon" >&2
 fi
 
-"$ROOT/tools/fetch-metal.sh" --bin "$BIN" --into "$APP"
+# MLX's Metal kernel library, where MLX will actually find it.
+#
+# `mlx/backend/metal/device.cpp:136-180` tries `mlx.metallib` beside the running binary first,
+# then `Resources/mlx.metallib`, then a SwiftPM resource bundle, then `Resources/default.metallib`.
+# The app's engine runs as `Contents/MacOS/chatbots-cli`, and the SwiftPM bundle this script copied
+# above is in `Contents/Resources/` — which the bundle lookups do not reach from there — so the
+# engine needs a colocated `Contents/MacOS/mlx.metallib`. That is why a metallib is installed here
+# at all.
+#
+# Which one: the build's own. Xcode 27 with the Metal toolchain (a build requirement since A133)
+# compiles the kernels into `mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib`, and that
+# file runs — measured by placing it beside a binary and evaluating a kernel, which is what
+# `Tests/ChatBotsCoreTests/AuditS2MetalLibraryTests.swift` does
+# (`AUDIT/baseline/swift64/a135-metal-lib.log`). This used to download ~190 MB from the network
+# instead, for a reason that was never true under Xcode 27 (A135). The pinned, digest-checked
+# download in `tools/fetch-metal.sh` stays as the fallback for a build that produced no metallib.
+BUILT_METALLIB="$BIN/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
+if [ -f "$BUILT_METALLIB" ]; then
+  cp "$BUILT_METALLIB" "$APP/Contents/MacOS/mlx.metallib"
+  echo "==> Metal kernels from the build: $(basename "$BUILT_METALLIB")"
+else
+  echo "warning: the build produced no default.metallib; falling back to the pinned download" >&2
+  "$ROOT/tools/fetch-metal.sh" --bin "$BIN" --into "$APP"
+fi
 
 # `LSMinimumSystemVersion` below must match `platforms: [.macOS(.v26)]` in Package.swift. It said
 # 14.0 while the app needs 26 for WebTransport, so macOS would happily launch it on Sonoma and
