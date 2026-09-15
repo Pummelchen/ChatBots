@@ -1,0 +1,43 @@
+# A186 — a nested filename in a checkpoint's list (2026-09-15T15:41:22Z)
+
+## 1. before: the target directory was never made
+$ git show HEAD:tools/install.sh | grep -n "local target=" -B 2
+  274-  local name="$1" expected="$2"
+  275-  local url="https://huggingface.co/$MODEL_ID/resolve/main/$name"
+  276:  local target="$MODEL_DIR/$name"
+$ git show HEAD:tools/install.sh | grep -n "mkdir -p" | head -2
+  194:mkdir -p "$MODELS_DIR"
+  196:mkdir -p "$MODEL_DIR"
+  (only the model directory is created; the listed name is used verbatim)
+
+$ curl -fsSL -o /tmp/a186/model/original/config.json http://127.0.0.1:8731/x
+  exit=23
+  curl: (23) Failure writing output to destination, passed 8 returned 4294967295
+  — a reachable source, so the only thing left that can fail is where the bytes are meant to go:
+    curl -o cannot create the directory, download_file returned non-zero, and the install counted a
+    failed download. The first attempt at this measurement used an unreachable host and failed with
+    a connection error instead, which would have been evidence of nothing — recorded because a wrong
+    demonstration is a likelier mistake than a wrong fix.
+
+## 2. after: the path helper makes the directory, and refuses anything that leaves it
+$ grep -n "model-target-path" tools/install.sh
+  280:  if ! target="$(bash "$SCRIPT_DIR/model-target-path.sh" "$MODEL_DIR" "$name" 2>&1)"; then
+
+  config.json              -> /tmp/a186/model/config.json
+  original/config.json     -> /tmp/a186/model/original/config.json
+  a/b/c.json               -> /tmp/a186/model/a/b/c.json
+  ../../etc/passwd         -> refusing '../../etc/passwd': it is not a plain path inside the checkpoint
+  /etc/passwd              -> refusing '/etc/passwd': it is not a plain path inside the checkpoint
+
+  the directories it made:
+    .
+    ./a
+    ./a/b
+    ./original
+
+$ shellcheck tools/install.sh tools/model-target-path.sh
+  clean
+
+  Limit, stated: the installer itself is not run end to end — it downloads about 3 GB — so what is
+  exercised here is the path rule it now calls, and the call site is checked by shellcheck and the
+  script's own bash -n.

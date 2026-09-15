@@ -273,7 +273,15 @@ info "This checkpoint has $TOTAL_FILES files."
 download_file() {
   local name="$1" expected="$2"
   local url="https://huggingface.co/$MODEL_ID/resolve/main/$name"
-  local target="$MODEL_DIR/$name"
+  # Where it belongs, and the directory it needs. The list comes from the hub, so the name may be a
+  # nested path (`original/config.json`) — which `curl -o` cannot write into a directory that does not
+  # exist — and it may not be trusted to stay inside the model directory (A186).
+  local target
+  if ! target="$(bash "$SCRIPT_DIR/model-target-path.sh" "$MODEL_DIR" "$name" 2>&1)"; then
+    fail "refusing to download $name"
+    dim "$target"
+    return 1
+  fi
 
   # A zero or non-numeric size is not "unknown, so accept anything": it means this file
   # cannot be verified, and an unverifiable model file is not recorded as complete. The size
