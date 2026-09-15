@@ -154,18 +154,45 @@ for argument in "$@"; do
   esac
 done
 
+# Every destination is checked and every failure is fatal.
+#
+# This used to be two `if`s with no else: a `--bin` that did not exist and a `--into` target with no
+# `Contents/MacOS` were both skipped in silence, and the script exited 0 having installed nothing —
+# inviting exactly the failure it exists to prevent, MLX throwing "Failed to load the default
+# metallib" the first time a model touches the GPU (A184). A bundle without the library is not a
+# bundle, so a destination that cannot be written is an error, not a note.
+installed=0
+
 if [[ -z "$BIN" ]]; then
   BIN="$(swift build --show-bin-path 2>/dev/null || true)"
+  if [[ -z "$BIN" && "${#INSTALL_TARGETS[@]}" -eq 0 ]]; then
+    echo "error: could not read the build directory, and no --into target was given." >&2
+    echo "       pass --bin <dir> or --into <app> so there is somewhere to install to." >&2
+    exit 1
+  fi
+elif [[ ! -d "$BIN" ]]; then
+  echo "error: no such build directory: $BIN" >&2
+  exit 1
 fi
+
 if [[ -n "$BIN" && -d "$BIN" ]]; then
   cp "$LIB" "$BIN/mlx.metallib"
   echo "    installed: $BIN/mlx.metallib"
+  installed=$((installed + 1))
 fi
 
 for target in "${INSTALL_TARGETS[@]:-}"; do
   [[ -n "$target" ]] || continue
-  if [[ -d "$target/Contents/MacOS" ]]; then
-    cp "$LIB" "$target/Contents/MacOS/mlx.metallib"
-    echo "    installed: $target/Contents/MacOS/mlx.metallib"
+  if [[ ! -d "$target/Contents/MacOS" ]]; then
+    echo "error: no app bundle at $target (expected $target/Contents/MacOS)." >&2
+    exit 1
   fi
+  cp "$LIB" "$target/Contents/MacOS/mlx.metallib"
+  echo "    installed: $target/Contents/MacOS/mlx.metallib"
+  installed=$((installed + 1))
 done
+
+if [[ "$installed" -eq 0 ]]; then
+  echo "error: nothing was installed; the Metal library would not travel with the app." >&2
+  exit 1
+fi
