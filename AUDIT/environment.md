@@ -234,3 +234,34 @@ brew install swiftlint llvm gitleaks osv-scanner semgrep ruff pyright shellcheck
 | --- | --- | --- | --- |
 | `node1` | Xcode 27 Metal Toolchain component (27A266a, 839 MB) | A133 — without it this package cannot build | Xcode ▸ Settings ▸ Components |
 | `node2` | *(pending — required before Phase E)* | Phase E must build on node2 | Xcode ▸ Settings ▸ Components |
+
+## A credential was sitting in plaintext in two wiki clones (A212)
+
+Found on 2026-09-15 while checking the wiki trackers §9 requires after a push. Two of the three wiki
+clones in `~/Downloads/` carried a **fine-grained GitHub personal access token, in plaintext, inside
+the `origin` URL** in `.git/config`:
+
+| Clone | State before | State after |
+| --- | --- | --- |
+| `chatbots-wiki-ro` | `https://Pummelchen:<token>@github.com/Pummelchen/ChatBots.wiki.git` | `https://github.com/Pummelchen/ChatBots.wiki.git` |
+| `mcps-wiki-ro` | same shape, for `MCPSearch.wiki.git` | `https://github.com/Pummelchen/MCPSearch.wiki.git` |
+| `aisessionserver-wiki` | clean (no credential in the URL) | unchanged |
+
+`ChatBots/.git/config` and the two other repository clones were already clean, and nothing in the
+audited repository or its history contains a credential — gitleaks has reported 0 findings over the
+full history since Phase A, and that result stands.
+
+**What was done.** Both URLs were rewritten to the bare HTTPS form. Pushes and fetches still
+authenticate: `~/.gitconfig` already routes `github.com` through `gh auth git-credential`, and `gh` is
+logged in as `Pummelchen`. A fetch against the rewritten clone was run afterwards and succeeded, so
+the rewrite removed the secret without removing access. `~/.config/gh/hosts.yml` (mode 0600) still
+holds the same token, which is where `gh` is designed to keep it.
+
+**What should still happen, by the token's owner.** A token that has been read out of a file into a
+terminal or a session log should be treated as disclosed. It is not in the repository and it was not
+committed, but it was visible on screen, so rotating it is the safe move; nothing in this audit needs
+it, because the credential helper supplies whatever `gh` holds.
+
+**Why it is recorded here rather than as a source fix.** The file it lived in is not in the tree this
+audit has scope over (the brief limits it to `Pummelchen/ChatBots`), so there is no repository change
+that removes it and no commit to point at. Recording it is the alternative to fixing it silently.
