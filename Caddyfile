@@ -76,8 +76,8 @@ http://:7788 {
 	# to the engine rather than overwritten from here.
 	#
 	# The policy is identical to HTTPResponse.interfacePolicy. It is safe for what this block
-	# serves — web/index.html, web/app.js and web/style.css — because the page loads its
-	# script and stylesheet as separate same-origin files, reaches the engine only through
+	# serves — web/index.html, web/deltas.js, web/app.js and web/style.css — because the page loads
+	# its scripts and stylesheet as separate same-origin files, reaches the engine only through
 	# relative /api paths, and contains no inline script, inline event handler, inline style,
 	# external origin, frame, form or <base>; style.css has no url() or @import. That is what
 	# lets `script-src 'self'` stand without `'unsafe-inline'`, which is the directive that

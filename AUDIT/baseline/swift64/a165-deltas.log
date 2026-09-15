@@ -1,0 +1,53 @@
+# A165 — the page consuming the engine's per-token events (2026-09-15T13:29:44Z)
+
+## 1. the defect: the page as it was listened for whole-turn snapshots only
+$ git show HEAD:web/app.js | grep -c 'addEventListener("delta"'
+  0
+$ git show HEAD:web/app.js | grep -n 'new EventSource' -A 2
+  1426:    const source = new EventSource("/api/events");
+  1427-    source.addEventListener("snapshot", (event) => apply(JSON.parse(event.data)));
+  1428-    source.addEventListener("turn", () => { /* the following snapshot carries it */ });
+
+## 2. and now
+$ grep -c 'addEventListener("delta"' web/app.js
+  1
+$ node tools/check-web-deltas.js
+  web/deltas.js
+    ok    token fragments accumulate in order
+    ok    a seat that is writing is marked as generating
+    ok    the other seat is untouched
+    ok    reasoning accumulates separately from the answer
+    ok    a new turn clears what the previous one left
+    ok    and the new turn then accumulates from empty
+    ok    an agent that is not a seat is ignored
+    ok    an unknown kind is ignored rather than guessed at
+    ok    an empty delta is ignored
+    ok    a seat with no live entry gets one the renderer can read
+    ok    a snapshot with no live array is repaired rather than throwing
+    ok    an empty fragment leaves the text a string
+  all deltas checks passed
+
+## 3. mutation: token fragments replace the text instead of accumulating
+$ sed 'live.text = (live.text || "") + (delta.text || "")' -> 'live.text = (delta.text || "")'
+$ node tools/check-web-deltas.js
+  web/deltas.js
+    FAIL  token fragments accumulate in order — got "lo"
+    ok    a seat that is writing is marked as generating
+    ok    the other seat is untouched
+    ok    reasoning accumulates separately from the answer
+    ok    a new turn clears what the previous one left
+    ok    and the new turn then accumulates from empty
+    ok    an agent that is not a seat is ignored
+    ok    an unknown kind is ignored rather than guessed at
+    ok    an empty delta is ignored
+    ok    a seat with no live entry gets one the renderer can read
+    ok    a snapshot with no live array is repaired rather than throwing
+    ok    an empty fragment leaves the text a string
+  1 deltas check(s) failed
+  exit=1
+
+## 4. mutation reverted
+$ node tools/check-web-deltas.js
+    ok    an empty fragment leaves the text a string
+  all deltas checks passed
+  exit=0

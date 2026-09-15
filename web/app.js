@@ -1426,6 +1426,13 @@
     const source = new EventSource("/api/events");
     source.addEventListener("snapshot", (event) => apply(JSON.parse(event.data)));
     source.addEventListener("turn", () => { /* the following snapshot carries it */ });
+    // The engine's own per-token events. Listening only for `snapshot` meant a reply appeared in one
+    // piece when the turn ended, so a long research turn looked frozen while it was working while
+    // the engine was publishing the words as it wrote them (A165). `applyDelta` merges a fragment
+    // into the live entries the renderer already draws from; nothing else about drawing changes.
+    source.addEventListener("delta", (event) => {
+      if (window.ChatBotsDeltas.applyDelta(state.snapshot, JSON.parse(event.data))) drawLive();
+    });
     source.onerror = () => toast("Lost the connection to the server — reconnecting…");
   }
 

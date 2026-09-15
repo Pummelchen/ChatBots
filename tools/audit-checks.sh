@@ -39,7 +39,7 @@ set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 2
 
-for tool in swift swiftlint swift-format xcrun jq; do
+for tool in swift swiftlint swift-format xcrun jq node; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         printf 'missing required tool: %s (see AUDIT/environment.md)\n' "$tool" >&2
         exit 2
@@ -64,7 +64,7 @@ fail() {
     failures=$((failures + 1))
 }
 
-printf '\n=== 1/5  build: products and tests, warnings are errors ===\n'
+printf '\n=== 1/6  build: products and tests, warnings are errors ===\n'
 if swift build --build-tests > "$logs/build.log" 2>&1; then
     pass "build: swift build --build-tests"
 else
@@ -73,7 +73,7 @@ else
     fail "build: swift build --build-tests"
 fi
 
-printf '\n=== 2/5  tests: the full suite ===\n'
+printf '\n=== 2/6  tests: the full suite ===\n'
 if swift test --enable-code-coverage > "$logs/test.log" 2>&1; then
     test_summary="$(grep -E 'Test run with' "$logs/test.log" | tail -1)"
     printf '      %s\n' "${test_summary:-swift test passed}"
@@ -84,7 +84,7 @@ else
     fail "tests: swift test --enable-code-coverage"
 fi
 
-printf '\n=== 3/5  coverage: Sources/ ===\n'
+printf '\n=== 3/6  coverage: Sources/ ===\n'
 bin_path="$(swift build --show-bin-path 2>/dev/null)"
 profile="$bin_path/codecov/default.profdata"
 test_binary="$bin_path/ChatBotsPackageTests.xctest/Contents/MacOS/ChatBotsPackageTests"
@@ -106,7 +106,7 @@ else
     fail "coverage: llvm-cov report over Sources/"
 fi
 
-printf '\n=== 4/5  swiftlint: Sources, Tests ===\n'
+printf '\n=== 4/6  swiftlint: Sources, Tests ===\n'
 # A06 added the configs and recorded what their residual is, so this gate is "no worse than the
 # number this audit recorded" rather than "zero" — which is the only form of it that can pass
 # without hiding findings. The waivers live in AUDIT/plan.md so that raising one is a deliberate,
@@ -136,7 +136,7 @@ case "${findings:-}" in
         ;;
 esac
 
-printf '\n=== 5/5  swift-format lint: Sources, Tests ===\n'
+printf '\n=== 5/6  swift-format lint: Sources, Tests ===\n'
 # Authored Swift only: the generated `WebAssets.swift` and `NameLists.swift` carry thousands
 # of diagnostics of their own, which makes the count a function of `web/` and `names/` rather than
 # of this repository's code (A125). swiftlint excludes the same two in `.swiftlint.yml`.
@@ -155,11 +155,24 @@ else
     fail "swift-format: $diagnostics diagnostic(s) exceeds the recorded waiver of $allowed"
 fi
 
+printf '\n=== 6/6  web: the merge that turns per-token events into live text ===\n'
+# The page's streaming reply is drawn from `state.snapshot.live`, and the merge that fills it from the
+# engine's `delta` events is pure JavaScript in `web/deltas.js`. It used to live inline in `app.js` and
+# there was no way to run it, which is how the page came to listen for nothing but whole-turn
+# snapshots (A165). This runs it in Node, with no browser and no network.
+if node tools/check-web-deltas.js > "$logs/web-deltas.log" 2>&1; then
+    pass "web: deltas merge ($(grep -c '  ok ' "$logs/web-deltas.log") cases)"
+else
+    printf '      last 20 lines of %s:\n' "$logs/web-deltas.log"
+    tail -n 20 "$logs/web-deltas.log" | sed 's/^/      /'
+    fail "web: deltas merge"
+fi
+
 printf '\n=== summary ===\n'
 cat "$summary"
 if [ "$failures" -eq 0 ]; then
-    printf '\nAll 5 Mac-only gates passed.\n'
+    printf '\nAll 6 Mac-only gates passed.\n'
     exit 0
 fi
-printf '\n%d of 5 Mac-only gates failed. Full output in %s/.\n' "$failures" "$logs"
+printf '\n%d of 6 Mac-only gates failed. Full output in %s/.\n' "$failures" "$logs"
 exit 1
