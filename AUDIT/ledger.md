@@ -30,12 +30,12 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 214 |
-| DONE | 168 |
-| START | 46 |
+| DONE | 169 |
+| START | 45 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 46
+### Open — 45
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -79,7 +79,6 @@ been run.
 | A195 | S3 | START | — | docs / TLS trust | The client never enforces the pinned fingerprint while another comment claims pinning is meaningful |
 | A199 | S2 | START | — | prompts / identity | The social engine keys and words itself by seat id while every other prompt surface uses display names |
 | A201 | S2 | START | — | resource lifecycle | A new client and a never-invalidated URLSession are created for every turn |
-| A203 | S2 | START | — | research / direction | The author of an unsupported claim can be directed to substantiate their own claim |
 | A205 | S3 | START | — | dead code / wrong label | The .richText case is unreachable and an RTF file is labelled 'Word' |
 | A206 | S3 | START | — | dead code | Six declarations are written or named but never used, one with a documented rule the code does not implement |
 | A207 | S3 | START | — | docs / correctness | Three comments say the document extractors live in the app target and that the core cannot read a PDF or Word file; all three are false |
@@ -213,7 +212,7 @@ been run.
 | A200 | S2 | DONE | daa6227 | model reporting | The MLX model label is a constant, so another checkpoint is misreported to the user and to the model |
 | A201 | S2 | START | — | resource lifecycle | A new client and a never-invalidated URLSession are created for every turn |
 | A202 | S2 | DONE | 0c885fd | terminal event | An empty server answer emits turnFailed and then turnFinished, so a failed turn is recorded as a successful empty one |
-| A203 | S2 | START | — | research / direction | The author of an unsupported claim can be directed to substantiate their own claim |
+| A203 | S2 | DONE | 2ac0bf1 | research / direction | The author of an unsupported claim can be directed to substantiate their own claim |
 | A204 | S2 | DONE | a562360 | prompt injection (A69 recurrence) | Raw display names are interpolated into the moderator instruction, bypassing the sanitiser A69 added |
 | A205 | S3 | START | — | dead code / wrong label | The .richText case is unreachable and an RTF file is labelled 'Word' |
 | A206 | S3 | START | — | dead code | Six declarations are written or named but never used, one with a documented rule the code does not implement |
