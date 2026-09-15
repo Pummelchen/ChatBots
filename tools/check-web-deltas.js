@@ -162,6 +162,13 @@ console.log("web/deltas.js");
   check(
     "every snapshot the page applies goes through the guard",
     /isStale\(next, state\.snapshot\)/.test(appJS));
+
+  // A172: the stylesheet documents the profile badge as "shown only when ?profile is in the URL", and
+  // nothing implemented the condition — the text went into an element the stylesheet keeps hidden. The
+  // browser behaviour is not exercised here (there is no headless browser in this audit); what is
+  // checked is that the page both reads `?profile` and applies it to the badge.
+  check("the debug label reads ?profile", /has\("profile"\)/.test(appJS));
+  check("and the badge is shown only when it is asked for", /badge\.hidden = !profileRequested\(\)/.test(appJS));
 }
 
 if (failures === 0) {

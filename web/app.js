@@ -169,10 +169,20 @@
       $(id)?.classList.toggle("on", viewMode === mode);
     }
 
-    $("profile-badge").textContent =
-      screenInfo.matched
-        ? `${screenInfo.matched.name} · ${screenInfo.matched.width}×${screenInfo.matched.height}`
-        : `${screenInfo.width}×${screenInfo.height} · unknown device`;
+    // The stylesheet has said since it was written that this is "a debug label, shown only when
+    // ?profile is in the URL" — and nothing ever unhid it, so the text was written into an element
+    // that `[hidden] { display: none !important; }` keeps invisible (A172). The condition the comment
+    // describes is what is implemented here, rather than deleting a deliberate debug surface.
+    const badge = $("profile-badge");
+    badge.textContent = screenInfo.matched
+      ? `${screenInfo.matched.name} · ${screenInfo.matched.width}×${screenInfo.matched.height}`
+      : `${screenInfo.width}×${screenInfo.height} · unknown device`;
+    badge.hidden = !profileRequested();
+  }
+
+  /// Whether the URL asks for the debug label.
+  function profileRequested() {
+    return new URLSearchParams(location.search).has("profile");
   }
 
   function setViewMode(mode) {
