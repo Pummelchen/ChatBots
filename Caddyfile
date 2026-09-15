@@ -58,9 +58,12 @@ http://:7788 {
 	# every share link answers 404 — which is what the shipped configuration did (A99).
 	#
 	# The difference from the block above is deliberate: no `header_up Host`, so Caddy passes the
-	# Host it was reached on through to the engine. The engine uses that to build the page's own
-	# links, which is how a link copied on a phone points back at the address the phone used
-	# rather than at the engine's loopback port.
+	# Host it was reached on through to the engine, which checks it and hands it to the page as
+	# `shareBase`. What the page *does* with it is nothing — every URL it could need is relative,
+	# and the page renders no links of its own (A217). The link a reader copies is built by the
+	# front ends instead: the web interface from the origin the browser is reading at, with the
+	# engine's reported base as its fallback (`web/app.js`), and the desktop app from that reported
+	# base (`ChatController.shareLink(for:)`), which `--share-base` sets.
 	handle /s/* {
 		reverse_proxy 127.0.0.1:7789
 	}

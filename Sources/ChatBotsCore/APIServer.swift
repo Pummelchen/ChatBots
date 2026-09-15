@@ -447,10 +447,11 @@ public final class APIServer {
 
     /// A `Host` header that is safe to reflect into a URL, or nil.
     ///
-    /// Reflecting the header is how a share link comes back to the origin that actually served the
-    /// page, but the value is client-supplied: anything carrying a path, a userinfo `@`, whitespace
-    /// or a character a host or port cannot contain is refused rather than interpolated. A refused
-    /// value falls back to the configured base.
+    /// Reflecting the header is how the engine learns the origin that actually served the page — the
+    /// value it passes to the share page as `shareBase`, which the page does not read yet (A217). The
+    /// value is client-supplied either way: anything carrying a path, a userinfo `@`, whitespace or a
+    /// character a host or port cannot contain is refused rather than interpolated. A refused value
+    /// falls back to the configured base.
     ///
     /// `nonisolated` because it is a pure function of its argument: the server is main-actor
     /// isolated, and a caller that only wants to know whether a string is a host should not have to
@@ -658,9 +659,13 @@ public final class APIServer {
         guard let record = await service.store.conversationOffMainActor(id: uuid) else {
             return sharedPageNotFound()
         }
-        // The page's own links go back to the origin that served it, so a phone that reached the
-        // page through Caddy gets Caddy's address rather than the engine's loopback port — which is
-        // the address the phone could not reach in the first place (A99).
+        // The address the page was reached on, checked before it is reflected (A99), so a phone that
+        // reached the page through Caddy hands the engine Caddy's address rather than its own. It
+        // travels to the page as `shareBase`, and the page renders no links, so nothing reads it
+        // (A217). The link a reader copies is built by the front ends instead: the web interface from
+        // the origin the browser is reading at, with the engine's reported base as its fallback
+        // (`web/app.js`), and the desktop app from that reported base, which `--share-base` sets
+        // (`ChatController.shareLink(for:)`, A99).
         let base =
             Self.validShareHost(host).map { "http://\($0)" }
             ?? service.shareBase ?? "http://127.0.0.1:\(port)"

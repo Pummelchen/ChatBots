@@ -1,0 +1,126 @@
+A163 — the Caddyfile's claim about the share page's own links, before and after
+Host: 27.0 / arm64, caddy v2.11.4
+
+--- BEFORE: the claim (Caddyfile, at HEAD) ---
+	# Kept conversations. `/s/<id>` is a page the engine renders and it does not live under
+	# `/api`, so without this block the catch-all below hands the path to the file server and
+	# every share link answers 404 — which is what the shipped configuration did (A99).
+	#
+	# The difference from the block above is deliberate: no `header_up Host`, so Caddy passes the
+	# Host it was reached on through to the engine. The engine uses that to build the page's own
+	# links, which is how a link copied on a phone points back at the address the phone used
+	# rather than at the engine's loopback port.
+
+--- And the same claim inside the engine (APIServer, at HEAD) ---
+        // The page's own links go back to the origin that served it, so a phone that reached the
+        // page through Caddy gets Caddy's address rather than the engine's loopback port — which is
+        // the address the phone could not reach in the first place (A99).
+
+--- Who reads the key the claim is about ---
+$ git grep -n "shareBase" -- Sources web Tests | grep -v WebAssets
+Sources/ChatBotsApp/ChatController.swift:1385:    public var shareBase: String? {
+Sources/ChatBotsApp/ChatController.swift:1386:        guard let base = lastSnapshot?.shareBase, !base.isEmpty else { return nil }
+Sources/ChatBotsApp/ChatController.swift:1392:        shareBase.flatMap { URL(string: "\($0)/s/\(id)") }
+Sources/ChatBotsCLI/main.swift:56:    var shareBase: String?
+Sources/ChatBotsCLI/main.swift:230:                options.shareBase = baseRaw
+Sources/ChatBotsCLI/main.swift:887:        port: options.port, shareBase: options.shareBase)
+Sources/ChatBotsCore/APIServer.swift:133:    public var shareBase: String?
+Sources/ChatBotsCore/APIServer.swift:391:        shareBase: String? = nil
+Sources/ChatBotsCore/APIServer.swift:403:        self.service.shareBase = shareBase ?? "http://127.0.0.1:\(port)"
+Sources/ChatBotsCore/APIServer.swift:451:    /// value it passes to the share page as `shareBase`, which the page does not read yet (A217). The
+Sources/ChatBotsCore/APIServer.swift:664:        // travels to the page as `shareBase`, and the page renders no links, so nothing reads it
+Sources/ChatBotsCore/APIServer.swift:671:            ?? service.shareBase ?? "http://127.0.0.1:\(port)"
+Sources/ChatBotsCore/APIServer.swift:674:            body: Data(SharedConversationPage.html(record, shareBase: base).utf8),
+Sources/ChatBotsCore/EngineService.swift:40:    public var shareBase: String?
+Sources/ChatBotsCore/EngineService.swift:736:            shareBase: shareBase,
+Sources/ChatBotsCore/SharedConversationPage.swift:24:    public static func html(_ record: StoredConversation, shareBase: String? = nil) -> String {
+Sources/ChatBotsCore/SharedConversationPage.swift:74:            <script id="data" type="application/json">\(dataJSON(record, shareBase: shareBase))</script>
+Sources/ChatBotsCore/SharedConversationPage.swift:104:    static func dataJSON(_ record: StoredConversation, shareBase: String?) -> String {
+Sources/ChatBotsCore/SharedConversationPage.swift:107:        payload["shareBase"] = shareBase ?? ""
+Tests/ChatBotsCoreTests/SharedConversationTests.swift:137:            record(turns: [chat(1, "Ada", text)]), shareBase: "http://127.0.0.1:7788")
+Tests/ChatBotsCoreTests/SharedConversationTests.swift:144:        #expect(object?["shareBase"] as? String == "http://127.0.0.1:7788")
+Tests/ChatBotsCoreTests/SharedConversationTests.swift:267:    func shareBaseIsInTheSnapshot() async throws {
+Tests/ChatBotsCoreTests/SharedConversationTests.swift:272:        #expect(snapshot?["shareBase"] as? String == base)
+Tests/ChatBotsCoreTests/SharedConversationTests.swift:303:                .contains("\"shareBase\":\"http://192.168.1.5:7788\""),
+Tests/ChatBotsCoreTests/SharedConversationTests.swift:313:                .contains("\"shareBase\":\"\(base)\""),
+web/app.js:1008:          : (state.snapshot && state.snapshot.shareBase);
+
+Reads of the *island's* key: none. SharedConversationPage writes it at :24 (the parameter), :74 (into
+the page) and :107 (into the JSON) and never reads it; its script reads data.entries and data.report
+and builds no links at all. The reads in the tree are of the *snapshot* field instead — web/app.js:1008
+and ChatController.shareLink(for:):1392 — which is a different channel: it reaches both front ends
+through the snapshot, not through the page's island.
+
+--- The mechanism that is live, which the corrected comment now names ---
+        // receiving the link needs. The snapshot's value is the fallback for an origin that is not
+        // a usable base (`file:` pages report "null").
+        const origin = window.location.origin;
+        const base = origin && origin !== "null"
+          ? origin
+          : (state.snapshot && state.snapshot.shareBase);
+        const url = `${base}/s/${item.id}`;
+        try {
+   and, in the app:
+    public func shareLink(for id: String) -> URL? {
+        shareBase.flatMap { URL(string: "\($0)/s/\(id)") }
+    }
+
+--- The tests that pin the island's value: they assert it is there, not that anything uses it ---
+137:            record(turns: [chat(1, "Ada", text)]), shareBase: "http://127.0.0.1:7788")
+144:        #expect(object?["shareBase"] as? String == "http://127.0.0.1:7788")
+267:    func shareBaseIsInTheSnapshot() async throws {
+272:        #expect(snapshot?["shareBase"] as? String == base)
+303:                .contains("\"shareBase\":\"http://192.168.1.5:7788\""),
+313:                .contains("\"shareBase\":\"\(base)\""),
+
+--- AFTER: the three corrected places ---
+$ sed -n "56,69p" Caddyfile
+	# Kept conversations. `/s/<id>` is a page the engine renders and it does not live under
+	# `/api`, so without this block the catch-all below hands the path to the file server and
+	# every share link answers 404 — which is what the shipped configuration did (A99).
+	#
+	# The difference from the block above is deliberate: no `header_up Host`, so Caddy passes the
+	# Host it was reached on through to the engine, which checks it and hands it to the page as
+	# `shareBase`. What the page *does* with it is nothing — every URL it could need is relative,
+	# and the page renders no links of its own (A217). The link a reader copies is built by the
+	# front ends instead: the web interface from the origin the browser is reading at, with the
+	# engine's reported base as its fallback (`web/app.js`), and the desktop app from that reported
+	# base (`ChatController.shareLink(for:)`), which `--share-base` sets.
+	handle /s/* {
+		reverse_proxy 127.0.0.1:7789
+	}
+
+$ sed -n "449,454p;662,668p" Sources/ChatBotsCore/APIServer.swift
+    ///
+    /// Reflecting the header is how the engine learns the origin that actually served the page — the
+    /// value it passes to the share page as `shareBase`, which the page does not read yet (A217). The
+    /// value is client-supplied either way: anything carrying a path, a userinfo `@`, whitespace or a
+    /// character a host or port cannot contain is refused rather than interpolated. A refused value
+    /// falls back to the configured base.
+   ...
+        // The address the page was reached on, checked before it is reflected (A99), so a phone that
+        // reached the page through Caddy hands the engine Caddy's address rather than its own. It
+        // travels to the page as `shareBase`, and the page renders no links, so nothing reads it
+        // (A217). The link a reader copies is built by the front ends instead: the web interface from
+        // the origin the browser is reading at, with the engine's reported base as its fallback
+        // (`web/app.js`), and the desktop app from that reported base, which `--share-base` sets
+        // (`ChatController.shareLink(for:)`, A99).
+
+--- The configuration still validates ---
+$ caddy validate --config Caddyfile
+Valid configuration
+(The "not formatted" warning names line 16 and is pre-existing: caddy fmt would remove one blank line
+ there, at HEAD as well as here, and no gate runs caddy fmt. Left alone rather than mixed into this
+ change.)
+
+--- FULL GATE at the fix commit (tools/audit-checks.sh) ---
+PASS  build: swift build --build-tests
+PASS  tests: 1020 tests in 188 suites
+PASS  coverage: Sources/ TOTAL 6505 regions 2590 covered 60.18%, 20490 lines 9831 covered 52.02%
+PASS  swiftlint: 253 finding(s), within the recorded waiver of 255
+PASS  swift-format: 739 diagnostic(s), within the recorded waiver of 744
+PASS  web: deltas merge (34 cases)
+PASS  web: the verdict rule (12 cases)
+
+All 6 Mac-only gates passed. (A comment change touches no gate; the gate is run at every fix commit
+regardless, and this is the run at this one.)

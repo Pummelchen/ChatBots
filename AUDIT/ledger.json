@@ -3677,6 +3677,23 @@
       "commit": "d3a4316",
       "notes": "Found out of A215 rather than in a reading pass: the check's report said `error 2`, and `error 2` is not a Foundation code for that type — it is the case index, which is what gave the cause away. The shape of the fix is deliberately conservative: `NSError` is *not* reformatted, so an ordinary POSIX or Cocoa failure cannot come out reading worse than it did, and that branch is pinned by a test. The first version put the helper on the client and pushed `WebTransportClient.swift` past swiftlint's 600-line file limit — fixed by giving the formatter its own file rather than by waiving the rule, which the gate's counts (254/255, 739/744) then confirmed was the right move. Commit d3a4316.",
       "blocked_reason": null
+    },
+    {
+      "id": "A217",
+      "severity": "S3",
+      "unit": "dead code / share page",
+      "file_line": "Sources/ChatBotsCore/SharedConversationPage.swift:24,74,104-110; Sources/ChatBotsCore/APIServer.swift:447-462,656-669; Caddyfile:56-68",
+      "title": "The share page's `shareBase` island field, the `Host` reflection that fills it and the validator that guards the reflection have no consumer",
+      "category": "incomplete",
+      "status": "START",
+      "host_used": "node1",
+      "discovered_by": "Phase C/D — found while correcting A163's comment, which described the channel as building the page's own links",
+      "evidence_before": "`SharedConversationPage.html(_:shareBase:)` writes the base into the JSON island (`dataJSON`, :107) and `APIServer.sharedPage(id:host:)` computes it from the request's `Host` through `validShareHost` (:447-462, :664-666). Nothing reads it: the page's own script reads `data.entries` and `data.report` and no links at all, the only other `shareBase` in the tree is `web/app.js`'s, which comes from the *snapshot* field rather than the island, and the tests assert the island value is present rather than that anything uses it. So a validator, a reflection and a page parameter exist to feed a key with no consumer — which is how the comment A163 corrected came to describe them as building the page's links.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "",
+      "blocked_reason": null
     }
   ]
 }
