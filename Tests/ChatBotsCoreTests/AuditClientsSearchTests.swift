@@ -206,3 +206,77 @@ struct AuditClientsSearchTests {
         #expect(server.attempts.map(\.search_depth) == ["advanced"])
     }
 }
+
+// MARK: - The tool the models are given (A170)
+
+/// `web_search` is what research mode is built around, and only its properties were covered: the tool's
+/// three branches — an empty query, no results at all, and the formatted list — were never executed.
+/// They are tested here rather than in a file of their own because the scripted Tavily server above is
+/// the thing they need, and it is private to this file.
+@MainActor
+@Suite("The web_search tool's own branches (A170)")
+struct WebSearchToolTests {
+
+    /// A Tavily response carrying `count` usable hits.
+    private func body(count: Int) -> Data {
+        let items = (1...max(count, 1)).prefix(count).map { index in
+            """
+            {"title":"Title \(index)","url":"https://\(index).example","content":"Snippet \(index)","score":0.5}
+            """
+        }
+        return Data("{\"results\":[\(items.joined(separator: ","))]}".utf8)
+    }
+
+    @Test("An empty query is refused before any request is made")
+    func emptyQueryIsRefused() async {
+        // A port nothing listens on, so a request would fail differently: what this asserts is that no
+        // request is attempted at all.
+        let tool = WebSearchTool(
+            client: TavilyClient(apiKey: "unused", baseURL: "http://127.0.0.1:9"), maxResults: 3)
+        do {
+            _ = try await tool.run(argument: " \n\t ")
+            Issue.record("an empty query must not be searched for")
+        } catch let error as ChatBotsError {
+            guard case .toolFailed(let reason) = error else {
+                Issue.record("wrong error: \(error)")
+                return
+            }
+            #expect(reason.contains("empty search query"))
+        } catch {
+            Issue.record("wrong error: \(error)")
+        }
+    }
+
+    @Test("Hits become a numbered list with their URLs, and a summary that says how many")
+    func hitsAreFormatted() async throws {
+        let server = try await ScriptedTavilyServer(
+            basicBody: body(count: 2), advancedBody: body(count: 2))
+        defer { server.stop() }
+
+        let outcome = try await WebSearchTool(client: server.client(), maxResults: 3)
+            .run(argument: "why are eggs ovoid")
+
+        #expect(outcome.text.contains("Search results for \"why are eggs ovoid\":"))
+        #expect(outcome.text.contains("1. Title 1"))
+        #expect(outcome.text.contains("URL: https://1.example"))
+        #expect(outcome.text.contains("Snippet 1"))
+        #expect(outcome.text.contains("2. Title 2"), "every hit is listed, not just the first")
+        #expect(outcome.text.contains("Cite the URLs"), "and the model is told what to do with them")
+        #expect(outcome.summary == "2 result(s) for \"why are eggs ovoid\" — Title 1")
+    }
+
+    @Test("A search that finds nothing says so instead of returning an empty list")
+    func noResultsIsItsOwnAnswer() async throws {
+        // Both depths answer empty, which is what the client's basic-then-advanced retry needs to end
+        // with no hits at all — the only way this branch is reached.
+        let empty = Data(#"{"results":[]}"#.utf8)
+        let server = try await ScriptedTavilyServer(basicBody: empty, advancedBody: empty)
+        defer { server.stop() }
+
+        let outcome = try await WebSearchTool(client: server.client())
+            .run(argument: "a query with no answers")
+
+        #expect(outcome.text == "No results for \"a query with no answers\".")
+        #expect(outcome.summary == "no results for \"a query with no answers\"")
+    }
+}
