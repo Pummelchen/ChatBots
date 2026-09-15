@@ -167,7 +167,7 @@ else
     fail "swift-format: $diagnostics diagnostic(s) exceeds the recorded waiver of $allowed"
 fi
 
-printf '\n=== 6/6  web: the merge that turns per-token events into live text ===\n'
+printf '\n=== 6/6  web: the rules the page runs ===\n'
 # The page's streaming reply is drawn from `state.snapshot.live`, and the merge that fills it from the
 # engine's `delta` events is pure JavaScript in `web/deltas.js`. It used to live inline in `app.js` and
 # there was no way to run it, which is how the page came to listen for nothing but whole-turn
@@ -178,6 +178,17 @@ else
     printf '      last 20 lines of %s:\n' "$logs/web-deltas.log"
     tail -n 20 "$logs/web-deltas.log" | sed 's/^/      /'
     fail "web: deltas merge"
+fi
+
+# The audience's verdict rule, for the same reason and in the same shape (A160): a turn is drawn once and
+# its buttons are re-marked in place, so the click handler used to work from the verdict captured when the
+# row was built. `web/votes.js` holds the rule; this runs it in Node and checks the page's use of it.
+if node tools/check-web-votes.js > "$logs/web-votes.log" 2>&1; then
+    pass "web: the verdict rule ($(grep -c '  ok ' "$logs/web-votes.log") cases)"
+else
+    printf '      last 20 lines of %s:\n' "$logs/web-votes.log"
+    tail -n 20 "$logs/web-votes.log" | sed 's/^/      /'
+    fail "web: the verdict rule"
 fi
 
 printf '\n=== summary ===\n'

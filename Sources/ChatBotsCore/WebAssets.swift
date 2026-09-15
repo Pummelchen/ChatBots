@@ -210,6 +210,7 @@ public enum WebAssets {
 <div id="profile-badge" class="profile-badge" hidden></div>
 
 <script src="/deltas.js"></script>
+<script src="/votes.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>
@@ -1493,9 +1494,9 @@ body[data-view="phone"] {
     for (const el of document.querySelectorAll(".msg[data-id]")) {
       const cast = voteFor(el.dataset.id);
       for (const button of el.querySelectorAll(".vote")) {
-        const isStrong = button.getAttribute("aria-label") === "Moved it forward";
-        const on = cast && ((isStrong && cast === "strong") || (!isStrong && cast === "weak"));
-        if (on) button.dataset.on = "1";
+        // The verdict is read from the button rather than from its label, and the comparison is the
+        // same one the click handler makes (A160).
+        if (window.ChatBotsVotes.isOn(cast, button.dataset.verdict)) button.dataset.on = "1";
         else delete button.dataset.on;
       }
     }
@@ -1579,11 +1580,17 @@ body[data-view="phone"] {
       button.textContent = verdict === "strong" ? "▲" : "▼";
       button.title = title;
       button.setAttribute("aria-label", title);
-      if (cast === verdict) button.dataset.on = "1";
+      button.dataset.verdict = verdict;
+      if (window.ChatBotsVotes.isOn(cast, verdict)) button.dataset.on = "1";
       button.onclick = () => {
         // Clicking the verdict already cast withdraws it, so a mis-click does not have to be
         // reversed by casting its opposite — which would leave a wrong judgement in the record.
-        const next = cast === verdict ? null : verdict;
+        //
+        // The verdict on record is read *now*, not taken from the `cast` this row was built with: a
+        // turn is drawn once and its marks are redrawn in place, so a captured value is the one from
+        // the moment the row appeared — normally none — and clicking the cast verdict re-cast it
+        // instead of withdrawing it (A160).
+        const next = window.ChatBotsVotes.nextVerdict(voteFor(message.id), verdict);
         run(() => api.post("/api/vote", { id: message.id, verdict: next }));
       };
       row.append(button);

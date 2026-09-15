@@ -43,7 +43,12 @@ struct AuditHTTPLimitTests {
     /// is the assertion because a stalled peer never receives a reply to read.
     @Test("A connection that sends a partial request and stalls is dropped")
     func stalledConnectionIsReaped() async throws {
-        let (server, port) = try await startServer(maximumConnections: 8, requestTimeout: 1)
+        // Three seconds, not one. The idle deadline is what the test is about, but the first assertion has to
+        // *see* the registered connection, and this suite shares the main actor with everything else: in a
+        // busy instrumented gate the polling loop below can be kept off the actor for longer than a
+        // one-second deadline, miss the window entirely, and report a registration that did happen as one
+        // that did not. A longer deadline keeps the race out of the test without weakening either assertion.
+        let (server, port) = try await startServer(maximumConnections: 8, requestTimeout: 3)
         defer { server.stop() }
 
         let client = try RawConnection(port: port)
