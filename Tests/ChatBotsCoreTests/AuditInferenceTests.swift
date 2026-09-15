@@ -111,3 +111,57 @@ struct AuditInferenceTests {
         return nil
     }
 }
+
+/// The output ceiling (A197).
+///
+/// `drain` exited only on EOF or EAGAIN, and a child that keeps its pipe full produces neither: the
+/// loop kept returning data, `outputData` grew without bound, and the caller's deadline was
+/// unreachable for as long as that lasted, because the loop never returned to have it checked. A
+/// compressed document that expands past its container is what reaches it, through
+/// `POST /api/attachments`.
+///
+/// The child here writes at about 6 MB/s: fast enough to keep the old loop reading, slow enough that
+/// these tests cannot exhaust the machine they run on.
+@Suite("SystemProcess output ceiling (A197)")
+struct AuditS1ProcessOutputTests {
+    /// Writes 64 KB every 10 ms and never ends, so the pipe keeps refilling.
+    private let endlessWriter = "while :; do /usr/bin/head -c 65536 /dev/zero; /bin/sleep 0.01; done"
+
+    @Test("Output past the ceiling is refused at the ceiling, not accumulated")
+    func ceilingStopsTheChild() throws {
+        let started = Date.now
+        do {
+            _ = try SystemProcess.run(
+                "/bin/sh", ["-c", endlessWriter], timeout: 5, maximumOutputBytes: 1_000_000)
+            Issue.record("output past the ceiling must not be returned")
+        } catch let error as DocumentError {
+            guard case .unreadable(let message) = error else {
+                Issue.record("wrong error: \(error)")
+                return
+            }
+            #expect(message.contains("more than 1 MB"), "the reason names the ceiling: \(message)")
+        }
+        let elapsed = Date.now.timeIntervalSince(started)
+        #expect(elapsed < 4, "1 MB at 6 MB/s is about 0.2s; took \(elapsed)s")
+    }
+
+    @Test("A child that never stops writing is still ended by the deadline")
+    func deadlineFiresWhileOutputFlows() throws {
+        // A ceiling far above what the child can produce in a second, so the deadline is the only
+        // thing that can end this run.
+        let started = Date.now
+        do {
+            _ = try SystemProcess.run(
+                "/bin/sh", ["-c", endlessWriter], timeout: 1,
+                maximumOutputBytes: 64 * 1024 * 1024)
+            Issue.record("a child that never stops writing must hit the deadline")
+        } catch let error as DocumentError {
+            guard case .unreadable(let message) = error else {
+                Issue.record("wrong error: \(error)")
+                return
+            }
+            #expect(message.contains("longer than 1 seconds"), "the deadline fired: \(message)")
+        }
+        #expect(Date.now.timeIntervalSince(started) < 10)
+    }
+}
