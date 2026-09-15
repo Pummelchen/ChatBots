@@ -27,17 +27,21 @@ been run.
 <!-- BEGIN GENERATED: ledger status — rendered from ledger.json by AUDIT/render-ledger.sh -->
 | Metric | Count |
 | --- | --- |
-| Tasks enumerated | 132 |
+| Tasks enumerated | 135 |
 | DONE | 132 |
-| START | 0 |
+| START | 3 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 0
+### Open — 3
 
-Nothing is open.
+| id | sev | status | commit | unit | title |
+| --- | --- | --- | --- | --- | --- |
+| A133 | S1 | START | — | build / environment | Xcode 27 ships the Metal compiler as a separate downloadable component and nothing in the repository requires or checks it, so a clean Xcode 27 machine cannot build the package at all |
+| A134 | S2 | START | — | audit tooling / acceptance | The acceptance script's coverage step hardcodes the pre-Swift-6.4 test-bundle path, which no longer exists, so Phase E's coverage gate fails on the new toolchain |
+| A135 | S2 | START | — | packaging / dependencies | The repository states that mlx-swift's SwiftPM build does not compile the Metal kernels; under Xcode 27 it does, so the 190 MB separate metallib download is of unverified necessity and the stated reason for it is now false |
 
-### Every task — 132
+### Every task — 135
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -87,6 +91,9 @@ Nothing is open.
 | A130 | S3 | DONE | cf589e9 | CI / audit tooling | The CI dependency step scanned the whole tree with `-r .` — the same defect A124 fixed in phase-e.sh, in the second copy of the same check |
 | A131 | S2 | DONE | 8c4174f | CI / audit tooling | The CI install step verified its own installs before GITHUB_PATH applied, so the job died with exit 127 on its first real run |
 | A132 | S3 | DONE | 73eac3b | audit tooling / acceptance | The acceptance script refused to run on main, the branch the audit had just been landed on |
+| A133 | S1 | START | — | build / environment | Xcode 27 ships the Metal compiler as a separate downloadable component and nothing in the repository requires or checks it, so a clean Xcode 27 machine cannot build the package at all |
+| A134 | S2 | START | — | audit tooling / acceptance | The acceptance script's coverage step hardcodes the pre-Swift-6.4 test-bundle path, which no longer exists, so Phase E's coverage gate fails on the new toolchain |
+| A135 | S2 | START | — | packaging / dependencies | The repository states that mlx-swift's SwiftPM build does not compile the Metal kernels; under Xcode 27 it does, so the 190 MB separate metallib download is of unverified necessity and the stated reason for it is now false |
 | A14 | S1 | DONE | 0de3123 | HTTPServer | isRunning/lastError are raced between the listener callback and waitUntilReady |
 | A15 | S1 | DONE | 8ece1d3 | EngineService/DocumentImport | Attaching a document blocks the engine main actor for the whole conversion, subprocess wait included |
 | A16 | S3 | DONE | 9c53771 | ChatBotsCLI | --serve has no signal handling, so the listener is never shut down and nothing is flushed on exit |
@@ -1289,3 +1296,47 @@ before it (#12). The figures: 824 tests in 139 suites, both sanitizers clean, co
 77.08 % lines, gitleaks 0 over the full history, `osv-scanner` clean, `semgrep` 3 findings all waived
 in writing, `shellcheck`/`ruff`/`pyright` clean, `swiftlint` 255 and authored `swift-format` 744 at
 their recorded waivers, and 130 tasks with none open.
+
+---
+
+# Re-audit — Swift 6.4 / Xcode 27 / macOS 27 (2026-09-15)
+
+The toolchain was replaced between sessions. The previous 132 tasks were accepted on **Swift 6.3.3 /
+Xcode 26.6 / macOS 26.6.2**, and every host in the fleet is now **Swift 6.4 / Xcode 27.0 / macOS 27.0**
+with the macOS 26 SDK removed. An acceptance that describes a toolchain nobody has is not an
+acceptance, so the audit is re-run in full rather than spot-checked. Branch `audit/2026-09-15`, cut
+from `main` @ `02ddd4e`. **132 tasks were already DONE and are not reopened**; this re-audit appends
+from A133. The previous work is not invalidated — it is the reason the baseline below is clean.
+
+## Phase A — environment, inventory, baseline ✅
+
+Environment and fleet: [`environment.md`](environment.md) (re-audit section). Scope: [`inventory.md`](inventory.md).
+Evidence: [`baseline/swift64/`](baseline/swift64).
+
+| Metric | 2026-09-13 (Swift 6.3.3) | 2026-09-15 (Swift 6.4) |
+| --- | --- | --- |
+| Build (`swift build --build-tests`) | success, 0 warnings | **success, 0 warnings in this repo** |
+| Tests | 824 in 139 suites | **824 in 139 suites**, exit 0 |
+| Coverage `Sources/` | 77.08 % lines, 80.49 % functions | **77.08 % / 80.49 %** |
+| `swiftlint` | 255 | **255** |
+| `swift-format` (authored files) | 744 | **744** (identical under Xcode 27's `swift-format` and brew 603.0.0) |
+| `ruff check` / `ruff format --check` | clean | **clean** |
+| `pyright` | 0 errors | **0 errors** |
+| `shellcheck -S style` | 0 | **0** |
+| `osv-scanner` (lockfile) | no issues | **no issues** |
+| `gitleaks` (full history) | 0 findings | **0 findings** |
+
+**The code came through the toolchain move unchanged**, which is the useful half of this table: the
+four dependency/notice warnings and the four `swiftlint` points of drift that a toolchain bump usually
+brings did not appear, and the suite grew by nothing because nothing in it needed changing. The one
+thing that did change is the **environment**, and it changed decisively: see A133.
+
+## Phase B — findings
+
+Numbered as found; all are enumerated before any is fixed (§11).
+
+| | |
+| --- | --- |
+| **A133 (S1)** | **Xcode 27 does not ship the Metal compiler.** It is a separate 839 MB component (`xcodebuild -downloadComponent MetalToolchain`), and without it this package cannot build at all — `mlx-swift` compiles generated Metal kernels. Nothing in `README.md`, `tools/install.sh` or the previous `environment.md` required or checked it. Measured by *executing* metal: node1 works, node2–4 do not. |
+| **A134 (S2)** | The acceptance script's coverage step hardcodes the pre-6.4 test-bundle path (`ChatBotsPackageTests.xctest`), which is now `ChatBotsCoreTests.xctest`, so Phase E's coverage gate fails for a reason that is not about the code. |
+| **A135 (S2)** | `make-app.sh` states that mlx-swift's SwiftPM build does not compile the Metal kernels and fetches a 190 MB prebuilt `mlx.metallib` (SHA-256 pinned, A24) for that reason. Under Xcode 27 the SwiftPM build **does** compile them and produces its own `default.metallib`, so the stated reason is false and the necessity of the separate download is unverified — a 190 MB supply-chain surface that may be redundant, and potentially two Metal libraries in one bundle. |

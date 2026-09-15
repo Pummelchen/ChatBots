@@ -133,3 +133,104 @@ A99 by measurement rather than by reading — the shipped `Caddyfile` in front o
 an unknown conversation id so that the response body identifies which server answered. `caddy` is not
 required to build or run the project; the packaged app and the installer do not use it.
 
+
+---
+
+# Re-audit — Swift 6.4 / Xcode 27 / macOS 27 (2026-09-15)
+
+The machine this audit runs on was upgraded between sessions: the same Mac now has macOS 27, Xcode 27
+and Swift 6.4, and **the macOS 26 SDK is gone** (27.0 is the only SDK installed). The previous
+acceptance described a toolchain that no longer exists on any host in the fleet, which is why a full
+re-audit was required rather than a spot check.
+
+| | 2026-09-13 audit | 2026-09-15 re-audit |
+| --- | --- | --- |
+| macOS | 26.6.2 (25G83) | **27.0 (26A428)** |
+| Xcode | 26.6 (17F113) | **27.0 (27A266a)** |
+| Swift | 6.3.3 | **6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)** |
+| SDK | macOS 26.5 | **macOS 27.0 — the only one installed** |
+| Development host | `MacBook-AB.local`, 24 GB | **`node1`**, 8 GB |
+| Verification host | `node1` | **`node2`** — a Mac that did not develop the fixes |
+
+## The fleet, measured 2026-09-15
+
+| Host | Class | macOS | Xcode | Swift | Metal toolchain | Role |
+| --- | --- | --- | --- | --- | --- | --- |
+| `node1` (`Node1.local`) | Mac Mini M2, 8 GB | 27.0 | 27.0 | 6.4 | **installed by this audit** | development |
+| `node2` (`Node2.local`) | Mac Mini M2, 8 GB | 27.0 | 27.0 | 6.4 | **missing** | Phase E |
+| `node3` (`Node3.local`) | Mac Mini M2, 8 GB | 27.0 | 27.0 | 6.4 | **missing** | spare |
+| `node4` (`Node4.local`) | Mac Mini M2, 8 GB | 27.0 | 27.0 | 6.4 | **missing** | spare |
+
+Access is `ssh <node>@<node>.local` — the **machine name is the username**, not the local user. The
+first probe of this session used the default user and was refused on all four; recorded so the next
+session does not repeat it.
+
+§1b's memory rule is why development is one 8 GB Mac with a single heavy job at a time: no Docker
+alongside an Xcode build, and no second build in parallel.
+
+## The Metal toolchain — Xcode 27's new prerequisite (A133)
+
+**Xcode 27 does not ship the Metal compiler.** It is a downloadable component:
+
+```sh
+xcodebuild -downloadComponent MetalToolchain   # 839 MB, resolves as "Metal Toolchain 27A266a"
+xcodebuild -runFirstLaunch
+```
+
+Without it every build of this package fails, because `mlx-swift` compiles generated Metal kernels:
+
+```
+error: cannot execute tool 'metal' due to missing Metal Toolchain
+error: CompileMetalFile .../mlx-swift/.../steel_attention.metal failed with a nonzero exit code
+```
+
+Installed by this audit on `node1`. It resolves through a cryptex mount, so the working invocation is
+`xcrun`, not the Xcode toolchain path:
+
+```
+$ xcrun --find metal
+/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v27.1.266.1.<id>/Metal.xctoolchain/usr/bin/metal
+$ xcrun -sdk macosx metal --version
+Apple metal version 32023.921 (metalfe-32023.921.6)
+```
+
+**`metal` must be *executed* to know it works, not merely resolved.** `xcrun --find metal` returns a
+path on a host where the component is absent, so a check built on `--find` reports success on all four
+nodes while three of them cannot build. Measured by execution: node1 works; node2, node3 and node4 do
+not, and node2 has a stale `com_apple_MobileAsset_MetalToolchain` asset directory that is unusable.
+
+## Toolchain, re-measured
+
+| Tool | 2026-09-13 | 2026-09-15 | Method |
+| --- | --- | --- | --- |
+| Swift | 6.3.3 | **6.4** | Xcode 27.0 |
+| SDK | macOS 26.5 | **macOS 27.0** | Xcode 27.0 |
+| `swift-format` | 603.0.0 (brew) | **`xcrun swift-format`** — Xcode 27's, reports `main` — plus 603.0.0 (brew) | Xcode toolchain / brew |
+| `swiftlint` | 0.65.1 | 0.65.1 | brew |
+| `llvm-cov` | Homebrew LLVM 23.1.1 | **`xcrun llvm-cov`** (Xcode 27) | Xcode |
+| `gitleaks` / `osv-scanner` / `semgrep` / `ruff` / `pyright` / `shellcheck` | 8.30.1 / 2.5.1 / 1.176.0 / 0.16.7 / 1.1.414 / 0.11.0 | unchanged | brew |
+| Python | 3.14.7 | 3.14.7 | brew |
+| Metal toolchain | *(bundled)* | **component 27A266a, separate download (A133)** | `xcodebuild -downloadComponent` |
+
+Both `swift-format` builds report **the same 744 diagnostics** on the same tree, so the toolchain move
+did not change the formatter's verdict.
+
+## Reproducing this environment (2026-09-15)
+
+```sh
+# Xcode 27.0 (Swift 6.4) — App Store or developer.apple.com, then:
+sudo xcode-select -s /Applications/Xcode.app
+xcodebuild -downloadComponent MetalToolchain     # A133: required, or nothing builds
+xcodebuild -runFirstLaunch
+swift --version                                  # expect 6.4
+
+brew install swiftlint llvm gitleaks osv-scanner semgrep ruff pyright shellcheck jq
+# swift-format comes from Xcode 27 (xcrun swift-format); it is not installed from brew for this audit.
+```
+
+## What this re-audit installed
+
+| Host | Installed | Why | Removal |
+| --- | --- | --- | --- |
+| `node1` | Xcode 27 Metal Toolchain component (27A266a, 839 MB) | A133 — without it this package cannot build | Xcode ▸ Settings ▸ Components |
+| `node2` | *(pending — required before Phase E)* | Phase E must build on node2 | Xcode ▸ Settings ▸ Components |

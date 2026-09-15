@@ -2249,6 +2249,57 @@
       "commit": "73eac3b",
       "notes": "A small thing with a pointed lesson: the audit's own instruments encoded the *circumstances* of the audit — which branch it ran on — rather than its invariant, which is that the run describes a commit. `90e9f7b6` was accepted on the audit branch and `73eac3bd` is accepted on `main`; both are the same tree, and the identity file in each run names the commit rather than the branch label.",
       "blocked_reason": null
+    },
+    {
+      "id": "A133",
+      "severity": "S1",
+      "unit": "build / environment",
+      "file_line": "tools/install.sh:119-160 (prerequisite checks), README.md:107-111 (Requirements), AUDIT/environment.md",
+      "title": "Xcode 27 ships the Metal compiler as a separate downloadable component and nothing in the repository requires or checks it, so a clean Xcode 27 machine cannot build the package at all",
+      "category": "incomplete",
+      "status": "START",
+      "host_used": "node1",
+      "discovered_by": "Phase A baseline build under Swift 6.4",
+      "evidence_before": "`swift build --build-tests` on a clean `.build` under Xcode 27.0 / Swift 6.4 failed: `error: CompileMetalFile .../mlx-swift/.../steel/attn/kernels/steel_attention.metal failed with a nonzero exit code` + `error: Build failed` (exit 1). The real diagnostic is only visible by running the compiler by hand: `xcrun -sdk macosx metal --version` -> `error: cannot execute tool 'metal' due to missing Metal Toolchain; use: xcodebuild -downloadComponent MetalToolchain`. Xcode 27 no longer bundles the Metal compiler. `tools/install.sh` checks for Swift, `iconutil`/`sips`/`plutil`/`textutil` and the macOS version but never for Metal; `README.md` Requirements says only Apple silicon + macOS 26 + disk/memory. Measured by execution on all four Macs: node1 works (after this audit installed it), node2/node3/node4 fail. `xcrun --find metal` returns a path even where the component is absent, so a path-only check reports false success.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "",
+      "blocked_reason": null
+    },
+    {
+      "id": "A134",
+      "severity": "S2",
+      "unit": "audit tooling / acceptance",
+      "file_line": "AUDIT/phase-e.sh:168-171 (the coverage step)",
+      "title": "The acceptance script's coverage step hardcodes the pre-Swift-6.4 test-bundle path, which no longer exists, so Phase E's coverage gate fails on the new toolchain",
+      "category": "test",
+      "status": "START",
+      "host_used": "node1",
+      "discovered_by": "Phase A baseline, while locating the coverage profile under the new build layout",
+      "evidence_before": "phase-e.sh builds `binary=\"$bin/ChatBotsPackageTests.xctest/Contents/MacOS/ChatBotsPackageTests\"`. Under Xcode 27 / Swift 6.4 the test bundle is `ChatBotsCoreTests.xctest` with executable `Contents/MacOS/ChatBotsCoreTests`; verified: `[ -f \"$bin/ChatBotsPackageTests.xctest/Contents/MacOS/ChatBotsPackageTests\" ]` -> missing, while `ChatBotsCoreTests.xctest/Contents/MacOS/ChatBotsCoreTests` exists and is executable. The profile path itself (`$bin/codecov/default.profdata`) is unchanged. The step therefore fails with `coverage: no profile or no test binary` and would block Phase E for a reason that is not about the code.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "",
+      "blocked_reason": null
+    },
+    {
+      "id": "A135",
+      "severity": "S2",
+      "unit": "packaging / dependencies",
+      "file_line": "tools/make-app.sh:89-90 and 141, tools/fetch-metal.sh (the whole strategy), Package.resolved (mlx-swift 0.31.6)",
+      "title": "The repository states that mlx-swift's SwiftPM build does not compile the Metal kernels; under Xcode 27 it does, so the 190 MB separate metallib download is of unverified necessity and the stated reason for it is now false",
+      "category": "deps",
+      "status": "START",
+      "host_used": "node1",
+      "discovered_by": "Phase A baseline, from the CompileMetalFile step that failed for want of the toolchain",
+      "evidence_before": "tools/make-app.sh:89-90 says: \"MLX's default.metallib is fetched separately, because mlx-swift's SwiftPM build does not compile the Metal kernels (see tools/fetch-metal.sh)\". Under Xcode 27 the SwiftPM build DOES compile them: the failed build stopped at `CompileMetalFile .../steel_attention.metal`, and a successful build now produces 27 artefacts under `.build/out/Intermediates.noindex/mlx-swift.build/Debug/mlx-swift_Cmlx-b.build/Metal/` (`.air`, `.dat`, `.dia`) plus `.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib`. `make-app.sh` both copies that SwiftPM resource bundle into the app and installs the separately fetched `mlx.metallib` into `Contents/MacOS/`, so the shipped app may carry two Metal libraries whose relationship is unstated. The fetch step (A24) pins a SHA-256 and downloads ~190 MB, so it is also a supply-chain surface that would be unnecessary if the built one is sufficient.",
+      "fix_summary": null,
+      "evidence_after": null,
+      "commit": null,
+      "notes": "",
+      "blocked_reason": null
     }
   ]
 }

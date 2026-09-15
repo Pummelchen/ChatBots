@@ -1,0 +1,5 @@
+Starting filesystem walk for root: /
+Scanned /Users/node1/Downloads/ChatBots/Package.resolved file and found 14 packages
+End status: 0 dirs visited, 1 inodes visited, 1 Extract calls, 3.008292ms elapsed, 3.008ms wall time
+
+No issues found
