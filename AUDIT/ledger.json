@@ -2747,7 +2747,7 @@
       "id": "A162",
       "severity": "S3",
       "unit": "docs / reproducibility",
-      "file_line": "AUDIT/environment.md:211,218-222,233-238; tools/audit-checks.sh:42-43; AUDIT/phase-e.sh:332 (the gate lines it must match)",
+      "file_line": "AUDIT/environment.md:211,218-222,233-238 (the record the gates contradict; see evidence for their lines)",
       "title": "environment.md records swift-format as Xcode-provided via xcrun while both gates invoke a bare `swift-format` from PATH",
       "category": "docs",
       "status": "DONE",
