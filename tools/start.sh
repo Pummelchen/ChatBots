@@ -27,9 +27,12 @@
 #   --foreground     stay attached and show logs  (default: same)
 #   --stop           stop whatever is running
 #   --status         report what is running
-#   --open <where>   desktop | mobile | none   (default: none — print the URL)
+#   --open <where>   open the page in the default browser; `none` only prints the URL
 #   --view <mode>    auto | phone | desktop    (default: auto)
 #   --local-only     bind 127.0.0.1 only, not every interface
+#
+# The value of `--open` is not a layout: every value but `none` opens the same URL, and the layout
+# comes from `--view`, or from the browser's own width in `auto`.
 #
 # `--view phone` forces the single-column phone layout even in a desktop browser, which is
 # what `start-web-mobile.sh` uses. The page honours `?view=` on load and remembers nothing, so
@@ -102,6 +105,11 @@ while [ $# -gt 0 ]; do
       ENGINE_PORT="$2"; shift 2 ;;
     --foreground) ACTION=run; shift ;;
     --open)
+      # Every value but `none` opens the same URL — the code has no desktop/mobile distinction here,
+      # and the help says so now instead of advertising one. Both wrappers pass `--open desktop`,
+      # including `start-web-mobile.sh`, which reaches the phone layout through `--view phone`; the
+      # old help line read `desktop | mobile | none` and described something that never existed
+      # (A194).
       require_value "$1" "${2:-}"
       OPEN_WHERE="${2:-none}"; shift 2 ;;
     --view)
@@ -110,7 +118,13 @@ while [ $# -gt 0 ]; do
     --local-only) LOCAL_ONLY=1; shift ;;
     --stop) ACTION=stop; shift ;;
     --status) ACTION=status; shift ;;
-    -h|--help) sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help)
+      # The header *is* the help: every leading comment line after the shebang is printed, with the
+      # `#` and one space removed, stopping at the first line that is not a comment. It used to be
+      # `sed -n '2,33p'`, a range that had to be updated by hand and was not — lines 34-36, the
+      # `--view phone` explanation, were missing from the help while being in the file (A194).
+      awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
+      exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
 done
