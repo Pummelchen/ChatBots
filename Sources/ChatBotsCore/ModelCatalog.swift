@@ -60,11 +60,12 @@ public struct ModelChoice: Sendable, Hashable, Identifiable {
 /// The checkpoints this app offers, and how a short name becomes a repository id.
 public enum ModelCatalog {
 
-    /// Everything that has been run through this app's own engine.
+    /// Everything that has been loaded through this app's own engine.
     ///
-    /// Adding an entry is a claim that it loads and generates, so it is added after that has been
-    /// measured rather than because a repository exists — see `AUDIT/baseline/swift64/` for the runs
-    /// behind the two abliterated checkpoints.
+    /// Adding an entry is a claim that it has been measured, not that a repository exists: each of
+    /// these has been loaded here, and driven through a real turn where the machine could hold it.
+    /// `AUDIT/baseline/swift64/model-choice-checkpoints.log` records which, and what the 9B costs on
+    /// an 8 GB Mac.
     public static let choices: [ModelChoice] = [
         ModelChoice(
             id: AgentSpec.defaultModelID,

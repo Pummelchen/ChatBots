@@ -35,7 +35,8 @@ choice is saved with your settings and stays for that conversation.
 from the seat's **Model** menu in the app, from the checkpoint list in the website, or with
 `--model-a`/`--model-b` on the command line. `chatbots-cli --list-models` prints what the app offers —
 the shipped Qwen3.5 4B and two abliterated Huihui variants (4B and 9B) — and any Hugging Face
-repository id works in place of a name. A checkpoint that is not on disk yet is downloaded the first
+repository id works in place of a name. The 9B needs the memory for it: about 6 GB on its own, so
+it wants a 16 GB Mac. A checkpoint that is not on disk yet is downloaded the first
 time it is used, so the list shows the size of each, and the choice is saved per seat.
 
 **Two front ends, one engine.** A macOS app with the models side by side, and a web interface

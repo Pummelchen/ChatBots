@@ -20,7 +20,18 @@ check failed: the model produced no output
 
 $ chatbots-cli --check --model-a huihui9b
   model loaded — context window 262144 tokens
-  (generation under way at the time of writing; this host has 8 GB and the checkpoint is 6 GB)
+  (no answer within the time this host was given; 8 GB against a 6 GB checkpoint)
+
+$ chatbots-cli --check --model-a huihui4b          # the control, minutes later
+  generated 5 characters in 12.6s
+Check passed — the app is ready to run
+
+# So the two behave differently on this machine, and the difference is memory, not the loader: the 4B
+# passes the check and answers a real topic; the 9B loads, and then swaps hard enough that a turn does
+# not finish in the minutes this host was given. After killing a 9B run mid-flight, the next start spent
+# nine minutes in the hub client before loading anything (RSS stayed at ~10 MB), which is the download
+# cache being re-verified rather than the model being loaded; the blobs themselves were complete
+# (5 005 041 864 + 1 034 616 787 bytes, matching the repository). A 9B wants a 16 GB Mac.
 
 # The `--check` prompt is "You are terse." / "Reply with the single word: ready" — the 4B answers the
 # default checkpoint's version of it with "ready" in 13.6 s, and this one with nothing, because it
