@@ -49,12 +49,13 @@ error is conservative.
 | `swift-format lint` | **not reproducible as recorded** (was 29 900); **3 003** after A06's config | 29 904 was the line count of the captured file (A28). Now counted from `warning:`/`error:` lines | `baseline/swift-format-lint.txt` |
 | `ruff check` / `ruff format --check` | **11 errors / 5 files would be reformatted** | `ruff check`'s own summary line; `ruff format --check`'s file list | `baseline/ruff-*.txt` — reproduces exactly |
 | `pyright` | **2 errors** | `pyright`'s own `N errors, M warnings` line | `baseline/pyright.json` — reproduces exactly |
-| `shellcheck -S style` | **4 findings**: 2 × SC2001 (`make-app.sh`), SC2034 (`start-app.sh`), SC2015 (`start.sh`) | `grep -cE 'SC[0-9]{4} \((style\|info\|warning\|error\)):'` — one per finding. This number was wrong **twice**: 24 was the captured file's **line count**, and 7 was `grep -oE 'SC[0-9]{4}'`, which also matches the three `shellcheck.net/wiki/SCnnnn` help URLs printed under the findings | `baseline/shellcheck.txt` is 24 lines containing 4 findings |
+| `shellcheck -S style` | **4 findings** at the baseline: 2 × SC2001 (`make-app.sh`), SC2034 (`start-app.sh`), SC2015 (`start.sh`) — **0 now**, over every tracked script | `grep -cE 'SC[0-9]{4} \((style\|info\|warning\|error\)):'` — one per finding. This number was wrong **twice**: 24 was the captured file's **line count**, and 7 was `grep -oE 'SC[0-9]{4}'`, which also matches the three `shellcheck.net/wiki/SCnnnn` help URLs printed under the findings | `baseline/shellcheck.txt` is 24 lines containing 4 findings; A10 fixed the four, A192 widened the glob from `tools/*.sh` to `git ls-files '*.sh'` (18 scripts) |
 | Force unwraps in `Sources/` | **12 `!` sites** (a review recorded "two … not a task") | `grep -nE '[A-Za-z0-9_)\]]!\s*($\|[^=])' Sources/`; 10 force unwraps + 3 implicitly-unwrapped declarations, minus overlap. None can currently trap; fixed by A28 | see A28 in `ledger.md` |
 | `try?` sites in `Sources/` | **72 across 23 files** | `grep -rno 'try?' Sources` — reproduces exactly | `baseline/` |
 | Secret scan, **full history** (`gitleaks --log-opts=--all`) | **0 findings** | `gitleaks` JSON report, read as a count only; values never echoed | `baseline/gitleaks.json` |
 | Dependency CVE (`osv-scanner`) | **no issues found** | the tool's own summary | `baseline/osv-scanner.txt` |
 | SAST (`semgrep --config auto`) | **3 findings**, all in `tools/cdp.py` | `jq '.results \| length'` | `baseline/semgrep.json` — reproduces exactly |
+| SAST, what `auto` resolved | a **1074-rule policy**, of which **461 ran** for this tree's languages, over 101 targets | semgrep's own scan summary, which the gate no longer suppresses with `--quiet` | `baseline/swift64/a192-semgrep-rules.log` — A192: the rule set is fetched from the registry at scan time, so no pin covers it; the gate now records what it resolved |
 | §5 placeholder sweep | **0 markers** (TODO/FIXME/HACK/XXX/WIP/STUB) | `git grep -cE` over tracked source; re-run in Phase C, still 0 | `inventory.md` §2.3 note |
 | Forbidden constructs (§0) | **0** — no `try!`, no `as!`, no `-Wno-` in `Sources/` or `Tests/` | `git grep -nE 'try!\|as!\|-Wno-'` | re-run in Phase C |
 | AddressSanitizer, full suite | **clean** — exit 0, no sanitizer report | `swift test --sanitize=address` | `baseline/swift-test-asan.log` |
@@ -111,8 +112,26 @@ is pinned to `http` and built only from validated values, and the reply is read 
 findings stay visible — there is no `nosemgrep` — and each site carries a comment saying what the
 rule cannot know.
 
-`shellcheck -S style` (4 findings, A10), `ruff check`, `ruff format --check` and `pyright` are
-**not** waived: those are clean targets or owned by a named task.
+`shellcheck -S style` (4 findings at the baseline, all fixed by A10), `ruff check`,
+`ruff format --check` and `pyright` are **not** waived: those are clean targets or owned by a named
+task. A192 widened the shell lint from `tools/*.sh` to every tracked `*.sh`, which brings the
+audit's own scripts and the probe scripts under `AUDIT/` into the gate; the run is 0 findings over
+18 scripts (`baseline/swift64/a192-shellcheck-scope.log`). The Python gates (parse, `ruff`,
+`pyright`) stay scoped to `tools/*.py`, which is all the Python this repository ships: the two probe
+scripts under `AUDIT/baseline/` are research artifacts, they are **not** clean under those gates,
+and that is stated here rather than left to be inferred from the glob.
+
+**One gate input is not pinned, and is not claimed to be.** `semgrep --config auto` fetches its
+rule set from the Semgrep registry when it runs, so the version pin on the *binary* (1.176.0) says
+nothing about the rules: on 2026-09-15 the registry served a 1074-rule policy
+(`sha256 d246b001…`, 2 423 491 bytes) of which semgrep ran 461 for this tree's languages. A192
+therefore removed `--quiet` from both semgrep invocations — the scan's own summary (rules run,
+targets scanned, and the one skipped target, the 1.5 MB app PNG) is now in the job log and in
+`phase-e.sh`'s line — and recorded the figures here. Pinning the policy was considered and
+rejected: the registry serves no versioned reference to `auto`, and vendoring the resolved file
+would freeze the rule set *and* require a gitleaks exclusion, because that file embeds the
+registry's own example credentials (two findings, values never echoed,
+`baseline/swift64/a192-semgrep-rules.log`).
 
 ## Phase B — audit passes (in progress)
 

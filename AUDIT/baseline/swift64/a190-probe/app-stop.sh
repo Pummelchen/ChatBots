@@ -31,8 +31,10 @@ old_matches() { pgrep -f "$PATTERN" 2>/dev/null | grep -qx "$1" && echo yes || e
 new_matches() { pgrep -x ChatBots 2>/dev/null | grep -qx "$1" && echo yes || echo no; }
 
 started=()
-cleanup() { for pid in "${started[@]:-}"; do kill -TERM "$pid" 2>/dev/null; done; }
-trap cleanup EXIT
+# The trap body is written inline: ShellCheck's SC2329 calls a function whose only use is a trap handler
+# never invoked once the script ends in `exit`, and the audit does not silence a check to keep a helper.
+# The body is the one that function had (A192).
+trap 'for pid in "${started[@]:-}"; do kill -TERM "$pid" 2>/dev/null; done' EXIT
 
 echo "decoys — processes that mention the bundle without being it"
 labels=(

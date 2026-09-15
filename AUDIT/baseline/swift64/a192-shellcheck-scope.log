@@ -1,0 +1,69 @@
+# A192 — the shell lint's scope, before and after
+
+## the glob the two gates used
+.github/workflows/checks.yml:9:#   * `static-analysis` — the checks that genuinely run on Linux: `shellcheck -S style` over
+.github/workflows/checks.yml:182:        run: shellcheck -S style tools/*.sh
+AUDIT/phase-e.sh:264:    shellcheck -S style tools/*.sh > "$out/shellcheck.txt" 2>&1
+AUDIT/phase-e.sh:272:        pass "shellcheck -S style: 0 findings"
+AUDIT/phase-e.sh:276:        pass "shellcheck -S style: $notes finding(s) — see $out/shellcheck.txt (A10's scope)"
+
+## every tracked shell script, and whether the old glob reaches it
+tracked:  18
+tools/*.sh: 12
+AUDIT/*.sh: 3
+outside both globs:
+  AUDIT/baseline/swift64/a188-probe/port-injection.sh
+  AUDIT/baseline/swift64/a189-probe/pid-ownership.sh
+  AUDIT/baseline/swift64/a190-probe/app-stop.sh
+
+## shellcheck -S style over the old scope (tools/*.sh): clean since A10
+exit=0
+
+## over AUDIT/*.sh
+exit=0
+
+## over the scripts the old glob never reached (the probe scripts)
+
+In AUDIT/baseline/swift64/a188-probe/port-injection.sh line 50:
+for value in '7789|e'; do
+             ^------^ SC2041 (warning): This is a literal string. To run as a command, use $(..) instead of '..' . 
+
+
+In AUDIT/baseline/swift64/a189-probe/pid-ownership.sh line 40:
+start() { "$@" >/dev/null 2>&1 & started+=("$!"); printf '%s' "$!"; }
+^-- SC2329 (info): This function is never invoked. Check usage (or ignored if invoked indirectly).
+
+
+In AUDIT/baseline/swift64/a189-probe/pid-ownership.sh line 41:
+cleanup() {
+^-- SC2329 (info): This function is never invoked. Check usage (or ignored if invoked indirectly).
+
+
+In AUDIT/baseline/swift64/a190-probe/app-stop.sh line 34:
+cleanup() { for pid in "${started[@]:-}"; do kill -TERM "$pid" 2>/dev/null; done; }
+^-- SC2329 (info): This function is never invoked. Check usage (or ignored if invoked indirectly).
+
+For more information:
+  https://www.shellcheck.net/wiki/SC2041 -- This is a literal string. To run ...
+  https://www.shellcheck.net/wiki/SC2329 -- This function is never invoked. C...
+exit=1
+
+## the probe fixes, and that they do not change what the probes do
+
+a189 cleanup body, as it was: for pid in "${started[@]:-}";  do kill -TERM "$pid" 2>/dev/null;  done; [ -n "${RUN_DIR:-}" ] && rm -rf "$RUN_DIR"
+a189 trap body, as it is    : for pid in "${started[@]:-}"; do kill -TERM "$pid" 2>/dev/null; done; [ -n "${RUN_DIR:-}" ] && rm -rf "$RUN_DIR"
+the same two commands in the same order; the only difference is the space after the ';' that
+separates them now that they share one trap string
+
+a189 start() before the fix — its only appearance is the definition:
+  25:# The real check, lifted out of the script by name so the probe never has to start one to test this.
+  26:is_our_process="$(sed -n '/^is_our_process()/,/^}/p' tools/start.sh)"
+  40:start() { "$@" >/dev/null 2>&1 & started+=("$!"); printf '%s' "$!"; }
+
+## after: shellcheck -S style over every tracked script
+exit=0
+
+## the two probes re-run after the edit
+a188: all A188 probe checks passed
+a190: all A190 probe checks passed
+a189 starts a real engine and a Caddy, so it is not re-run here; the body above is the one it ran.

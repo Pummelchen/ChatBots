@@ -47,7 +47,11 @@ for value in '7990|e' '.*' 'x' '99999' '0' '-1' '7788 '; do
     check "the validation refuses --port '$value'" no "it accepted it"
   fi
 done
-for value in '7789|e'; do
+# The engine option gets one value of the same shape as the port list above — a metacharacter inside a
+# plausible value. It is held in an array because a `for` list holding a single literal reads as a
+# mistake to ShellCheck (SC2041), and A192 put this probe under the shell lint.
+engine_values=('7789|e')
+for value in "${engine_values[@]}"; do
   if refuses --engine "$value"; then
     check "the validation refuses --engine '$value'" yes
   else

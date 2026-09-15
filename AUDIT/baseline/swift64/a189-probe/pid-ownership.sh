@@ -37,12 +37,13 @@ old_is_our() {
 }
 
 started=()
-start() { "$@" >/dev/null 2>&1 & started+=("$!"); printf '%s' "$!"; }
-cleanup() {
-  for pid in "${started[@]:-}"; do kill -TERM "$pid" 2>/dev/null; done
-  [ -n "${RUN_DIR:-}" ] && rm -rf "$RUN_DIR"
-}
-trap cleanup EXIT
+# The cleanup is the trap body itself, not a function the trap names. ShellCheck's SC2329 reports a
+# function whose only use is a trap handler as never invoked once the script ends in `exit` (measured on
+# this version: a script whose function is trapped and that ends without `exit` is clean), and the audit
+# does not silence a check to keep a helper. The body is the one that function had, with its two
+# commands on one line, and `start()` went with it: nothing ever called it, because the decoy loop below
+# starts its processes directly. Both changes are A192 putting this probe under the shell lint.
+trap 'for pid in "${started[@]:-}"; do kill -TERM "$pid" 2>/dev/null; done; [ -n "${RUN_DIR:-}" ] && rm -rf "$RUN_DIR"' EXIT
 
 echo "decoys — processes whose *arguments* mention the words"
 decoy_specs=(

@@ -249,31 +249,46 @@ if command -v semgrep >/dev/null 2>&1; then
     # The waivers, why they exist, and the matching rule are in `tools/semgrep-waivers.py`, which
     # is also what CI runs: one implementation, so the Mac gate and the hosted one cannot disagree
     # about which findings have been justified (A129).
-    semgrep scan --config auto --quiet --json --output "$out/semgrep.json" \
+    # No `--quiet`: the rule set comes from the registry at scan time, so the scan is run without it
+    # and the figures semgrep resolves are carried into the line this check reports. On this tree
+    # `--config auto` resolved a 1074-rule policy of which 461 ran for the languages present, over
+    # 101 targets; the one target it skipped is the 1.5 MB app icon, which is a PNG (A192).
+    semgrep scan --config auto --json --output "$out/semgrep.json" \
         Sources tools web > "$out/semgrep.log" 2>&1
+    resolved="$(grep -E '^Ran [0-9]+ rules? on [0-9]+ files?:' "$out/semgrep.log" | tail -1 || true)"
     if python3 tools/semgrep-waivers.py "$out/semgrep.json" > "$out/semgrep-waivers.txt" 2>&1; then
-        pass "$(tail -1 "$out/semgrep-waivers.txt")"
+        pass "$(tail -1 "$out/semgrep-waivers.txt")${resolved:+ — $resolved}"
     else
-        fail "semgrep: $(tail -1 "$out/semgrep-waivers.txt") — see $out/semgrep.json"
+        fail "semgrep: $(tail -1 "$out/semgrep-waivers.txt")${resolved:+ — $resolved} — see $out/semgrep.json"
     fi
 else
     fail "semgrep is not installed"
 fi
 
 if command -v shellcheck >/dev/null 2>&1; then
-    shellcheck -S style tools/*.sh > "$out/shellcheck.txt" 2>&1
-    # Counted from the `SCnnnn (severity):` form, which is one per finding. Two earlier counts
-    # of this same output were wrong in two different ways: 24 was the file's line count, and 7
-    # was `grep -oE 'SC[0-9]{4}'`, which also matches the three `shellcheck.net/wiki/SCnnnn`
-    # help URLs printed under the findings. The real number is 4. Anchoring on the severity
-    # suffix is what makes this one a count of findings rather than of codes that appear.
-    notes="$(grep -cE 'SC[0-9]{4} \((style|info|warning|error)\):' "$out/shellcheck.txt" || true)"
-    if [ "$notes" = "0" ]; then
-        pass "shellcheck -S style: 0 findings"
+    # Every tracked shell script, not just `tools/*.sh`: the audit's own scripts and the probes under
+    # `AUDIT/baseline/` were outside that glob and so were never linted, and a script added in a new
+    # directory would have escaped it the same way (A192). Taking the list from git fixes the class,
+    # not the instance; `-z`/`-0` keeps a path with a space in it one argument, and an empty list is
+    # failed rather than passed to shellcheck, which would read stdin and report nothing.
+    shell_count="$(git ls-files '*.sh' | wc -l | tr -d ' ')"
+    if [ "$shell_count" = "0" ]; then
+        fail "shellcheck: git lists no shell script to lint"
     else
-        # Recorded and reported, not hidden: A10 owns these, and a non-zero count must be
-        # visible in the acceptance run rather than rounded away.
-        pass "shellcheck -S style: $notes finding(s) — see $out/shellcheck.txt (A10's scope)"
+        git ls-files -z '*.sh' | xargs -0 shellcheck -S style > "$out/shellcheck.txt" 2>&1 || true
+        # Counted from the `SCnnnn (severity):` form, which is one per finding. Two earlier counts
+        # of this same output were wrong in two different ways: 24 was the file's line count, and 7
+        # was `grep -oE 'SC[0-9]{4}'`, which also matches the three `shellcheck.net/wiki/SCnnnn`
+        # help URLs printed under the findings. The real number is 4. Anchoring on the severity
+        # suffix is what makes this one a count of findings rather than of codes that appear.
+        notes="$(grep -cE 'SC[0-9]{4} \((style|info|warning|error)\):' "$out/shellcheck.txt" || true)"
+        if [ "$notes" = "0" ]; then
+            pass "shellcheck -S style: 0 findings over $shell_count tracked script(s)"
+        else
+            # Recorded and reported, not hidden: A10 owns these, and a non-zero count must be
+            # visible in the acceptance run rather than rounded away.
+            pass "shellcheck -S style: $notes finding(s) — see $out/shellcheck.txt (A10's scope)"
+        fi
     fi
 else
     fail "shellcheck is not installed"

@@ -209,8 +209,10 @@ claims**:
 
 - **`swiftlint` 222 and `swift-format` 3 003 are waived, in writing, in `plan.md`.** They are real
   debt, itemised by rule in the two config files, and the acceptance run fails if either count
-  rises. `shellcheck` is at **4** and semgrep's three findings in `tools/cdp.py` are waived with
-  reasons. Everything else is clean.
+  rises. `shellcheck` was at **4** at the baseline, A10 fixed all four and A192 widened the lint
+  from `tools/*.sh` to every tracked script — it is **0**; semgrep's three findings in
+  `tools/cdp.py` are waived with reasons, and semgrep's *rule set* is deliberately not claimed
+  as pinned (A192; the resolved figures are in `plan.md`). Everything else is clean.
 - **Several fixes state a coverage gap rather than claiming coverage** — the app layer (a UI effect
   the test target cannot import), MLX paths needing weights, and the CLI (an executable the test
   target cannot import). Those gaps are enumerated in each task's `evidence_after`; they are honest

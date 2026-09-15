@@ -6,11 +6,21 @@
 #     `names/`. This is the class of problem that has already bitten this repository once: for
 #     four commits Caddy served a page older than the engine's, and nothing failed until a
 #     person read both. macOS enforces the same invariant in `EmbeddedWebAssetTests`.
-#   * `static-analysis` — the checks that genuinely run on Linux: `shellcheck -S style` over
-#     `tools/*.sh`, `ruff check` and `ruff format --check` over the Python, `pyright`,
-#     `gitleaks` over the full history, `semgrep` and `osv-scanner`. None of these is
-#     advisory: a finding fails the job, and the tools are installed at the exact versions
+#   * `static-analysis` — the checks that genuinely run on Linux: `shellcheck -S style` over every
+#     tracked `*.sh` — `tools/`, `AUDIT/` and the probe scripts under `AUDIT/baseline/`, which the
+#     old `tools/*.sh` glob left unlinted (A192) — `ruff check` and `ruff format --check` over the
+#     Python, `pyright`, `gitleaks` over the full history, `semgrep` and `osv-scanner`. None of
+#     these is advisory: a finding fails the job, and the tools are installed at the exact versions
 #     recorded in `AUDIT/environment.md`.
+#
+#     One input is *not* pinned, and the job says so rather than letting the pin imply otherwise:
+#     semgrep's rule set is fetched from the Semgrep registry at scan time, so `--config auto`
+#     resolves a policy that no version pin covers. That is why the step runs without `--quiet`:
+#     the scan's own summary — rules run, targets scanned, findings — is then in the job log, and
+#     the figures it resolved are recorded in `AUDIT/plan.md`. Pinning the policy was considered
+#     and rejected in A192: the registry serves no versioned reference to the `auto` policy, and
+#     vendoring the resolved rule set would both freeze it and require the secret scan to skip the
+#     vendored file, which holds the registry's own example credentials.
 #
 #     The three that arrive as release binaries — shellcheck, gitleaks and osv-scanner — are
 #     each checked against a pinned SHA-256 before they are unpacked, which is `A187`:
@@ -71,8 +81,19 @@ jobs:
       # with it. Adding a dependency is a one-line manifest edit that nothing else notices (A77).
       - name: The third-party notices cover the resolved dependencies
         run: python3 tools/third-party-notices.py
+      # Every tracked shell script, from git, for the same reason the lint step below does: the old
+      # `tools/*.sh AUDIT/*.sh` glob left the probe scripts unlinted — and unchecked — and a script
+      # added in a new directory would have escaped it the same way (A192). `bash -n` takes one file,
+      # so this is a loop; the process substitution keeps it in this shell, where a failure fails the
+      # step instead of being hidden by a subshell's exit status.
       - name: The shell scripts parse
-        run: for script in tools/*.sh AUDIT/*.sh; do bash -n "$script"; done
+        run: |
+          set -eu
+          while IFS= read -r script; do bash -n "$script"; done < <(git ls-files '*.sh')
+      # `tools/` is the Python this repository ships. The two probe scripts under `AUDIT/baseline/`
+      # are research artifacts: they are outside the Python gates (parse, ruff, pyright) on purpose,
+      # and `plan.md` says so rather than leaving it to be inferred (A192 covered every tracked shell
+      # script, where the run is 0 findings; the Python probes are not, so their scope is unchanged).
       - name: The helper scripts parse
         run: for script in tools/*.py; do python3 -m py_compile "$script"; done
       # The bundle said 14.0 while the package needs macOS 26, so the app would launch on
@@ -178,8 +199,20 @@ jobs:
           semgrep --version
           pyright --version
 
+      # Every tracked shell script, taken from git so that a script added in a new directory cannot
+      # escape the gate; `tools/*.sh` alone left `AUDIT/` and the probe scripts unlinted (A192).
+      # `-z`/`-0` keeps a path with a space in it one argument, and the count check means an empty
+      # list fails the step instead of handing shellcheck nothing to read (which exits 0).
       - name: The shell scripts are clean
-        run: shellcheck -S style tools/*.sh
+        run: |
+          set -eu
+          count="$(git ls-files '*.sh' | wc -l | tr -d ' ')"
+          if [ "$count" -eq 0 ]; then
+            echo "git lists no shell script to lint"
+            exit 1
+          fi
+          echo "linting $count tracked shell script(s)"
+          git ls-files -z '*.sh' | xargs -0 shellcheck -S style
       - name: The Python passes ruff
         run: ruff check tools/
       - name: The Python is formatted as ruff format would write it
@@ -198,10 +231,14 @@ jobs:
       # exactly the findings the audit had justified — and the workflow does not run on the audit
       # branch, so this step had never executed (A129). The allowlist is one implementation shared
       # with `AUDIT/phase-e.sh`, so the two gates cannot disagree about what is justified.
+      # Without `--quiet`, so the job log carries the summary the gate resolves: how many rules ran,
+      # how many targets were scanned, and what was skipped. The rule set comes from the registry at
+      # scan time and is not covered by the version pin — the header says so and `AUDIT/plan.md`
+      # records the figures (A192).
       - name: The source passes semgrep, except the findings waived in writing
         run: |
           set -eu
-          semgrep scan --config auto --quiet --json --output semgrep.json Sources tools web
+          semgrep scan --config auto --json --output semgrep.json Sources tools web
           python3 tools/semgrep-waivers.py semgrep.json
       # Scoped to the lockfile, the object this check is about. `-r .` scans the whole tree, which is
       # how the same step in `phase-e.sh` came to report 16 vulnerabilities from dependencies' own

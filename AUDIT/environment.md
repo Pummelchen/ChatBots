@@ -46,7 +46,7 @@ Language coverage against §1's minimum list:
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Swift | `swift-format` | `swiftlint` | `swiftlint` + `swift build` warnings-as-errors | compiler (Swift 6 mode) | `semgrep` | `osv-scanner` | `gitleaks` | `llvm-cov` |
 | Python (`tools/`, 5 files) | `ruff format` | `ruff check` | `ruff` | `pyright` | `semgrep` | `osv-scanner` | `gitleaks` | n/a — tooling scripts, not production code |
-| Shell (`tools/`, 7 files) | — | `shellcheck` | — | — | `semgrep` | n/a | `gitleaks` | n/a |
+| Shell (`tools/`, 7 files at the baseline) | — | `shellcheck` over every tracked `*.sh` (18: `tools/`, `AUDIT/`, probes — A192) | — | — | `semgrep` | n/a | `gitleaks` | n/a |
 | JavaScript (`web/`) | — | see A-findings | — | — | `semgrep` | `osv-scanner` | `gitleaks` | n/a |
 | C | none in this repository | — | — | — | — | — | — | — |
 
@@ -245,7 +245,9 @@ unpacking (A187), and a step in `.github/workflows/checks.yml` fails if the vers
 and the versions in the table above disagree — the record is what the audit ran, so a version bumped
 in only one of the two would make it untrue. The digests themselves are in
 `AUDIT/baseline/swift64/a187-audit-tools.log`, alongside the figures GitHub publishes for the same
-assets.
+assets. What that pin does **not** cover is semgrep's rule set: `--config auto` fetches its rules
+from the Semgrep registry at scan time, so the version is fixed and the rules are not (A192 — the
+resolved figures are recorded in `plan.md`).
 
 ## What this re-audit installed
 
