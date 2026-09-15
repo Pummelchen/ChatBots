@@ -124,7 +124,7 @@ public final class WebTransportEngineServer {
             identity: .certificateChain(
                 chainDER: identity.certificateChainDER,
                 privateKeyDER: identity.privateKeyDER,
-                keyKind: .rsa(sizeInBits: 2048)),
+                keyKind: identity.keyKind.transportKind),
             admission: WebTransportAdmissionPolicy(
                 maxConcurrentConnections: configuration.maximumConnections),
             transportLimits: .default)
@@ -420,4 +420,17 @@ public final class WebTransportEngineServer {
     /// Sessions the server still owns. Used by the stop-race test (A198): after `stop()` returns this
     /// must be zero, whatever arrived while it was closing.
     var liveSessionCount: Int { sessions.count }
+}
+
+extension EngineIdentity.KeyKind {
+    /// This key kind as the transport spells it.
+    ///
+    /// The transport was configured with a hardcoded `.rsa(sizeInBits: 2048)` while the identity carried a
+    /// key kind of its own that nothing read, so a key of any other size would have been described to
+    /// `SecKeyCreateWithData` as 2048 bits — an error that names nothing (A155).
+    var transportKind: WebTransportPrivateKeyKind {
+        switch self {
+        case .rsa(let sizeInBits): .rsa(sizeInBits: sizeInBits)
+        }
+    }
 }

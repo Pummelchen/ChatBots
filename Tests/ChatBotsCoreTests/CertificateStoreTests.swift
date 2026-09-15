@@ -102,21 +102,35 @@ struct CertificateStoreTests {
         return (attributes?[.posixPermissions] as? NSNumber)?.intValue
     }
 
-    @Test("A partial identity on disk is regenerated rather than half-used")
-    func repairsPartialState() throws {
-        // A crash between writing the two files would otherwise leave an install that can
-        // never start again, with an error about a missing key rather than a fix.
+    @Test("A partial identity on disk is reported with a way out, not silently replaced")
+    func partialStateIsReported() throws {
+        // This test used to assert the opposite — that a missing key was regenerated — and that
+        // expectation was the defect A155 records: a damaged identity was read as "no identity here", the
+        // store generated a new key, and every client that had pinned the old certificate refused to
+        // connect. The failure is now the store's, with the file named and the way out in the message; the
+        // cost of the way out (a new fingerprint) is stated rather than paid in silence.
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let identity = try CertificateStore.loadOrCreate(in: directory)
 
+        let certificate = directory.appending(path: "webtransport-cert.pem")
+        let pinned = try Data(contentsOf: certificate)
+
         // Remove the key, as an interrupted first run would.
         try FileManager.default.removeItem(at: directory.appending(path: "webtransport-key.pem"))
 
-        let repaired = try CertificateStore.loadOrCreate(in: directory)
-        #expect(!repaired.privateKeyDER.isEmpty)
-        // A new identity, because the key the old certificate matched is gone.
-        #expect(repaired.fingerprintSHA256 != identity.fingerprintSHA256)
+        do {
+            _ = try CertificateStore.loadOrCreate(in: directory)
+            Issue.record("a partial identity was regenerated in place of the pinned one")
+        } catch let error as CertificateStoreError {
+            #expect(error.errorDescription?.contains("webtransport-key.pem") == true)
+            #expect(error.errorDescription?.contains("Delete") == true, "no way out in the message")
+        }
+
+        // The certificate the clients pinned is byte for byte the one that was there: a refused load
+        // changed nothing on disk.
+        #expect(try Data(contentsOf: certificate) == pinned, "the refused load rewrote the certificate")
+        #expect(identity.fingerprintSHA256.count == 32)
     }
 
     @Test("The private key is in the encoding the transport accepts")
