@@ -65,7 +65,8 @@ struct TransportCheckCoverageTests {
         #expect(!report.succeeded)
         #expect(!report.connected)
         #expect(report.roundTrips == 0)
-        #expect(report.failures.contains { $0.hasPrefix("certificate:") },
+        #expect(
+            report.failures.contains { $0.hasPrefix("certificate:") },
             "the refusal is named as a certificate problem: \(report.failures)")
         #expect(report.describe().contains("certificate"))
     }
