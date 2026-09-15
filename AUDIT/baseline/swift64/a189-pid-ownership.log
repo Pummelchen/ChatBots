@@ -1,0 +1,79 @@
+A189 — whose pid does the pid file name?
+Host: 27.0 / arm64, bash 3.2.57(1)-release
+
+--- The probe, unmutated (stderr is the probe's own cleanup) ---
+$ bash AUDIT/baseline/swift64/a189-probe/pid-ownership.sh
+decoys — processes whose *arguments* mention the words
+  a shell that renames itself to grep chatbots
+    old check says ours: yes, the check now says ours: no
+  ok    the check refuses a shell that renames itself to grep chatbots
+  a shell that renames itself to tail -f caddy.log
+    old check says ours: yes, the check now says ours: no
+  ok    the check refuses a shell that renames itself to tail -f caddy.log
+  a plain sleep
+    old check says ours: no, the check now says ours: no
+  ok    the check refuses a plain sleep
+  vim Caddyfile
+    old check says ours: no, the check now says ours: no
+  ok    the check refuses vim Caddyfile
+  vim caddyfile
+    old check says ours: yes, the check now says ours: no
+  ok    the check refuses vim caddyfile
+
+the real processes the pid files actually hold
+  ok    the engine is recognised
+  ok    Caddy is recognised
+
+all A189 probe checks passed
+AUDIT/baseline/swift64/a189-probe/pid-ownership.sh: line 41: 12002 Terminated: 15          bash -c "$command"
+AUDIT/baseline/swift64/a189-probe/pid-ownership.sh: line 41: 12012 Terminated: 15          bash -c "$command"
+AUDIT/baseline/swift64/a189-probe/pid-ownership.sh: line 41: 12022 Terminated: 15          $command
+AUDIT/baseline/swift64/a189-probe/pid-ownership.sh: line 41: 12032 Terminated: 15          vim -u NONE -c 'sleep 30' "$file" > /dev/null 2>&1
+exit=0
+
+--- The shell checks CI runs ---
+  shellcheck : clean
+  bash -n    : parses
+
+--- M1: the substring matcher again (the pre-fix behaviour) ---
+  FAIL  the check refuses a shell that renames itself to grep chatbots — it said the process was ours
+  FAIL  the check refuses a shell that renames itself to tail -f caddy.log — it said the process was ours
+  FAIL  the check refuses vim caddyfile — it said the process was ours
+3 A189 probe check(s) failed
+
+--- M2: nothing is ever ours (over-correction) ---
+  FAIL  the engine is recognised — the check refused its own engine
+  FAIL  Caddy is recognised — the check refused Caddy
+2 A189 probe check(s) failed
+
+--- M3: the caddy half of the check is dropped ---
+  FAIL  Caddy is recognised — the check refused Caddy
+1 A189 probe check(s) failed
+
+--- RESTORED: unmutated again ---
+all A189 probe checks passed
+
+--- What each mutation shows ---
+M1 the substring matcher back: the three decoys whose arguments carry the words are taken for ours — the
+finding, reproduced — while the real processes still pass, which is why this needed its own check rather than
+a stricter pattern. M2 the check refuses everything: its own engine and its own Caddy fail, which is the
+counterweight — a check is not "safer" for refusing the processes it exists to recognise. M3 the caddy half of
+the case is dropped: a real Caddy is refused.
+
+--- The finding's example, measured ---
+`vim Caddyfile` does **not** match the old matcher, because it was case-sensitive: the word has to be
+lowercase, as in `vim caddyfile`, which the probe runs beside it. The class of defect the finding describes is
+real and reproduces twice over (the two renamed shells), so the fix stands; what is corrected is the example,
+not the finding.
+
+--- FULL GATE at the fix commit (tools/audit-checks.sh) ---
+PASS  build: swift build --build-tests
+PASS  tests: 1033 tests in 192 suites
+PASS  coverage: Sources/ TOTAL 6505 regions 2574 covered 60.43%, 20541 lines 9852 covered 52.04%
+PASS  swiftlint: 253 finding(s), within the recorded waiver of 255
+PASS  swift-format: 739 diagnostic(s), within the recorded waiver of 744
+PASS  web: deltas merge (34 cases)
+PASS  web: the verdict rule (12 cases)
+
+All 6 Mac-only gates passed. (A shell change touches no gate; shellcheck and `bash -n` are in this log, and
+the gate is run at every fix commit regardless.)

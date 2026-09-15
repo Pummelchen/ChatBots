@@ -168,13 +168,21 @@ share_base() {
 }
 
 is_our_process() {
-  # Ownership is decided from the whole command line, never from the bare name. A pid file
-  # outlives the process it named and the OS can hand that number to an unrelated program, so
-  # a live pid is not on its own evidence that the process belongs to ChatBots.
+  # Ownership is decided from the **executable**, not from a substring of the command line. A pid file
+  # outlives the process it named and the OS can hand that number to an unrelated program, so a live pid
+  # is not on its own evidence that the process belongs to ChatBots — and neither is a substring match,
+  # which is what this used to be: `vim Caddyfile`, `tail -f .run/caddy.log` and anything else with the
+  # word in an argument matched, and killing one of those is exactly the collateral damage this check
+  # exists to prevent (A189).
+  #
+  # `comm` is the path the executable was launched from, so the basename is the program itself: the
+  # engine is `chatbots-cli` whatever configuration directory it was built into, and Caddy is `caddy`
+  # wherever Homebrew put it. A process that renames itself can still impersonate either name, which is
+  # out of scope here: another process running as this user can already do anything this script can.
   local command
-  command="$(ps -p "$1" -o command= 2>/dev/null)" || true
-  case "$command" in
-    *chatbots*|*caddy*) return 0 ;;
+  command="$(ps -p "$1" -o comm= 2>/dev/null)" || true
+  case "${command##*/}" in
+    chatbots-cli|caddy) return 0 ;;
     *) return 1 ;;
   esac
 }
