@@ -16,6 +16,8 @@ import Foundation
 
 public enum OpenAIResponsesError: LocalizedError, Sendable {
     case badURL(String)
+    /// An endpoint this client will not send to, and the rule that refused it.
+    case refusedEndpoint(String, reason: String)
     case http(status: Int, body: String)
     case streamFailed(String)
     case noOutput
@@ -25,6 +27,8 @@ public enum OpenAIResponsesError: LocalizedError, Sendable {
         switch self {
         case .badURL(let value):
             "Not a usable base URL: \(value)"
+        case .refusedEndpoint(let value, let reason):
+            "The endpoint \(value) is not used: \(reason)."
         case .http(let status, let body):
             "Server returned HTTP \(status): \(UTF8Text.prefix(body, 300))"
         case .streamFailed(let message):
@@ -305,12 +309,43 @@ public struct OpenAIEndpoint: Sendable, Hashable, Codable {
 
     /// The full endpoint, tolerating a base URL given with or without a trailing slash or
     /// with `/v1` already present.
+    ///
+    /// Nil when the endpoint is one this client will not send to, which is `endpointRefusal`'s
+    /// decision rather than a parsing accident.
     public var responsesURL: URL? {
         var trimmed = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         while trimmed.hasSuffix("/") { trimmed.removeLast() }
         guard !trimmed.isEmpty else { return nil }
         let path = trimmed.hasSuffix("/v1") ? "/responses" : "/v1/responses"
-        return URL(string: trimmed + path)
+        guard let url = URL(string: trimmed + path) else { return nil }
+        guard Self.endpointRefusal(url) == nil else { return nil }
+        return url
+    }
+
+    /// Why this client will not send a request to `url`, or nil when it will.
+    ///
+    /// Two rules, both about an address that arrives from configuration a user — or, before A136, any
+    /// web page — could set. It has to be http or https: a `file://` base URL made a model request
+    /// read the local disk. And it must not be link-local, where cloud metadata services live, since
+    /// `http://169.254.169.254/…` is the classic way a request path like this hands out credentials,
+    /// and a non-2xx body is echoed back into the snapshot the front ends display.
+    ///
+    /// Loopback and private addresses stay allowed on purpose — pointing a seat at LM Studio or Ollama
+    /// on this Mac or on the LAN is the thing this app is for, so refusing them would break the
+    /// product to close a hole it does not have. A name that resolves to a link-local address is not
+    /// covered by a string check like this one; the redirect policy on the session is what keeps a
+    /// validated endpoint from being re-pointed behind the check (A141).
+    static func endpointRefusal(_ url: URL) -> String? {
+        guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else {
+            return "only http and https endpoints are used"
+        }
+        guard let host = url.host?.lowercased(), !host.isEmpty else {
+            return "the endpoint has no host"
+        }
+        if host.hasPrefix("169.254.") || host.hasPrefix("fe80:") || host.hasPrefix("[fe80:") {
+            return "it is link-local, which is where cloud metadata services answer"
+        }
+        return nil
     }
 
     /// Derived from the model id so the UI can show something short.
@@ -346,6 +381,23 @@ public struct OpenAIUsage: Sendable, Hashable {
     }
 }
 
+/// A session delegate whose only job is to refuse redirects.
+///
+/// `completionHandler(nil)` means "do not follow": the redirect response is the answer, so a 302 from
+/// an endpoint shows up as a non-2xx rather than as a request to wherever it pointed.
+///
+/// Stateless, and `Sendable` because of it — `URLSession` keeps it for the session's lifetime and the
+/// client is sent between tasks.
+private final class NoRedirects: NSObject, URLSessionTaskDelegate, Sendable {
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        completionHandler(nil)
+    }
+}
+
 public struct OpenAIResponsesClient: Sendable {
     private let endpoint: OpenAIEndpoint
     private let session: URLSession
@@ -356,7 +408,11 @@ public struct OpenAIResponsesClient: Sendable {
         configuration.timeoutIntervalForRequest = 600
         configuration.timeoutIntervalForResource = 3_600
         configuration.httpAdditionalHeaders = ["User-Agent": "ChatBots/1.0 (macOS)"]
-        self.session = URLSession(configuration: configuration)
+        // No redirects. The endpoint is validated before the request (`endpointRefusal`), and following
+        // a redirect is how a URL that passed that check reaches a host that never did — a cloud
+        // endpoint answering 302 to a metadata address, with the body echoed into the snapshot (A141).
+        self.session = URLSession(
+            configuration: configuration, delegate: NoRedirects(), delegateQueue: nil)
     }
 
     /// Everything a request can set. Mirrors the app's seat configuration; fields the
@@ -489,13 +545,28 @@ public struct OpenAIResponsesClient: Sendable {
     }
 
 
+    /// The endpoint's URL, or the error that says why there is not one.
+    ///
+    /// Its own function because `run` is at its `function_body_length` budget, and because the two
+    /// reasons a base URL is unusable — it does not parse, or it parses and is refused — are worth
+    /// telling apart in a UI: "not a usable base URL" is what a typo produces (A141).
+    private func endpointURL() throws -> URL {
+        guard let url = endpoint.responsesURL else {
+            if let parsed = URL(string: endpoint.baseURL),
+                let reason = OpenAIEndpoint.endpointRefusal(parsed)
+            {
+                throw OpenAIResponsesError.refusedEndpoint(endpoint.baseURL, reason: reason)
+            }
+            throw OpenAIResponsesError.badURL(endpoint.baseURL)
+        }
+        return url
+    }
+
     private func run(
         _ request: Request,
         into continuation: AsyncThrowingStream<OpenAIStreamEvent, Error>.Continuation
     ) async throws {
-        guard let url = endpoint.responsesURL else {
-            throw OpenAIResponsesError.badURL(endpoint.baseURL)
-        }
+        let url = try endpointURL()
 
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
