@@ -28,6 +28,14 @@ Worth knowing before you report, because several things that look like leaks are
   built-in DeepSeek key is only ever sent to `api.deepseek.com` — the host is compared exactly
   rather than by substring, so a lookalike domain cannot be handed a real key
   (`BuiltInKeys.allowedHosts`).
+* **One switch writes the conversation somewhere else, and it is off unless you set it.**
+  `CHATBOTS_TRACE_API=1` makes the client print each request to the endpoint on standard error, so
+  that a protocol problem can be seen. It prints the first 2 000 characters of the body with attached
+  images left out — the trace line says how many were omitted — and it does not print the API key.
+  Where that output ends up
+  is wherever standard error goes — a terminal, or a log file you have pointed it at — so treat it as
+  writing the conversation to that place. Any value other than `0`, `false`, `no` or the empty string
+  turns it on.
 
 ## The local trust boundary, stated honestly
 

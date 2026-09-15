@@ -550,6 +550,22 @@ public struct OpenAIResponsesClient: Sendable {
     /// Its own function because `run` is at its `function_body_length` budget, and because the two
     /// reasons a base URL is unusable — it does not parse, or it parses and is refused — are worth
     /// telling apart in a UI: "not a usable base URL" is what a typo produces (A141).
+    /// How much of a traced request body is printed.
+    ///
+    /// Enough to see the shape of a prompt and where a field went wrong; not enough to spill a whole
+    /// conversation into a log, which is what it did with no cap at all (A140).
+    static let traceLimit = 2_000
+
+    /// Whether `CHATBOTS_TRACE_API` was set to something that means "on".
+    ///
+    /// The test was `!= nil`, so `CHATBOTS_TRACE_API=0` turned the trace *on* — not what anyone
+    /// writing that means, and the switch prints the conversation (A140).
+    static func traceIsOn(_ value: String?) -> Bool {
+        guard let value else { return false }
+        let lowered = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return !(lowered.isEmpty || lowered == "0" || lowered == "false" || lowered == "no")
+    }
+
     private func endpointURL() throws -> URL {
         guard let url = endpoint.responsesURL else {
             if let parsed = URL(string: endpoint.baseURL),
@@ -560,6 +576,29 @@ public struct OpenAIResponsesClient: Sendable {
             throw OpenAIResponsesError.badURL(endpoint.baseURL)
         }
         return url
+    }
+
+    /// Write the request to standard error, when the trace switch is on.
+    ///
+    /// Its own function because `run` is at its `function_body_length` budget, and because this is the
+    /// one place that writes the conversation somewhere other than the chosen endpoint, so it should
+    /// be reviewable on its own (A140).
+    ///
+    /// Bounded, and with the images left out rather than cut off mid-base64: a request body is the
+    /// whole conversation plus every attached image, and standard error is a terminal, a launchd log or
+    /// a container log — `SECURITY.md` says the conversation leaves the machine only to the chosen
+    /// endpoint. What is printed is still the request's own shape, so it remains useful for the
+    /// protocol debugging it exists for.
+    private func traceRequest(_ url: URL, _ request: Request) {
+        let omitted = request.images.isEmpty ? "" : ", \(request.images.count) image payload(s) omitted"
+        let payload = body(for: request, images: [])
+        let encoded =
+            (try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])) ?? Data()
+        let text = String(data: encoded, encoding: .utf8) ?? "?"
+        let preview = UTF8Text.prefix(text, Self.traceLimit)
+        let header = "[trace] POST \(url.absoluteString) (\(encoded.count) bytes\(omitted))\n"
+        FileHandle.standardError.write(Data(header.utf8))
+        FileHandle.standardError.write(Data("[trace] \(preview)\n".utf8))
     }
 
     private func run(
@@ -575,12 +614,8 @@ public struct OpenAIResponsesClient: Sendable {
         if let key = endpoint.effectiveAPIKey, !key.isEmpty {
             urlRequest.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         }
-        if ProcessInfo.processInfo.environment["CHATBOTS_TRACE_API"] != nil {
-            let preview = String(
-                data: (try? JSONSerialization.data(
-                    withJSONObject: body(for: request), options: [.sortedKeys])) ?? Data(),
-                encoding: .utf8) ?? "?"
-            FileHandle.standardError.write(Data("[trace] POST \(url.absoluteString)\n[trace] \(preview)\n".utf8))
+        if Self.traceIsOn(ProcessInfo.processInfo.environment["CHATBOTS_TRACE_API"]) {
+            traceRequest(url, request)
         }
         urlRequest.httpBody = try JSONSerialization.data(
             withJSONObject: body(for: request), options: [])
@@ -707,10 +742,15 @@ public struct OpenAIResponsesClient: Sendable {
         return [["role": "user", "content": content]]
     }
 
-    public func body(for request: Request) -> [String: Any] {
+    /// The JSON body for a request.
+    ///
+    /// `images` is an override for the trace, which prints the body with the image payloads left out
+    /// rather than spilling base64 into a log: the images travel inline in `input` as data URLs
+    /// (A140).
+    public func body(for request: Request, images: [ImageAttachment]? = nil) -> [String: Any] {
         var body: [String: Any] = [
             "model": endpoint.model,
-            "input": Self.encodeInput(request.input, images: request.images),
+            "input": Self.encodeInput(request.input, images: images ?? request.images),
             "stream": true,
         ]
         if let instructions = request.instructions, !instructions.isEmpty {
