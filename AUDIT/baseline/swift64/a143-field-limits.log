@@ -1,0 +1,37 @@
+# A143 — user-supplied text that is echoed in every snapshot (2026-09-15T14:36:23Z)
+
+## 1. before: the caps that existed, and the fields that had none
+$ git show HEAD:Sources/ChatBotsCore/EngineService.swift | grep -n 'prefix(40)|count < 24'
+  156:                spec.displayName = String(name.trimmingCharacters(in: .whitespaces).prefix(40))
+  382:        guard engine.attachments.count < 24 else {
+$ git show HEAD:Sources/ChatBotsCore/EngineService.swift | grep -n 'setTopic(let topic)' -A 6
+  111:        case .setTopic(let topic):
+  112-            // A blank topic is refused rather than blanking the question. Restoring from
+  113-            // saved settings sets the topic directly, so this does not affect startup.
+  114-            guard !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+  115-                return .refused("a topic is required")
+  116-            }
+  117-            guard engine.setTopic(topic) else {
+
+$ swift test --filter EngineServiceFieldLimitTests   # before
+  ✔ Test "A steering message within the limit is still accepted" passed after 0.011 seconds.
+  ✘ Test "A moderator name past the limit is shortened rather than refused" recorded an issue at EngineServiceTests.swift:369:9: Expectation failed: engine.m
+  ✘ Test "A moderator name past the limit is shortened rather than refused" failed after 0.014 seconds with 1 issue.
+  ✘ Test "A topic past the limit is refused, and the room keeps the topic it had" recorded an issue at EngineServiceTests.swift:328:25: Issue recorded
+  ✘ Test "A topic past the limit is refused, and the room keeps the topic it had" failed after 0.019 seconds with 1 issue.
+  ✘ Test "A steering message past the limit is refused" recorded an issue at EngineServiceTests.swift:348:25: Issue recorded
+  ✘ Test "A steering message past the limit is refused" failed after 0.024 seconds with 1 issue.
+  ✔ Test "A topic within the limit is still accepted" passed after 0.026 seconds.
+  ✘ Test run with 5 tests in 1 suite failed after 0.026 seconds with 3 issues.
+
+## 2. after
+$ grep -n 'maximumFieldCharacters' Sources/ChatBotsCore/EngineService.swift
+  119:            guard topic.count <= Self.maximumFieldCharacters else {
+  121:                    "a topic is limited to \(Self.maximumFieldCharacters) characters")
+  132:            guard text.count <= Self.maximumFieldCharacters else {
+  134:                    "a message is limited to \(Self.maximumFieldCharacters) characters")
+  235:            if boundedIdentity.name.count > Self.maximumFieldCharacters {
+  237:                    boundedIdentity.name.prefix(Self.maximumFieldCharacters))
+  405:    public static let maximumFieldCharacters = 2_000
+$ swift test --filter EngineServiceFieldLimitTests   # after
+  ✔ Test run with 5 tests in 1 suite passed after 0.150 seconds.

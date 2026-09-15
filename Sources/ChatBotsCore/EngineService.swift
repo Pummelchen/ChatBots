@@ -114,6 +114,12 @@ public final class EngineService {
             guard !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 return .refused("a topic is required")
             }
+            // Refused rather than truncated: a topic is a command, and a silently shortened question is
+            // a question the room answers differently from the one that was asked (A143).
+            guard topic.count <= Self.maximumFieldCharacters else {
+                return .refused(
+                    "a topic is limited to \(Self.maximumFieldCharacters) characters")
+            }
             guard engine.setTopic(topic) else {
                 return .refused("the topic cannot be changed once the conversation has started")
             }
@@ -122,6 +128,10 @@ public final class EngineService {
         case .steer(let text):
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 return .refused("a message is required")
+            }
+            guard text.count <= Self.maximumFieldCharacters else {
+                return .refused(
+                    "a message is limited to \(Self.maximumFieldCharacters) characters")
             }
             engine.steer(text)
             return .state(snapshot())
@@ -218,7 +228,15 @@ public final class EngineService {
             // Changeable while a conversation runs, unlike the topic: who is speaking is not a
             // property of the question, and a moderator who is halfway through an investigation
             // under the wrong name should be able to fix it.
-            engine.moderator = identity
+            // The name is a label rather than an instruction, so it is truncated exactly as a seat name
+            // is (the 40-character cap at `updateSeat`) instead of being refused: losing the tail of a
+            // very long name is a smaller surprise than refusing to rename the moderator (A143).
+            var boundedIdentity = identity
+            if boundedIdentity.name.count > Self.maximumFieldCharacters {
+                boundedIdentity.name = String(
+                    boundedIdentity.name.prefix(Self.maximumFieldCharacters))
+            }
+            engine.moderator = boundedIdentity
             return .state(snapshot())
 
         // ── Saved conversations ──────────────────────────────────────────────────────
@@ -375,6 +393,17 @@ public final class EngineService {
     /// The `defer` still removes the staging directory, and it is still correct across the
     /// move: `Task.value` is awaited before it runs, so the file outlives the read and not the
     /// request. A conversion that throws is reported as the same refusal it was before.
+    /// How much user-supplied text one field may carry.
+    ///
+    /// Every value bounded by this enters the conversation and is re-sent inside every `APISnapshot` to
+    /// every connected client, so an uncapped field is an uncapped cost per turn and per client for as
+    /// long as the conversation lives — and a snapshot is a few kilobytes even when the fields are
+    /// small. The seat name has been capped at 40 characters and attachments at 24 for a while; the
+    /// topic, the steering message and the moderator's name were the fields that were not (A143).
+    /// 2 000 characters is a long paragraph: more than any of these needs, and far less than the ~85 MB
+    /// one request may carry.
+    public static let maximumFieldCharacters = 2_000
+
     private func addAttachment(filename: String, contents: Data) async -> EngineReply {
         guard engine.canAttachFiles else {
             return .refused("source material must be added before the conversation starts")
