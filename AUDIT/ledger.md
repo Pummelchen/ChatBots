@@ -30,16 +30,15 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 216 |
-| DONE | 192 |
-| START | 24 |
+| DONE | 193 |
+| START | 23 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 24
+### Open — 23
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
-| A157 | S3 | START | — | concurrency / transport | Transport sessions have no idle deadline, the per-server error is clobbered across sessions, an undecodable frame is dropped in silence, and a second start() leaks the first listener |
 | A158 | S3 | START | — | concurrency / transport client | The client's event stream is unbounded while the server deliberately buffers 256, and an unreadable frame is swallowed by try? |
 | A159 | S3 | START | — | validation / web tools | URL validation accepts any scheme starting with 'http' and requires no host, on model-controlled input |
 | A160 | S3 | START | — | logic / web front end | A vote verdict is captured when the row is built, so clicking an already-cast verdict never withdraws it |
@@ -140,7 +139,7 @@ been run.
 | A154 | S3 | DONE | ca6cb5c | logic / HTTP parsing | Head parsing is lenient: 'Host : x' is accepted, obs-fold lines are dropped, methods and versions are unvalidated, and '+' becomes a space in the path |
 | A155 | S3 | DONE | e7fec77 | security / TLS identity | The certificate store treats any read failure as first run, hardcodes RSA-2048 without checking the pair, executes user-writable openssl paths, and drains pipes in an order that can deadlock |
 | A156 | S3 | DONE | 03f7903 | logic / API consistency | removeAttachment answers 200 for an id that does not exist, and the concurrent-upload ceiling is counted before an await so simultaneous uploads all pass |
-| A157 | S3 | START | — | concurrency / transport | Transport sessions have no idle deadline, the per-server error is clobbered across sessions, an undecodable frame is dropped in silence, and a second start() leaks the first listener |
+| A157 | S3 | DONE | 511febd | concurrency / transport | Transport sessions have no idle deadline, the per-server error is clobbered across sessions, an undecodable frame is dropped in silence, and a second start() leaks the first listener |
 | A158 | S3 | START | — | concurrency / transport client | The client's event stream is unbounded while the server deliberately buffers 256, and an unreadable frame is swallowed by try? |
 | A159 | S3 | START | — | validation / web tools | URL validation accepts any scheme starting with 'http' and requires no host, on model-controlled input |
 | A16 | S3 | DONE | 9c53771 | ChatBotsCLI | --serve has no signal handling, so the listener is never shut down and nothing is flushed on exit |
