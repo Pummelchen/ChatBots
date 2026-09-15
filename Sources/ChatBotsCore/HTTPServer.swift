@@ -215,17 +215,43 @@ public enum HTTPParser {
     /// drift apart again.
     public static let maximumBodyBytes = ProtocolLimits.maximumMessageBytes
 
+    /// How large a request head may be before it is refused.
+    ///
+    /// A head is a request line and a handful of fields — a few hundred bytes for everything this
+    /// server does, and no browser sends kilobytes. It had no bound of its own: a client could stream
+    /// the full 85 MB body allowance as "headers", kept in memory per connection and rescanned from
+    /// the start on every 64 KB read, so thirty-two connections pinned gigabytes and the scan was
+    /// quadratic in the head (A145). 16 KB is generous for a head and small enough that the worst case
+    /// per connection is not worth attacking.
+    public static let maximumHeadBytes = 16 * 1_024
+
     public struct Incomplete: Error {}
+
+    /// Where the request head ends, or why there is not one yet.
+    ///
+    /// Only the first `maximumHeadBytes` are searched, so the work per read is bounded by the cap
+    /// rather than by how much has arrived — the whole buffer used to be rescanned on every 64 KB, so
+    /// the scan was quadratic in the head — and a request whose head cannot fit is refused here rather
+    /// than accumulated, which is what kept thirty-two connections from pinning gigabytes (A145).
+    ///
+    /// Its own function as well as its own rule: `parse` is at its cyclomatic-complexity budget, and
+    /// the two ways this can end without a head are worth reading together.
+    private static func headEnd(in data: Data) throws -> Data.Index {
+        let searchable = data.prefix(maximumHeadBytes + 4)
+        guard let end = searchable.range(of: Data("\r\n\r\n".utf8))?.lowerBound else {
+            if data.count > maximumHeadBytes { throw HTTPError.headTooLarge }
+            throw Incomplete()
+        }
+        return end
+    }
 
     /// Parse a complete request head plus whatever body has arrived.
     ///
     /// Throws `Incomplete` when more bytes are needed, which is the normal case for a
     /// request arriving in pieces.
     public static func parse(_ data: Data) throws -> HTTPRequest {
-        guard let headerEnd = data.range(of: Data("\r\n\r\n".utf8)) else {
-            throw Incomplete()
-        }
-        let headData = data[data.startIndex..<headerEnd.lowerBound]
+        let headerEnd = try headEnd(in: data)
+        let headData = data[data.startIndex..<headerEnd]
         guard let head = String(data: headData, encoding: .utf8) else {
             throw HTTPError.malformed("the request head was not valid UTF-8")
         }
@@ -252,7 +278,8 @@ public enum HTTPParser {
         guard declaredLength <= maximumBodyBytes else {
             throw HTTPError.tooLarge
         }
-        let bodyStart = headerEnd.upperBound
+        // Past the blank line that ends the head: the terminator is four bytes.
+        let bodyStart = headerEnd + 4
         let available = data.count - data.distance(from: data.startIndex, to: bodyStart)
         guard available >= declaredLength else { throw Incomplete() }
         let body = Data(data[bodyStart..<data.index(bodyStart, offsetBy: declaredLength)])
@@ -306,13 +333,25 @@ public enum HTTPParser {
 public enum HTTPError: LocalizedError {
     case malformed(String)
     case tooLarge
+    case headTooLarge
     case portInUse(UInt16)
 
     public var errorDescription: String? {
         switch self {
         case .malformed(let reason): "Malformed request: \(reason)"
         case .tooLarge: "Request body is too large"
+        case .headTooLarge: "Request headers are too large"
         case .portInUse(let port): "Port \(port) is already in use"
+        }
+    }
+
+    /// The status a client is answered with. 431 for a head that cannot fit is the code that exists
+    /// for it; 413 is the body's.
+    public var statusCode: Int {
+        switch self {
+        case .headTooLarge: 431
+        case .tooLarge: 413
+        case .malformed, .portInUse: 400
         }
     }
 }
@@ -762,7 +801,11 @@ public final class HTTPServer: @unchecked Sendable {
                 if isComplete {
                     // The peer closed mid-request; nothing useful to send.
                     self.finish(connection, error: nil)
-                } else if accumulated.count > HTTPParser.maximumBodyBytes {
+                } else if accumulated.count > HTTPParser.maximumHeadBytes
+                    + HTTPParser.maximumBodyBytes
+                {
+                    // Head plus body, because a head that has not terminated is counted here too and the
+                    // head has its own cap inside `parse` (A145).
                     self.write(
                         .error("Request body is too large", status: 413), to: connection,
                         thenClose: true)
@@ -773,7 +816,8 @@ public final class HTTPServer: @unchecked Sendable {
                 }
             } catch let error as HTTPError {
                 self.write(
-                    .error(error.localizedDescription, status: 400), to: connection, thenClose: true)
+                    .error(error.localizedDescription, status: error.statusCode), to: connection,
+                    thenClose: true)
             } catch {
                 self.write(
                     .error(error.localizedDescription, status: 400), to: connection, thenClose: true)

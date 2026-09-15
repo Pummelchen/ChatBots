@@ -137,6 +137,63 @@ struct AuditHTTPLimitTests {
     }
 
     /// The other half of the finding: `connections` had no maximum at all.
+    @Test("The parser refuses a head that cannot fit, and still parses one that does")
+    func parserRefusesAnOversizedHead() throws {
+        // The head has its own cap now: a request whose head cannot fit is refused rather than
+        // accumulated and rescanned (A145).
+        let unterminated = Data(repeating: 0x41, count: HTTPParser.maximumHeadBytes + 1)
+        do {
+            _ = try HTTPParser.parse(unterminated)
+            Issue.record("a head past the cap must be refused")
+        } catch let error as HTTPError {
+            guard case .headTooLarge = error else {
+                Issue.record("wrong error: \(error)")
+                return
+            }
+        }
+
+        // The counterweight: an ordinary head is unaffected, and the terminator is still found when it
+        // arrives in pieces — the search window is a cap on the search, not on what may be parsed.
+        let ok = Data("GET /api/state HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n".utf8)
+        let request = try HTTPParser.parse(ok)
+        #expect(request.method == "GET")
+        #expect(request.path == "/api/state")
+
+        // A head that fits, split across the window boundary, is still found.
+        var split = Data(repeating: 0x41, count: HTTPParser.maximumHeadBytes - 2)
+        split.append(Data("\r\n\r\n".utf8))
+        do {
+            _ = try HTTPParser.parse(split)
+            Issue.record("this is not a valid request line, so it must be malformed rather than incomplete")
+        } catch let error as HTTPError {
+            guard case .malformed = error else {
+                Issue.record("expected a malformed request, got \(error)")
+                return
+            }
+        }
+    }
+
+    @Test("A connection whose head cannot fit is answered 431")
+    func oversizedHeadOverTheWireIsRefused() async throws {
+        let (server, port) = try await startServer(maximumConnections: 8, requestTimeout: 10)
+        defer { server.stop() }
+        let client = try RawConnection(port: port)
+        #expect(await client.connect())
+        defer { client.cancel() }
+
+        // Never terminated, and past the cap: one write, so the size is what the server reacts to.
+        var head = "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n"
+        let line = "X-Pad: " + String(repeating: "a", count: 900) + "\r\n"
+        head += String(repeating: line, count: HTTPParser.maximumHeadBytes / line.count + 4)
+        client.send(head)
+
+        let response = await client.receiveOnce(timeout: .seconds(5))
+        let text = String(data: response ?? Data(), encoding: .utf8) ?? ""
+        #expect(
+            text.hasPrefix("HTTP/1.1 431"),
+            "a head that cannot fit is 431 Request Header Fields Too Large, was \(text.prefix(40))")
+    }
+
     @Test("Connections over the cap are refused rather than entered in the table")
     func connectionsOverTheCapAreRefused() async throws {
         let ceiling = 2
