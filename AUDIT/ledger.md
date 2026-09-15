@@ -30,17 +30,16 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 216 |
-| DONE | 178 |
-| START | 38 |
+| DONE | 180 |
+| START | 36 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 38
+### Open — 36
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
 | A135 | S2 | START | — | packaging / dependencies | The repository states that mlx-swift's SwiftPM build does not compile the Metal kernels; under Xcode 27 it does, so the 190 MB separate metallib download is of unverified necessity and the stated reason for it is now false |
-| A144 | S2 | START | — | performance / payload | Every attached image is re-base64-encoded into every snapshot pushed to every client |
 | A147 | S3 | START | — | performance / main actor | Every /s/<id> request, including for unknown ids, reads and JSON-decodes the whole conversation index on the main actor |
 | A148 | S3 | START | — | safety / image intake | An image is fully decoded before any dimension or size check, so a small crafted TIFF/BMP/HEIC can expand hugely |
 | A149 | S3 | START | — | safety / TOCTOU | The attachment byte cap degrades to zero on a failed stat, the file is re-read after the stat, and a non-regular file is never rejected |
@@ -76,7 +75,6 @@ been run.
 | A206 | S3 | START | — | dead code | Six declarations are written or named but never used, one with a documented rule the code does not implement |
 | A207 | S3 | START | — | docs / correctness | Three comments say the document extractors live in the app target and that the core cannot read a PDF or Word file; all three are false |
 | A208 | S3 | START | — | installer / dependencies | The checkpoint the installer downloads is a hand-copied duplicate of AgentSpec.defaultModelID and nothing keeps the two in step |
-| A214 | S2 | START | — | API / snapshot payload | A snapshot that carries an attached image can exceed the transport's own message cap, so the state push is not delivered at all |
 
 ### Every task — 216
 
@@ -140,7 +138,7 @@ been run.
 | A141 | S2 | DONE | 4ca2b19 | security / SSRF | A seat's baseURL is interpolated into a URL and fetched with no scheme/host check and no redirect policy, so file://, link-local and loopback targets are reachable and internal error bodies are echoed |
 | A142 | S2 | DONE | b08203c | logic / API | A body that fails to decode silently mutates state through defaults: an unknown mode becomes entertainment, an unknown budget becomes standard, a malformed topic clears it |
 | A143 | S2 | DONE | e37238b | safety / input bounds | Topic, moderator name and steering text are uncapped and echoed in every snapshot, although the same file caps seat names and attachment counts |
-| A144 | S2 | START | — | performance / payload | Every attached image is re-base64-encoded into every snapshot pushed to every client |
+| A144 | S2 | DONE | b052a34 | performance / payload | Every attached image is re-base64-encoded into every snapshot pushed to every client |
 | A145 | S2 | DONE | f1fe0f0 | safety / HTTP parsing | The HTTP request head has no size cap and is re-scanned for the header terminator on every read, so 32 connections can pin gigabytes and cost O(n^2) |
 | A146 | S2 | DONE | 487108d | audit tooling / acceptance | Second instance of A134: the documented Mac gate hardcodes the pre-Swift-6.4 test-bundle path, so its coverage step fails on the new toolchain |
 | A147 | S3 | START | — | performance / main actor | Every /s/<id> request, including for unknown ids, reads and JSON-decodes the whole conversation index on the main actor |
@@ -217,7 +215,7 @@ been run.
 | A211 | S2 | DONE | a5288a1 | audit documentation / session entry point | The session entry point still says the audit is complete and names the landed 2026-09-13 branch, while 73 findings are open on a different, unmerged branch |
 | A212 | S1 | DONE | 479faab | workspace / audit tooling | Two wiki clones carried a GitHub personal access token in plaintext inside their origin URL, so the credential that can write to the wikis and to this repository sat in a readable file |
 | A213 | S2 | DONE | 0960c86 | audit tooling / DONE-commit guard | The DONE-commit guard recognised only .swift, .py and .sh paths, so a task fixed in the web interface or a CI workflow could be reported unbacked while its commit contained the fix |
-| A214 | S2 | START | — | API / snapshot payload | A snapshot that carries an attached image can exceed the transport's own message cap, so the state push is not delivered at all |
+| A214 | S2 | DONE | b052a34 | API / snapshot payload | A snapshot that carries an attached image can exceed the transport's own message cap, so the state push is not delivered at all |
 | A215 | S2 | DONE | e9b7f44 | verification / installer smoke test | The installer's transport check pins an identity it never gives the engine it starts, so it can fail for a reason that is not the transport |
 | A216 | S2 | DONE | d3a4316 | transport / diagnostics | A transport error is reported as a number, so the reason the engine refused is thrown away |
 | A22 | S2 | DONE | 18100dd | start script | stop_all kills a stale PID from a pid file without checking the process is ours |
