@@ -30,12 +30,12 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 213 |
-| DONE | 146 |
-| START | 67 |
+| DONE | 147 |
+| START | 66 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 67
+### Open — 66
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -69,7 +69,6 @@ been run.
 | A163 | S3 | START | — | docs / correctness | The Caddyfile says the engine uses the passed Host to build the page's own links, but the replay script never reads the shareBase field it is written into |
 | A164 | S3 | START | — | unsafe / tooling | The DevTools client uses a fixed shared temporary profile path, so a second run or a hostile local process can interfere with it |
 | A166 | S1 | START | — | test coverage | The whole application target is untestable and untested: no test target depends on it, so its logic is outside every gate |
-| A169 | S1 | START | — | test harness / real concurrency | Twenty-one teardowns are fire-and-forget tasks, so the serialising gate is released before QUIC teardown finishes and the A102 collision is reduced rather than removed |
 | A170 | S2 | START | — | test coverage | Near-zero coverage on three paths the product depends on, including the web-search tool the research mode is built around |
 | A171 | S2 | START | — | logic / ordering | The web client applies snapshots unconditionally while the Swift client guards with the monotonic revision, so a late reply regresses the page |
 | A172 | S2 | START | — | dead UI | The device-profile badge is hidden in markup and never unhidden, so the detected profile and viewport are computed and discarded |
@@ -196,7 +195,7 @@ been run.
 | A166 | S1 | START | — | test coverage | The whole application target is untestable and untested: no test target depends on it, so its logic is outside every gate |
 | A167 | S1 | DONE | 00049e6 | test that cannot fail | The zoom suite asserts private copies of the logic, never the store, and its comment claiming they cannot diverge is false |
 | A168 | S1 | DONE | 18d4017 | test harness deadlock | The transport gate leaks on cancellation, so a cancelled test permanently blocks every later transport suite |
-| A169 | S1 | START | — | test harness / real concurrency | Twenty-one teardowns are fire-and-forget tasks, so the serialising gate is released before QUIC teardown finishes and the A102 collision is reduced rather than removed |
+| A169 | S1 | DONE | 1c6cb9f | test harness / real concurrency | Twenty-one teardowns are fire-and-forget tasks, so the serialising gate is released before QUIC teardown finishes and the A102 collision is reduced rather than removed |
 | A17 | S1 | DONE | 0de3123 | HTTPServer | streams is appended on the main actor without the lock that every other access takes |
 | A170 | S2 | START | — | test coverage | Near-zero coverage on three paths the product depends on, including the web-search tool the research mode is built around |
 | A171 | S2 | START | — | logic / ordering | The web client applies snapshots unconditionally while the Swift client guards with the monotonic revision, so a late reply regresses the page |
