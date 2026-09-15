@@ -128,5 +128,15 @@ let package = Package(
             path: "Tests/ChatBotsCoreTests",
             swiftSettings: ownedTargetSettings
         ),
+
+        // The application target had no test target, so none of its logic was measured (A166). It is
+        // an executable target, and SwiftPM builds one for testing by linking its objects into this
+        // bundle; `@testable import ChatBots` is what that needs.
+        .testTarget(
+            name: "ChatBotsAppTests",
+            dependencies: ["ChatBots"],
+            path: "Tests/ChatBotsAppTests",
+            swiftSettings: ownedTargetSettings
+        ),
     ]
 )

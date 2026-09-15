@@ -75,7 +75,11 @@ fi
 
 printf '\n=== 2/6  tests: the full suite ===\n'
 if swift test --enable-code-coverage > "$logs/test.log" 2>&1; then
-    test_summary="$(grep -E 'Test run with' "$logs/test.log" | tail -1)"
+    # Summed across test bundles: `swift test` runs one process per test target and each prints its
+    # own "Test run with" line, so taking the last one reported a single target's count (A166).
+    test_summary="$(grep -E 'Test run with' "$logs/test.log" \
+        | sed -E 's/.*with ([0-9]+) tests? in ([0-9]+) suites.*/\1 \2/' \
+        | awk '{t += $1; s += $2} END {printf "%d tests in %d suites", t, s}')"
     printf '      %s\n' "${test_summary:-swift test passed}"
     pass "tests: ${test_summary:-swift test passed}"
 else

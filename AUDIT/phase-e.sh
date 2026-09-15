@@ -144,7 +144,11 @@ fi
 # ---------------------------------------------------------------- tests
 section "4/12  full suite"
 if swift test > "$out/test.log" 2>&1; then
-    summary="$(grep -E 'Test run with' "$out/test.log" | tail -1)"
+    # Summed across test bundles: one process per test target, one "Test run with" line each, so the
+    # last line alone is a single target's count (A166).
+    summary="$(grep -E 'Test run with' "$out/test.log" \
+        | sed -E 's/.*with ([0-9]+) tests? in ([0-9]+) suites.*/\1 \2/' \
+        | awk '{t += $1; s += $2} END {printf "%d tests in %d suites", t, s}')"
     pass "tests: ${summary:-swift test exited 0}"
 else
     fail "test suite failed; see $out/test.log"
