@@ -30,12 +30,12 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 214 |
-| DONE | 163 |
-| START | 51 |
+| DONE | 164 |
+| START | 50 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 51
+### Open — 50
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -71,7 +71,6 @@ been run.
 | A180 | S3 | START | — | deps / deprecated API | `NSApp.activate(ignoringOtherApps:)` is API_TO_BE_DEPRECATED in the macOS 27 SDK |
 | A182 | S2 | START | — | tools / build staleness | The rebuild guard compares directory mtimes, so editing a source file never triggers a rebuild and a stale binary or embed is served |
 | A183 | S2 | START | — | tools / exposure | The device-capture run publishes the unauthenticated API on every interface, unlike the start scripts which warn and offer --local-only |
-| A184 | S2 | START | — | tools / packaging | A missing SwiftPM bin path silently skips the metallib copy and the script still exits 0, so a bundle can ship that fails at runtime |
 | A186 | S2 | START | — | installer / model download | A checkpoint file whose repository name contains a directory uses it verbatim, so the download fails and the install dies |
 | A187 | S2 | START | — | supply chain / CI | The CI downloads shellcheck, gitleaks and osv-scanner and never verifies them, while the file's header claims pinned tools |
 | A188 | S3 | START | — | tools / injection | --port and --engine are interpolated into sed programs with no validation, so a crafted value injects into the generated Caddyfile that is then run |
@@ -197,7 +196,7 @@ been run.
 | A181 | S2 | DONE | d647954 | tools / argument parsing | An option given without a value loops forever instead of failing |
 | A182 | S2 | START | — | tools / build staleness | The rebuild guard compares directory mtimes, so editing a source file never triggers a rebuild and a stale binary or embed is served |
 | A183 | S2 | START | — | tools / exposure | The device-capture run publishes the unauthenticated API on every interface, unlike the start scripts which warn and offer --local-only |
-| A184 | S2 | START | — | tools / packaging | A missing SwiftPM bin path silently skips the metallib copy and the script still exits 0, so a bundle can ship that fails at runtime |
+| A184 | S2 | DONE | 40a9982 | tools / packaging | A missing SwiftPM bin path silently skips the metallib copy and the script still exits 0, so a bundle can ship that fails at runtime |
 | A185 | S2 | DONE | 52804c0 | audit tooling / scanner | The waiver checker ignores semgrep's `errors` array and treats a missing `results` key as zero findings, so a failed scan reports a clean pass |
 | A186 | S2 | START | — | installer / model download | A checkpoint file whose repository name contains a directory uses it verbatim, so the download fails and the install dies |
 | A187 | S2 | START | — | supply chain / CI | The CI downloads shellcheck, gitleaks and osv-scanner and never verifies them, while the file's header claims pinned tools |
