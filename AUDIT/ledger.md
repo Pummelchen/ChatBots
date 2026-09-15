@@ -30,16 +30,15 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 216 |
-| DONE | 189 |
-| START | 27 |
+| DONE | 190 |
+| START | 26 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 27
+### Open — 26
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
-| A154 | S3 | START | — | logic / HTTP parsing | Head parsing is lenient: 'Host : x' is accepted, obs-fold lines are dropped, methods and versions are unvalidated, and '+' becomes a space in the path |
 | A155 | S3 | START | — | security / TLS identity | The certificate store treats any read failure as first run, hardcodes RSA-2048 without checking the pair, executes user-writable openssl paths, and drains pipes in an order that can deadlock |
 | A156 | S3 | START | — | logic / API consistency | removeAttachment answers 200 for an id that does not exist, and the concurrent-upload ceiling is counted before an await so simultaneous uploads all pass |
 | A157 | S3 | START | — | concurrency / transport | Transport sessions have no idle deadline, the per-server error is clobbered across sessions, an undecodable frame is dropped in silence, and a second start() leaks the first listener |
@@ -140,7 +139,7 @@ been run.
 | A151 | S3 | DONE | e0945da | operations / logging | There is no request or error logging: connection errors are discarded and the counters are exposed nowhere |
 | A152 | S3 | DONE | 71d72d2 | operations / health | /api/health is a hardcoded 200 that says nothing about readiness, and the readiness helper next to it is dead |
 | A153 | S3 | DONE | f9d4c6e | logic / HTTP | Transfer-Encoding is never read or rejected, so a chunked request is answered with an empty body while its route still runs |
-| A154 | S3 | START | — | logic / HTTP parsing | Head parsing is lenient: 'Host : x' is accepted, obs-fold lines are dropped, methods and versions are unvalidated, and '+' becomes a space in the path |
+| A154 | S3 | DONE | ca6cb5c | logic / HTTP parsing | Head parsing is lenient: 'Host : x' is accepted, obs-fold lines are dropped, methods and versions are unvalidated, and '+' becomes a space in the path |
 | A155 | S3 | START | — | security / TLS identity | The certificate store treats any read failure as first run, hardcodes RSA-2048 without checking the pair, executes user-writable openssl paths, and drains pipes in an order that can deadlock |
 | A156 | S3 | START | — | logic / API consistency | removeAttachment answers 200 for an id that does not exist, and the concurrent-upload ceiling is counted before an await so simultaneous uploads all pass |
 | A157 | S3 | START | — | concurrency / transport | Transport sessions have no idle deadline, the per-server error is clobbered across sessions, an undecodable frame is dropped in silence, and a second start() leaks the first listener |
