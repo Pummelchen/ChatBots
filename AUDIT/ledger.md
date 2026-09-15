@@ -30,16 +30,15 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 217 |
-| DONE | 205 |
-| START | 12 |
+| DONE | 206 |
+| START | 11 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 12
+### Open — 11
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
-| A189 | S3 | START | — | tools / process safety | The pid-ownership check is a substring match, so a recycled pid belonging to an unrelated process can be signalled |
 | A190 | S3 | START | — | tools / process safety | The stop path kills by name directly beneath a comment that says it kills by pid |
 | A191 | S3 | START | — | generated sources / escaping | Name-list entries are interpolated into Swift string literals unescaped, so a quote or backslash in names/*.txt produces Swift that does not compile |
 | A192 | S3 | START | — | CI / coverage of the gates | The shell lint covers only tools/*.sh so the audit scripts are never linted, and semgrep fetches a mutable live rule set despite the pinning claim |
@@ -163,7 +162,7 @@ been run.
 | A186 | S2 | DONE | 6524b3c | installer / model download | A checkpoint file whose repository name contains a directory uses it verbatim, so the download fails and the install dies |
 | A187 | S2 | DONE | d01c937 | supply chain / CI | The CI downloads shellcheck, gitleaks and osv-scanner and never verifies them, while the file's header claims pinned tools |
 | A188 | S3 | DONE | 34169ea | tools / injection | --port and --engine are interpolated into sed programs with no validation, so a crafted value injects into the generated Caddyfile that is then run |
-| A189 | S3 | START | — | tools / process safety | The pid-ownership check is a substring match, so a recycled pid belonging to an unrelated process can be signalled |
+| A189 | S3 | DONE | b1a08d8 | tools / process safety | The pid-ownership check is a substring match, so a recycled pid belonging to an unrelated process can be signalled |
 | A19 | S2 | DONE | 0de3123 | process / git history | A DONE task was committed with its evidence and its ledger entry but without its fix: 948ea29 claims A14 and A17 and contains no source change |
 | A190 | S3 | START | — | tools / process safety | The stop path kills by name directly beneath a comment that says it kills by pid |
 | A191 | S3 | START | — | generated sources / escaping | Name-list entries are interpolated into Swift string literals unescaped, so a quote or backslash in names/*.txt produces Swift that does not compile |
