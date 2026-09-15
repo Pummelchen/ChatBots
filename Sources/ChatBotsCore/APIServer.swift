@@ -533,7 +533,19 @@ public final class APIServer {
         // Everything else is the engine's, and goes through the same dispatch the
         // WebTransport server uses. A command that works on one channel therefore works on
         // the other, because there is only one implementation of it.
-        guard let command = translate(request) else {
+        let command: EngineRequest?
+        do {
+            command = try translate(request)
+        } catch let unreadable as UnreadableRequest {
+            // 400, and the reason is the server's own: a client that sent something unreadable is told
+            // what was wrong with it rather than that the route does not exist (A142).
+            return .error(unreadable.reason, status: 400)
+        } catch {
+            // `translate` throws only `UnreadableRequest`; anything else here is a defect, and naming
+            // it in a 400 is better than a crash or a blank answer.
+            return .error("the request could not be read: \(error)", status: 400)
+        }
+        guard let command else {
             return .error("no route for \(request.method) \(request.path)", status: 404)
         }
         let reply = await service.handle(command)
@@ -594,7 +606,53 @@ public final class APIServer {
         return mode
     }
 
-    private func translate(_ request: HTTPRequest) -> EngineRequest? {
+    /// A request that cannot be turned into an engine request, and why.
+    ///
+    /// Separate from "no route" because the answer differs: an unknown route is a 404, a body the
+    /// server cannot read is a 400 that says what was wrong (A142).
+    private struct UnreadableRequest: Error {
+        var reason: String
+    }
+
+    /// The command body, telling three states apart that `try?` used to collapse into one.
+    ///
+    /// No body at all means the field was not sent, which some routes treat as "clear this" and is
+    /// the caller's decision. A body that decodes is the command. A body that was **sent and cannot
+    /// be read** is a client error — and it used to be read as the defaults, so a typo in `mode`
+    /// switched the room to entertainment, an unknown research depth reset it to standard, and a
+    /// malformed topic cleared it. Silent, and in the direction of changing state (A142).
+    private func command(from request: HTTPRequest) throws -> APICommand? {
+        guard !request.body.isEmpty else { return nil }
+        guard let decoded = request.json(APICommand.self) else {
+            throw UnreadableRequest(
+                reason: "the request body is not a JSON object with the fields this route takes")
+        }
+        return decoded
+    }
+
+    /// The 400 for a value that is present but not one this server knows.
+    ///
+    /// The two routes that map a string to a case used to answer with a default instead — an unknown
+    /// mode switched the room to entertainment, an unknown research depth reset it to standard — so a
+    /// misspelling changed state. It is a bad request, and the answer says what was expected (A142).
+    private func unknownValue(_ field: String, _ raw: String, _ allowed: [String]) -> UnreadableRequest {
+        UnreadableRequest(
+            reason: "unknown \(field) \"\(raw)\" — expected one of: \(allowed.joined(separator: ", "))")
+    }
+
+    /// The change a seat update describes.
+    ///
+    /// Pulled out of `translate` because the case that used to build it inline put that function over
+    /// its `function_body_length` budget, and a named value reads better than a nested `.init` anyway.
+    private func seatChange(from body: APICommand, seatID: String) -> EngineRequest.SeatChange {
+        EngineRequest.SeatChange(
+            seatID: seatID, name: body.name, personaID: body.personaID,
+            thinking: body.thinking.flatMap(ThinkingMode.init(rawValue:)),
+            backend: body.backend.flatMap(AgentSpec.Backend.init(rawValue:)),
+            baseURL: body.baseURL, apiModel: body.apiModel, apiKey: body.apiKey)
+    }
+
+    private func translate(_ request: HTTPRequest) throws -> EngineRequest? {
         switch (request.method, request.path) {
         case ("GET", "/api/state"): return .fetchState
         case ("POST", "/api/start"): return .start
@@ -608,47 +666,48 @@ public final class APIServer {
         case ("POST", "/api/conversations/new"): return .newConversation
 
         case ("POST", "/api/conversations/load"):
-            guard let id = request.json(APICommand.self)?.value else { return nil }
+            guard let id = try command(from: request)?.value else { return nil }
             return .loadSavedConversation(id: id)
 
         case ("POST", "/api/conversations/delete"):
-            guard let id = request.json(APICommand.self)?.value else { return nil }
+            guard let id = try command(from: request)?.value else { return nil }
             return .deleteSavedConversation(id: id)
 
         case ("POST", "/api/topic"):
-            guard let body = request.json(APICommand.self), let topic = body.topic,
+            guard let body = try command(from: request), let topic = body.topic,
                 !topic.isEmpty
             else { return .setTopic("") }   // an empty topic is refused by the engine
             return .setTopic(topic)
 
         case ("POST", "/api/message"):
-            guard let body = request.json(APICommand.self), let text = body.text else {
+            guard let body = try command(from: request), let text = body.text else {
                 return .steer("")
             }
             return .steer(text)
 
         case ("POST", "/api/settings"):
-            let body = request.json(APICommand.self)
+            let body = try command(from: request)
             return .setShowReasoning(body?.showReasoning ?? service.showReasoning)
 
         case ("POST", "/api/mode"):
-            guard let raw = request.json(APICommand.self)?.value,
-                let mode = DiscussionMode(rawValue: raw)
-            else { return .setMode(.entertainment) }
+            guard let raw = try command(from: request)?.value else { return nil }
+            guard let mode = DiscussionMode(rawValue: raw) else {
+                throw unknownValue("mode", raw, DiscussionMode.allCases.map(\.rawValue))
+            }
             return .setMode(mode)
 
         case ("POST", "/api/roster"):
-            guard let body = request.json(APICommand.self), let id = body.id else { return nil }
+            guard let body = try command(from: request), let id = body.id else { return nil }
             // A seed the caller supplies reproduces a draw; one it does not supply is made
             // here and reported, so every draw is repeatable whether or not it was planned.
             return .applyRoster(id: id, seed: body.seed ?? RosterLibrary.freshSeed())
 
         case ("POST", "/api/scenario"):
-            guard let id = request.json(APICommand.self)?.id else { return nil }
+            guard let id = try command(from: request)?.id else { return nil }
             return .applyScenario(id: id)
 
         case ("POST", "/api/vote"):
-            guard let body = request.json(APICommand.self), let turnID = body.id else { return nil }
+            guard let body = try command(from: request), let turnID = body.id else { return nil }
             // No verdict withdraws the vote, so a mis-click does not have to be reversed by
             // clicking the opposite button — which would leave a wrong judgement in the record.
             return .castVote(
@@ -659,37 +718,34 @@ public final class APIServer {
             return .clearVotes
 
         case ("POST", "/api/moderator"):
-            guard let body = request.json(APICommand.self) else { return nil }
+            guard let body = try command(from: request) else { return nil }
             return .setModerator(
                 ModeratorIdentity(
                     name: body.name ?? ModeratorIdentity.defaultName,
                     personaID: body.personaID ?? PersonaLibrary.neutral.id))
 
         case ("POST", "/api/research/budget"):
-            guard let raw = request.json(APICommand.self)?.value,
-                let depth = ResearchBudget.Depth(rawValue: raw)
-            else { return .setResearchBudget(.standard) }
+            guard let raw = try command(from: request)?.value else { return nil }
+            guard let depth = ResearchBudget.Depth(rawValue: raw) else {
+                throw unknownValue(
+                    "research depth", raw, ResearchBudget.Depth.allCases.map(\.rawValue))
+            }
             return .setResearchBudget(depth)
 
         case ("POST", "/api/seat"):
-            guard let body = request.json(APICommand.self), let seatID = body.seat else {
+            guard let body = try command(from: request), let seatID = body.seat else {
                 return nil
             }
-            return .updateSeat(
-                .init(
-                    seatID: seatID, name: body.name, personaID: body.personaID,
-                    thinking: body.thinking.flatMap(ThinkingMode.init(rawValue:)),
-                    backend: body.backend.flatMap(AgentSpec.Backend.init(rawValue:)),
-                    baseURL: body.baseURL, apiModel: body.apiModel, apiKey: body.apiKey))
+            return .updateSeat(seatChange(from: body, seatID: seatID))
 
         case ("POST", "/api/attachments"):
-            guard let body = request.json(APICommand.self), let filename = body.filename,
+            guard let body = try command(from: request), let filename = body.filename,
                 let content = body.content, let data = Data(base64Encoded: content)
             else { return nil }
             return .addAttachment(filename: filename, contents: data)
 
         case ("POST", "/api/attachments/remove"):
-            guard let id = request.json(APICommand.self)?.value else { return nil }
+            guard let id = try command(from: request)?.value else { return nil }
             return .removeAttachment(id: id)
 
         default:

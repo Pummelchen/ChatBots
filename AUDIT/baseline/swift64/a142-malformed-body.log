@@ -1,0 +1,54 @@
+# A142 — a body the server cannot read (2026-09-15T14:08:28Z)
+
+## 1. before: the three collapsed states
+$ git show HEAD:Sources/ChatBotsCore/HTTPServer.swift | grep -n 'func json' -A 2
+  42:    public func json<T: Decodable>(_ type: T.Type) -> T? {
+  43-        try? JSONDecoder().decode(type, from: body)
+  44-    }
+  --
+  74:    public static func json(_ value: some Encodable) -> HTTPResponse {
+  75-        let encoder = JSONEncoder()
+  76-        // Dates as ISO-8601 so the web page can format them itself rather than being handed
+  --
+  100:    public static func json(_ value: [String: String], status: Int) -> HTTPResponse {
+  101-        HTTPResponse(status: status, body: (try? JSONEncoder().encode(value)) ?? Data())
+  102-    }
+$ git show HEAD:Sources/ChatBotsCore/APIServer.swift | grep -n 'setMode(.entertainment)\|setResearchBudget(.standard)\|setTopic("")'
+  621:            else { return .setTopic("") }   // an empty topic is refused by the engine
+  637:            else { return .setMode(.entertainment) }
+  671:            else { return .setResearchBudget(.standard) }
+
+$ swift test --filter MalformedBodyTests   # before
+  ✘ Test "A body that is not a JSON object at all is refused" recorded an issue at AuditS2MalformedBodyTests.swift:140:9: Expectation failed: response.status
+  ✘ Test "An unknown research depth is a 400, and the depth is untouched" recorded an issue at AuditS2MalformedBodyTests.swift:128:9: Expectation failed: res
+  ✘ Test "A body that is not a JSON object at all is refused" failed after 0.052 seconds with 1 issue.
+  ✘ Test "An unknown research depth is a 400, and the depth is untouched" failed after 0.052 seconds with 1 issue.
+  ✘ Test "An unknown mode is a 400, and the mode is untouched" recorded an issue at AuditS2MalformedBodyTests.swift:116:9: Expectation failed: response.statu
+  ✘ Test "An unknown mode is a 400, and the mode is untouched" recorded an issue at AuditS2MalformedBodyTests.swift:118:9: Expectation failed: mode == "resea
+  ✘ Test "A body that is not JSON is a 400, and the topic is untouched" recorded an issue at AuditS2MalformedBodyTests.swift:100:9: Expectation failed: respo
+  ✘ Test "An unknown mode is a 400, and the mode is untouched" failed after 0.062 seconds with 2 issues.
+  ✘ Test "A body that is not JSON is a 400, and the topic is untouched" failed after 0.065 seconds with 1 issue.
+  ✘ Test run with 5 tests in 1 suite failed after 0.065 seconds with 5 issues.
+
+## 2. after
+$ grep -n 'UnreadableRequest|command(from:|unknownValue|seatChange' Sources/ChatBotsCore/APIServer.swift
+  539:        } catch let unreadable as UnreadableRequest {
+  544:            // `translate` throws only `UnreadableRequest`; anything else here is a defect, and naming
+  613:    private struct UnreadableRequest: Error {
+  624:    private func command(from request: HTTPRequest) throws -> APICommand? {
+  627:            throw UnreadableRequest(
+  638:    private func unknownValue(_ field: String, _ raw: String, _ allowed: [String]) -> UnreadableRequest {
+  639:        UnreadableRequest(
+  647:    private func seatChange(from body: APICommand, seatID: String) -> EngineRequest.SeatChange {
+$ swift test --filter MalformedBodyTests   # after
+  ✔ Test run with 5 tests in 1 suite passed after 0.055 seconds.
+
+## 3. the style the fix had to keep, and the tools that check it
+$ swiftlint lint --quiet        # 255 before this task and 255 after
+  the first version of the change put translate() at 82 lines against an 80-line budget:
+  the unknown-value guard and the seat-change construction were extracted into named
+  helpers, which is where the two functions below come from — measured, not waived.
+$ xcrun swift-format lint -r Sources Tests | wc -l
+  authored swift-format diagnostics: 747 before and 747 after
+$ swift test   # the whole suite, both bundles
+  866 tests in 151 suites, exit 0
