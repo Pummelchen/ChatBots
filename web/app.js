@@ -861,12 +861,19 @@
 
   // ── Commands ──────────────────────────────────────────────────────────────────────
 
+  // Run one command and answer whether the engine took it.
+  //
+  // The answer matters to `send` below and to nothing else: a command that is refused, or an engine
+  // that cannot be reached, arrives here as a thrown error, and the caller that has to decide what a
+  // failure means needs to know it happened (A174).
   async function run(fn) {
     try {
       const next = await fn();
       if (next && next.seats) apply(next);
+      return true;
     } catch (error) {
       toast(error.message);
+      return false;
     }
   }
 
@@ -1265,13 +1272,31 @@
     await run(() => api.post("/api/research/budget", { value: depth }));
   }
 
+  // Whether a send is in flight.
+  //
+  // The box used to be emptied *before* the request, which is also what stopped a second Return from
+  // posting the same text twice. Emptying it afterwards — so a refused send keeps what was typed —
+  // needs that guard to be explicit (A174).
+  let sending = false;
+
   async function send() {
     const box = $("message");
     const text = box.value.trim();
-    if (!text) return;
-    box.value = "";
-    autosize(box);
-    await run(() => api.post("/api/message", { text }));
+    if (!text || sending) return;
+    sending = true;
+    try {
+      // The box is emptied only once the engine has taken the message. Emptying it first meant a
+      // send the engine refused, or one that never left the page because the engine could not be
+      // reached, silently discarded what the moderator had typed (A174).
+      if (!(await run(() => api.post("/api/message", { text })))) return;
+      // Only the text that was sent: anything typed while the request was in flight stays.
+      if (box.value.trim() === text) {
+        box.value = "";
+        autosize(box);
+      }
+    } finally {
+      sending = false;
+    }
   }
 
   function autosize(box) {

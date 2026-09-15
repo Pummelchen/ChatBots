@@ -719,11 +719,56 @@ public final class ChatController: ObservableObject {
         errorBanner = nil
     }
 
-    public func sendModeratorMessage() {
+    /// Send the moderator's message.
+    ///
+    /// The send is returned as a task rather than started and forgotten: the button action ignores it,
+    /// and a test can await it instead of polling for the outcome it produces (A174).
+    @discardableResult
+    public func sendModeratorMessage() -> Task<Void, Never> {
         let text = moderatorDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
-        run { client in _ = try await client.send(.steer(text)) }
-        moderatorDraft = ""
+        guard !text.isEmpty else { return Task {} }
+        return Task { [weak self] in await self?.deliverModeratorDraft(text) }
+    }
+
+    /// Send the moderator's message, and keep the draft unless the engine took it.
+    ///
+    /// Split from the button's action so the rule below has a caller a test can drive without
+    /// racing the task the button starts.
+    func deliverModeratorDraft(_ text: String) async {
+        let accepted = await deliver(.steer(text))
+        moderatorDraft = Self.draft(afterSendOf: text, accepted: accepted, current: moderatorDraft)
+    }
+
+    /// What the moderator's draft becomes once a send has been attempted.
+    ///
+    /// Cleared only when the engine accepted the message, and only when the box still holds what was
+    /// sent: the moderator may have started the next line while the request was in flight, and
+    /// clearing *that* would be this defect one step later. A send that was refused — a message over
+    /// the engine's limit, or an engine that cannot be reached at all — keeps what was typed, which
+    /// is the only copy of it (A174).
+    static func draft(afterSendOf sent: String, accepted: Bool, current: String) -> String {
+        guard accepted else { return current }
+        return current.trimmingCharacters(in: .whitespacesAndNewlines) == sent ? "" : current
+    }
+
+    /// Send one command and answer whether the engine accepted it.
+    ///
+    /// `run` is fire-and-forget: it reports a failure into `engineConnection` and returns, so a
+    /// caller whose next step depends on the outcome has nothing to read. This is that caller's
+    /// version (A174).
+    @discardableResult
+    private func deliver(_ request: EngineRequest) async -> Bool {
+        guard let client else {
+            engineConnection = "Not connected to the engine."
+            return false
+        }
+        do {
+            _ = try await client.send(request)
+            return true
+        } catch {
+            engineConnection = error.localizedDescription
+            return false
+        }
     }
 
     /// Change one seat's thinking level. Applies from its next turn.

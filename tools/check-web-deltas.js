@@ -178,6 +178,28 @@ console.log("web/deltas.js");
   check(
     "the page gates removing an attachment on the same flag the engine uses",
     /remove\.disabled = !state\.snapshot\.canAttach/.test(appJS));
+
+  // A174: the moderator's draft was emptied *before* the send, so a message the engine refused — or one
+  // that never left the page because the engine could not be reached — silently discarded what had been
+  // typed. The browser interaction is not exercised here; what is checked is the ordering that was
+  // wrong, that the helper the ordering depends on reports the outcome, and that the guard which used to
+  // be the emptied box is now explicit.
+  const sendBody = appJS.slice(
+    appJS.indexOf("async function send()"),
+    appJS.indexOf("function autosize(box)"));
+  const runBody = appJS.slice(
+    appJS.indexOf("async function run(fn)"),
+    appJS.indexOf("── Kept conversations"));
+  check("the command helper reports whether the engine took the command",
+    /return true;/.test(runBody) && /return false;/.test(runBody));
+  check("the page posts the message before it empties the box",
+    sendBody.indexOf('api.post("/api/message"') < sendBody.indexOf('box.value = ""'));
+  check("and it empties the box only when the send was accepted",
+    /if \(!\(await run\(\(\) => api\.post\("\/api\/message", \{ text \}\)\)\)\) return;/.test(sendBody));
+  check("so that what is typed during the request is not thrown away",
+    /box\.value\.trim\(\) === text/.test(sendBody));
+  check("and a second Return cannot post the same text twice",
+    /if \(!text \|\| sending\) return;/.test(sendBody));
 }
 
 if (failures === 0) {
