@@ -30,12 +30,12 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 213 |
-| DONE | 161 |
-| START | 52 |
+| DONE | 162 |
+| START | 51 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 52
+### Open — 51
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -84,7 +84,6 @@ been run.
 | A194 | S3 | START | — | docs / drift | Several tool comments and help texts describe behaviour that changed or never existed |
 | A195 | S3 | START | — | docs / TLS trust | The client never enforces the pinned fingerprint while another comment claims pinning is meaningful |
 | A199 | S2 | START | — | prompts / identity | The social engine keys and words itself by seat id while every other prompt surface uses display names |
-| A200 | S2 | START | — | model reporting | The MLX model label is a constant, so another checkpoint is misreported to the user and to the model |
 | A201 | S2 | START | — | resource lifecycle | A new client and a never-invalidated URLSession are created for every turn |
 | A203 | S2 | START | — | research / direction | The author of an unsupported claim can be directed to substantiate their own claim |
 | A205 | S3 | START | — | dead code / wrong label | The .richText case is unreachable and an RTF file is labelled 'Word' |
@@ -216,7 +215,7 @@ been run.
 | A198 | S1 | DONE | 2918d0b | concurrency / lifecycle | A session accepted during stop() is orphaned and keeps serving |
 | A199 | S2 | START | — | prompts / identity | The social engine keys and words itself by seat id while every other prompt surface uses display names |
 | A20 | S1 | DONE | e9d45ef | web front end | Stored DOM XSS: the live-pane header interpolates the moderator-supplied seat name into innerHTML |
-| A200 | S2 | START | — | model reporting | The MLX model label is a constant, so another checkpoint is misreported to the user and to the model |
+| A200 | S2 | DONE | daa6227 | model reporting | The MLX model label is a constant, so another checkpoint is misreported to the user and to the model |
 | A201 | S2 | START | — | resource lifecycle | A new client and a never-invalidated URLSession are created for every turn |
 | A202 | S2 | DONE | 0c885fd | terminal event | An empty server answer emits turnFailed and then turnFinished, so a failed turn is recorded as a successful empty one |
 | A203 | S2 | START | — | research / direction | The author of an unsupported claim can be directed to substantiate their own claim |
