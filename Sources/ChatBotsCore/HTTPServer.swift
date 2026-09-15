@@ -114,6 +114,7 @@ public struct HTTPResponse: Sendable {
         case 409: "Conflict"
         case 413: "Payload Too Large"
         case 500: "Internal Server Error"
+        case 501: "Not Implemented"
         case 503: "Service Unavailable"
         default: "OK"
         }
@@ -301,6 +302,8 @@ public enum HTTPParser {
             headers[name.lowercased()] = headers[name.lowercased()].map { "\($0), \(value)" } ?? value
         }
 
+        try refuseUnframedBody(headers)
+
         let declaredLength = try declaredBodyLength(headers["content-length"])
         guard declaredLength <= maximumBodyBytes else {
             throw HTTPError.tooLarge
@@ -326,6 +329,30 @@ public enum HTTPParser {
 
         return HTTPRequest(
             method: method, path: path, query: query, headers: headers, body: body)
+    }
+
+    /// Refuse a body whose framing this server cannot read, rather than reading it as empty.
+    ///
+    /// `Transfer-Encoding` appeared nowhere in this file (A153), so a chunked request — what a proxy
+    /// forwards when the client did not know the length, and what `curl --data-binary @-` sends from a
+    /// pipe — arrived with no `Content-Length`, which `declaredBodyLength` reads as zero. The request
+    /// then parsed successfully with an empty body and its route ran on it. Every route here reads an
+    /// empty body as "the field was not sent" (A142) and `/api/topic` answers that by clearing the
+    /// topic, so the failure was silent and in the direction of changing state.
+    ///
+    /// Both framings at once is the one shape here that is a request-smuggling signal rather than a
+    /// client mistake, so it is a 400 (RFC 9112 §6.1); a coding this server does not implement — it
+    /// implements none — is the 501 that same section asks for. Nothing downstream sees either: the
+    /// read loop answers and closes before a route is reached.
+    private static func refuseUnframedBody(_ headers: [String: String]) throws {
+        guard let declared = headers["transfer-encoding"] else { return }
+        guard headers["content-length"] == nil else {
+            throw HTTPError.malformed("both Transfer-Encoding and Content-Length were declared")
+        }
+        guard !declared.isEmpty else {
+            throw HTTPError.malformed("Transfer-Encoding declared no coding")
+        }
+        throw HTTPError.unsupportedTransferEncoding(declared)
     }
 
     /// The body length a `Content-Length` header declares, or zero when it is absent.
@@ -362,6 +389,8 @@ public enum HTTPError: LocalizedError {
     case tooLarge
     case headTooLarge
     case portInUse(UInt16)
+    /// A body the server cannot frame because it does not implement the coding asked for (A153).
+    case unsupportedTransferEncoding(String)
 
     public var errorDescription: String? {
         switch self {
@@ -369,15 +398,19 @@ public enum HTTPError: LocalizedError {
         case .tooLarge: "Request body is too large"
         case .headTooLarge: "Request headers are too large"
         case .portInUse(let port): "Port \(port) is already in use"
+        case .unsupportedTransferEncoding(let coding):
+            "Transfer-Encoding is not supported: \(coding). Send a Content-Length instead."
         }
     }
 
     /// The status a client is answered with. 431 for a head that cannot fit is the code that exists
-    /// for it; 413 is the body's.
+    /// for it; 413 is the body's; 501 is what RFC 9112 §6.1 asks for when the recipient does not
+    /// implement the transfer coding it was sent.
     public var statusCode: Int {
         switch self {
         case .headTooLarge: 431
         case .tooLarge: 413
+        case .unsupportedTransferEncoding: 501
         case .malformed, .portInUse: 400
         }
     }

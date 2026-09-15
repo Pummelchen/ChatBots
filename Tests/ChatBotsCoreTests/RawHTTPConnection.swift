@@ -39,9 +39,12 @@ final class RawConnection {
         return false
     }
 
-    func send(_ text: String) {
-        connection.send(content: Data(text.utf8), completion: .contentProcessed { _ in })
+    /// Write bytes as they are, for a body that is not text a `String` round-trip would preserve.
+    func send(_ data: Data) {
+        connection.send(content: data, completion: .contentProcessed { _ in })
     }
+
+    func send(_ text: String) { send(Data(text.utf8)) }
 
     /// The next bytes the server sends, or `nil` if none arrive before `timeout`.
     ///
