@@ -30,17 +30,16 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 213 |
-| DONE | 150 |
-| START | 63 |
+| DONE | 151 |
+| START | 62 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 63
+### Open — 62
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
 | A135 | S2 | START | — | packaging / dependencies | The repository states that mlx-swift's SwiftPM build does not compile the Metal kernels; under Xcode 27 it does, so the 190 MB separate metallib download is of unverified necessity and the stated reason for it is now false |
-| A138 | S2 | START | — | security / TLS identity | The TLS private key's 0600 mode is applied with `try?` and never verified, so a failure leaves the engine key group/world-readable |
 | A139 | S2 | START | — | security / credentials | The per-seat cloud API key is copied into Codable settings and written to the preferences plist in cleartext, contradicting the app's own Keychain claim |
 | A140 | S2 | START | — | security / logging (L7) | An undocumented trace switch writes the entire request body — system instructions, whole conversation, base64 images — to stderr, unbounded |
 | A141 | S2 | START | — | security / SSRF | A seat's baseURL is interpolated into a URL and fetched with no scheme/host check and no redirect policy, so file://, link-local and loopback targets are reachable and internal error bodies are echoed |
@@ -158,7 +157,7 @@ been run.
 | A135 | S2 | START | — | packaging / dependencies | The repository states that mlx-swift's SwiftPM build does not compile the Metal kernels; under Xcode 27 it does, so the 190 MB separate metallib download is of unverified necessity and the stated reason for it is now false |
 | A136 | S0 | DONE | 8d3fa2b | security / HTTP API | No Origin/Referer check and Content-Type is ignored, so any web page the user visits can drive the engine; /api/seat lets it repoint a cloud seat and exfiltrate a conversation |
 | A137 | S0 | DONE | 8d3fa2b | persistence | The store deletes the index and then moves the new one into place, so a crash between the two loses every kept conversation, and the atomically written .tmp is never recovered |
-| A138 | S2 | START | — | security / TLS identity | The TLS private key's 0600 mode is applied with `try?` and never verified, so a failure leaves the engine key group/world-readable |
+| A138 | S2 | DONE | d6f9ca6 | security / TLS identity | The TLS private key's 0600 mode is applied with `try?` and never verified, so a failure leaves the engine key group/world-readable |
 | A139 | S2 | START | — | security / credentials | The per-seat cloud API key is copied into Codable settings and written to the preferences plist in cleartext, contradicting the app's own Keychain claim |
 | A14 | S1 | DONE | 0de3123 | HTTPServer | isRunning/lastError are raced between the listener callback and waitUntilReady |
 | A140 | S2 | START | — | security / logging (L7) | An undocumented trace switch writes the entire request body — system instructions, whole conversation, base64 images — to stderr, unbounded |
