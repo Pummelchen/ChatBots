@@ -35,7 +35,9 @@ private struct FakeExtractor: DocumentExtracting {
     var imageData: Data?
     var throwsError: DocumentError?
 
-    func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument {
+    func extract(data: Data, from url: URL, kind: DocumentKind, limits: AttachmentLimits) throws
+        -> AttachedDocument
+    {
         if let throwsError { throw throwsError }
         let truncated = text.count > limits.maximumTextCharacters
         return AttachedDocument(

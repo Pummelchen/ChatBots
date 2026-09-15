@@ -44,7 +44,9 @@ private struct BlockingExtractor: DocumentExtracting {
     let entered: DispatchSemaphore
     let release: DispatchSemaphore
 
-    func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument {
+    func extract(data: Data, from url: URL, kind: DocumentKind, limits: AttachmentLimits) throws
+        -> AttachedDocument
+    {
         _ = entered.signal()
         // Bounded, so a test that fails before it signals cannot wedge the suite.
         _ = release.wait(timeout: .now() + 20)

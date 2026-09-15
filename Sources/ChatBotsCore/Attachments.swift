@@ -239,6 +239,8 @@ public enum DocumentError: LocalizedError, Equatable {
     case emptyText(String)
     case needsOCR(String)
     case tooLarge(String, limit: Int)
+    /// A path that is not a regular file — a directory, a FIFO, a device (A149).
+    case notARegularFile(String)
     /// An image whose own metadata declares more pixels than this app will decode (A148).
     case imageTooManyPixels(String, pixels: Int, limit: Int)
     case imageNotAllowed
@@ -255,6 +257,8 @@ public enum DocumentError: LocalizedError, Equatable {
             "\(name) has no text layer — it looks like a scan, so its text cannot be extracted."
         case .tooLarge(let name, let limit):
             "\(name) is larger than \(limit / 1_000_000) MB."
+        case .notARegularFile(let name):
+            "\(name) is not a regular file, so it cannot be read as a document."
         case .imageTooManyPixels(let name, let pixels, let limit):
             "\(name) is about \(pixels / 1_000_000) megapixels; images are limited to "
                 + "\(limit / 1_000_000) MP. Resize it first."
@@ -312,12 +316,22 @@ public struct AttachmentLimits: Sendable {
     public static let standard = AttachmentLimits()
 }
 
-/// Reads a file and returns its text.
+/// Reads one document and returns its text or image bytes.
 ///
 /// A protocol so the app can supply the real extractors while tests supply fakes, and so a
 /// future format is one more implementation rather than a change here.
+///
+/// **The bytes, not a path (A149).** The ingestor reads the file once, refuses anything that is not a
+/// regular file, and refuses anything over the byte cap *as it is reading* — so what an extractor is
+/// given is what has already been bounded. Handing over the path instead is what made the cap
+/// unenforceable: the size came from a separate `stat`, so an unreadable one meant a cap of zero, a
+/// file that grew between the two calls was read in full, and a FIFO — which has no size and never
+/// ends — hung the conversion forever.
+///
+/// `url` still travels alongside, for the one extractor that hands a path to a system tool.
 public protocol DocumentExtracting: Sendable {
-    func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument
+    func extract(data: Data, from url: URL, kind: DocumentKind, limits: AttachmentLimits) throws
+        -> AttachedDocument
 }
 
 /// Holds the extractor a front end installed.
@@ -381,15 +395,28 @@ public final class DocumentIngestor: @unchecked Sendable {
             throw DocumentError.unsupportedType(name)
         }
 
-        let attributes = try? fileManager.attributesOfItem(atPath: url.path)
-        let size = (attributes?[.size] as? NSNumber)?.intValue ?? 0
-        if size > limits.maximumFileBytes {
+        // The stat is required, and it has to say "regular file" (A149). A failed stat used to mean a
+        // size of zero, which meant a cap of zero; a FIFO or a device has no size and never reaches an
+        // end, so a conversion from one either hung or ran unbounded.
+        guard let attributes = try? fileManager.attributesOfItem(atPath: url.path) else {
+            throw DocumentError.unreadable("\(name)'s size could not be read")
+        }
+        guard attributes[.type] as? FileAttributeType == .typeRegular else {
+            throw DocumentError.notARegularFile(name)
+        }
+        if let size = (attributes[.size] as? NSNumber)?.intValue, size > limits.maximumFileBytes {
             throw DocumentError.tooLarge(name, limit: limits.maximumFileBytes)
         }
 
-        var document = try extractor.extract(url: url, kind: kind, limits: limits)
+        // One read, bounded by the cap. The stat above is a courtesy — it refuses an obviously large
+        // file without opening it — but *this* is the check that binds: a file that grew after the stat,
+        // or one whose size the stat did not report, cannot be read past the limit, and the extractor
+        // receives only bytes that were counted.
+        let data = try Self.readBounded(url: url, name: name, limit: limits.maximumFileBytes)
+
+        var document = try extractor.extract(data: data, from: url, kind: kind, limits: limits)
         document.name = name
-        document.byteCount = size
+        document.byteCount = data.count
 
         guard document.isUsable else {
             // An image with no bytes is a read failure; a document with no text is either
@@ -401,6 +428,32 @@ public final class DocumentIngestor: @unchecked Sendable {
             throw DocumentError.emptyText(name)
         }
         return document
+    }
+
+    /// A file's bytes, stopping one byte past the limit rather than reading whatever is there.
+    ///
+    /// `Data(contentsOf:)` is the wrong tool here: it reads to the end of whatever it was given, which
+    /// for a special file is either forever or unbounded. This reads in chunks and refuses as soon as
+    /// the limit is passed, so the ceiling is a property of the read rather than of a previous `stat`
+    /// that could be raced (A149). The file is a regular file by the time this runs — the caller has
+    /// checked — so the read terminates.
+    static func readBounded(url: URL, name: String, limit: Int) throws -> Data {
+        guard let handle = try? FileHandle(forReadingFrom: url) else {
+            throw DocumentError.unreadable("\(name) could not be opened")
+        }
+        defer { try? handle.close() }
+
+        var data = Data()
+        // A chunk size rather than one call: `read(upToCount:)` returns what is available, so a file
+        // larger than the limit arrives in pieces and the check below happens on each of them.
+        while data.count <= limit {
+            guard let chunk = try? handle.read(upToCount: 64 * 1024), !chunk.isEmpty else { break }
+            data.append(chunk)
+        }
+        guard data.count <= limit else {
+            throw DocumentError.tooLarge(name, limit: limit)
+        }
+        return data
     }
 }
 

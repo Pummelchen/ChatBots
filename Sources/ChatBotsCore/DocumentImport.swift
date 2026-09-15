@@ -19,14 +19,10 @@ import UniformTypeIdentifiers
 /// Markdown is included here: it is text, and converting it would strip the structure that
 /// makes it useful to a model, so it is passed through as written.
 public struct PlainTextExtractor: DocumentExtracting {
-    public func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument {
-        let data: Data
-        do {
-            data = try Data(contentsOf: url)
-        } catch {
-            throw DocumentError.unreadable(error.localizedDescription)
-        }
-
+    public func extract(data: Data, from url: URL, kind: DocumentKind, limits: AttachmentLimits) throws
+        -> AttachedDocument
+    {
+        // The bytes were read once, by the ingestor, and bounded there (A149).
         // UTF-8 first, then the encodings a Mac is most likely to meet. Latin-1 is last
         // because it accepts any byte, so it would mask a genuine encoding problem.
         let text =
@@ -57,8 +53,12 @@ public struct PlainTextExtractor: DocumentExtracting {
 
 /// Reads a PDF's text layer.
 public struct PDFTextExtractor: DocumentExtracting {
-    public func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument {
-        guard let document = PDFDocument(url: url) else {
+    public func extract(data: Data, from url: URL, kind: DocumentKind, limits: AttachmentLimits) throws
+        -> AttachedDocument
+    {
+        // From the bytes rather than the path: `PDFDocument(url:)` would read the file a second time,
+        // which is the read the ingestor has just bounded (A149).
+        guard let document = PDFDocument(data: data) else {
             throw DocumentError.unreadable("the PDF could not be opened")
         }
 
@@ -132,7 +132,14 @@ struct PDFTextBudget {
 
 /// Converts Word, RTF, ODT, HTML and WebArchive with the system's own converter.
 public struct TextutilExtractor: DocumentExtracting {
-    public func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument {
+    /// The one extractor that still works from the path: `textutil` is a system tool that takes a file,
+    /// and staging the bytes to a temporary file to satisfy it would double the reading and writing for
+    /// no gain. What bounds it is the same as before — its output is capped and it is killed if it
+    /// overstays (`SystemProcess`, A197) — and the input is a regular file the ingestor has already
+    /// measured and read (A149).
+    public func extract(data: Data, from url: URL, kind: DocumentKind, limits: AttachmentLimits) throws
+        -> AttachedDocument
+    {
         let result = try SystemProcess.run(
             "/usr/bin/textutil",
             ["-convert", "txt", "-stdout", "-encoding", "UTF-8", url.path],
@@ -169,13 +176,10 @@ public struct TextutilExtractor: DocumentExtracting {
 /// attachments were likely rejected with a 400. They are common — macOS writes TIFF and other
 /// systems produce BMP — so this conversion path, not a refusal, is what handles them now.
 public struct ImageExtractor: DocumentExtracting {
-    public func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument {
-        let data: Data
-        do {
-            data = try Data(contentsOf: url)
-        } catch {
-            throw DocumentError.unreadable(error.localizedDescription)
-        }
+    public func extract(data: Data, from url: URL, kind: DocumentKind, limits: AttachmentLimits) throws
+        -> AttachedDocument
+    {
+        // The bytes were read once, by the ingestor, and bounded there (A149).
         let payload = try Self.wireRepresentation(
             of: data, filename: url.lastPathComponent, limits: limits)
         return AttachedDocument(

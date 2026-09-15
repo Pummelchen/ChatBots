@@ -60,7 +60,9 @@ private struct ControlledExtractor: DocumentExtracting {
     /// When set, the extractor refuses with this reason instead of returning a document.
     var failure: String?
 
-    func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument {
+    func extract(data: Data, from url: URL, kind: DocumentKind, limits: AttachmentLimits) throws
+        -> AttachedDocument
+    {
         staged.record(url)
         if let entered { _ = entered.signal() }
         if let release {
