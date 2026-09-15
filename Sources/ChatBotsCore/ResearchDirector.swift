@@ -563,7 +563,9 @@ public struct ResearchDirector: Sendable {
         // Skipped rather than reassigned when the only analyst equipped to check it is the one
         // who just spoke: asking someone to answer themselves is not a direction, and the gap
         // is still there next round.
-        if let gap = unsupported.first, let seat = seatFor(.methodology) {
+        // `excluding: gap.seatID` — the comment above this rule says asking the author to answer
+        // themselves is not a direction; this is what makes that true (A203).
+        if let gap = unsupported.first, let seat = seatFor(.methodology, excluding: gap.seatID) {
             let name = instructionName(gap.seatID)
             return ResearchDirection(
                 seatID: seat,
@@ -702,9 +704,15 @@ public struct ResearchDirector: Sendable {
     /// Nil when the only analyst who fits it is the one who just spoke. Nil means "not now"
     /// rather than "nobody": every caller falls through to the next check, or to the rotation,
     /// so a skipped assignment costs a turn of delay and never a turn of silence.
-    private func seatFor(_ question: ResearchSubQuestion) -> String? {
+    /// `excluding` is how a caller says "anyone but this one". The unsupported-claim rule passes the
+    /// author, because asking someone to establish whether their *own* claim holds is not a direction —
+    /// which the comment above that rule has always said, while the call passed only `lastSpeakerID`
+    /// and so chose the author whenever they had the top affinity and had not just spoken (A203).
+    private func seatFor(_ question: ResearchSubQuestion, excluding excluded: String? = nil) -> String? {
         let fitting = rankedSeats(for: question)
-        if let pick = fitting.first(where: { $0.id != lastSpeakerID }) { return pick.id }
+        if let pick = fitting.first(where: { $0.id != lastSpeakerID && $0.id != excluded }) {
+            return pick.id
+        }
         return nil
     }
 

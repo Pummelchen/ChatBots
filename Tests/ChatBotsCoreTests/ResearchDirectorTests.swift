@@ -752,3 +752,55 @@ struct ResearchDirectorInjectionTests {
         #expect(direction.instruction.hasPrefix("sta "))
     }
 }
+
+// MARK: - The author of a claim is not asked to check it (A203)
+
+@Suite("An unsupported claim is not sent back to its author")
+@MainActor
+struct ResearchDirectorAuthorTests {
+
+    @Test("The claim is given to someone other than the analyst who made it")
+    func authorIsNotAskedToCheckTheirOwnClaim() {
+        // `sta` is the methodology fit — the seat this rule would normally pick — and the author here,
+        // so the exclusion is the only thing that can move the direction.
+        let seats = [analyst("sta", role: "statistician"), analyst("eco", role: "economist")]
+        let director = ResearchDirector(
+            seats: seats,
+            contributions: ["sta": 1],
+            unsupported: [(seatID: "sta", claim: "the market will collapse")],
+            analystIDs: ["sta", "eco"])
+
+        let direction = director.direction()
+        #expect(direction.seatID == "eco", "the other analyst is asked, not the author")
+        #expect(direction.instruction.contains("sta made a claim"), "and the author is still named")
+        #expect(direction.kind == .unsupportedClaim)
+    }
+
+    @Test("When the author is the only analyst who fits, the rule is skipped rather than reversed")
+    func noDirectionWhenTheAuthorIsTheOnlyFit() {
+        let seats = [analyst("sta", role: "statistician")]
+        let director = ResearchDirector(
+            seats: seats,
+            contributions: ["sta": 1],
+            unsupported: [(seatID: "sta", claim: "the market will collapse")],
+            analystIDs: ["sta"])
+
+        let direction = director.direction()
+        // Not "ask the author": the rule declines, and the director falls through to the rotation.
+        #expect(direction.kind != .unsupportedClaim, "the author must not be handed their own claim")
+    }
+
+    @Test("The counterweight: a claim by someone else still goes to the fitting analyst")
+    func someoneElsesClaimIsStillDirected() {
+        let seats = [analyst("sta", role: "statistician"), analyst("eco", role: "economist")]
+        let director = ResearchDirector(
+            seats: seats,
+            contributions: ["eco": 1],
+            unsupported: [(seatID: "eco", claim: "the market will collapse")],
+            analystIDs: ["sta", "eco"])
+
+        let direction = director.direction()
+        #expect(direction.seatID == "sta", "the statistician checks a claim the economist made")
+        #expect(direction.kind == .unsupportedClaim)
+    }
+}
