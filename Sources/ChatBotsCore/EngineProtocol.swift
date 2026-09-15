@@ -261,6 +261,19 @@ public enum ProtocolLimits {
     /// magnitude, so the message cap is decided by the document rather than by the envelope.
     public static let envelopeOverheadBytes = 64 * 1024
 
+    /// How many events one hop buffers before it starts dropping the oldest.
+    ///
+    /// One number for every hop, deliberately. The engine's own stream, the transport server's per-session
+    /// stream and the client's stream all carry the same event flow, and the cost of a bound that exists on
+    /// one side of a protocol and not the other is what A158 found: the server kept 256 and the client kept
+    /// everything, so a consumer that fell behind — a stalled interface, a paused window — turned the
+    /// client's stream into exactly the unbounded retention the bound was there to prevent.
+    ///
+    /// Newest rather than oldest: a consumer that is behind wants the state as it is now, not the backlog it
+    /// missed. A `turnFinished` is followed by a whole fresh state, so dropping stale fragments cannot leave
+    /// a client unable to draw.
+    public static let eventBufferDepth = 256
+
     /// The largest single message either side will accept: the base64 form of the largest
     /// attachment the engine accepts, plus the envelope around it.
     ///

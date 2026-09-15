@@ -119,12 +119,8 @@ public final class WebTransportEngineClient {
         }
     }
 
-    /// Whether a `send` currently owns the request channel, and the sends waiting for it.
-    ///
-    /// The channel is one request wide. See `acquireRequestSlot` for why that is enforced here
-    /// rather than assumed.
-    private var requestSlotHeld = false
-    private var waitingForRequestSlot: [CheckedContinuation<Void, Never>] = []
+    /// The one-request-wide channel, and the sends waiting for it. See `RequestSlot`.
+    private let requestSlot = RequestSlot()
 
     /// Events and states, in order, for as long as the connection lasts.
     private var eventContinuation: AsyncStream<EngineEvent>.Continuation?
@@ -193,8 +189,12 @@ public final class WebTransportEngineClient {
                 self.stream = try await session.openBidirectionalStream(
                     timeoutMilliseconds: configuration.idleTimeoutMilliseconds)
 
+                // The same depth the server keeps, from the shared constant: this was `.unbounded`, which
+                // made the bounding one-sided — the server dropped its oldest 256 while the client retained
+                // every event it was sent, so a consumer that stopped draining (a stalled interface, a
+                // paused window) grew the client without limit (A158).
                 let (events, continuation) = AsyncStream<EngineEvent>.makeStream(
-                    bufferingPolicy: .unbounded)
+                    bufferingPolicy: .bufferingNewest(ProtocolLimits.eventBufferDepth))
                 self.events = events
                 self.eventContinuation = continuation
 
@@ -280,8 +280,8 @@ public final class WebTransportEngineClient {
     /// request so a reply can be checked against it. A reply that matches nothing is a reader
     /// failure with that reason, not a wait that runs out.
     public func send(_ request: EngineRequest) async throws -> EngineReply {
-        await acquireRequestSlot()
-        defer { releaseRequestSlot() }
+        await requestSlot.acquire()
+        defer { requestSlot.release() }
         guard let stream = self.stream, readerTask != nil else {
             throw ClientError.cannotConnect("not connected")
         }
@@ -352,39 +352,6 @@ public final class WebTransportEngineClient {
         throw ClientError.streamFailed("the engine closed the connection")
     }
 
-    /// Wait for the request channel.
-    ///
-    /// The wire protocol carries no correlation id — `EngineFrame.reply` is the reply and
-    /// nothing else — so a reply can only be matched while there is exactly one request
-    /// outstanding. The file used to *claim* that ("a single pending reply is all there can be
-    /// at a time") and enforce nothing: every send appended its continuation and the reader
-    /// gave each reply to `pendingReplies.first`. `ChatController` polls `state()` at 1 Hz
-    /// beside a user's command, so two sends overlap routinely; the two `stream.send` calls can
-    /// reach the wire in either order, and a reply was then delivered to the wrong waiter or
-    /// dropped. This gate makes the claim true, and `PendingRequest.request` is the identity
-    /// the reply is checked against.
-    private func acquireRequestSlot() async {
-        if !requestSlotHeld {
-            requestSlotHeld = true
-            return
-        }
-        await withCheckedContinuation { continuation in
-            waitingForRequestSlot.append(continuation)
-        }
-    }
-
-    /// Hand the request channel to the next waiter, or release it.
-    ///
-    /// The slot is handed straight over rather than released and re-taken, so two sends can
-    /// never both believe they hold it.
-    private func releaseRequestSlot() {
-        if waitingForRequestSlot.isEmpty {
-            requestSlotHeld = false
-        } else {
-            waitingForRequestSlot.removeFirst().resume()
-        }
-    }
-
     /// Send a file to the engine, which extracts it and holds it as source material.
     ///
     /// The bytes go over the request channel rather than the event channel: it is a one-shot
@@ -413,6 +380,30 @@ public final class WebTransportEngineClient {
     /// silently leaves a connected-looking client that never updates, which is the hardest
     /// kind of failure to notice.
     public private(set) var readerError: String?
+
+    /// How many frames the engine sent that this build could not read, and why the last one could not be.
+    ///
+    /// Not fatal, deliberately: the framing is intact, so the stream stays aligned and the reader carries
+    /// on — and an app may be attached to an engine of another build, where a frame it does not know is a
+    /// version difference rather than a broken connection. This was `try?` and `continue`, which dropped
+    /// the payload with no trace at all: the A32/A54 class, and the same shape A157 fixed at the server
+    /// (A158).
+    public private(set) var unreadableFrames = 0
+    public private(set) var lastUnreadableFrame: String?
+
+    /// The frame a payload carries, or nil — recorded — when this build cannot read it.
+    ///
+    /// Internal so a test can hand it a payload no decoder reads and see what the client does with it,
+    /// which is the only way to reach this path without a peer that speaks a different protocol.
+    func decodedFrame(_ payload: Data) -> EngineFrame? {
+        do {
+            return try ProtocolCodec.decodeFrame(payload)
+        } catch {
+            unreadableFrames += 1
+            lastUnreadableFrame = error.localizedDescription
+            return nil
+        }
+    }
 
     /// Read frames until the stream ends, routing each to its destination.
     private func read(from stream: WebTransportNetworkBidirectionalStream) async {
@@ -449,7 +440,7 @@ public final class WebTransportEngineClient {
                 }
                 guard case .message(let payload, let remainder) = result else { break }
                 buffer = remainder
-                guard let frame = try? ProtocolCodec.decodeFrame(payload) else { continue }
+                guard let frame = decodedFrame(payload) else { continue }
                 switch frame {
                 case .reply(let reply):
                     // Matched to the request, not to the position. The slot held by the sender

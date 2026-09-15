@@ -221,7 +221,8 @@ public final class ConversationEngine {
     /// the whole prompt, so an unobserved run accumulated a full event-by-event copy of the
     /// conversation including one copy of a multi-thousand-token prompt per turn. A consumer
     /// that falls behind now loses the oldest events instead of the process retaining them
-    /// forever — the same policy and bound the WebTransport server gives each client. The CLI
+    /// forever — the same policy and bound the WebTransport server and the client give each hop, from the
+    /// one constant they share. The CLI
     /// only reads the coarse tool and turn events, so dropping stale fragments cannot starve it.
     public private(set) var events: AsyncStream<TurnEvent>
 
@@ -288,7 +289,7 @@ public final class ConversationEngine {
         // The event buffer is bounded: with no iterative reader, an unbounded stream retained
         // every token and every full prompt for the life of the process. See `events`.
         let (eventStream, eventSink) = AsyncStream.makeStream(
-            of: TurnEvent.self, bufferingPolicy: .bufferingNewest(256))
+            of: TurnEvent.self, bufferingPolicy: .bufferingNewest(ProtocolLimits.eventBufferDepth))
         let (statusStream, statusSink) = AsyncStream.makeStream(
             of: RunStatus.self, bufferingPolicy: .bufferingNewest(1))
         let (transcriptStream, transcriptSink) = AsyncStream.makeStream(

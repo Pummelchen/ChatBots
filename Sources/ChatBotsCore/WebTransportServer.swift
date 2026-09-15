@@ -293,7 +293,7 @@ public final class WebTransportEngineServer {
         // eventually moved the window was the polling safety net. Since replies and events are
         // told apart by their frame tag, no negotiation is needed at all.
         let (events, continuation) = AsyncStream<EngineEvent>.makeStream(
-            bufferingPolicy: .bufferingNewest(256))
+            bufferingPolicy: .bufferingNewest(ProtocolLimits.eventBufferDepth))
         subscribers[id] = continuation
         let writer = Task { [weak self] in
             guard let self else { return }
