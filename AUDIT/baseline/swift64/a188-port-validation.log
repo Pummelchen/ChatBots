@@ -1,0 +1,97 @@
+A188 — the port values that reach the Caddyfile generator
+Host: 27.0 / arm64, bash 3.2.57(1)-release
+
+--- The probe, unmutated ---
+$ bash AUDIT/baseline/swift64/a188-probe/port-injection.sh
+the pre-fix program, with a hostile port (this is the finding)
+sed: 1: "s|http://:7788|http://: ...": bad flag in substitute command: 'e'
+  --port '7990|e' -> 
+  --port '7990'   -> http://:7990 {
+  --port '.*'     -> http://:.* {
+  --port '7990&x' -> http://:7990http://:7788x {
+  (with '.*' as --port the local-only pattern '/^http:\/\/:.* {/' matches every line ending in ' {')
+
+the validation itself, extracted from the script so nothing can be started
+  ok    the validation refuses --port '7990|e'
+  ok    the validation refuses --port '.*'
+  ok    the validation refuses --port 'x'
+  ok    the validation refuses --port '99999'
+  ok    the validation refuses --port '0'
+  ok    the validation refuses --port '-1'
+  ok    the validation refuses --port '7788 '
+  ok    the validation refuses --engine '7789|e'
+
+and both options go through it, which is what makes the values above unreachable
+  ok    --port is validated where it is read
+  ok    --engine is validated where it is read
+
+a valid port still passes
+  ok    a valid --port 1 is accepted
+  ok    a valid --port 7788 is accepted
+  ok    a valid --port 65535 is accepted
+  ok    a valid --port 7990 is accepted
+  ok    a valid --port 07 is accepted
+
+the counterweight: a real port still generates the config
+  ok    a real port reaches the site address
+  ok    a real engine port reaches the reverse proxy
+
+all A188 probe checks passed
+exit=0
+
+--- The script itself, refusing a hostile port before it does anything ---
+  $ bash tools/start.sh --port '7990|e'
+      --port needs a port number, not '7990|e'
+    exit=2
+  $ bash tools/start.sh --port '.*'
+      --port needs a port number, not '.*'
+    exit=2
+  $ bash tools/start.sh --port '99999'
+      --port needs a port between 1 and 65535, not '99999'
+    exit=2
+  (With the pre-fix script these reached the Caddyfile generator, which is the first section of the
+   probe: '7990|e' makes sed fail with 'bad flag in substitute command', '.*' writes the site address
+   as 'http://:.*', and '&' splices the matched text back into the config.)
+
+--- The shell checks CI runs ---
+  shellcheck : clean
+  bash -n    : parses
+
+--- M1: --port is not validated (the pre-fix behaviour) ---
+  FAIL  --port is validated where it is read — the option loop does not call it
+1 A188 probe check(s) failed
+
+--- M2: --engine is not validated ---
+  FAIL  --engine is validated where it is read — the option loop does not call it
+1 A188 probe check(s) failed
+
+--- M3: the range check is dropped (digits of any size pass) ---
+  FAIL  the validation refuses --port '99999' — it accepted it
+  FAIL  the validation refuses --port '0' — it accepted it
+2 A188 probe check(s) failed
+
+--- M4: a valid port is refused too (over-correction) ---
+  FAIL  a valid --port 7788 is accepted — it refused it
+1 A188 probe check(s) failed
+
+--- RESTORED: unmutated again ---
+all A188 probe checks passed
+
+--- What each mutation shows ---
+M1 and M2 remove the validation from one option each: the probe's source check fails — "the option loop does
+not call it" — which is the half that the extracted function cannot see, since it is still refusing when
+called directly. M3 drops the range check: 0 and 99999 are accepted. M4 refuses a valid port as well: the
+counterweight fails, which is why it is there — a check that only forbids hostile values would be happy with
+a script that rejects every port.
+
+--- FULL GATE at the fix commit (tools/audit-checks.sh) ---
+PASS  build: swift build --build-tests
+PASS  tests: 1033 tests in 192 suites
+PASS  coverage: Sources/ TOTAL 6505 regions 2577 covered 60.38%, 20541 lines 9857 covered 52.01%
+PASS  swiftlint: 253 finding(s), within the recorded waiver of 255
+PASS  swift-format: 739 diagnostic(s), within the recorded waiver of 744
+PASS  web: deltas merge (34 cases)
+PASS  web: the verdict rule (12 cases)
+
+All 6 Mac-only gates passed. (A shell change touches no gate; the shell checks CI runs are in this log, and
+the gate is run at every fix commit regardless.)

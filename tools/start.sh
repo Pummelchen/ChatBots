@@ -68,13 +68,37 @@ require_value() {
   exit 2
 }
 
+# A TCP port number, or a message and an exit.
+#
+# Both port options are interpolated into `sed` programs — one as a replacement, one as a *pattern* —
+# and the result is a Caddyfile that Caddy is then asked to run. A value containing `|` ends the `s`
+# command early, `&` inserts the text that matched, `/` breaks the address pattern, and a pattern like
+# `.*` matches any line at all: the generated config is then mangled, or carries a directive nobody
+# asked for, and it is a file this script wrote and a program this script started (A188). Digits in
+# range is the whole of the validation that interpolation needs, and doing it here means the value is
+# a number by the time any of that runs.
+require_port() {
+  case "${2:-}" in
+    ''|*[!0-9]*)
+      echo "$1 needs a port number, not '${2:-}'" >&2
+      exit 2
+      ;;
+  esac
+  if [ "$2" -lt 1 ] || [ "$2" -gt 65535 ]; then
+    echo "$1 needs a port between 1 and 65535, not '$2'" >&2
+    exit 2
+  fi
+}
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --port)
       require_value "$1" "${2:-}"
+      require_port "$1" "${2:-}"
       PORT="$2"; shift 2 ;;
     --engine)
       require_value "$1" "${2:-}"
+      require_port "$1" "${2:-}"
       ENGINE_PORT="$2"; shift 2 ;;
     --foreground) ACTION=run; shift ;;
     --open)
