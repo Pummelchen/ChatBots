@@ -3665,17 +3665,17 @@
       "id": "A216",
       "severity": "S2",
       "unit": "transport / diagnostics",
-      "file_line": "Sources/ChatBotsCore/WebTransportClient.swift:242",
+      "file_line": "Sources/ChatBotsCore/ErrorText.swift:25-39; Sources/ChatBotsCore/WebTransportClient.swift:242",
       "title": "A transport error is reported as a number, so the reason the engine refused is thrown away",
       "category": "defect",
-      "status": "START",
+      "status": "DONE",
       "host_used": "node1",
       "discovered_by": "Phase C/D — found while diagnosing A215, whose report said only `error 2`",
       "evidence_before": "`WebTransportEngineClient.connect()`'s catch threw `ClientError.cannotConnect(error.localizedDescription)`. The transport's errors are `CustomStringConvertible` and not `LocalizedError`, and Foundation bridges exactly those to `The operation couldn't be completed. (WebTransportNetworkRuntime.WebTransportNetworkRuntimeError error 2.)` — so what `chatbots-cli --check-transport` printed was `error 2`, the case at index 2, `invalidTransport`, while the sentence naming the setting it had rejected sat unread in the error's own `description`. The same collapse reaches the window: `engineConnection` is the text the app shows when it cannot reach the engine (A175).",
-      "fix_summary": null,
-      "evidence_after": null,
-      "commit": null,
-      "notes": "Found by reading a code instead of a message: `error 2` is not a Foundation code for that type, it is the case index, and the cases in it carry a sentence each that was being dropped. The remedy is that an error which is not an `NSError` speaks with its own `description`, `LocalizedError` is preferred when there is one, and `NSError` keeps `localizedDescription` because its own `description` is that same text.",
+      "fix_summary": "`ErrorText.describe(_:)`, in its own file, prefers a `LocalizedError`'s `errorDescription`, then the `description` of an error that is not an `NSError`, then `localizedDescription`; `WebTransportEngineClient.connect()` reports through it, so the transport's own sentence reaches the report and the window.",
+      "evidence_after": "`chatbots-cli --check-client --transport-port 7999`, with no listener, now reports `network runtime operation timed out after 10000ms` where the same command reported `(… WebTransportNetworkRuntimeError error 2.)`; both texts are in `AUDIT/baseline/swift64/a216-error-description-before-after.log`, along with the mutation run in which the helper is reduced to `localizedDescription` (the old behaviour) and the assertion that pins the wording fails. Four tests in `Tests/ChatBotsCoreTests/AuditS2ClientErrorDescriptionTests.swift` cover a self-describing Swift error, a `LocalizedError`, an `NSError` (which keeps Foundation's own text) and an error with nothing to say. Full gate green at the fix commit: 917 tests in 162 suites, `Sources/` 57.83 % of regions, swiftlint 254/255, swift-format 739/744, web 26 cases (`AUDIT/baseline/swift64/a216-gate.log`).",
+      "commit": "d3a4316",
+      "notes": "Found out of A215 rather than in a reading pass: the check's report said `error 2`, and `error 2` is not a Foundation code for that type — it is the case index, which is what gave the cause away. The shape of the fix is deliberately conservative: `NSError` is *not* reformatted, so an ordinary POSIX or Cocoa failure cannot come out reading worse than it did, and that branch is pinned by a test. The first version put the helper on the client and pushed `WebTransportClient.swift` past swiftlint's 600-line file limit — fixed by giving the formatter its own file rather than by waiving the rule, which the gate's counts (254/255, 739/744) then confirmed was the right move. Commit d3a4316.",
       "blocked_reason": null
     }
   ]

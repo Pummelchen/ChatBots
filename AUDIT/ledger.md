@@ -30,12 +30,12 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 216 |
-| DONE | 174 |
-| START | 42 |
+| DONE | 175 |
+| START | 41 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 42
+### Open — 41
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -80,7 +80,6 @@ been run.
 | A207 | S3 | START | — | docs / correctness | Three comments say the document extractors live in the app target and that the core cannot read a PDF or Word file; all three are false |
 | A208 | S3 | START | — | installer / dependencies | The checkpoint the installer downloads is a hand-copied duplicate of AgentSpec.defaultModelID and nothing keeps the two in step |
 | A214 | S2 | START | — | API / snapshot payload | A snapshot that carries an attached image can exceed the transport's own message cap, so the state push is not delivered at all |
-| A216 | S2 | START | — | transport / diagnostics | A transport error is reported as a number, so the reason the engine refused is thrown away |
 
 ### Every task — 216
 
@@ -223,7 +222,7 @@ been run.
 | A213 | S2 | DONE | 0960c86 | audit tooling / DONE-commit guard | The DONE-commit guard recognised only .swift, .py and .sh paths, so a task fixed in the web interface or a CI workflow could be reported unbacked while its commit contained the fix |
 | A214 | S2 | START | — | API / snapshot payload | A snapshot that carries an attached image can exceed the transport's own message cap, so the state push is not delivered at all |
 | A215 | S2 | DONE | e9b7f44 | verification / installer smoke test | The installer's transport check pins an identity it never gives the engine it starts, so it can fail for a reason that is not the transport |
-| A216 | S2 | START | — | transport / diagnostics | A transport error is reported as a number, so the reason the engine refused is thrown away |
+| A216 | S2 | DONE | d3a4316 | transport / diagnostics | A transport error is reported as a number, so the reason the engine refused is thrown away |
 | A22 | S2 | DONE | 18100dd | start script | stop_all kills a stale PID from a pid file without checking the process is ours |
 | A23 | S2 | DONE | 38fbe08 | device capture tool | capture-devices.py prints a viewport mismatch but cannot fail the run |
 | A24 | S2 | DONE | b803b3c | installer | A native binary artifact is downloaded with no integrity check and embedded in the signed app |
