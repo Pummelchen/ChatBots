@@ -188,7 +188,18 @@ Leave previous releases' notes and performance tables alone.
 
 ## ChatBots — Swift, no release yet
 
-- **Identity** semantic version, not yet established.
-- **Code scanning** as for MCPSearch: CodeQL default setup, AI Scan disabled.
-- Needs a release path before it can be called releasable; follow Converter's
-  minimal shape once it produces a runnable target.
+- **Identity** semantic version, not yet established. The only version literals are
+  `APP_VERSION` and `APP_BUILD` in `tools/make-app.sh`, expanded into the bundle's
+  `Info.plist`; nothing enforces either against a release.
+- **Code scanning** runs CodeQL **default setup** — there is no `codeql.yml` here —
+  and AI Scan for pull requests is disabled. The Autofind job asks
+  `api.individual.githubcopilot.com` for a model an individual Copilot plan does not
+  serve, so it failed on every PR head with `CAPIError: 400 The requested model is
+  not supported` and could never report a finding. Re-enable only with an entitlement
+  that serves that model. If Swift CodeQL coverage is wanted, the pattern that works
+  is advanced setup on `xcode-27` with `build-mode: manual`, because default setup
+  autobuilds with a Swift 6.3.3 image that cannot parse this package's 6.4 manifest.
+- **Before the first release** this needs a runnable artifact: a version literal that
+  cannot drift, one script that builds and packages native `arm64` only, a dry run,
+  and a Release carrying the archive plus its digest. Nothing here produces a binary
+  yet, so the release gate below cannot be exercised.
