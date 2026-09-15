@@ -66,6 +66,7 @@ public enum CertificateStoreError: LocalizedError {
     case opensslUnavailable
     case generationFailed(String)
     case unusableIdentity(String)
+    case insecurePrivateKey(String)
 
     public var errorDescription: String? {
         switch self {
@@ -79,6 +80,13 @@ public enum CertificateStoreError: LocalizedError {
             "The engine's certificate could not be generated: \(detail)"
         case .unusableIdentity(let detail):
             "The stored engine certificate could not be read: \(detail)"
+        case .insecurePrivateKey(let path):
+            """
+            The engine's private key at \(path) is readable by other users on this Mac and could \
+            not be made private. Anyone who can read it can impersonate the engine to the app. \
+            Fix it with `chmod 600 "\(path)"`, or delete it and let the engine generate a new \
+            identity.
+            """
         }
     }
 }
@@ -123,6 +131,10 @@ public enum CertificateStore {
             throw CertificateStoreError.unusableIdentity("not generated yet")
         }
 
+        // Before the key is read, not after: the load path used to trust whatever mode it found, so a
+        // key that was already too open stayed that way for the life of the install (A138).
+        try restrictToThisUser(privateKey)
+
         let chain = try derFromPEM(certificate, kind: "certificate")
         let key = try derFromPEM(privateKey, kind: "key")
         let fingerprint = try fingerprint(ofPEMCertificate: certificate)
@@ -131,6 +143,34 @@ public enum CertificateStore {
             privateKeyDER: key,
             keyKind: .rsa(sizeInBits: 2048),
             fingerprintSHA256: fingerprint)
+    }
+
+    /// Readable and writable by this user only.
+    private static let privateKeyPermissions = 0o600
+
+    /// Make sure the private key is not readable by anyone else, and refuse to go on if it is.
+    ///
+    /// openssl writes the key under the process umask, so a permissive umask, a restored backup or a
+    /// copy by hand is all it takes for the engine's identity to be readable by every user on the
+    /// machine. The result of the `setAttributes` call used to be discarded with `try?`, which meant a
+    /// failed chmod was silent (A138); the mode is now applied and *read back*, and a key that is
+    /// still exposed stops the engine with a message naming the file and the fix, rather than starting
+    /// with a hole in it.
+    private static func restrictToThisUser(_ privateKey: URL) throws {
+        let manager = FileManager.default
+        if let current = permissions(of: privateKey), current & 0o077 != 0 {
+            try manager.setAttributes(
+                [.posixPermissions: privateKeyPermissions], ofItemAtPath: privateKey.path)
+        }
+        guard let applied = permissions(of: privateKey), applied & 0o077 == 0 else {
+            throw CertificateStoreError.insecurePrivateKey(privateKey.path)
+        }
+    }
+
+    /// The mode of `url`, or `nil` if it cannot be read.
+    private static func permissions(of url: URL) -> Int? {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        return (attributes?[.posixPermissions] as? NSNumber)?.intValue
     }
 
     private static func generate(
@@ -172,9 +212,9 @@ public enum CertificateStore {
             throw CertificateStoreError.generationFailed(result.errorText)
         }
         // Readable only by this user. It is not a secret in the usual sense — it is local to
-        // the machine — but there is no reason for it to be world-readable either.
-        try? manager.setAttributes(
-            [.posixPermissions: 0o600], ofItemAtPath: privateKey.path)
+        // the machine — but there is no reason for it to be world-readable either, and the mode is
+        // now checked rather than assumed: `try?` here used to swallow a failed chmod (A138).
+        try restrictToThisUser(privateKey)
 
         return try existing(certificate: certificate, privateKey: privateKey)
     }

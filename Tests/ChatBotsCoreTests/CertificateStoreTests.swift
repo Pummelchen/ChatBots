@@ -76,6 +76,32 @@ struct CertificateStoreTests {
         }
     }
 
+    @Test("A key that is readable by others is made private again the next time it is loaded")
+    func keyPermissionsAreRepairedOnLoad() throws {
+        // The gap A138 records: generation set the mode and threw the result away, and the load path
+        // never looked. An identity that was already on disk — because an earlier version wrote it
+        // under a permissive umask, or a backup restored it, or someone copied it — stayed readable by
+        // every user on the machine for the life of the install, and nothing said so.
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        _ = try CertificateStore.loadOrCreate(in: directory)
+        let key = directory.appending(path: "webtransport-key.pem")
+
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o644], ofItemAtPath: key.path)
+        #expect(mode(of: key) == 0o644, "the fixture has to actually be open for this to mean anything")
+
+        // The load path is where this is repaired: the files exist, so nothing is regenerated.
+        _ = try CertificateStore.loadOrCreate(in: directory)
+        #expect(mode(of: key) == 0o600, "loading an identity must not leave its key readable by others")
+    }
+
+    /// The mode bits of `url`, or `nil` if they cannot be read.
+    private func mode(of url: URL) -> Int? {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        return (attributes?[.posixPermissions] as? NSNumber)?.intValue
+    }
+
     @Test("A partial identity on disk is regenerated rather than half-used")
     func repairsPartialState() throws {
         // A crash between writing the two files would otherwise leave an install that can
