@@ -59,18 +59,20 @@ def waivers(path: pathlib.Path) -> list[tuple[str, str]]:
     return [(match.group(1), match.group(2)) for match in WAIVER.finditer(text)]
 
 
-def findings(path: pathlib.Path) -> list[tuple[str, str]]:
+def findings(path: pathlib.Path) -> tuple[list[tuple[str, str]], list[str]]:
     """Read rule id and path for each finding in a semgrep JSON report.
 
     Args:
         path: The report to read.
 
     Returns:
-        One pair per finding.
+        One pair per finding, and the warnings the scan reported.
 
     Raises:
-        SystemExit: The report is missing or unparseable. Reporting "no unwaived findings" from a
-            report that could not be read is the failure mode A89 recorded.
+        SystemExit: The report is missing, unparseable, incomplete or records an error. Reporting
+            "no unwaived findings" from a report that could not be read is the failure mode A89
+            recorded, and it happened again here: only `results` was read, so a failed scan printed
+            "0 finding(s), all covered by a recorded waiver" and exited 0 (A185).
     """
     try:
         document = cast("dict[str, Any]", json.loads(path.read_text(encoding="utf-8")))
@@ -80,10 +82,42 @@ def findings(path: pathlib.Path) -> list[tuple[str, str]]:
     except json.JSONDecodeError as error:
         print(f"{path} is not valid JSON: {error}", file=sys.stderr)
         raise SystemExit(2) from error
-    return [
-        (str(result.get("check_id", "")), str(result.get("path", "")))
-        for result in cast("list[dict[str, Any]]", document.get("results", []))
-    ]
+
+    raw_results = document.get("results")
+    if not isinstance(raw_results, list):
+        print(
+            f"{path} has no `results` array, so semgrep did not complete a scan. "
+            "A missing results key is not the same as no findings.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+
+    # semgrep records anything it could not do in `errors`, and exits 0 while doing it. An entry at
+    # error level means the scan did not cover what it was asked to; a warning (a file it could not
+    # parse, a rule it could not load) means it covered it with a caveat. The first stops the gate,
+    # the second is printed and carried into the summary, because a scan nobody can see the caveats
+    # of is worth little.
+    warnings: list[str] = []
+    for entry in cast("list[dict[str, Any]]", document.get("errors") or []):
+        level = str(entry.get("level", "error"))
+        detail = entry.get("message") or entry.get("type") or entry
+        if level == "warn":
+            warnings.append(str(detail))
+            continue
+        print(f"semgrep reported a scan error: {detail}", file=sys.stderr)
+        raise SystemExit(2)
+
+    found: list[tuple[str, str]] = []
+    for entry in cast("list[object]", raw_results):
+        if not isinstance(entry, dict):
+            print(
+                f"{path} has a finding that is not an object: {entry!r}",
+                file=sys.stderr,
+            )
+            raise SystemExit(2)
+        result = cast("dict[str, Any]", entry)
+        found.append((str(result.get("check_id", "")), str(result.get("path", ""))))
+    return found, warnings
 
 
 def main() -> int:
@@ -94,7 +128,10 @@ def main() -> int:
     plan = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 else PLAN
 
     allowed = waivers(plan)
-    found = findings(report)
+    found, warnings = findings(report)
+
+    for warning in warnings:
+        print(f"semgrep scan warning: {warning}", file=sys.stderr)
 
     unwaived: list[tuple[str, str]] = []
     for rule, path in found:
@@ -114,7 +151,8 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
-    print(f"semgrep: {len(found)} finding(s), all covered by a recorded waiver")
+    caveat = f", with {len(warnings)} scan warning(s) printed above" if warnings else ""
+    print(f"semgrep: {len(found)} finding(s), all covered by a recorded waiver{caveat}")
     return 0
 
 
