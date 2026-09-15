@@ -242,7 +242,18 @@ public final class EngineService {
             // caller already had, so a removal that did not happen was reported as one that did — and
             // the Mac app's ✕ is always enabled, so a user could click it and see nothing at all
             // (A173). The rule the engine enforces is the one the web page already gates on.
-            guard engine.setAttachments(engine.attachments.filter { $0.id.uuidString != id }) else {
+            //
+            // And an id that matches nothing is a refusal rather than a success, which is what `castVote`
+            // already answered for the same shape of request. Filtering produced a state identical to the
+            // one the caller had — a removal that never happened, reported as one that did (A156).
+            guard UUID(uuidString: id) != nil else {
+                return .refused("that is not a valid file id")
+            }
+            let remaining = engine.attachments.filter { $0.id.uuidString != id }
+            guard remaining.count != engine.attachments.count else {
+                return .refused("there is no attached file with that id")
+            }
+            guard engine.setAttachments(remaining) else {
                 return .refused(Self.sourceMaterialIsFixed)
             }
             return .state(snapshot())
@@ -483,11 +494,20 @@ public final class EngineService {
     /// one request may carry.
     public static let maximumFieldCharacters = 2_000
 
+    /// How many files one conversation may carry.
+    ///
+    /// Enforced here rather than in the engine, because it is a front-end rule about how much material a
+    /// room is asked to read. It has to be checked **after** the conversion as well as before it: the
+    /// guard at the top of `addAttachment` runs before the `await`, so uploads that arrive together all
+    /// saw the same count and all passed it, and the room ended up over the ceiling by however many
+    /// arrived at once (A156).
+    static let maximumAttachments = 24
+
     private func addAttachment(filename: String, contents: Data) async -> EngineReply {
         guard engine.canAttachFiles else {
             return .refused("source material must be added before the conversation starts")
         }
-        guard engine.attachments.count < 24 else {
+        guard engine.attachments.count < Self.maximumAttachments else {
             return .refused("too many attached files")
         }
 
@@ -497,28 +517,21 @@ public final class EngineService {
             return .refused("the uploaded file name is not a usable name")
         }
 
-        let directory = FileManager.default.temporaryDirectory
-            .appending(path: "chatbots-upload-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: directory) }
-
+        let staged: StagedUpload
         do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            staged = try Self.stageUpload(contents: contents, name: name)
         } catch {
-            return .refused("could not stage the upload: \(error.localizedDescription)")
+            return .refused(error.localizedDescription)
         }
+        let directory = staged.directory
+        defer { try? FileManager.default.removeItem(at: directory) }
 
         // The belt to the validation's braces: even if the name check above were ever bypassed,
         // the write is refused unless the destination really is a direct child of the directory
         // created a moment ago.
-        let temporary = directory.appending(path: name)
+        let temporary = staged.file
         guard Self.isDirectChild(temporary, of: directory) else {
             return .refused("the uploaded file name is not a usable name")
-        }
-
-        do {
-            try contents.write(to: temporary)
-        } catch {
-            return .refused("could not stage the upload: \(error.localizedDescription)")
         }
 
         // Detached rather than a structured child, so the read is not cancelled by a caller
@@ -544,11 +557,72 @@ public final class EngineService {
             guard !document.kind.isImage || engine.allSeatsSupportVision else {
                 return .refused("images need every seat to support vision")
             }
+            // Counted again here, on the main actor with the append below and after the `await`, because
+            // that is the only place the count cannot have moved: the guard at the top of this method ran
+            // before the conversion, so uploads arriving together all passed it (A156).
+            guard engine.attachments.count < Self.maximumAttachments else {
+                return .refused("too many attached files")
+            }
             guard engine.setAttachments(engine.attachments + [document]) else {
                 return .refused(Self.sourceMaterialIsFixed)
             }
             return .state(snapshot())
         }
+    }
+
+    /// One staged upload: the private directory it lives in and the file inside it.
+    struct StagedUpload {
+        var directory: URL
+        var file: URL
+    }
+
+    /// Why an upload could not be staged on disk.
+    enum UploadStagingError: LocalizedError {
+        case cannotCreateDirectory(String)
+        case cannotWriteFile
+
+        var errorDescription: String? {
+            switch self {
+            case .cannotCreateDirectory(let reason): "could not stage the upload: \(reason)"
+            case .cannotWriteFile: "could not stage the upload"
+            }
+        }
+    }
+
+    /// Write the uploaded bytes into a directory of their own, readable only by this user.
+    ///
+    /// Two rules live here rather than inline, and both are about the window between creating a file and
+    /// being able to trust it (A156):
+    ///
+    /// - **Owner-only, from the start.** The default mode leaves the directory and the file inside it
+    ///   readable by every user on the machine for as long as the conversion takes — up to the extractor's
+    ///   30-second deadline, for a document that is the moderator's own material.
+    /// - **Created with its final mode rather than written and then chmodded.** Between those two steps
+    ///   the file is on disk under the process umask, which is exactly the window a chmod-after-write
+    ///   leaves open. `Data.write(to:)` used to be the whole of it, with no mode at all.
+    ///
+    /// The directory is removed if the write fails, so a failed staging leaves nothing behind: the caller
+    /// registers its `defer` only once this has returned.
+    static func stageUpload(contents: Data, name: String) throws -> StagedUpload {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "chatbots-upload-\(UUID().uuidString)")
+        do {
+            try FileManager.default.createDirectory(
+                at: directory, withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700])
+        } catch {
+            throw UploadStagingError.cannotCreateDirectory(error.localizedDescription)
+        }
+        let file = directory.appending(path: name)
+        guard
+            FileManager.default.createFile(
+                atPath: file.path, contents: contents,
+                attributes: [.posixPermissions: 0o600])
+        else {
+            try? FileManager.default.removeItem(at: directory)
+            throw UploadStagingError.cannotWriteFile
+        }
+        return StagedUpload(directory: directory, file: file)
     }
 
     /// The name an upload is staged under, or `nil` when what the caller sent cannot be used.
