@@ -325,7 +325,14 @@ struct WindowConfigurator: NSViewRepresentable {
             applyAppearance(to: window)
             Self.fitOnScreen(window)
             window.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+            // `activate()`, not the `activateIgnoringOtherApps:` this used to call: the macOS 27 SDK
+            // annotates that one `API_TO_BE_DEPRECATED` and names this as the replacement, and it is a
+            // request rather than a command — the app asks to come forward and the system decides,
+            // which is what cooperative activation means. The window is still made key and ordered
+            // front above, so a user who launched the app gets it; what no longer happens is taking
+            // focus from whatever else was frontmost, which is the behaviour the deprecation is for
+            // (A180).
+            NSApp.activate()
         }
         return view
     }
