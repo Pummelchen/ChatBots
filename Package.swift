@@ -1,4 +1,4 @@
-// swift-tools-version: 6.3
+// swift-tools-version: 6.4
 // ChatBots — two local LLMs talking to each other on a Mac (MLX / Apple Silicon).
 //
 // Layout:
