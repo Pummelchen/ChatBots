@@ -233,7 +233,6 @@ public final class ChatController: ObservableObject {
         configuration.host = host
         configuration.port = port
         let client = WebTransportEngineClient(configuration: configuration)
-        self.client = client
 
         // The event stream delivers states and output fragments; it is started before the
         // first request so nothing that happens in between is missed.
@@ -249,9 +248,15 @@ public final class ChatController: ObservableObject {
             }
         }
         guard client.isConnected else {
-            engineConnection = lastError ?? "Could not reach the engine."
+            // A client that never connected is not a connection, so it is not stored: `client != nil`
+            // has to keep meaning "there is an engine to talk to". Storing it meant the seat endpoints
+            // were pushed through it, every one of those commands answered with a transport failure,
+            // and each failure replaced the reason the connection had actually failed with a symptom
+            // of it — before the banner that shows the reason was ever read (A175).
+            noteConnectionFailed(lastError ?? "Could not reach the engine.")
             return
         }
+        self.client = client
         engineConnection = nil
 
         // The current state first, so the interface is correct before any event arrives.
@@ -596,12 +601,6 @@ public final class ChatController: ObservableObject {
         pacer.backlog(agentID: agentID) > 0
     }
 
-    /// True while any seat is still revealing text.
-    public var isDisplayingAnything: Bool { pacer.isDraining }
-
-    /// Characters per second this conversation's models actually produce, for display.
-    public private(set) var measuredGenerationRate: Double = 0
-
     /// Applies buffered *non-text* deltas to the panes.
     ///
     /// Streamed text no longer passes through here: it goes into the pacer, which releases
@@ -635,7 +634,8 @@ public final class ChatController: ObservableObject {
         }
         let rate = Double(sample.characters) / elapsed
         rateSamples[agentID] = (0, now)
-        measuredGenerationRate = rate
+        // The rate the reveal is paced at, and the only thing the measurement is for: it was also
+        // assigned to a `measuredGenerationRate` that no view read (A177).
         pacer.observe(agentID: agentID, charactersPerSecond: rate)
     }
 
@@ -719,11 +719,56 @@ public final class ChatController: ObservableObject {
         errorBanner = nil
     }
 
-    public func sendModeratorMessage() {
+    /// Send the moderator's message.
+    ///
+    /// The send is returned as a task rather than started and forgotten: the button action ignores it,
+    /// and a test can await it instead of polling for the outcome it produces (A174).
+    @discardableResult
+    public func sendModeratorMessage() -> Task<Void, Never> {
         let text = moderatorDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
-        run { client in _ = try await client.send(.steer(text)) }
-        moderatorDraft = ""
+        guard !text.isEmpty else { return Task {} }
+        return Task { [weak self] in await self?.deliverModeratorDraft(text) }
+    }
+
+    /// Send the moderator's message, and keep the draft unless the engine took it.
+    ///
+    /// Split from the button's action so the rule below has a caller a test can drive without
+    /// racing the task the button starts.
+    func deliverModeratorDraft(_ text: String) async {
+        let accepted = await deliver(.steer(text))
+        moderatorDraft = Self.draft(afterSendOf: text, accepted: accepted, current: moderatorDraft)
+    }
+
+    /// What the moderator's draft becomes once a send has been attempted.
+    ///
+    /// Cleared only when the engine accepted the message, and only when the box still holds what was
+    /// sent: the moderator may have started the next line while the request was in flight, and
+    /// clearing *that* would be this defect one step later. A send that was refused — a message over
+    /// the engine's limit, or an engine that cannot be reached at all — keeps what was typed, which
+    /// is the only copy of it (A174).
+    static func draft(afterSendOf sent: String, accepted: Bool, current: String) -> String {
+        guard accepted else { return current }
+        return current.trimmingCharacters(in: .whitespacesAndNewlines) == sent ? "" : current
+    }
+
+    /// Send one command and answer whether the engine accepted it.
+    ///
+    /// `run` is fire-and-forget: it reports a failure into `engineConnection` and returns, so a
+    /// caller whose next step depends on the outcome has nothing to read. This is that caller's
+    /// version (A174).
+    @discardableResult
+    private func deliver(_ request: EngineRequest) async -> Bool {
+        guard let client else {
+            reportNoClient()
+            return false
+        }
+        do {
+            _ = try await client.send(request)
+            return true
+        } catch {
+            engineConnection = error.localizedDescription
+            return false
+        }
     }
 
     /// Change one seat's thinking level. Applies from its next turn.
@@ -751,7 +796,7 @@ public final class ChatController: ObservableObject {
     /// failure, which the `catch` below does for a command and the poll does for itself.
     private func run(_ body: @escaping (WebTransportEngineClient) async throws -> Void) {
         guard let client else {
-            engineConnection = "Not connected to the engine."
+            reportNoClient()
             return
         }
         Task { [weak self] in
@@ -761,6 +806,29 @@ public final class ChatController: ObservableObject {
                 self?.engineConnection = error.localizedDescription
             }
         }
+    }
+
+    /// Say that a command had nowhere to go, without covering a reason that is already there.
+    ///
+    /// A control pressed while nothing is connected has to say something, and "Not connected to the
+    /// engine." is the right thing to say when nothing else explains it. When something else does —
+    /// `connect` failing with "Could not reach the engine: …" — that reason is more specific and
+    /// still true, and the controls `applyAPIEndpoints` fires one after another must not overwrite it
+    /// with a symptom (A175). `connect` clears the message when a connection is actually made, so a
+    /// message that is present is always about the connection that is not.
+    private func reportNoClient() {
+        if engineConnection == nil { engineConnection = "Not connected to the engine." }
+    }
+
+    /// Record a connection that could not be made: the reason, and no client.
+    ///
+    /// The failure half of `connect`, in one place so that "a client that never connected is not a
+    /// connection" is stated once rather than implied by the order of two assignments (A175). Being a
+    /// method also means the failure path — which the whole finding is about — can be driven without
+    /// waiting out eight real connect attempts.
+    func noteConnectionFailed(_ reason: String) {
+        client = nil
+        engineConnection = reason
     }
 
     /// The whole conversation as plain text.
@@ -867,6 +935,32 @@ public final class ChatController: ObservableObject {
         pane(agentID)?.spec.backend = backend
     }
 
+    /// Point one seat at a different MLX checkpoint.
+    ///
+    /// The engine replaces the seat's MLX engine with one for the new weights and releases the old
+    /// one, so the pane is updated from what was asked for and the next turn loads the new
+    /// checkpoint. A refusal — the room is running, or the id is empty — comes back as a message and
+    /// the pane keeps the model it has, because a change that did not happen must not be shown as one
+    /// that did (A173).
+    public func setModel(_ modelID: String, for agentID: String) {
+        let resolved = ModelCatalog.resolve(modelID)
+        guard !resolved.isEmpty else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            // The pane follows the engine, not the click: the change is shown only once the engine has
+            // taken it, and a refusal — the room is running — arrives in `engineConnection` with the
+            // reason. Showing the new checkpoint on a seat that is still running the old one is the
+            // defect A173 records, and `deliver` is the awaiting send A174 added for exactly this.
+            guard await self.deliver(.updateSeat(.init(seatID: agentID, modelID: resolved))) else {
+                return
+            }
+            guard self.pane(agentID)?.spec.modelID != resolved else { return }
+            self.pane(agentID)?.spec.modelID = resolved
+            self.pane(agentID)?.spec.modelShortName = ModelNames.shortName(resolved)
+            self.saveSettings()
+        }
+    }
+
     /// Point one seat at a different server or model id.
     public func setEndpoint(_ endpoint: OpenAIEndpoint, for agentID: String) {
         run { client in
@@ -960,6 +1054,11 @@ public final class ChatController: ObservableObject {
     /// recomputing them from fields this side never had — recomputing produced "0 words" on
     /// every chip (audit A46). The body itself is not here, which is why the chip does not
     /// offer to show it.
+    ///
+    /// An image's bytes are not among the fields the engine sends either (A144, A214): this used to
+    /// decode `imageBase64` back into `imageData`, and nothing in the app ever read it — the chip
+    /// draws the document's kind as a symbol, not the picture. The engine keeps the bytes; sending
+    /// them cost a base64 copy of every attached image in every state push.
     public var attachments: [AttachedDocument] {
         let held = (lastSnapshot?.attachments ?? []).map { attachment in
             AttachedDocument(
@@ -970,7 +1069,7 @@ public final class ChatController: ObservableObject {
                 byteCount: 0,
                 pageCount: nil,
                 wasTruncated: attachment.wasTruncated,
-                imageData: attachment.imageBase64.flatMap { Data(base64Encoded: $0) },
+                imageData: nil,
                 engineSummary: attachment.summary,
                 engineTokens: attachment.tokens)
         }

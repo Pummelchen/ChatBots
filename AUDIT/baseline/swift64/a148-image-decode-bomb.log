@@ -1,0 +1,78 @@
+# A148 — an image is measured before it is decoded (2026-09-16)
+
+## What the code did
+# `ImageExtractor.wireRepresentation` decoded first and looked afterwards:
+#     CGImageSourceCreateImageAtIndex(source, 0, nil)      // the whole canvas, in memory
+#     … then properties, then re-encode, then `converted.count <= maximumFileBytes`
+# The byte cap cannot bound that: the formats that reach this path are the ones a model cannot be given
+# as they are (TIFF, BMP, HEIC) and they are compressed.
+
+## The amplification, measured
+# Valid single-strip PackBits TIFFs, written by the fixture generator: each row is a run of 128
+# identical bytes, so the file is a fraction of the canvas it declares. ImageIO reports the canvas from
+# the file's own metadata (`AUDIT/baseline/swift64/a148-probe/reported-size.swift`), decodes it, and
+# re-encodes it as JPEG:
+
+file        declared        on disk     decoded RGB      ratio    re-encoded   old code
+small.tiff   20 × 20          4 230 B        1.2 KB         0.3×       —         converted
+over.tiff  6 500 × 6 500    663 146 B      127 MB          191×      504 KB      converted
+# and the same trick with PNG, which is not converted but shows what the byte cap allows:
+bomb.png  12 000 × 12 000   441 252 B      432 MB          979×         —         —
+# At the 64 MB byte cap, a crafted PNG is a canvas of tens of gigabytes. That is the bomb: nothing
+# about it is slow or malformed, it is a small file that expands.
+
+## The fix
+# The dimensions come from `CGImageSourceCopyPropertiesAtIndex` — metadata, no pixels — and are checked
+# against `AttachmentLimits.maximumImagePixels` (40 MP, new, more than twice a 20 MP camera) before
+# `CreateImageAtIndex` is called at all. An image that will not report its dimensions is refused rather
+# than decoded to find out, and the product is computed with `multipliedReportingOverflow` because a
+# header may declare two numbers whose product traps.
+#
+# Images that need no conversion are untouched by this: they are passed through as they arrived, and the
+# byte cap is what bounds them. There is no decode to bound.
+
+## The tests, against both behaviours
+# `AuditS3ImageDecodeTests` writes its own PackBits TIFFs, so what is refused is a format the app
+# genuinely converts.
+
+$ swift test --filter ImageDecodeTests          # with the fix
+  ✔ Test "An image whose metadata declares too many pixels is refused without being decoded"
+  ✔ Test "The cap is the caller's, and an image under it is still converted"
+  ✔ Test "An image that will not report its dimensions is refused rather than decoded blind"
+  ✔ Test "A file that is not an image at all is refused as that, not as an unmeasurable image"
+  ✔ Test run with 4 tests in 1 suite passed after 0.009 seconds.
+
+$ swift test --filter ImageDecodeTests          # with the decode put back before the check
+  ✘ Test "An image whose metadata declares too many pixels is refused without being decoded"
+      Issue recorded: a 42 MP TIFF was converted
+  ✘ Test "The cap is the caller's, and an image under it is still converted"
+      Expectation failed: an error was expected but none was thrown
+  ✘ Test "An image that will not report its dimensions is refused rather than decoded blind"
+      Expectation failed: reason.contains("dimensions")
+  ✘ Test run with 3 tests in 1 suite failed after 0.042 seconds with 3 issues.
+
+# The boundary case is why the cap is a parameter: a cap of 399 pixels refuses a 20 × 20 image and 401
+# converts it, so what is tested is the cap rather than a hard-coded size. The first is the finding:
+# 42 MP, 663 KB on disk, accepted by the old code after allocating 127 MB.
+
+## Two refusals, told apart
+# `CGImageSourceGetType` is the difference between "not an image at all" (nil: the file a picker offered
+# because of its extension) and "damaged" (a recognised format whose size will not be reported). They are
+# different sentences because they are different problems, and an existing test
+# (`AuditAttachmentMediaTests`, "An image that cannot be decoded is refused with its name") pins the
+# first — it failed when both cases shared the dimension message, which is how the distinction was found
+# rather than reasoned about.
+
+## The full gate, with the fix
+$ bash tools/audit-checks.sh
+PASS  build: swift build --build-tests
+PASS  tests: 959 tests in 172 suites
+PASS  coverage: TOTAL 6343 2595 59.09% (regions) · 20064 9831 51.00% (lines)
+PASS  swiftlint: 254 finding(s), within the recorded waiver of 255
+PASS  swift-format: 739 diagnostic(s), within the recorded waiver of 744
+PASS  web: deltas merge (34 cases)
+All 6 Mac-only gates passed.
+
+# Two lint findings were introduced on the way and fixed rather than left at the waiver: a four-element
+# tuple in the fixture (swiftlint `large_tuple`) became an `IFDEntry` type, and `wireRepresentation`
+# reached complexity 11 with the guards inline, so they were extracted into `validateImage`.

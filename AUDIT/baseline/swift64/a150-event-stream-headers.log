@@ -1,0 +1,63 @@
+# A150 — the event stream's head is built like every other response (2026-09-16)
+
+## What the stream path did
+# `HTTPServer.respond` assembled the server-sent-events head by hand:
+#     let head =
+#         "HTTP/1.1 200 OK\r\n"
+#         + "Content-Type: text/event-stream; charset=utf-8\r\n"
+#         + "Cache-Control: no-store\r\n"
+#         + "X-Accel-Buffering: no\r\n"
+#         + "Connection: keep-alive\r\n"
+#         + "\r\n"
+# so the one response that stays open carried none of the headers `HTTPResponse.serialised` adds —
+# `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY` and the
+# content-security policy. A76 fixed the serialiser; this path never went through it.
+
+## The fix
+# `HTTPResponse` now builds every head in one private `head(keepAlive:contentLength:)`:
+# `serialised` appends the body and passes its length, and `streamingHead()` passes no length and appends
+# nothing, which is what a stream needs. The stream's own response is `HTTPResponse.eventStream()`, so
+# its content type and its `X-Accel-Buffering: no` hint are declared in the same place as every other
+# response's headers rather than in the wire text, and the route sends
+# `HTTPResponse.eventStream().streamingHead()`.
+
+## The tests, against both behaviours
+# `AuditS1SecurityHeaderTests` (A76's suite, which owns the live-server harness) gains two:
+# the stream head compared header-by-header with a complete response's head, and the live
+# `GET /api/events` read over a real socket.
+
+$ swift test --filter AuditS1SecurityHeaderTests          # with the fix
+  ✔ Test "The event stream's head carries the same security headers as every other response"
+  ✔ Test "The live event stream answers with those headers"
+  ✔ Test run with 10 tests in 1 suite passed after 0.058 seconds.
+
+$ swift test --filter AuditS1SecurityHeaderTests          # with the hand-written head put back
+  ✔ Test "The event stream's head carries the same security headers as every other response"
+  ✘ Test "The live event stream answers with those headers"
+      Expectation failed: http.value(forHTTPHeaderField: "X-Content-Type-Options") == "nosniff"
+      Expectation failed: http.value(forHTTPHeaderField: "Referrer-Policy") == "no-referrer"
+      Expectation failed: http.value(forHTTPHeaderField: "X-Frame-Options") == "DENY"
+      Expectation failed: policy.contains("default-src 'none'")   (got "")
+# The first test passes under the mutation on purpose: it checks the head the response type produces,
+# which is still correct — the *live* test is the one that sees what the server actually wrote, and it
+# fails on all four headers. That division is the point of having both.
+
+# Notes on the way. `URLSession.data(for:)` waits for the whole body, and a stream's body never ends, so
+# the first version of the live test sat there for the session's 60-second timeout; `bytes(for:)` returns
+# the head as soon as it arrives. And the header comparison skips exactly two lines — `Content-Length`
+# and `Content-Type` — because a stream has no length and a content type of its own; everything else must
+# match, which is what makes this a drift guard rather than a snapshot.
+
+## The full gate, with the fix
+$ bash tools/audit-checks.sh
+PASS  build: swift build --build-tests
+PASS  tests: 968 tests in 173 suites
+PASS  coverage: TOTAL 6353 2597 59.12% (regions) · 20092 9835 51.05% (lines)
+PASS  swiftlint: 254 finding(s), within the recorded waiver of 255
+PASS  swift-format: 739 diagnostic(s), within the recorded waiver of 744
+PASS  web: deltas merge (34 cases)
+All 6 Mac-only gates passed.
+
+# 966 tests in 172 suites before this task. One lint finding was introduced and fixed rather than left at
+# the waiver: the new test's `String(decoding:as:)` is not the failable `String(bytes:encoding:)` that
+# swiftlint's `optional_data_string_conversion` asks for.

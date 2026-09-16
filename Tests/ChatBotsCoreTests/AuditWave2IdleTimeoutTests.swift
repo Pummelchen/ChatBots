@@ -102,7 +102,7 @@ struct AuditWave2IdleTimeoutTests {
     @Test("A stream quiet past the request deadline is still connected")
     func silentStreamSurvives() async throws {
         let running = try await startEngine()
-        defer { Task { await running.stop() } }
+        defer { TransportTeardown.register { await running.stop() } }
 
         var configuration = WebTransportEngineClient.Configuration()
         configuration.port = running.port

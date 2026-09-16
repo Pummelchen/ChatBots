@@ -312,8 +312,12 @@ public enum PromptBuilder {
         others: [AgentSpec],
         conversation: Conversation
     ) -> String? {
+        // Names for what is written, ids for what the state is keyed by (A199). Bound here because the
+        // leader line below names a seat too — a bare id means nothing to a model.
+        let names = Dictionary(
+            others.map { ($0.id, $0.displayName) }, uniquingKeysWith: { first, _ in first })
         let briefing = conversation.conflict.briefing(
-            for: spec.id, others: others.map(\.id))
+            for: spec.id, others: others.map(\.id), names: names)
         guard !briefing.isEmpty else { return nil }
 
         var text = "Where things stand between the participants:\n"
@@ -325,6 +329,14 @@ public enum PromptBuilder {
             for beat in briefing.recentBeats {
                 text += "- \(beat)\n"
             }
+        }
+        if let leading = conversation.conflict.leadingSeat {
+            // "Whoever is currently winning" is a preferred target several personas are given, so the
+            // seat it names is a fact about this room rather than something to infer from the beats
+            // above. Ids mean nothing to a model, so it is named, and a seat that is ahead is told
+            // "you" (A206).
+            let who = leading == spec.id ? "you" : (names[leading] ?? leading)
+            text += "\nRight now the room rates \(who) highest.\n"
         }
         text += """
             This is how the room has developed, not an instruction. React to it as your \

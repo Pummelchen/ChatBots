@@ -1,0 +1,40 @@
+Building for debugging...
+[Computing dependencies]
+[Using on-disk description]
+[1 / 1]
+[1 / 58] swift-transformers_Hub
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+[4 / 24] MLXLMCommon
+[7 / 8] ChatBotsCoreTests-product
+Build complete! (2,42 secs)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "SystemProcess output ceiling (A197)" started.
+◇ Test "A child that never stops writing is still ended by the deadline" started.
+◇ Test "Output past the ceiling is refused at the ceiling, not accumulated" started.
+✔ Test "A child that never stops writing is still ended by the deadline" passed after 1.096 seconds.
+✘ Test "Output past the ceiling is refused at the ceiling, not accumulated" recorded an issue at AuditInferenceTests.swift:142:13: Expectation failed: message.contains("more than 1 MB")
+↳ the reason names the ceiling: the conversion took longer than 5 seconds
+↳ message.contains("more than 1 MB") → false
+↳   message → "the conversion took longer than 5 seconds"
+✘ Test "Output past the ceiling is refused at the ceiling, not accumulated" recorded an issue at AuditInferenceTests.swift:145:9: Expectation failed: elapsed < 4
+↳ 1 MB at 6 MB/s is about 0.2s; took 5.09757399559021s
+↳ elapsed < 4 → false
+↳   elapsed → 5.09757399559021
+↳   4 → 4.0
+✘ Test "Output past the ceiling is refused at the ceiling, not accumulated" failed after 5.098 seconds with 2 issues.
+✘ Suite "SystemProcess output ceiling (A197)" failed after 5.098 seconds with 2 issues.
+↳ /// The output ceiling (A197).
+↳ ///
+↳ /// `drain` exited only on EOF or EAGAIN, and a child that keeps its pipe full produces neither: the
+↳ /// loop kept returning data, `outputData` grew without bound, and the caller's deadline was
+↳ /// unreachable for as long as that lasted, because the loop never returned to have it checked. A
+↳ /// compressed document that expands past its container is what reaches it, through
+↳ /// `POST /api/attachments`.
+↳ ///
+↳ /// The child here writes at about 6 MB/s: fast enough to keep the old loop reading, slow enough that
+↳ /// these tests cannot exhaust the machine they run on.
+✘ Test run with 2 tests in 1 suite failed after 5.099 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ChatBotsCoreTests (Swift Testing)

@@ -3,8 +3,10 @@
 Machine-readable twin: `ledger.json` (same ids; carries every field of §8's schema).
 **This file wins on conflict with the wiki.**
 
-Branch `audit/2026-09-13` from `main` @ `a6d6999`, fast-forwarded into `main` when the audit was
-complete and kept in step with it since — both names point at the same commit. Baseline and evidence:
+Branch `audit/2026-09-15`, cut from `main` @ `02ddd4e`: the Swift 6.4 / Xcode 27 / macOS 27 re-audit.
+By decision `main` stays untouched until Phase E passes and the branch goes back by pull request;
+`main` has since moved on its own (to `349fefe`), so this branch and `main` are **not** the same
+commit. The previous `audit/2026-09-13` work is already in `main`. Baseline and evidence:
 [`plan.md`](plan.md),
 [`baseline/`](baseline). Fleet and toolchain: [`environment.md`](environment.md).
 Scope and trust boundaries: [`inventory.md`](inventory.md).
@@ -27,8 +29,8 @@ been run.
 <!-- BEGIN GENERATED: ledger status — rendered from ledger.json by AUDIT/render-ledger.sh -->
 | Metric | Count |
 | --- | --- |
-| Tasks enumerated | 132 |
-| DONE | 132 |
+| Tasks enumerated | 219 |
+| DONE | 219 |
 | START | 0 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
@@ -37,7 +39,7 @@ been run.
 
 Nothing is open.
 
-### Every task — 132
+### Every task — 219
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -87,14 +89,101 @@ Nothing is open.
 | A130 | S3 | DONE | cf589e9 | CI / audit tooling | The CI dependency step scanned the whole tree with `-r .` — the same defect A124 fixed in phase-e.sh, in the second copy of the same check |
 | A131 | S2 | DONE | 8c4174f | CI / audit tooling | The CI install step verified its own installs before GITHUB_PATH applied, so the job died with exit 127 on its first real run |
 | A132 | S3 | DONE | 73eac3b | audit tooling / acceptance | The acceptance script refused to run on main, the branch the audit had just been landed on |
+| A133 | S1 | DONE | ea9f06b | build / environment | Xcode 27 ships the Metal compiler as a separate downloadable component and nothing in the repository requires or checks it, so a clean Xcode 27 machine cannot build the package at all |
+| A134 | S2 | DONE | 487108d | audit tooling / acceptance | The acceptance script's coverage step hardcodes the pre-Swift-6.4 test-bundle path, which no longer exists, so Phase E's coverage gate fails on the new toolchain |
+| A135 | S2 | DONE | 819a694 | packaging / dependencies | The repository states that mlx-swift's SwiftPM build does not compile the Metal kernels; under Xcode 27 it does, so the 190 MB separate metallib download is of unverified necessity and the stated reason for it is now false |
+| A136 | S0 | DONE | 8d3fa2b | security / HTTP API | No Origin/Referer check and Content-Type is ignored, so any web page the user visits can drive the engine; /api/seat lets it repoint a cloud seat and exfiltrate a conversation |
+| A137 | S0 | DONE | 8d3fa2b | persistence | The store deletes the index and then moves the new one into place, so a crash between the two loses every kept conversation, and the atomically written .tmp is never recovered |
+| A138 | S2 | DONE | d6f9ca6 | security / TLS identity | The TLS private key's 0600 mode is applied with `try?` and never verified, so a failure leaves the engine key group/world-readable |
+| A139 | S2 | DONE | 3182900 | security / credentials | The per-seat cloud API key is copied into Codable settings and written to the preferences plist in cleartext, contradicting the app's own Keychain claim |
 | A14 | S1 | DONE | 0de3123 | HTTPServer | isRunning/lastError are raced between the listener callback and waitUntilReady |
+| A140 | S2 | DONE | 6099a3b | security / logging (L7) | An undocumented trace switch writes the entire request body — system instructions, whole conversation, base64 images — to stderr, unbounded |
+| A141 | S2 | DONE | 4ca2b19 | security / SSRF | A seat's baseURL is interpolated into a URL and fetched with no scheme/host check and no redirect policy, so file://, link-local and loopback targets are reachable and internal error bodies are echoed |
+| A142 | S2 | DONE | b08203c | logic / API | A body that fails to decode silently mutates state through defaults: an unknown mode becomes entertainment, an unknown budget becomes standard, a malformed topic clears it |
+| A143 | S2 | DONE | e37238b | safety / input bounds | Topic, moderator name and steering text are uncapped and echoed in every snapshot, although the same file caps seat names and attachment counts |
+| A144 | S2 | DONE | b052a34 | performance / payload | Every attached image is re-base64-encoded into every snapshot pushed to every client |
+| A145 | S2 | DONE | f1fe0f0 | safety / HTTP parsing | The HTTP request head has no size cap and is re-scanned for the header terminator on every read, so 32 connections can pin gigabytes and cost O(n^2) |
+| A146 | S2 | DONE | 487108d | audit tooling / acceptance | Second instance of A134: the documented Mac gate hardcodes the pre-Swift-6.4 test-bundle path, so its coverage step fails on the new toolchain |
+| A147 | S3 | DONE | 7d60374 | performance / main actor | Every /s/<id> request, including for unknown ids, reads and JSON-decodes the whole conversation index on the main actor |
+| A148 | S3 | DONE | 904f300 | safety / image intake | An image is fully decoded before any dimension or size check, so a small crafted TIFF/BMP/HEIC can expand hugely |
+| A149 | S3 | DONE | dd6e5e7 | safety / TOCTOU | The attachment byte cap degrades to zero on a failed stat, the file is re-read after the stat, and a non-regular file is never rejected |
 | A15 | S1 | DONE | 8ece1d3 | EngineService/DocumentImport | Attaching a document blocks the engine main actor for the whole conversion, subprocess wait included |
+| A150 | S3 | DONE | 19e5374 | security headers | The hand-written SSE response head bypasses the shared serialiser and therefore carries none of A76's security headers |
+| A151 | S3 | DONE | e0945da | operations / logging | There is no request or error logging: connection errors are discarded and the counters are exposed nowhere |
+| A152 | S3 | DONE | 71d72d2 | operations / health | /api/health is a hardcoded 200 that says nothing about readiness, and the readiness helper next to it is dead |
+| A153 | S3 | DONE | f9d4c6e | logic / HTTP | Transfer-Encoding is never read or rejected, so a chunked request is answered with an empty body while its route still runs |
+| A154 | S3 | DONE | ca6cb5c | logic / HTTP parsing | Head parsing is lenient: 'Host : x' is accepted, obs-fold lines are dropped, methods and versions are unvalidated, and '+' becomes a space in the path |
+| A155 | S3 | DONE | e7fec77 | security / TLS identity | The certificate store treats any read failure as first run, hardcodes RSA-2048 without checking the pair, executes user-writable openssl paths, and drains pipes in an order that can deadlock |
+| A156 | S3 | DONE | 03f7903 | logic / API consistency | removeAttachment answers 200 for an id that does not exist, and the concurrent-upload ceiling is counted before an await so simultaneous uploads all pass |
+| A157 | S3 | DONE | 511febd | concurrency / transport | Transport sessions have no idle deadline, the per-server error is clobbered across sessions, an undecodable frame is dropped in silence, and a second start() leaks the first listener |
+| A158 | S3 | DONE | e715db9 | concurrency / transport client | The client's event stream is unbounded while the server deliberately buffers 256, and an unreadable frame is swallowed by try? |
+| A159 | S3 | DONE | 8e31033 | validation / web tools | URL validation accepts any scheme starting with 'http' and requires no host, on model-controlled input |
 | A16 | S3 | DONE | 9c53771 | ChatBotsCLI | --serve has no signal handling, so the listener is never shut down and nothing is flushed on exit |
+| A160 | S3 | DONE | 399f735 | logic / web front end | A vote verdict is captured when the row is built, so clicking an already-cast verdict never withdraws it |
+| A161 | S3 | DONE | 4fc5500 | docs / security | SECURITY.md still says a share link is local and served only by the engine, while the shipped Caddy configuration proxies /s/* on every interface |
+| A162 | S3 | DONE | e89086d | docs / reproducibility | environment.md records swift-format as Xcode-provided via xcrun while both gates invoke a bare `swift-format` from PATH |
+| A163 | S3 | DONE | 4d56ad6 | docs / correctness | The Caddyfile says the engine uses the passed Host to build the page's own links, but the replay script never reads the shareBase field it is written into |
+| A164 | S3 | DONE | b3337f1 | unsafe / tooling | The DevTools client uses a fixed shared temporary profile path, so a second run or a hostile local process can interfere with it |
+| A165 | S1 | DONE | 3445aee | web / API integration | The browser never consumes the engine's delta events, so a reply is invisible until the turn ends |
+| A166 | S1 | DONE | 9f2fbf0 | test coverage | The whole application target is untestable and untested: no test target depends on it, so its logic is outside every gate |
+| A167 | S1 | DONE | 00049e6 | test that cannot fail | The zoom suite asserts private copies of the logic, never the store, and its comment claiming they cannot diverge is false |
+| A168 | S1 | DONE | 18d4017 | test harness deadlock | The transport gate leaks on cancellation, so a cancelled test permanently blocks every later transport suite |
+| A169 | S1 | DONE | 1c6cb9f | test harness / real concurrency | Twenty-one teardowns are fire-and-forget tasks, so the serialising gate is released before QUIC teardown finishes and the A102 collision is reduced rather than removed |
 | A17 | S1 | DONE | 0de3123 | HTTPServer | streams is appended on the main actor without the lock that every other access takes |
+| A170 | S2 | DONE | e9b7f44 | test coverage | Near-zero coverage on three paths the product depends on, including the web-search tool the research mode is built around |
+| A171 | S2 | DONE | c836585 | logic / ordering | The web client applies snapshots unconditionally while the Swift client guards with the monotonic revision, so a late reply regresses the page |
+| A172 | S2 | DONE | 501c521 | dead UI | The device-profile badge is hidden in markup and never unhidden, so the detected profile and viewport are computed and discarded |
+| A173 | S2 | DONE | 6a2c3ba | divergent duplicate rule | The web disables removing an attachment once a conversation runs while the app and the engine both allow it, so the two front ends disagree |
+| A174 | S2 | DONE | 0a837ab | data loss / UX | Both front ends clear the moderator's draft before the send is confirmed, so a refused send silently discards what was typed |
+| A175 | S2 | DONE | a25f69c | error handling | The client is stored before its connection is verified, so the specific 'could not reach the engine' reason is overwritten by a generic transport error |
+| A176 | S2 | DONE | 98fe56d | dead code | EndpointBar is unreferenced and carries an action nothing invokes, plus state nothing reads and an environment object that would trap if it were instantiated |
+| A177 | S3 | DONE | f9d1351 | dead declarations, false comments | Nine app-layer declarations are unread, and one of them describes a window minimum the code does not enforce in three different ways |
+| A178 | S3 | DONE | 2334d79 | docs / false user-facing text | Two user-facing strings say the models run in-process, which stopped being true when the engine became a separate process |
+| A179 | S3 | DONE | 1079d4d | style / dead injection | Duplicated and mid-sentence-truncated comments, and an @EnvironmentObject with no @Published property and no reader |
 | A18 | S1 | DONE | 0de3123 | tests | The suite is not hermetic: three tests need the developer's private models/ and .secrets.env and fail on a fresh clone |
+| A180 | S3 | DONE | 5f14392 | deps / deprecated API | `NSApp.activate(ignoringOtherApps:)` is API_TO_BE_DEPRECATED in the macOS 27 SDK |
+| A181 | S2 | DONE | d647954 | tools / argument parsing | An option given without a value loops forever instead of failing |
+| A182 | S2 | DONE | d984446 | tools / build staleness | The rebuild guard compares directory mtimes, so editing a source file never triggers a rebuild and a stale binary or embed is served |
+| A183 | S2 | DONE | 5995de6 | tools / exposure | The device-capture run publishes the unauthenticated API on every interface, unlike the start scripts which warn and offer --local-only |
+| A184 | S2 | DONE | 40a9982 | tools / packaging | A missing SwiftPM bin path silently skips the metallib copy and the script still exits 0, so a bundle can ship that fails at runtime |
+| A185 | S2 | DONE | 52804c0 | audit tooling / scanner | The waiver checker ignores semgrep's `errors` array and treats a missing `results` key as zero findings, so a failed scan reports a clean pass |
+| A186 | S2 | DONE | 6524b3c | installer / model download | A checkpoint file whose repository name contains a directory uses it verbatim, so the download fails and the install dies |
+| A187 | S2 | DONE | d01c937 | supply chain / CI | The CI downloads shellcheck, gitleaks and osv-scanner and never verifies them, while the file's header claims pinned tools |
+| A188 | S3 | DONE | 34169ea | tools / injection | --port and --engine are interpolated into sed programs with no validation, so a crafted value injects into the generated Caddyfile that is then run |
+| A189 | S3 | DONE | b1a08d8 | tools / process safety | The pid-ownership check is a substring match, so a recycled pid belonging to an unrelated process can be signalled |
 | A19 | S2 | DONE | 0de3123 | process / git history | A DONE task was committed with its evidence and its ledger entry but without its fix: 948ea29 claims A14 and A17 and contains no source change |
+| A190 | S3 | DONE | b826657 | tools / process safety | The stop path kills by name directly beneath a comment that says it kills by pid |
+| A191 | S3 | DONE | 83e2c11 | generated sources / escaping | Name-list entries are interpolated into Swift string literals unescaped, so a quote or backslash in names/*.txt produces Swift that does not compile |
+| A192 | S3 | DONE | ab64af5 | CI / coverage of the gates | The shell lint covers only tools/*.sh so the audit scripts are never linted, and semgrep fetches a mutable live rule set despite the pinning claim |
+| A193 | S3 | DONE | 971c610 | tools / network robustness | Model and Metal downloads have no transfer deadline, so a stalled connection hangs the installer indefinitely |
+| A194 | S3 | DONE | cac00df | docs / drift | Several tool comments and help texts describe behaviour that changed or never existed |
+| A195 | S3 | DONE | 6cdd6ef | docs / TLS trust | The client never enforces the pinned fingerprint while another comment claims pinning is meaningful |
+| A196 | S1 | DONE | e4a8e16 | inference / arithmetic | The reasoning ceiling under-counts tokens, so the thinking level the UI promises is not the one enforced |
+| A197 | S1 | DONE | a2d5b80 | untrusted input / resource | Child output is unbounded and the conversion timeout cannot fire while output flows |
+| A198 | S1 | DONE | 2918d0b | concurrency / lifecycle | A session accepted during stop() is orphaned and keeps serving |
+| A199 | S2 | DONE | 1a331f5 | prompts / identity | The social engine keys and words itself by seat id while every other prompt surface uses display names |
 | A20 | S1 | DONE | e9d45ef | web front end | Stored DOM XSS: the live-pane header interpolates the moderator-supplied seat name into innerHTML |
+| A200 | S2 | DONE | daa6227 | model reporting | The MLX model label is a constant, so another checkpoint is misreported to the user and to the model |
+| A201 | S2 | DONE | ac5bab4 | resource lifecycle | A new client and a never-invalidated URLSession are created for every turn |
+| A202 | S2 | DONE | 0c885fd | terminal event | An empty server answer emits turnFailed and then turnFinished, so a failed turn is recorded as a successful empty one |
+| A203 | S2 | DONE | 2ac0bf1 | research / direction | The author of an unsupported claim can be directed to substantiate their own claim |
+| A204 | S2 | DONE | a562360 | prompt injection (A69 recurrence) | Raw display names are interpolated into the moderator instruction, bypassing the sanitiser A69 added |
+| A205 | S3 | DONE | c722b95 | dead code / wrong label | The .richText case is unreachable and an RTF file is labelled 'Word' |
+| A206 | S3 | DONE | d19edd7 | dead code | Six declarations are written or named but never used, one with a documented rule the code does not implement |
+| A207 | S3 | DONE | cc5afef | docs / correctness | Three comments say the document extractors live in the app target and that the core cannot read a PDF or Word file; all three are false |
+| A208 | S3 | DONE | b7a8700 | installer / dependencies | The checkpoint the installer downloads is a hand-copied duplicate of AgentSpec.defaultModelID and nothing keeps the two in step |
+| A209 | S3 | DONE | 8d3fa2b | tests / CORS | A75's CORS test asserted 404 because there was no OPTIONS route; A136 refuses the request explicitly, so the assertion named the old mechanism rather than the property |
 | A21 | S2 | DONE | 8111b1a | installer | The model-download integrity check silently degrades to 'accept any size' when the HEAD request yields nothing |
+| A210 | S2 | DONE | 70ac721 | audit tooling / Phase E gate | The Phase E gate accepts only audit/2026-09-13 or main, so it fails on the branch this re-audit is developed on and the acceptance run cannot pass |
+| A211 | S2 | DONE | a5288a1 | audit documentation / session entry point | The session entry point still says the audit is complete and names the landed 2026-09-13 branch, while 73 findings are open on a different, unmerged branch |
+| A212 | S1 | DONE | 479faab | workspace / audit tooling | Two wiki clones carried a GitHub personal access token in plaintext inside their origin URL, so the credential that can write to the wikis and to this repository sat in a readable file |
+| A213 | S2 | DONE | 0960c86 | audit tooling / DONE-commit guard | The DONE-commit guard recognised only .swift, .py and .sh paths, so a task fixed in the web interface or a CI workflow could be reported unbacked while its commit contained the fix |
+| A214 | S2 | DONE | b052a34 | API / snapshot payload | A snapshot that carries an attached image can exceed the transport's own message cap, so the state push is not delivered at all |
+| A215 | S2 | DONE | e9b7f44 | verification / installer smoke test | The installer's transport check pins an identity it never gives the engine it starts, so it can fail for a reason that is not the transport |
+| A216 | S2 | DONE | d3a4316 | transport / diagnostics | A transport error is reported as a number, so the reason the engine refused is thrown away |
+| A217 | S3 | DONE | b20a177 | dead code / share page | The share page's `shareBase` island field, the `Host` reflection that fills it and the validator that guards the reflection have no consumer |
+| A218 | S3 | DONE | 39cdb47 | docs / audit record | A point in the Phase E section lost the first half of its sentence and the clause that gave it an antecedent |
+| A219 | S3 | DONE | 1cf5f75 | docs / instruction and release files | The two instruction documents carried test counts and a file count the re-audit had moved, and described CLAUDE.md as containing nothing but the import |
 | A22 | S2 | DONE | 18100dd | start script | stop_all kills a stale PID from a pid file without checking the process is ours |
 | A23 | S2 | DONE | 38fbe08 | device capture tool | capture-devices.py prints a viewport mismatch but cannot fail the run |
 | A24 | S2 | DONE | b803b3c | installer | A native binary artifact is downloaded with no integrity check and embedded in the signed app |
@@ -1289,3 +1378,75 @@ before it (#12). The figures: 824 tests in 139 suites, both sanitizers clean, co
 77.08 % lines, gitleaks 0 over the full history, `osv-scanner` clean, `semgrep` 3 findings all waived
 in writing, `shellcheck`/`ruff`/`pyright` clean, `swiftlint` 255 and authored `swift-format` 744 at
 their recorded waivers, and 130 tasks with none open.
+
+---
+
+# Re-audit — Swift 6.4 / Xcode 27 / macOS 27 (2026-09-15)
+
+The toolchain was replaced between sessions. The previous 132 tasks were accepted on **Swift 6.3.3 /
+Xcode 26.6 / macOS 26.6.2**, and every host in the fleet is now **Swift 6.4 / Xcode 27.0 / macOS 27.0**
+with the macOS 26 SDK removed. An acceptance that describes a toolchain nobody has is not an
+acceptance, so the audit is re-run in full rather than spot-checked. Branch `audit/2026-09-15`, cut
+from `main` @ `02ddd4e`. **132 tasks were already DONE and are not reopened**; this re-audit appends
+from A133. The previous work is not invalidated — it is the reason the baseline below is clean.
+
+## Phase A — environment, inventory, baseline ✅
+
+Environment and fleet: [`environment.md`](environment.md) (re-audit section). Scope: [`inventory.md`](inventory.md).
+Evidence: [`baseline/swift64/`](baseline/swift64).
+
+| Metric | 2026-09-13 (Swift 6.3.3) | 2026-09-15 (Swift 6.4) |
+| --- | --- | --- |
+| Build (`swift build --build-tests`) | success, 0 warnings | **success, 0 warnings in this repo** |
+| Tests | 824 in 139 suites | **824 in 139 suites**, exit 0 |
+| Coverage `Sources/` | 77.08 % lines, 80.49 % functions | **77.08 % / 80.49 %** |
+| `swiftlint` | 255 | **255** |
+| `swift-format` (authored files) | 744 | **744** (identical under Xcode 27's `swift-format` and brew 603.0.0) |
+| `ruff check` / `ruff format --check` | clean | **clean** |
+| `pyright` | 0 errors | **0 errors** |
+| `shellcheck -S style` | 0 | **0** |
+| `osv-scanner` (lockfile) | no issues | **no issues** |
+| `gitleaks` (full history) | 0 findings | **0 findings** |
+
+**The code came through the toolchain move unchanged**, which is the useful half of this table: the
+four dependency/notice warnings and the four `swiftlint` points of drift that a toolchain bump usually
+brings did not appear, and the suite grew by nothing because nothing in it needed changing. The one
+thing that did change is the **environment**, and it changed decisively: see A133.
+
+## Phase B — findings
+
+Numbered as found; all are enumerated before any is fixed (§11).
+
+| | |
+| --- | --- |
+| **A133 (S1)** | **Xcode 27 does not ship the Metal compiler.** It is a separate 839 MB component (`xcodebuild -downloadComponent MetalToolchain`), and without it this package cannot build at all — `mlx-swift` compiles generated Metal kernels. Nothing in `README.md`, `tools/install.sh` or the previous `environment.md` required or checked it. Measured by *executing* metal: node1 works, node2–4 do not. |
+| **A134 (S2)** | The acceptance script's coverage step hardcodes the pre-6.4 test-bundle path (`ChatBotsPackageTests.xctest`), which is now `ChatBotsCoreTests.xctest`, so Phase E's coverage gate fails for a reason that is not about the code. |
+| **A135 (S2)** | `make-app.sh` states that mlx-swift's SwiftPM build does not compile the Metal kernels and fetches a 190 MB prebuilt `mlx.metallib` (SHA-256 pinned, A24) for that reason. Under Xcode 27 the SwiftPM build **does** compile them and produces its own `default.metallib`, so the stated reason is false and the necessity of the separate download is unverified — a 190 MB supply-chain surface that may be redundant, and potentially two Metal libraries in one bundle. |
+
+## Phase B — the finding set, enumerated before any fix
+
+Sixty-three findings (A133–A195) from four read-only passes: toolchain/repository, core module
+(L2/L3/L5), security/operations (L4/L7) and tests/app/web (L6), plus a fifth pass over `tools/` and CI.
+They are enumerated here, and committed, **before anything is fixed**, as §11 requires. The two S0s
+come first.
+
+| sev | ids |
+| --- | --- |
+| **S0** | A136 (a visited web page can drive the engine and repoint a cloud seat), A137 (`ConversationStore` can lose every kept conversation) |
+| **S1** | A165 (browser never consumes `delta`, so replies are invisible until a turn ends), A166 (the whole app target is untestable), A167 (a test that asserts a copy of the logic), A168 (the transport gate deadlocks on cancellation), A169 (21 fire-and-forget teardowns defeat the serialisation) |
+| **S2** | A134, A135, A138–A146, A170–A176, A181–A187 |
+| **S3** | A133-adjacent environment notes, A147–A164, A177–A180, A188–A195 |
+
+Three findings are worth stating in prose because they change what the re-audit is for:
+
+* **A136 is a drive-by, not just a LAN exposure.** A01 was "the API is reachable from the network";
+  A75 was "any site can *read* the API". This is "any site can *make it act*": no Origin check, and a
+  `Content-Type` that is never inspected, so `text/plain` JSON from a page the user merely visited
+  executes `/api/start`, `/api/conversations/delete` and `/api/seat` — and `/api/seat` will repoint a
+  cloud seat at a host the attacker controls. The audit had treated the browser boundary as closed.
+* **A137 is the first S0 in this re-audit that is not about the new toolchain**: the store deletes the
+  index and then moves the replacement into place, so a crash in between leaves the atomically written
+  `.tmp` unread and the whole kept history reading as empty.
+* **A165 explains a symptom the previous audit never tested**: the engine has streamed per-token
+  `delta` events since `f0b71b2` and the browser has never listened for them, so the page the README
+  advertises for phones shows replies only once a turn completes.

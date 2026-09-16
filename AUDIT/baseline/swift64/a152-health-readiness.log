@@ -1,0 +1,89 @@
+A152 — controlled before/after for the health readiness tests
+Host: 27.0 / arm64, swift-driver version: 1.168.6 Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)
+
+--- BASELINE: unmutated, both health suites ---
+◇ Test run started.
+✔ Test "The failure ring keeps the newest entries and no more than its limit" passed after 0.017 seconds.
+✔ Test "An engine whose seats have not been asked to load is ready" passed after 0.044 seconds.
+✔ Test "The health endpoint reports the counters and the recent failures" passed after 0.045 seconds.
+✔ Test "One seat failing is degradation, not an outage" passed after 0.045 seconds.
+✔ Test "A malformed request is answered and recorded" passed after 0.054 seconds.
+✔ Test "An engine whose every seat failed to load is not ready, and answers 503" passed after 0.074 seconds.
+✔ Test run with 6 tests in 2 suites passed after 0.075 seconds.
+◇ Test run started.
+✔ Test "One seat failing is degradation, not an outage" passed after 0.046 seconds.
+✔ Test "An engine whose seats have not been asked to load is ready" passed after 0.046 seconds.
+✔ Test "An engine whose every seat failed to load is not ready, and answers 503" passed after 0.076 seconds.
+✔ Test run with 3 tests in 1 suite passed after 0.076 seconds.
+
+--- M1: the status code is hardcoded 200 again (the pre-fix behaviour) ---
+◇ Test run started.
+✔ Test "An engine whose seats have not been asked to load is ready" passed after 0.043 seconds.
+✔ Test "One seat failing is degradation, not an outage" passed after 0.043 seconds.
+✘ Test "An engine whose every seat failed to load is not ready, and answers 503" recorded an issue at AuditS3ServerDiagnosticsTests.swift:238:9: Expectation failed: status == 503
+✘ Test "An engine whose every seat failed to load is not ready, and answers 503" failed after 0.081 seconds with 1 issue.
+✘ Suite "A listener says whether it can serve, not just that it is listening (A152)" failed after 0.082 seconds with 1 issue.
+✘ Test run with 3 tests in 1 suite failed after 0.082 seconds with 1 issue.
+
+--- M2: readiness is always true ---
+◇ Test run started.
+✔ Test "One seat failing is degradation, not an outage" passed after 0.046 seconds.
+✔ Test "An engine whose seats have not been asked to load is ready" passed after 0.047 seconds.
+✘ Test "An engine whose every seat failed to load is not ready, and answers 503" recorded an issue at AuditS3ServerDiagnosticsTests.swift:236:9: Expectation failed: health.status == "unavailable"
+✘ Test "An engine whose every seat failed to load is not ready, and answers 503" recorded an issue at AuditS3ServerDiagnosticsTests.swift:237:9: Expectation failed: health.ready == false
+✘ Test "An engine whose every seat failed to load is not ready, and answers 503" recorded an issue at AuditS3ServerDiagnosticsTests.swift:238:9: Expectation failed: status == 503
+✘ Test "An engine whose every seat failed to load is not ready, and answers 503" failed after 5.072 seconds with 3 issues.
+✘ Suite "A listener says whether it can serve, not just that it is listening (A152)" failed after 5.072 seconds with 3 issues.
+✘ Test run with 3 tests in 1 suite failed after 5.072 seconds with 3 issues.
+
+--- M3: the load failure is not recorded (the pre-fix behaviour: a notice and nothing else) ---
+◇ Test run started.
+✔ Test "An engine whose seats have not been asked to load is ready" passed after 0.035 seconds.
+✘ Test "One seat failing is degradation, not an outage" recorded an issue at AuditS3ServerDiagnosticsTests.swift:266:9: Expectation failed: health.failedSeats.count == 1
+✘ Test "One seat failing is degradation, not an outage" recorded an issue at AuditS3ServerDiagnosticsTests.swift:267:9: Expectation failed: health.failedSeats.keys.first == failingSeat
+✘ Test "One seat failing is degradation, not an outage" failed after 5.042 seconds with 2 issues.
+✘ Test "An engine whose every seat failed to load is not ready, and answers 503" recorded an issue at AuditS3ServerDiagnosticsTests.swift:236:9: Expectation failed: health.status == "unavailable"
+✘ Test "An engine whose every seat failed to load is not ready, and answers 503" recorded an issue at AuditS3ServerDiagnosticsTests.swift:237:9: Expectation failed: health.ready == false
+✘ Test "An engine whose every seat failed to load is not ready, and answers 503" recorded an issue at AuditS3ServerDiagnosticsTests.swift:238:9: Expectation failed: status == 503
+✘ Test "An engine whose every seat failed to load is not ready, and answers 503" recorded an issue at AuditS3ServerDiagnosticsTests.swift:240:9: Expectation failed: health.reason != nil
+✘ Test "An engine whose every seat failed to load is not ready, and answers 503" recorded an issue at AuditS3ServerDiagnosticsTests.swift:241:9: Expectation failed: health.failedSeats.count == 2
+✘ Test "An engine whose every seat failed to load is not ready, and answers 503" failed after 5.045 seconds with 5 issues.
+✘ Suite "A listener says whether it can serve, not just that it is listening (A152)" failed after 5.045 seconds with 7 issues.
+✘ Test run with 3 tests in 1 suite failed after 5.046 seconds with 7 issues.
+
+--- M4: any failed seat is treated as an outage ---
+◇ Test run started.
+✔ Test "An engine whose seats have not been asked to load is ready" passed after 0.042 seconds.
+✘ Test "One seat failing is degradation, not an outage" recorded an issue at AuditS3ServerDiagnosticsTests.swift:262:9: Expectation failed: status == 200
+✘ Test "One seat failing is degradation, not an outage" recorded an issue at AuditS3ServerDiagnosticsTests.swift:263:9: Expectation failed: health.ready
+✘ Test "One seat failing is degradation, not an outage" recorded an issue at AuditS3ServerDiagnosticsTests.swift:264:9: Expectation failed: health.status == "ok"
+✘ Test "One seat failing is degradation, not an outage" recorded an issue at AuditS3ServerDiagnosticsTests.swift:265:9: Expectation failed: health.reason == nil
+✘ Test "One seat failing is degradation, not an outage" failed after 0.044 seconds with 4 issues.
+✔ Test "An engine whose every seat failed to load is not ready, and answers 503" passed after 0.080 seconds.
+✘ Suite "A listener says whether it can serve, not just that it is listening (A152)" failed after 0.080 seconds with 4 issues.
+✘ Test run with 3 tests in 1 suite failed after 0.080 seconds with 4 issues.
+
+--- RESTORED: unmutated again ---
+◇ Test run started.
+✔ Test "The failure ring keeps the newest entries and no more than its limit" passed after 0.008 seconds.
+✔ Test "An engine whose seats have not been asked to load is ready" passed after 0.041 seconds.
+✔ Test "The health endpoint reports the counters and the recent failures" passed after 0.041 seconds.
+✔ Test "A malformed request is answered and recorded" passed after 0.050 seconds.
+✔ Test "One seat failing is degradation, not an outage" passed after 0.066 seconds.
+✔ Test "An engine whose every seat failed to load is not ready, and answers 503" passed after 0.066 seconds.
+✔ Test run with 6 tests in 2 suites passed after 0.067 seconds.
+◇ Test run started.
+✔ Test "One seat failing is degradation, not an outage" passed after 0.045 seconds.
+✔ Test "An engine whose seats have not been asked to load is ready" passed after 0.046 seconds.
+✔ Test "An engine whose every seat failed to load is not ready, and answers 503" passed after 0.080 seconds.
+✔ Test run with 3 tests in 1 suite passed after 0.080 seconds.
+
+--- FULL GATE at the fix commit (tools/audit-checks.sh) ---
+PASS  build: swift build --build-tests
+PASS  tests: 974 tests in 175 suites
+PASS  coverage: Sources/ TOTAL 6375 regions 2595 covered 59.29%, 20191 lines 9841 covered 51.26%
+PASS  swiftlint: 254 finding(s), within the recorded waiver of 255
+PASS  swift-format: 739 diagnostic(s), within the recorded waiver of 744
+PASS  web: deltas merge (34 cases)
+
+All 6 Mac-only gates passed.

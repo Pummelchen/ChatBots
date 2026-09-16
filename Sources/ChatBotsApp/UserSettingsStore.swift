@@ -35,8 +35,18 @@ final class UserSettingsStore: ObservableObject {
         let supported = AgentSpec.SeatRoster.count()
         if let data = defaults.data(forKey: Self.key) {
             do {
-                self.settings = try UserSettings.decoded(from: data)
+                let loaded = try UserSettings.decoded(from: data)
                     .reconciled(supportedSeatCount: supported)
+                self.settings = loaded
+                // A payload written by a build before A139 carries the cloud API keys in cleartext, in
+                // a plist anything running as this user can read. `encoded()` no longer writes them, but
+                // that only helps from the next save onwards — this is what takes a key that is already
+                // on disk back out, immediately and before anything else reads it. The settings are
+                // otherwise unchanged, and `applyAPIEndpoints` re-applies the Keychain values.
+                let redacted = loaded.withoutSecrets()
+                if redacted != loaded, let payload = redacted.encoded() {
+                    defaults.set(payload, forKey: Self.key)
+                }
             } catch {
                 self.settings = .defaults(topic: fallbackTopic)
                 self.loadWarning =

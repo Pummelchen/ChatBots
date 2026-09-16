@@ -6,7 +6,7 @@
 // **On trust.** The transport is configured with the library's `localDevelopmentSelfSigned`
 // policy, which is a loopback-only bypass of platform certificate validation — it does not
 // verify our fingerprint. So the security of this channel rests on the socket being bound to
-// loopback and on the operating system keeping other users out, not on the pin.
+// loopback and on the operating system keeping other users out, not on the fingerprint.
 //
 // That is a real limitation and worth stating rather than implying more: a malicious process
 // running as the same user on this machine could present its own certificate and be accepted.
@@ -68,6 +68,19 @@ public final class WebTransportEngineClient {
         /// dead channel.
         public var idleTimeoutMilliseconds: Int32 = 120_000
 
+        /// How long one *connect* may take, when that should differ from the request deadline.
+        ///
+        /// A connect that begins before the engine's listener exists does not fail — it waits, for
+        /// as long as it is allowed to. So an attempt given the whole request deadline spends the
+        /// whole deadline, and a caller that retries gets exactly one attempt instead of the several
+        /// it asked for. That is how the installer's smoke test reported "the transport does NOT
+        /// work" on a machine whose engine bound its port two seconds later (A215): the retry loop
+        /// was there, and the first attempt ate the budget.
+        ///
+        /// `nil` keeps the request deadline, which is right for a caller that connects once and is
+        /// content to wait. It is only a caller that retries that needs a shorter one.
+        public var connectTimeoutMilliseconds: Int32?
+
         public init() {}
     }
 
@@ -106,12 +119,8 @@ public final class WebTransportEngineClient {
         }
     }
 
-    /// Whether a `send` currently owns the request channel, and the sends waiting for it.
-    ///
-    /// The channel is one request wide. See `acquireRequestSlot` for why that is enforced here
-    /// rather than assumed.
-    private var requestSlotHeld = false
-    private var waitingForRequestSlot: [CheckedContinuation<Void, Never>] = []
+    /// The one-request-wide channel, and the sends waiting for it. See `RequestSlot`.
+    private let requestSlot = RequestSlot()
 
     /// Events and states, in order, for as long as the connection lasts.
     private var eventContinuation: AsyncStream<EngineEvent>.Continuation?
@@ -151,10 +160,12 @@ public final class WebTransportEngineClient {
             // Loopback only, and the identity is self-signed, so the platform trust path
             // cannot be used. See the note at the top of this file.
             let client = WebTransportQUICClient(trustPolicy: .localDevelopmentSelfSigned)
-            // The connect gets the *request* deadline. This is the same handshake the
-            // convenience wrapper performs, with the one difference that matters here: the
-            // session timeout is not the reader's idle deadline, because the stream below
-            // overrides it (A100).
+            // The connect gets the request deadline unless the caller asked for a separate one.
+            // This is the same handshake the convenience wrapper performs, with the one difference
+            // that matters here: the session timeout is not the reader's idle deadline, because the
+            // stream below overrides it (A100). A caller that retries sets
+            // `connectTimeoutMilliseconds`, so one attempt cannot spend the whole budget before the
+            // engine has bound its listener (A215).
             let session = try await client.connectSession(
                 to: WebTransportNetworkEndpoint(
                     host: configuration.host, port: configuration.port),
@@ -164,7 +175,8 @@ public final class WebTransportEngineClient {
                 protocols: [],
                 optimisticCapsules: [],
                 settingsValidation: .draft16Strict,
-                timeoutMilliseconds: configuration.timeoutMilliseconds)
+                timeoutMilliseconds: configuration.connectTimeoutMilliseconds
+                    ?? configuration.timeoutMilliseconds)
 
             do {
                 self.session = session
@@ -177,8 +189,12 @@ public final class WebTransportEngineClient {
                 self.stream = try await session.openBidirectionalStream(
                     timeoutMilliseconds: configuration.idleTimeoutMilliseconds)
 
+                // The same depth the server keeps, from the shared constant: this was `.unbounded`, which
+                // made the bounding one-sided — the server dropped its oldest 256 while the client retained
+                // every event it was sent, so a consumer that stopped draining (a stalled interface, a
+                // paused window) grew the client without limit (A158).
                 let (events, continuation) = AsyncStream<EngineEvent>.makeStream(
-                    bufferingPolicy: .unbounded)
+                    bufferingPolicy: .bufferingNewest(ProtocolLimits.eventBufferDepth))
                 self.events = events
                 self.eventContinuation = continuation
 
@@ -223,7 +239,7 @@ public final class WebTransportEngineClient {
                 throw error
             }
         } catch {
-            throw ClientError.cannotConnect(error.localizedDescription)
+            throw ClientError.cannotConnect(ErrorText.describe(error))
         }
     }
 
@@ -264,8 +280,8 @@ public final class WebTransportEngineClient {
     /// request so a reply can be checked against it. A reply that matches nothing is a reader
     /// failure with that reason, not a wait that runs out.
     public func send(_ request: EngineRequest) async throws -> EngineReply {
-        await acquireRequestSlot()
-        defer { releaseRequestSlot() }
+        await requestSlot.acquire()
+        defer { requestSlot.release() }
         guard let stream = self.stream, readerTask != nil else {
             throw ClientError.cannotConnect("not connected")
         }
@@ -336,39 +352,6 @@ public final class WebTransportEngineClient {
         throw ClientError.streamFailed("the engine closed the connection")
     }
 
-    /// Wait for the request channel.
-    ///
-    /// The wire protocol carries no correlation id — `EngineFrame.reply` is the reply and
-    /// nothing else — so a reply can only be matched while there is exactly one request
-    /// outstanding. The file used to *claim* that ("a single pending reply is all there can be
-    /// at a time") and enforce nothing: every send appended its continuation and the reader
-    /// gave each reply to `pendingReplies.first`. `ChatController` polls `state()` at 1 Hz
-    /// beside a user's command, so two sends overlap routinely; the two `stream.send` calls can
-    /// reach the wire in either order, and a reply was then delivered to the wrong waiter or
-    /// dropped. This gate makes the claim true, and `PendingRequest.request` is the identity
-    /// the reply is checked against.
-    private func acquireRequestSlot() async {
-        if !requestSlotHeld {
-            requestSlotHeld = true
-            return
-        }
-        await withCheckedContinuation { continuation in
-            waitingForRequestSlot.append(continuation)
-        }
-    }
-
-    /// Hand the request channel to the next waiter, or release it.
-    ///
-    /// The slot is handed straight over rather than released and re-taken, so two sends can
-    /// never both believe they hold it.
-    private func releaseRequestSlot() {
-        if waitingForRequestSlot.isEmpty {
-            requestSlotHeld = false
-        } else {
-            waitingForRequestSlot.removeFirst().resume()
-        }
-    }
-
     /// Send a file to the engine, which extracts it and holds it as source material.
     ///
     /// The bytes go over the request channel rather than the event channel: it is a one-shot
@@ -397,6 +380,30 @@ public final class WebTransportEngineClient {
     /// silently leaves a connected-looking client that never updates, which is the hardest
     /// kind of failure to notice.
     public private(set) var readerError: String?
+
+    /// How many frames the engine sent that this build could not read, and why the last one could not be.
+    ///
+    /// Not fatal, deliberately: the framing is intact, so the stream stays aligned and the reader carries
+    /// on — and an app may be attached to an engine of another build, where a frame it does not know is a
+    /// version difference rather than a broken connection. This was `try?` and `continue`, which dropped
+    /// the payload with no trace at all: the A32/A54 class, and the same shape A157 fixed at the server
+    /// (A158).
+    public private(set) var unreadableFrames = 0
+    public private(set) var lastUnreadableFrame: String?
+
+    /// The frame a payload carries, or nil — recorded — when this build cannot read it.
+    ///
+    /// Internal so a test can hand it a payload no decoder reads and see what the client does with it,
+    /// which is the only way to reach this path without a peer that speaks a different protocol.
+    func decodedFrame(_ payload: Data) -> EngineFrame? {
+        do {
+            return try ProtocolCodec.decodeFrame(payload)
+        } catch {
+            unreadableFrames += 1
+            lastUnreadableFrame = error.localizedDescription
+            return nil
+        }
+    }
 
     /// Read frames until the stream ends, routing each to its destination.
     private func read(from stream: WebTransportNetworkBidirectionalStream) async {
@@ -433,7 +440,7 @@ public final class WebTransportEngineClient {
                 }
                 guard case .message(let payload, let remainder) = result else { break }
                 buffer = remainder
-                guard let frame = try? ProtocolCodec.decodeFrame(payload) else { continue }
+                guard let frame = decodedFrame(payload) else { continue }
                 switch frame {
                 case .reply(let reply):
                     // Matched to the request, not to the position. The slot held by the sender

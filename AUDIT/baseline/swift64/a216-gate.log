@@ -1,0 +1,18 @@
+# A216 — the full Mac gate, after the fix (2026-09-15)
+
+$ bash tools/audit-checks.sh
+
+PASS  build: swift build --build-tests
+PASS  tests: 917 tests in 162 suites
+PASS  coverage: TOTAL 6236 2630 57.83% (regions) · 19697 9810 50.20% (lines)
+PASS  swiftlint: 254 finding(s), within the recorded waiver of 255
+PASS  swift-format: 739 diagnostic(s), within the recorded waiver of 744
+PASS  web: deltas merge (26 cases)
+
+All 6 Mac-only gates passed.
+
+# The suite was 913 tests in 161 suites after A215 and is 917 in 162 here: the four new tests are
+# `ClientErrorDescriptionTests`. Lint and format are back at their pre-change counts (254 and 739),
+# because the first version of this fix put the helper on the `@MainActor` client and pushed that
+# file past swiftlint's 600-line limit — it lives in `Sources/ChatBotsCore/ErrorText.swift` instead,
+# which is also where a pure formatter belongs.

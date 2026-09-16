@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 """Capture the web interface at every device profile, offscreen.
 
-Uses headless Chrome, so nothing appears on the desktop: `--headless` renders without a
-window and `--screenshot` writes the result straight to a file. Each profile is captured at
-its real CSS viewport and device pixel ratio, which is the whole point — a layout that looks
-right at 390 points can still break at 360, and those are the widths real entry-level phones
-report.
+Uses headless Chrome, so nothing appears on the desktop, and drives it over the DevTools protocol
+(`tools/cdp.py`) rather than Chrome's command line: `Emulation.setDeviceMetricsOverride` sets each
+profile's CSS viewport, device pixel ratio and touch emulation, and `Page.captureScreenshot` writes
+the image straight to a file. Each profile is captured at its real CSS viewport and device pixel
+ratio, which is the whole point — a layout that looks right at 390 points can still break at 360,
+and those are the widths real entry-level phones report.
 
     python3 tools/capture-devices.py                  # every profile
     python3 tools/capture-devices.py --class phone    # one class
     python3 tools/capture-devices.py --id galaxy-a13  # one device
     python3 tools/capture-devices.py --common         # one per distinct shape
 
-Output goes to `captures/`, with an index page that tiles them so the results can be
-compared side by side. Exits non-zero if any capture fails or renders no messages, so it can
+Output goes to `captures/`: the capture itself, a display-sized copy of it when ImageMagick is
+installed, and an index page that tiles the display copies and links each full one, so the results
+can be compared side by side. Exits non-zero if any capture fails or renders no messages, so it can
 be wired into a check.
 
 The server is started and stopped by this script, on its own ports, and it seeds the
@@ -43,7 +45,6 @@ OUT: pathlib.Path = ROOT / "captures"
 PORT: int = 7791  # the interface
 ENGINE_PORT: int = 7792  # the engine behind it
 CHROME: str = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-CHROME_PORT: int = 9223
 
 # A phone profile is the strictest test, so landscape is worth checking too: it is where a
 # header can eat the whole screen.
@@ -180,16 +181,33 @@ def start_servers() -> subprocess.Popen[bytes] | None:
     return engine
 
 
-def caddy_process() -> subprocess.Popen[bytes] | None:
-    if not shutil.which("caddy"):
-        return None
-    config = run_directory() / "Caddyfile.capture"
-    config.write_text(
+def capture_caddyfile() -> str:
+    """The Caddyfile a capture run uses.
+
+    The repository's own, on the capture ports, plus one directive the repository's does not carry.
+
+    The site address is host-less on purpose — that is what lets a phone reach the page — and a
+    host-less address makes Caddy bind **every** interface, so this used to publish the whole
+    unauthenticated `/api/*` surface to the network for the duration of a screenshot run. A capture run
+    is not somebody choosing to share; it is a developer taking pictures on their own machine.
+    `start.sh` inserts the same directive for `--local-only`, and the reason is the same one the
+    Caddyfile documents: the site address names the Host a request must carry, it does not pick the
+    listener, so `bind` is what chooses the interface (A183).
+    """
+    text = (
         (ROOT / "Caddyfile")
         .read_text()
         .replace("http://:7788", f"http://:{PORT}")
         .replace("127.0.0.1:7789", f"127.0.0.1:{ENGINE_PORT}")
     )
+    return text.replace(f"http://:{PORT} {{", f"http://:{PORT} {{\n\tbind 127.0.0.1", 1)
+
+
+def caddy_process() -> subprocess.Popen[bytes] | None:
+    if not shutil.which("caddy"):
+        return None
+    config = run_directory() / "Caddyfile.capture"
+    config.write_text(capture_caddyfile())
     process = subprocess.Popen(
         ["caddy", "run", "--config", str(config), "--adapter", "caddyfile"],
         cwd=ROOT,
@@ -269,35 +287,46 @@ def capture(
     return metrics
 
 
-def downscale(name: str) -> None:
-    """Keep the capture at its real size but make a display copy, since a 3x phone capture is
-    three thousand pixels tall and unreasonable in an index page.
+def downscale(name: str) -> pathlib.Path | None:
+    """Write the display copy of one capture and return its path, or None if there is none.
+
+    A 3x phone capture is three thousand pixels tall and unreasonable in an index page, so the index
+    shows this copy and links the capture itself (A194: this used to write a `-thumb.png` that
+    nothing used, while the index embedded the full-size capture it exists to avoid).
 
     `name` is resolved through `output_directory()` for the same reason `capture()` does it:
     the thumbnail is written next to the capture, into a directory this function does not
     otherwise know has been created.
+
+    None means "the caller shows the capture itself": ImageMagick is not installed, or the
+    conversion failed. The caller puts the answer in the row rather than assuming a thumbnail
+    exists, because this tool runs on Macs without `magick` and an index pointing at a file that is
+    not there would be worse than a large one.
     """
     shot = output_directory() / name
-    if shutil.which("magick"):
-        subprocess.run(
-            [
-                "magick",
-                str(shot),
-                "-resize",
-                "420x",
-                str(shot.with_name(shot.stem + "-thumb.png")),
-            ],
-            check=False,
-            capture_output=True,
-        )
+    thumb = shot.with_name(shot.stem + "-thumb.png")
+    if not shutil.which("magick"):
+        return None
+    result = subprocess.run(
+        ["magick", str(shot), "-resize", "420x", str(thumb)],
+        check=False,
+        capture_output=True,
+    )
+    if result.returncode != 0 or not thumb.exists():
+        return None
+    return thumb
 
 
 def build_index(rows: list[JsonObject]) -> None:
-    """A page that tiles every capture, for comparing profiles at a glance."""
+    """A page that tiles every capture, for comparing profiles at a glance.
+
+    Each card shows the display copy and links the full-size capture; the figcaption says when it is
+    showing the capture itself because there is no thumbnail (A194).
+    """
     cards = "\n".join(
         f"""  <figure>
-    <img src="{r["file"]}" alt="{r["name"]}" loading="lazy">
-    <figcaption><b>{r["name"]}</b><br>{r["width"]}×{r["height"]} @{r["pixelRatio"]}x · {r["class"]} · {r["mode"]}{" · landscape" if r["orientation"] == "landscape" else ""}</figcaption>
+    <a href="{r["file"]}"><img src="{r.get("thumb") or r["file"]}" alt="{r["name"]}" loading="lazy"></a>
+    <figcaption><b>{r["name"]}</b><br>{r["width"]}×{r["height"]} @{r["pixelRatio"]}x · {r["class"]} · {r["mode"]}{" · landscape" if r["orientation"] == "landscape" else ""}{"" if r.get("thumb") else " · full size"}</figcaption>
   </figure>"""
         for r in rows
     )
@@ -384,7 +413,9 @@ def main() -> int:
         viewport_mismatches: list[tuple[Any, str, Any, Any]] = []
         empty_captures: list[tuple[Any, str]] = []
 
-        with Chrome(CHROME, port=CHROME_PORT) as browser:
+        # Each browser gets its own port and its own private profile, so two captures — or two people
+        # capturing at once — cannot collide or reach each other's browser (A164).
+        with Chrome(CHROME) as browser:
             for profile in selected:
                 orientations: list[str] = ["portrait"]
                 if args.include_landscape and profile["class"] == "phone":
@@ -401,9 +432,12 @@ def main() -> int:
                         failures += 1
                         continue
 
-                    downscale(file)
+                    display = downscale(file)
                     row: JsonObject = {
                         "file": file,
+                        # The display copy's name, shown by the index; None means there is none and
+                        # the index falls back to the capture itself (A194).
+                        "thumb": display.name if display else None,
                         "name": profile["name"],
                         "width": profile["width"],
                         "height": profile["height"],
@@ -454,7 +488,7 @@ def main() -> int:
         # tools/start-web-mobile.sh exists for.
         print("\nForced views, on a desktop-sized browser:")
         forced_failures: list[str] = []
-        with Chrome(CHROME, port=CHROME_PORT + 1) as browser:
+        with Chrome(CHROME) as browser:
             for view, expected_device, expected_layout, expected_max_width in [
                 ("phone", "phone", "thread", 440),
                 ("desktop", "desktop", "split", 2000),

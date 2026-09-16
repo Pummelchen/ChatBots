@@ -2,8 +2,9 @@
 """List the files a Hugging Face checkpoint offers, one per line.
 
 The API's `siblings` response does not include sizes, so they are read separately with a
-HEAD request by the installer. Documentation files are skipped: they are not part of the
-model and would just be wasted bandwidth.
+HEAD request by the installer. Files this installer does not download are skipped, each for
+the reason recorded on `SKIP` below — repository prose, and the vocabularies the app does
+not read — so no bandwidth is spent on them.
 
 Kept as its own file rather than an inline heredoc so the installer stays readable.
 """
@@ -19,8 +20,18 @@ type JsonValue = (
     None | bool | int | float | str | list[JsonValue] | dict[str, JsonValue]
 )
 
-# Documentation files that live beside a checkpoint but are not part of it. Frozen because the
-# constant is only ever read, and saying so keeps it that way.
+# Files a checkpoint offers that this installer does not download, each with its own reason rather
+# than one label that fits none of them (A194):
+#
+#   * repository metadata and prose — `.gitattributes`, `README.md`, `LICENSE`, `LICENSE.txt`,
+#     `.gitignore` — which are not the model and would only be wasted bandwidth;
+#   * `tokenizer.model`, the SentencePiece vocabulary. That is a *model* file, not documentation: it
+#     is skipped because `Sources/ChatBotsCore/ModelStore.swift` treats `tokenizer.json` as the
+#     tokenizer a local checkpoint must have, so a checkpoint offering only `tokenizer.model` is
+#     rejected by the app as incomplete either way, and one offering both does not need the duplicate
+#     (~2 MB).
+#
+# Frozen because the constant is only ever read, and saying so keeps it that way.
 SKIP: frozenset[str] = frozenset(
     {
         ".gitattributes",

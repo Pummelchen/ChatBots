@@ -1,0 +1,62 @@
+A178 — the strings that said the models run in the app
+Host: 27.0 / arm64, swift-driver version: 1.168.6 Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)
+
+--- BASELINE: unmutated ---
+✔ Test run with 3 tests in 1 suite passed after 0.006 seconds.
+
+--- M1: the Help window says in-process again ---
+✘ Test "The Help window and the tooltip say where the model actually runs" recorded an issue at AuditS3UserFacingTextTests.swift:59:9: Expectation failed: help.contains("runs in the engine process the app starts")
+✘ Test "The Help window and the tooltip say where the model actually runs" recorded an issue at AuditS3UserFacingTextTests.swift:60:9: Expectation failed: help.contains("or against the endpoint you configured for that seat")
+✘ Test "The Help window and the tooltip say where the model actually runs" failed after 0.003 seconds with 2 issues.
+✘ Test "No user-facing string claims the models run in the app" recorded an issue at AuditS3UserFacingTextTests.swift:49:17: Expectation failed: !text.contains(phrase)
+✘ Test "No user-facing string claims the models run in the app" failed after 0.006 seconds with 1 issue.
+✘ Test run with 3 tests in 1 suite failed after 0.006 seconds with 3 issues.
+
+--- M2: the tooltip names a model the app no longer ships ---
+✘ Test "The Help window and the tooltip say where the model actually runs" recorded an issue at AuditS3UserFacingTextTests.swift:63:9: Expectation failed: tooltip.contains("in the engine process")
+✘ Test "No user-facing string claims the models run in the app" recorded an issue at AuditS3UserFacingTextTests.swift:49:17: Expectation failed: !text.contains(phrase)
+✘ Test "The Help window and the tooltip say where the model actually runs" recorded an issue at AuditS3UserFacingTextTests.swift:66:9: Expectation failed: tooltip.contains("\\(spec.modelShortName)")
+✘ Test "The Help window and the tooltip say where the model actually runs" failed after 0.003 seconds with 2 issues.
+✘ Test "No user-facing string claims the models run in the app" failed after 0.006 seconds with 1 issue.
+✘ Test run with 3 tests in 1 suite failed after 0.006 seconds with 3 issues.
+
+--- M3: the backend label says in-process again ---
+✘ Test "The local backend is called local, not in-process" recorded an issue at AuditS3UserFacingTextTests.swift:23:9: Expectation failed: AgentSpec.Backend.mlx.label == "MLX (local)"
+✘ Test "The local backend is called local, not in-process" recorded an issue at AuditS3UserFacingTextTests.swift:25:9: Expectation failed: !AgentSpec.Backend.mlx.label.contains("in-process")
+✘ Test "The local backend is called local, not in-process" failed after 0.001 seconds with 2 issues.
+✘ Test "No user-facing string claims the models run in the app" recorded an issue at AuditS3UserFacingTextTests.swift:49:17: Expectation failed: !text.contains(phrase)
+✘ Test "No user-facing string claims the models run in the app" failed after 0.006 seconds with 1 issue.
+✘ Test run with 3 tests in 1 suite failed after 0.007 seconds with 3 issues.
+
+--- M4: the backend's documentation says it again ---
+✘ Test "No user-facing string claims the models run in the app" recorded an issue at AuditS3UserFacingTextTests.swift:49:17: Expectation failed: !text.contains(phrase)
+✘ Test "No user-facing string claims the models run in the app" failed after 0.007 seconds with 1 issue.
+✘ Test run with 3 tests in 1 suite failed after 0.007 seconds with 1 issue.
+
+--- M5: the label loses the distinction it exists for (over-correction) ---
+✘ Test "The local backend is called local, not in-process" recorded an issue at AuditS3UserFacingTextTests.swift:24:9: Expectation failed: AgentSpec.Backend.mlx.shortLabel == "MLX"
+✘ Test "The local backend is called local, not in-process" failed after 0.001 seconds with 1 issue.
+✘ Test run with 3 tests in 1 suite failed after 0.006 seconds with 1 issue.
+
+--- RESTORED: unmutated again ---
+✔ Test run with 3 tests in 1 suite passed after 0.006 seconds.
+
+--- What each mutation shows ---
+M1 the Help window's old sentence returns: both the "says where it runs" test and the stale-phrase check
+fail. M2 the tooltip names a model the app no longer ships and says in-process: the tooltip test fails on
+both counts. M3 the label becomes "MLX (in-process)" again: the value test fails directly and the phrase
+check fails with it. M4 the backend's own documentation returns to the old account: the phrase check is the
+only thing that can see a comment, and it does. M5 the label stops distinguishing anything ("Local" for the
+short label): the value test fails, which is the counterweight — the check pins the names rather than only
+forbidding the old ones.
+
+--- FULL GATE at the fix commit (tools/audit-checks.sh) ---
+PASS  build: swift build --build-tests
+PASS  tests: 1028 tests in 190 suites
+PASS  coverage: Sources/ TOTAL 6505 regions 2573 covered 60.45%, 20530 lines 9843 covered 52.06%
+PASS  swiftlint: 253 finding(s), within the recorded waiver of 255
+PASS  swift-format: 739 diagnostic(s), within the recorded waiver of 744
+PASS  web: deltas merge (34 cases)
+PASS  web: the verdict rule (12 cases)
+
+All 6 Mac-only gates passed.

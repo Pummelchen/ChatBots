@@ -57,12 +57,16 @@ http://:7788 {
 	# `/api`, so without this block the catch-all below hands the path to the file server and
 	# every share link answers 404 — which is what the shipped configuration did (A99).
 	#
-	# The difference from the block above is deliberate: no `header_up Host`, so Caddy passes the
-	# Host it was reached on through to the engine. The engine uses that to build the page's own
-	# links, which is how a link copied on a phone points back at the address the phone used
-	# rather than at the engine's loopback port.
+	# This block used to be the one that did *not* rewrite the upstream `Host`, because the engine
+	# derived the page's origin from it. The page renders no links and needs no origin, so nothing
+	# reads the header now and it is normalised here like every other block (A217). The link a
+	# reader copies is built by the front ends: the web interface from the origin the browser is
+	# reading at, with the engine's reported base as its fallback (`web/app.js`), and the desktop
+	# app from that reported base (`ChatController.shareLink(for:)`), which `--share-base` sets.
 	handle /s/* {
-		reverse_proxy 127.0.0.1:7789
+		reverse_proxy 127.0.0.1:7789 {
+			header_up Host {upstream_hostport}
+		}
 	}
 
 	# The interface itself.
@@ -76,8 +80,8 @@ http://:7788 {
 	# to the engine rather than overwritten from here.
 	#
 	# The policy is identical to HTTPResponse.interfacePolicy. It is safe for what this block
-	# serves — web/index.html, web/app.js and web/style.css — because the page loads its
-	# script and stylesheet as separate same-origin files, reaches the engine only through
+	# serves — web/index.html, web/deltas.js, web/app.js and web/style.css — because the page loads
+	# its scripts and stylesheet as separate same-origin files, reaches the engine only through
 	# relative /api paths, and contains no inline script, inline event handler, inline style,
 	# external origin, frame, form or <base>; style.css has no url() or @import. That is what
 	# lets `script-src 'self'` stand without `'unsafe-inline'`, which is the directive that

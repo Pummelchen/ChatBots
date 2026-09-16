@@ -1,0 +1,203 @@
+A159 — controlled before/after for the fetch_page URL validation
+Host: 27.0 / arm64, swift-driver version: 1.168.6 Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)
+
+--- PROBE: what Foundation and the old guard made of each shape ---
+$ swift AUDIT/baseline/swift64/a159-probe/url-shapes.swift
+raw="https://example.com/article"
+   parses=true scheme=https host=example.com port=-
+   old-guard-accepts=true
+raw="http://example.com"
+   parses=true scheme=http host=example.com port=-
+   old-guard-accepts=true
+raw="HTTP://EXAMPLE.COM/x"
+   parses=true scheme=HTTP host=EXAMPLE.COM port=-
+   old-guard-accepts=false
+raw="Https://example.com"
+   parses=true scheme=Https host=example.com port=-
+   old-guard-accepts=false
+raw="httpx://example.com"
+   parses=true scheme=httpx host=example.com port=-
+   old-guard-accepts=true
+raw="httpfoo://example.com"
+   parses=true scheme=httpfoo host=example.com port=-
+   old-guard-accepts=true
+raw="http://"
+   parses=true scheme=http host=- port=-
+   old-guard-accepts=true
+raw="http:"
+   parses=true scheme=http host=- port=-
+   old-guard-accepts=true
+raw="http:///path"
+   parses=true scheme=http host=- port=-
+   old-guard-accepts=true
+raw="https://example.com:8443/x"
+   parses=true scheme=https host=example.com port=8443
+   old-guard-accepts=true
+raw="http://user:pass@example.com/x"
+   parses=true scheme=http host=example.com port=-
+   old-guard-accepts=true
+raw="http://127.0.0.1:1/x"
+   parses=true scheme=http host=127.0.0.1 port=1
+   old-guard-accepts=true
+raw="http://[::1]:1/x"
+   parses=true scheme=http host=::1 port=1
+   old-guard-accepts=true
+raw="http://exa mple.com/x"
+   parses=false scheme=- host=- port=-
+   old-guard-accepts=false
+raw="http://example.com/a b"
+   parses=true scheme=http host=example.com port=-
+   old-guard-accepts=true
+raw="  https://example.com/x  "
+   parses=false scheme=- host=- port=-
+   old-guard-accepts=false
+raw="example.com/x"
+   parses=true scheme=- host=- port=-
+   old-guard-accepts=false
+raw="ftp://example.com"
+   parses=true scheme=ftp host=example.com port=-
+   old-guard-accepts=false
+raw="file:///etc/passwd"
+   parses=true scheme=file host=- port=-
+   old-guard-accepts=false
+raw="javascript:alert(1)"
+   parses=true scheme=javascript host=- port=-
+   old-guard-accepts=false
+
+--- BASELINE: unmutated ---
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test "A URL with no host is refused" passed after 0.001 seconds.
+✔ Test "An ordinary http or https URL is accepted" passed after 0.001 seconds.
+✔ Test "Whitespace is refused, and a relative reference with no scheme" passed after 0.001 seconds.
+✔ Test "The scheme is matched exactly, and without regard to case" passed after 0.001 seconds.
+✔ Test "The tool refuses a URL it cannot read, before it asks the extractor anything" passed after 0.005 seconds.
+✔ Test run with 5 tests in 1 suite passed after 0.005 seconds.
+
+--- M1: the pre-fix guard, exactly: hasPrefix("http") and no host check ---
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test "An ordinary http or https URL is accepted" passed after 0.001 seconds.
+✘ Test "The scheme is matched exactly, and without regard to case" recorded an issue at AuditS3WebToolValidationTests.swift:43:13: Expectation failed: FetchPageTool.readableURL(raw) != nil
+↳ HTTP://EXAMPLE.COM/x was refused
+↳ FetchPageTool.readableURL(raw) != nil → false
+↳   FetchPageTool.readableURL(raw) → nil
+✘ Test "The scheme is matched exactly, and without regard to case" recorded an issue at AuditS3WebToolValidationTests.swift:43:13: Expectation failed: FetchPageTool.readableURL(raw) != nil
+↳ Https://example.com was refused
+↳ FetchPageTool.readableURL(raw) != nil → false
+↳   FetchPageTool.readableURL(raw) → nil
+✘ Test "The scheme is matched exactly, and without regard to case" recorded an issue at AuditS3WebToolValidationTests.swift:43:13: Expectation failed: FetchPageTool.readableURL(raw) != nil
+↳ hTTpS://example.com/x was refused
+↳ FetchPageTool.readableURL(raw) != nil → false
+↳   FetchPageTool.readableURL(raw) → nil
+✘ Test "A URL with no host is refused" recorded an issue at AuditS3WebToolValidationTests.swift:63:13: Expectation failed: FetchPageTool.readableURL(raw) == nil
+↳ http: was accepted
+
+--- M2: the scheme is checked but the host is not ---
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test "An ordinary http or https URL is accepted" passed after 0.001 seconds.
+✔ Test "The scheme is matched exactly, and without regard to case" passed after 0.001 seconds.
+✔ Test "Whitespace is refused, and a relative reference with no scheme" passed after 0.001 seconds.
+✘ Test "A URL with no host is refused" recorded an issue at AuditS3WebToolValidationTests.swift:63:13: Expectation failed: FetchPageTool.readableURL(raw) == nil
+↳ http: was accepted
+↳ FetchPageTool.readableURL(raw) == nil → false
+↳   FetchPageTool.readableURL(raw) → http:
+↳     some → http:
+↳       _url → Foundation._SwiftURL
+↳         _parseInfo → Foundation.URLParseInfo
+↳           urlString → "http:"
+↳           schemeRange → 0[utf8] ..< 4[utf8]
+↳             some → 0[utf8] ..< 4[utf8]
+↳               lowerBound → 0[utf8]
+↳                 _rawBits → 4
+
+--- M3: case is not folded, so HTTP:// is refused again ---
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test "Whitespace is refused, and a relative reference with no scheme" passed after 0.001 seconds.
+✔ Test "An ordinary http or https URL is accepted" passed after 0.001 seconds.
+✔ Test "A URL with no host is refused" passed after 0.001 seconds.
+✘ Test "The scheme is matched exactly, and without regard to case" recorded an issue at AuditS3WebToolValidationTests.swift:43:13: Expectation failed: FetchPageTool.readableURL(raw) != nil
+↳ HTTP://EXAMPLE.COM/x was refused
+↳ FetchPageTool.readableURL(raw) != nil → false
+↳   FetchPageTool.readableURL(raw) → nil
+✘ Test "The scheme is matched exactly, and without regard to case" recorded an issue at AuditS3WebToolValidationTests.swift:43:13: Expectation failed: FetchPageTool.readableURL(raw) != nil
+↳ Https://example.com was refused
+↳ FetchPageTool.readableURL(raw) != nil → false
+↳   FetchPageTool.readableURL(raw) → nil
+✘ Test "The scheme is matched exactly, and without regard to case" recorded an issue at AuditS3WebToolValidationTests.swift:43:13: Expectation failed: FetchPageTool.readableURL(raw) != nil
+↳ hTTpS://example.com/x was refused
+↳ FetchPageTool.readableURL(raw) != nil → false
+↳   FetchPageTool.readableURL(raw) → nil
+
+--- M4: whitespace is not checked (over-permissive in the third requirement) ---
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test "A URL with no host is refused" passed after 0.001 seconds.
+✔ Test "The scheme is matched exactly, and without regard to case" passed after 0.001 seconds.
+✔ Test "An ordinary http or https URL is accepted" passed after 0.001 seconds.
+✔ Test "The tool refuses a URL it cannot read, before it asks the extractor anything" passed after 0.005 seconds.
+✘ Test "Whitespace is refused, and a relative reference with no scheme" recorded an issue at AuditS3WebToolValidationTests.swift:82:13: Expectation failed: FetchPageTool.readableURL(raw) == nil
+↳ "http://example.com/a b" was accepted
+↳ FetchPageTool.readableURL(raw) == nil → false
+↳   FetchPageTool.readableURL(raw) → http://example.com/a%20b
+↳     some → http://example.com/a%20b
+↳       _url → Foundation._SwiftURL
+↳         _parseInfo → Foundation.URLParseInfo
+↳           urlString → "http://example.com/a%20b"
+↳           schemeRange → 0[utf8] ..< 4[utf8]
+↳             some → 0[utf8] ..< 4[utf8]
+↳               lowerBound → 0[utf8]
+
+--- M5: every URL is refused (over-correction, which the counterweights exist to catch) ---
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✘ Test "An ordinary http or https URL is accepted" recorded an issue at AuditS3WebToolValidationTests.swift:34:13: Expectation failed: FetchPageTool.readableURL(raw) != nil
+↳ https://example.com/article was refused
+↳ FetchPageTool.readableURL(raw) != nil → false
+↳   FetchPageTool.readableURL(raw) → nil
+✘ Test "A URL with no host is refused" recorded an issue at AuditS3WebToolValidationTests.swift:66:9: Expectation failed: FetchPageTool.readableURL("http://example.com") != nil
+↳ // The counterweight: the same scheme with a host is fine, including a bare host and a port.
+↳ FetchPageTool.readableURL("http://example.com") != nil → false
+↳   FetchPageTool.readableURL("http://example.com") → nil
+✘ Test "The scheme is matched exactly, and without regard to case" recorded an issue at AuditS3WebToolValidationTests.swift:43:13: Expectation failed: FetchPageTool.readableURL(raw) != nil
+↳ HTTP://EXAMPLE.COM/x was refused
+↳ FetchPageTool.readableURL(raw) != nil → false
+↳   FetchPageTool.readableURL(raw) → nil
+✘ Test "Whitespace is refused, and a relative reference with no scheme" recorded an issue at AuditS3WebToolValidationTests.swift:86:9: Expectation failed: FetchPageTool.readableURL("  https://example.com/x  ") != nil
+↳ // Surrounding whitespace is trimmed rather than refused: that is the model being sloppy, not wrong.
+↳ // A trailing newline is the same case, which is why the refusal is about whitespace *inside*.
+
+--- RESTORED: unmutated again ---
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test "A URL with no host is refused" passed after 0.001 seconds.
+✔ Test "Whitespace is refused, and a relative reference with no scheme" passed after 0.001 seconds.
+✔ Test "An ordinary http or https URL is accepted" passed after 0.001 seconds.
+✔ Test "The scheme is matched exactly, and without regard to case" passed after 0.001 seconds.
+✔ Test "The tool refuses a URL it cannot read, before it asks the extractor anything" passed after 0.005 seconds.
+✔ Test run with 5 tests in 1 suite passed after 0.006 seconds.
+
+--- NOTE on the shape of these blocks ---
+Each mutation's test output is cut at 18 lines so the log stays readable, so a block that ends mid-test is
+truncated rather than silent: M1 fails at least "The scheme is matched exactly" and "A URL with no host is
+refused", and the suite summary line for the run is the count that matters. Every mutation above ends in a
+failing test run, and the restored baseline ends in a passing one.
+
+--- FULL GATE at the fix commit (tools/audit-checks.sh) ---
+PASS  build: swift build --build-tests
+PASS  tests: 1020 tests in 188 suites
+PASS  coverage: Sources/ TOTAL 6505 regions 2590 covered 60.18%, 20486 lines 9826 covered 52.04%
+PASS  swiftlint: 253 finding(s), within the recorded waiver of 255
+PASS  swift-format: 739 diagnostic(s), within the recorded waiver of 744
+PASS  web: deltas merge (34 cases)
+
+All 6 Mac-only gates passed.

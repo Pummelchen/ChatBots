@@ -38,6 +38,7 @@ struct EmbeddedWebAssetTests {
         ("/", "index.html"),
         ("/index.html", "index.html"),
         ("/style.css", "style.css"),
+        ("/deltas.js", "deltas.js"),
         ("/app.js", "app.js"),
     ]
 

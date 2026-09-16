@@ -1,0 +1,31 @@
+# A204 — a moderator instruction forged from a name (2026-09-15T14:01:36Z)
+
+## 1. before: the raw name interpolated into the instruction
+$ git show HEAD:Sources/ChatBotsCore/ResearchDirector.swift | grep -n 'let name = displayName'
+  567:            let name = displayName(gap.seatID)
+  593:            let names = parties.map(displayName).joined(separator: " and ")
+$ git show HEAD:Sources/ChatBotsCore/ResearchDirector.swift | grep -n 'gap.claim.prefix'
+  572:                    \(name) made a claim without a basis: "\(gap.claim.prefix(140))". \
+
+$ swift test --filter ResearchDirectorInjectionTests   # before
+  ✘ Test "A name carrying a bracket and a newline cannot start a new line of the log" recorded an issue at ResearchDirectorTests.swift:715:9: Expectation failed: 
+  ✘ Test "A name carrying a bracket and a newline cannot start a new line of the log" recorded an issue at ResearchDirectorTests.swift:717:9: Expectation failed: 
+  ✘ Test "A name carrying a bracket and a newline cannot start a new line of the log" recorded an issue at ResearchDirectorTests.swift:719:9: Expectation failed: 
+  ✘ Test "A name carrying a bracket and a newline cannot start a new line of the log" recorded an issue at ResearchDirectorTests.swift:721:9: Expectation failed: 
+  ✘ Test "A quoted claim cannot forge a line either" recorded an issue at ResearchDirectorTests.swift:734:9: Expectation failed: !direction.instruction.contains("
+  ✘ Test "A quoted claim cannot forge a line either" recorded an issue at ResearchDirectorTests.swift:735:9: Expectation failed: !direction.instruction.contains("
+  ✘ Test "A name that sanitises away entirely still leaves a usable instruction" recorded an issue at ResearchDirectorTests.swift:747:9: Expectation failed: direc
+  ✘ Test "A name that sanitises away entirely still leaves a usable instruction" failed after 0.003 seconds with 1 issue.
+  ✘ Test "A quoted claim cannot forge a line either" failed after 0.003 seconds with 2 issues.
+  ✘ Test "A name carrying a bracket and a newline cannot start a new line of the log" failed after 0.003 seconds with 4 issues.
+  ✘ Test run with 3 tests in 1 suite failed after 0.004 seconds with 7 issues.
+
+## 2. after
+$ grep -n 'instructionName|instructionQuote' Sources/ChatBotsCore/ResearchDirector.swift
+  567:            let name = instructionName(gap.seatID)
+  572:                    \(name) made a claim without a basis: "\(instructionQuote(gap.claim))". \
+  593:            let names = parties.map(instructionName).joined(separator: " and ")
+  675:    private func instructionName(_ seatID: String) -> String {
+  685:    private func instructionQuote(_ text: String, limit: Int = 140) -> String {
+$ swift test --filter ResearchDirectorInjectionTests   # after
+  ✔ Test run with 3 tests in 1 suite passed after 0.002 seconds.

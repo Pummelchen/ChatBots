@@ -133,15 +133,17 @@ struct SharedConversationPageTests {
         // artefact: the escaping exists to keep the block from being closed early, and if it
         // corrupted the data the page would render nothing.
         let text = "An arrow → and a <tag> and a backslash \\ here"
-        let page = SharedConversationPage.html(
-            record(turns: [chat(1, "Ada", text)]), shareBase: "http://127.0.0.1:7788")
+        let page = SharedConversationPage.html(record(turns: [chat(1, "Ada", text)]))
         let json = island(in: page)
         #expect(!json.isEmpty, "the page must carry a data island")
         let object = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
         let entries = object?["entries"] as? [[String: Any]]
         #expect(entries?.count == 1)
         #expect(entries?.first?["text"] as? String == text)
-        #expect(object?["shareBase"] as? String == "http://127.0.0.1:7788")
+        // The island carries the transcript and the topic, and nothing about where the page was
+        // reached: the `shareBase` key that used to be here had no reader (A217), and its absence is
+        // asserted where the page is fetched over a socket (`AuditShareLinkTests`).
+        #expect(object?["shareBase"] == nil)
     }
 
     /// The data island exactly as it appears in the page, escapes and all.
@@ -272,8 +274,8 @@ struct SharedConversationHTTPTests {
         #expect(snapshot?["shareBase"] as? String == base)
     }
 
-    @Test("A page reached through a proxy builds its links on the host it was reached on")
-    func sharePageUsesTheRequestHost() async throws {
+    @Test("A page carries no origin, whatever Host it was reached on")
+    func sharePageCarriesNoOrigin() async throws {
         let (server, engine, session, base) = try await shareServer()
         defer { server.stop() }
         engine.start()
@@ -283,10 +285,12 @@ struct SharedConversationHTTPTests {
         let list = try JSONSerialization.jsonObject(with: listData) as? [[String: Any]]
         let id = try #require(list?.first?["id"] as? String)
 
-        // The engine's own base is its loopback port, which is what a phone cannot reach. Reaching
-        // the page through a proxy has to produce a link back to the address the proxy is on (A99).
-        // The island carries JSONSerialization's escapes (`\/` for a slash, `\u003c` for `<`), so
-        // the page is unescaped the way the replay script does before its value is read.
+        // The page used to be handed an origin built from the request's `Host` (A99) and wrote it into
+        // its JSON island, where nothing ever read it (A217). It is rendered from the record alone now,
+        // so neither a proxy's host nor the engine's own base appears in it — and the page still
+        // arrives with the conversation in it, which is the part that matters. The island carries
+        // JSONSerialization's escapes (`\/` for a slash, `\u003c` for `<`), so the page is unescaped
+        // the way the replay script does before a value is compared.
         func decoded(_ page: String) -> String {
             page
                 .replacingOccurrences(of: "\\u003c", with: "<")
@@ -296,22 +300,20 @@ struct SharedConversationHTTPTests {
         var proxied = URLRequest(url: URL(string: "\(base)/s/\(id)")!)
         proxied.setValue("192.168.1.5:7788", forHTTPHeaderField: "Host")
         let (data, response) = try await session.data(for: proxied)
-        // The port in `base` is not 7788, so a reflected host is distinguishable from the fallback.
         #expect((response as? HTTPURLResponse)?.statusCode == 200)
-        #expect(
-            decoded(try #require(String(bytes: data, encoding: .utf8)))
-                .contains("\"shareBase\":\"http://192.168.1.5:7788\""),
-            "the page did not build its links on the host it was reached on")
+        let page = decoded(try #require(String(bytes: data, encoding: .utf8)))
+        #expect(page.contains("\"entries\""), "the page did not carry the conversation")
+        #expect(!page.contains("192.168.1.5:7788"), "the proxy's host reached the page")
+        #expect(!page.contains(base), "the engine's own base reached the page")
 
-        // A Host that is not a host is refused rather than interpolated into a URL, and the page
-        // falls back to the engine's own base.
+        // A Host that is not a host is not special-cased either, because nothing reads the header.
         var hostile = URLRequest(url: URL(string: "\(base)/s/\(id)")!)
         hostile.setValue("evil.example/../admin", forHTTPHeaderField: "Host")
-        let (fallbackData, _) = try await session.data(for: hostile)
-        #expect(
-            decoded(try #require(String(bytes: fallbackData, encoding: .utf8)))
-                .contains("\"shareBase\":\"\(base)\""),
-            "a Host that is not a host was reflected into the page")
+        let (hostileData, _) = try await session.data(for: hostile)
+        let hostilePage = decoded(try #require(String(bytes: hostileData, encoding: .utf8)))
+        #expect(hostilePage.contains("\"entries\""))
+        #expect(!hostilePage.contains("evil.example"), "a Host that is not a host reached the page")
+        #expect(!hostilePage.contains("shareBase"), "the island still carries a base nothing reads")
     }
 }
 

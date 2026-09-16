@@ -10,9 +10,9 @@
 // The one test that wants a *push* reads `client.events`, because that stream is where the
 // reader puts what it was sent — and it takes a fresh connection, so it is the only consumer.
 
-import ChatBotsCore
 import Foundation
 import Testing
+@testable import ChatBotsCore
 
 /// An engine that does nothing, so these tests are about the transport rather than generation.
 private actor QuietStub: LLMEngine {
@@ -98,11 +98,11 @@ struct WebTransportSessionTests {
     @Test("A client can ask the engine for its state and get it")
     func stateRoundTrip() async throws {
         let running = try await startEngine()
-        defer { Task { await running.stop() } }
+        defer { TransportTeardown.register { await running.stop() } }
 
         let client = makeClient(port: running.port)
         try await client.connect()
-        defer { Task { await client.disconnect() } }
+        defer { TransportTeardown.register { await client.disconnect() } }
 
         let snapshot = try #require(await client.state())
         #expect(snapshot.seats.count == 2)
@@ -123,11 +123,11 @@ struct WebTransportSessionTests {
     @Test("A client is still served after sitting idle on its connection")
     func idleClientIsStillServed() async throws {
         let running = try await startEngine()
-        defer { Task { await running.stop() } }
+        defer { TransportTeardown.register { await running.stop() } }
 
         let client = makeClient(port: running.port)
         try await client.connect()
-        defer { Task { await client.disconnect() } }
+        defer { TransportTeardown.register { await client.disconnect() } }
 
         try? await Task.sleep(for: .seconds(1))
 
@@ -146,7 +146,7 @@ struct WebTransportSessionTests {
     @Test("After probing, the real client still reaches the engine")
     func probeThenConnect() async throws {
         let running = try await startEngine()
-        defer { Task { await running.stop() } }
+        defer { TransportTeardown.register { await running.stop() } }
 
         // Five rounds, each a connect and a clean close: what `isEngineAnswering` does over a
         // slow startup, plus the retries around it.
@@ -167,7 +167,7 @@ struct WebTransportSessionTests {
 
         let client = makeClient(port: running.port)
         try await client.connect()
-        defer { Task { await client.disconnect() } }
+        defer { TransportTeardown.register { await client.disconnect() } }
 
         let snapshot = try #require(await client.state())
         #expect(snapshot.topic == "A transport test")
@@ -194,7 +194,7 @@ struct WebTransportSessionTests {
     func clientAfterClient() async throws {
         let ceiling = 4
         let running = try await startEngine(maximumConnections: ceiling)
-        defer { Task { await running.stop() } }
+        defer { TransportTeardown.register { await running.stop() } }
 
         for round in 0..<24 {
             // Let the previous session finish being torn down before the next arrives, so this
@@ -227,11 +227,11 @@ struct WebTransportSessionTests {
     @Test("A command over the transport changes the engine state")
     func requestChangesState() async throws {
         let running = try await startEngine()
-        defer { Task { await running.stop() } }
+        defer { TransportTeardown.register { await running.stop() } }
 
         let client = makeClient(port: running.port)
         try await client.connect()
-        defer { Task { await client.disconnect() } }
+        defer { TransportTeardown.register { await client.disconnect() } }
 
         let reply = try await client.send(.setTopic("A new subject"))
         #expect(reply.snapshot?.topic == "A new subject")
@@ -249,11 +249,11 @@ struct WebTransportSessionTests {
     @Test("A change is pushed to an attached client")
     func changeIsPushed() async throws {
         let running = try await startEngine()
-        defer { Task { await running.stop() } }
+        defer { TransportTeardown.register { await running.stop() } }
 
         let client = makeClient(port: running.port)
         try await client.connect()
-        defer { Task { await client.disconnect() } }
+        defer { TransportTeardown.register { await client.disconnect() } }
 
         // Connect pushes the current state, so the stream is already carrying something. Take
         // that first, so the assertion below is about the change rather than the greeting.
@@ -281,11 +281,11 @@ struct WebTransportSessionTests {
     @Test("A request too large to frame fails at the sender and leaves the session usable")
     func oversizeRequestFailsFast() async throws {
         let running = try await startEngine()
-        defer { Task { await running.stop() } }
+        defer { TransportTeardown.register { await running.stop() } }
 
         let client = makeClient(port: running.port)
         try await client.connect()
-        defer { Task { await client.disconnect() } }
+        defer { TransportTeardown.register { await client.disconnect() } }
 
         // Over the cap once the bytes are base64-encoded into the request JSON.
         let contents = Data(repeating: 0x41, count: ProtocolLimits.maximumMessageBytes)
@@ -302,6 +302,50 @@ struct WebTransportSessionTests {
         // Not hung, and not desynced: the same connection still answers.
         let snapshot = try #require(await client.state())
         #expect(snapshot.topic == "A transport test")
+    }
+}
+
+/// A session accepted while `stop()` is closing the others must not survive it.
+///
+/// `acceptSession()` is where the accept loop spends its life. Cancelling the loop stops the *next*
+/// iteration, not an accept already in flight, and that accept returns its session **after** `stop()`
+/// has cleared both tables and while it is suspended in `session.close()` further down. The loop then
+/// registered the session and spawned a serve task that nothing cancelled and nothing closed: a
+/// client still being served, still holding its admission slot, on a server that had stopped (A198).
+///
+/// The window is widened on purpose — several sessions are live when `stop()` runs, so it spends
+/// longer in the close loop — and the late client connects into it.
+@Suite(
+    "A session accepted during stop() does not survive it (A198)", .serialized, TransportSerialized()
+)
+@MainActor
+struct AuditS1StopRaceTests {
+    @Test("A client that connects while the server is stopping is not left being served")
+    func connectsDuringStopAreNotOrphaned() async throws {
+        let running = try await startEngine()
+        var connected: [WebTransportEngineClient] = []
+        for _ in 0..<6 {
+            let client = makeClient(port: running.port)
+            try await client.connect()
+            _ = try? await client.state()
+            connected.append(client)
+        }
+
+        let late = makeClient(port: running.port)
+        let connecting = Task { try await late.connect() }
+        await running.stop()
+        _ = try? await connecting.value
+
+        let stillOwned = running.server.liveSessionCount
+        #expect(
+            stillOwned == 0,
+            "stop() leaves no session registered, whatever arrived while it was closing")
+
+        let served = try? await late.state()
+        #expect(served == nil, "a session accepted during stop() is closed, not served on")
+
+        for client in connected { await client.disconnect() }
+        await late.disconnect()
     }
 }
 

@@ -1,0 +1,42 @@
+# A145 — the request head (2026-09-15T14:45:40Z)
+
+## 1. before: no head cap, and the whole buffer rescanned per read
+$ git show HEAD:Sources/ChatBotsCore/HTTPServer.swift | grep -n 'func parse' -A 4
+  224:    public static func parse(_ data: Data) throws -> HTTPRequest {
+  225-        guard let headerEnd = data.range(of: Data("\r\n\r\n".utf8)) else {
+  226-            throw Incomplete()
+  227-        }
+  228-        let headData = data[data.startIndex..<headerEnd.lowerBound]
+$ git show HEAD:Sources/ChatBotsCore/HTTPServer.swift | grep -n 'maximumBodyBytes' | head -3
+  216:    public static let maximumBodyBytes = ProtocolLimits.maximumMessageBytes
+  252:        guard declaredLength <= maximumBodyBytes else {
+  280:    /// to pass both guards that followed — `declaredLength <= maximumBodyBytes` and
+  (one bound, for the body only; the head grew until the terminator appeared)
+
+$ swift test --filter AuditHTTPLimitTests   # before
+  ✔ Test "A connection that sends a partial request and stalls is dropped" passed after 1.130 seconds.
+  ✘ Test "The parser refuses a head that cannot fit, and still parses one that does" recorded an issue at AuditHTTPLimitTests.swift:140:6: Caught error: Incomplet
+  ✘ Test "The parser refuses a head that cannot fit, and still parses one that does" failed after 0.002 seconds with 1 issue.
+  ✘ Test "A connection whose head cannot fit is answered 431" recorded an issue at AuditHTTPLimitTests.swift:192:9: Expectation failed: text.hasPrefix("HTTP/1.1 4
+  ✘ Test "A connection whose head cannot fit is answered 431" failed after 5.289 seconds with 1 issue.
+  ✔ Test "Connections over the cap are refused rather than entered in the table" passed after 0.067 seconds.
+  ✘ Test run with 4 tests in 1 suite failed after 6.492 seconds with 2 issues.
+
+## 2. after
+$ grep -n 'maximumHeadBytes|headTooLarge|searchable' Sources/ChatBotsCore/HTTPServer.swift
+  226:    public static let maximumHeadBytes = 16 * 1_024
+  235:        // Only the first `maximumHeadBytes` are searched, so the work per read is bounded by the cap
+  238:        let searchable = data.prefix(HTTPParser.maximumHeadBytes + 4)
+  239:        guard let headerEnd = searchable.range(of: Data("\r\n\r\n".utf8)) else {
+  240:            if data.count > HTTPParser.maximumHeadBytes { throw HTTPError.headTooLarge }
+  324:    case headTooLarge
+  331:        case .headTooLarge: "Request headers are too large"
+  340:        case .headTooLarge: 431
+$ swift test --filter AuditHTTPLimitTests   # after
+  ✔ Test run with 4 tests in 1 suite passed after 1.256 seconds.
+
+## 3. the style the fix had to keep
+  The first version put parse() at cyclomatic complexity 11 against swiftlint's 10, fixed by
+  extracting headEnd(in:) — which is also where the two ways a head can be missing are read
+  together. swiftlint 255 and authored swift-format 743 before this task and after it. The line
+  numbers in section 2 were taken before that extraction.

@@ -71,8 +71,55 @@ public final class EngineService {
         engine.conversationStore = store
     }
 
-    /// How many seats and what state, for a health check.
+    /// How many seats this engine has.
     public var seatCount: Int { engine.specs.count }
+
+    /// What this engine can serve right now.
+    ///
+    /// The finding was that `/api/health` answered an unconditional 200 with a hardcoded `"ok"`, so a
+    /// client could not tell a listening engine from one that can serve, while the readiness signal
+    /// that existed — `seatCount` — was read by nobody (A152). This is the one definition the
+    /// endpoint's status code and its body are both built from.
+    ///
+    /// A seat count on its own cannot answer the question: `ConversationEngine` traps on an empty
+    /// roster, so the count is never zero and the number proved nothing. What can answer it is whether
+    /// the seats' models loaded. Weights load when a conversation starts rather than at launch, so a
+    /// seat that failed carries the reason from then on, and an engine whose every seat failed cannot
+    /// serve a turn however healthy the port looks.
+    ///
+    /// What this deliberately does not claim: that the room is running or paused (`status` in the
+    /// snapshot says that), or that a seat which has never been asked to load is ready — before the
+    /// first start there is nothing to report, and silence is not failure.
+    public struct Readiness: Sendable, Equatable {
+        public var isReady: Bool
+        /// How many seats the engine has.
+        public var seats: Int
+        /// The seats whose model could not be loaded, and why, by seat id.
+        public var failedSeats: [String: String]
+        /// Why the engine cannot serve a conversation, in a sentence a person can act on. Nil when it
+        /// can — including when only some seats failed, which is degradation rather than an outage
+        /// and is what `failedSeats` is for.
+        public var reason: String?
+    }
+
+    /// What this engine can serve right now. See `Readiness`.
+    public var readiness: Readiness {
+        let seats = seatCount
+        guard seats > 0 else {
+            // Unreachable through `ConversationEngine`, which requires a seat. Kept so the answer is
+            // total rather than relying on a trap somewhere else, and because a service is given its
+            // engine rather than building it.
+            return Readiness(
+                isReady: false, seats: 0, failedSeats: [:],
+                reason: "the engine has no seats, so there is nobody to speak")
+        }
+        let failed = engine.modelLoadFailures
+        return Readiness(
+            isReady: failed.count < seats,
+            seats: seats,
+            failedSeats: failed,
+            reason: failed.count >= seats ? "no seat could load its model" : nil)
+    }
 
     /// Handle one request.
     ///
@@ -114,6 +161,12 @@ public final class EngineService {
             guard !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 return .refused("a topic is required")
             }
+            // Refused rather than truncated: a topic is a command, and a silently shortened question is
+            // a question the room answers differently from the one that was asked (A143).
+            guard topic.count <= Self.maximumFieldCharacters else {
+                return .refused(
+                    "a topic is limited to \(Self.maximumFieldCharacters) characters")
+            }
             guard engine.setTopic(topic) else {
                 return .refused("the topic cannot be changed once the conversation has started")
             }
@@ -122,6 +175,10 @@ public final class EngineService {
         case .steer(let text):
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 return .refused("a message is required")
+            }
+            guard text.count <= Self.maximumFieldCharacters else {
+                return .refused(
+                    "a message is limited to \(Self.maximumFieldCharacters) characters")
             }
             engine.steer(text)
             return .state(snapshot())
@@ -162,6 +219,17 @@ public final class EngineService {
             if let model = change.apiModel { spec.openAI.model = model }
             if let key = change.apiKey { spec.openAI.apiKey = key }
             engine.updateSeat(spec)
+            // The checkpoint last, because it is the one field that replaces an engine rather than
+            // editing one: `setModel` holds the rule about when that is allowed, so it is stated
+            // once. A refusal here is an answer — a change that could not be made is never reported
+            // as one that was (A173).
+            if let modelID = change.modelID {
+                let resolved = ModelCatalog.resolve(modelID)
+                guard !resolved.isEmpty else { return .refused("a model is required") }
+                if resolved != spec.modelID, !engine.setModel(resolved, for: spec.id) {
+                    return .refused("the model cannot be changed while a turn is in flight")
+                }
+            }
             return .state(snapshot())
 
         // ── Attachments ──────────────────────────────────────────────────────────────
@@ -169,11 +237,31 @@ public final class EngineService {
             return await addAttachment(filename: filename, contents: contents)
 
         case .removeAttachment(let id):
-            engine.setAttachments(engine.attachments.filter { $0.id.uuidString != id })
+            // The result is checked. `ConversationEngine.setAttachments` refuses once a turn has
+            // completed, and this discarded the `false`: the reply was a state identical to the one the
+            // caller already had, so a removal that did not happen was reported as one that did — and
+            // the Mac app's ✕ is always enabled, so a user could click it and see nothing at all
+            // (A173). The rule the engine enforces is the one the web page already gates on.
+            //
+            // And an id that matches nothing is a refusal rather than a success, which is what `castVote`
+            // already answered for the same shape of request. Filtering produced a state identical to the
+            // one the caller had — a removal that never happened, reported as one that did (A156).
+            guard UUID(uuidString: id) != nil else {
+                return .refused("that is not a valid file id")
+            }
+            let remaining = engine.attachments.filter { $0.id.uuidString != id }
+            guard remaining.count != engine.attachments.count else {
+                return .refused("there is no attached file with that id")
+            }
+            guard engine.setAttachments(remaining) else {
+                return .refused(Self.sourceMaterialIsFixed)
+            }
             return .state(snapshot())
 
         case .clearAttachments:
-            engine.setAttachments([])
+            guard engine.setAttachments([]) else {
+                return .refused(Self.sourceMaterialIsFixed)
+            }
             return .state(snapshot())
 
         // ── Reads ────────────────────────────────────────────────────────────────────
@@ -218,15 +306,26 @@ public final class EngineService {
             // Changeable while a conversation runs, unlike the topic: who is speaking is not a
             // property of the question, and a moderator who is halfway through an investigation
             // under the wrong name should be able to fix it.
-            engine.moderator = identity
+            // The name is a label rather than an instruction, so it is truncated exactly as a seat name
+            // is (the 40-character cap at `updateSeat`) instead of being refused: losing the tail of a
+            // very long name is a smaller surprise than refusing to rename the moderator (A143).
+            var boundedIdentity = identity
+            if boundedIdentity.name.count > Self.maximumFieldCharacters {
+                boundedIdentity.name = String(
+                    boundedIdentity.name.prefix(Self.maximumFieldCharacters))
+            }
+            engine.moderator = boundedIdentity
             return .state(snapshot())
 
         // ── Saved conversations ──────────────────────────────────────────────────────
         case .listSavedConversations:
-            return .savedConversations(store.list().map(Self.summary))
+            // Off the main actor: this decodes the whole index, and the engine's turn loop is on
+            // the same actor (A147).
+            return .savedConversations(await store.listOffMainActor().map(Self.summary))
 
         case .loadSavedConversation(let id):
-            guard let uuid = UUID(uuidString: id), let record = store.conversation(id: uuid)
+            guard let uuid = UUID(uuidString: id),
+                let record = await store.conversationOffMainActor(id: uuid)
             else {
                 return .refused("no saved conversation with that id")
             }
@@ -240,7 +339,9 @@ public final class EngineService {
                 return .refused("that is not a valid id")
             }
             _ = store.delete(id: uuid)
-            return .savedConversations(store.list().map(Self.summary))
+            // Off the main actor: this decodes the whole index, and the engine's turn loop is on
+            // the same actor (A147).
+            return .savedConversations(await store.listOffMainActor().map(Self.summary))
 
         case .newConversation:
             engine.startNewConversation()
@@ -375,11 +476,38 @@ public final class EngineService {
     /// The `defer` still removes the staging directory, and it is still correct across the
     /// move: `Task.value` is awaited before it runs, so the file outlives the read and not the
     /// request. A conversion that throws is reported as the same refusal it was before.
+    /// Why an attachment change was refused, in the words the app and the page both use.
+    ///
+    /// One string rather than two, because the app's disabled ✕, the page's disabled ✕ and this
+    /// refusal are the same rule (A173).
+    static let sourceMaterialIsFixed =
+        "Source material cannot be changed once the conversation has started"
+
+    /// How much user-supplied text one field may carry.
+    ///
+    /// Every value bounded by this enters the conversation and is re-sent inside every `APISnapshot` to
+    /// every connected client, so an uncapped field is an uncapped cost per turn and per client for as
+    /// long as the conversation lives — and a snapshot is a few kilobytes even when the fields are
+    /// small. The seat name has been capped at 40 characters and attachments at 24 for a while; the
+    /// topic, the steering message and the moderator's name were the fields that were not (A143).
+    /// 2 000 characters is a long paragraph: more than any of these needs, and far less than the ~85 MB
+    /// one request may carry.
+    public static let maximumFieldCharacters = 2_000
+
+    /// How many files one conversation may carry.
+    ///
+    /// Enforced here rather than in the engine, because it is a front-end rule about how much material a
+    /// room is asked to read. It has to be checked **after** the conversion as well as before it: the
+    /// guard at the top of `addAttachment` runs before the `await`, so uploads that arrive together all
+    /// saw the same count and all passed it, and the room ended up over the ceiling by however many
+    /// arrived at once (A156).
+    static let maximumAttachments = 24
+
     private func addAttachment(filename: String, contents: Data) async -> EngineReply {
         guard engine.canAttachFiles else {
             return .refused("source material must be added before the conversation starts")
         }
-        guard engine.attachments.count < 24 else {
+        guard engine.attachments.count < Self.maximumAttachments else {
             return .refused("too many attached files")
         }
 
@@ -389,28 +517,21 @@ public final class EngineService {
             return .refused("the uploaded file name is not a usable name")
         }
 
-        let directory = FileManager.default.temporaryDirectory
-            .appending(path: "chatbots-upload-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: directory) }
-
+        let staged: StagedUpload
         do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            staged = try Self.stageUpload(contents: contents, name: name)
         } catch {
-            return .refused("could not stage the upload: \(error.localizedDescription)")
+            return .refused(error.localizedDescription)
         }
+        let directory = staged.directory
+        defer { try? FileManager.default.removeItem(at: directory) }
 
         // The belt to the validation's braces: even if the name check above were ever bypassed,
         // the write is refused unless the destination really is a direct child of the directory
         // created a moment ago.
-        let temporary = directory.appending(path: name)
+        let temporary = staged.file
         guard Self.isDirectChild(temporary, of: directory) else {
             return .refused("the uploaded file name is not a usable name")
-        }
-
-        do {
-            try contents.write(to: temporary)
-        } catch {
-            return .refused("could not stage the upload: \(error.localizedDescription)")
         }
 
         // Detached rather than a structured child, so the read is not cancelled by a caller
@@ -436,9 +557,72 @@ public final class EngineService {
             guard !document.kind.isImage || engine.allSeatsSupportVision else {
                 return .refused("images need every seat to support vision")
             }
-            engine.setAttachments(engine.attachments + [document])
+            // Counted again here, on the main actor with the append below and after the `await`, because
+            // that is the only place the count cannot have moved: the guard at the top of this method ran
+            // before the conversion, so uploads arriving together all passed it (A156).
+            guard engine.attachments.count < Self.maximumAttachments else {
+                return .refused("too many attached files")
+            }
+            guard engine.setAttachments(engine.attachments + [document]) else {
+                return .refused(Self.sourceMaterialIsFixed)
+            }
             return .state(snapshot())
         }
+    }
+
+    /// One staged upload: the private directory it lives in and the file inside it.
+    struct StagedUpload {
+        var directory: URL
+        var file: URL
+    }
+
+    /// Why an upload could not be staged on disk.
+    enum UploadStagingError: LocalizedError {
+        case cannotCreateDirectory(String)
+        case cannotWriteFile
+
+        var errorDescription: String? {
+            switch self {
+            case .cannotCreateDirectory(let reason): "could not stage the upload: \(reason)"
+            case .cannotWriteFile: "could not stage the upload"
+            }
+        }
+    }
+
+    /// Write the uploaded bytes into a directory of their own, readable only by this user.
+    ///
+    /// Two rules live here rather than inline, and both are about the window between creating a file and
+    /// being able to trust it (A156):
+    ///
+    /// - **Owner-only, from the start.** The default mode leaves the directory and the file inside it
+    ///   readable by every user on the machine for as long as the conversion takes — up to the extractor's
+    ///   30-second deadline, for a document that is the moderator's own material.
+    /// - **Created with its final mode rather than written and then chmodded.** Between those two steps
+    ///   the file is on disk under the process umask, which is exactly the window a chmod-after-write
+    ///   leaves open. `Data.write(to:)` used to be the whole of it, with no mode at all.
+    ///
+    /// The directory is removed if the write fails, so a failed staging leaves nothing behind: the caller
+    /// registers its `defer` only once this has returned.
+    static func stageUpload(contents: Data, name: String) throws -> StagedUpload {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "chatbots-upload-\(UUID().uuidString)")
+        do {
+            try FileManager.default.createDirectory(
+                at: directory, withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700])
+        } catch {
+            throw UploadStagingError.cannotCreateDirectory(error.localizedDescription)
+        }
+        let file = directory.appending(path: name)
+        guard
+            FileManager.default.createFile(
+                atPath: file.path, contents: contents,
+                attributes: [.posixPermissions: 0o600])
+        else {
+            try? FileManager.default.removeItem(at: directory)
+            throw UploadStagingError.cannotWriteFile
+        }
+        return StagedUpload(directory: directory, file: file)
     }
 
     /// The name an upload is staged under, or `nil` when what the caller sent cannot be used.
@@ -515,15 +699,15 @@ public final class EngineService {
             contextFraction: usage.fraction,
             compactThreshold: engine.configuration.compactThreshold,
             attachments: engine.attachments.map { document in
+                // Metadata only: the bytes stay in the engine, which is where the model request
+                // reads them from (A144, A214). They used to be re-encoded into every snapshot.
                 APIAttachment(
                     id: document.id.uuidString,
                     name: document.name,
                     kind: document.kind.rawValue,
                     summary: document.summary,
                     tokens: document.estimatedTokens,
-                    wasTruncated: document.wasTruncated,
-                    imageBase64: document.kind.isImage
-                        ? document.imageData?.base64EncodedString() : nil)
+                    wasTruncated: document.wasTruncated)
             },
             canAttach: engine.canAttachFiles,
             imagesAllowed: engine.allSeatsSupportVision,
@@ -531,6 +715,14 @@ public final class EngineService {
                 APIPersona(
                     id: $0.id, name: $0.name, category: $0.group, summary: $0.summary,
                     emoji: $0.emoji, isAnalyst: $0.isAnalyst)
+            },
+            // The checkpoint list travels with every state for the same reason the personas do: a
+            // front end offers what this engine can actually run, without a second copy of the
+            // catalogue to keep in step (ModelCatalog).
+            availableModels: ModelCatalog.choices.map { choice in
+                APIModelOption(
+                    id: choice.id, name: choice.name, summary: choice.summary,
+                    sizeLabel: choice.sizeLabel)
             },
             serverTime: .now,
             revision: snapshotRevision,

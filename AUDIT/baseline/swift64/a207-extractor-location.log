@@ -1,0 +1,29 @@
+# A207 — the three claims as they were committed, and where the extractors are
+
+$ git show HEAD:Sources/ChatBotsCore/Attachments.swift | grep -nE 'app target|cannot read a PDF'
+  14:// The extractors themselves live in the app target, which can use PDFKit and `textutil`;
+  339:/// The core cannot read a PDF or a Word file itself — that needs PDFKit and `textutil`, which
+  340:/// belong to the app target — so the front end installs an ingestor here at launch and the
+
+$ git show HEAD:Sources/ChatBotsCLI/main.swift | grep -nE "app target|app's extractors"
+  875:    // Documents are read by the app's extractors, which live in the app target; the CLI
+
+and the same claims in the tree now:
+  no match: 0
+
+where the extractors actually are:
+  Sources/ChatBotsCore/Attachments.swift:15:// `/usr/bin/textutil` are used (`PDFTextExtractor`, `TextutilExtractor`, `SystemDocumentExtractor`).
+  Sources/ChatBotsCore/Attachments.swift:345:/// which uses PDFKit and `/usr/bin/textutil` — and `chatbots-cli` is what installs it, for the server
+  Sources/ChatBotsCore/DocumentImport.swift:14:import PDFKit
+  Sources/ChatBotsCore/DocumentImport.swift:55:public struct PDFTextExtractor: DocumentExtracting {
+  Sources/ChatBotsCore/DocumentImport.swift:134:public struct TextutilExtractor: DocumentExtracting {
+  Sources/ChatBotsCore/DocumentImport.swift:144:            "/usr/bin/textutil",
+  Sources/ChatBotsCore/DocumentImport.swift:311:public enum SystemDocumentExtractor {
+
+who installs one:
+  Sources/ChatBotsCLI/main.swift:856:    DocumentIngestorProvider.install(SystemDocumentExtractor.ingestor)
+  Sources/ChatBotsCLI/main.swift:879:    DocumentIngestorProvider.install(SystemDocumentExtractor.ingestor)
+  Sources/ChatBotsCLI/main.swift:1024:    DocumentIngestorProvider.install(SystemDocumentExtractor.ingestor)
+
+and the app target:
+  files under Sources/ChatBotsApp mentioning PDFKit, textutil, Extractor or Ingestor: 0

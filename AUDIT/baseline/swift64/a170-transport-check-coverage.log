@@ -1,0 +1,26 @@
+# A170 — the second near-zero path, covered (2026-09-15)
+
+The finding named three paths. Two of them were near zero: `WebTools.swift` at **11.36 %** of
+lines and `TransportCheck.swift` at **24.33 %**. The third, `TavilyClient.swift`, was already
+**61.35 %** and the finding's own note says so.
+
+    file                                      baseline   a170 first   after A215
+    ChatBotsCore/WebTools.swift                 11.36 %     57.95 %      57.95 %
+    ChatBotsCore/TransportCheck.swift           24.33 %     29.10 %      88.46 %
+    ChatBotsCore/WebTransportClient.swift           —           —       82.44 %
+
+Measured with the gate's own command over the same report the baseline used:
+
+    xcrun llvm-cov report <test bundles> -instr-profile <bin>/codecov/default.profdata --sources Sources
+
+    ChatBotsCore/WebTools.swift                              88   37   57.95 %
+    ChatBotsCore/TransportCheck.swift                       286   33   88.46 %
+    ChatBotsCore/WebTransportClient.swift                   410   72   82.44 %
+    ChatBotsCore/RunDirectory.swift                          33    5   84.85 %
+
+`TransportCheck.swift` is the installer's own smoke test, and the passing path is now executed from
+`Tests/ChatBotsCoreTests/AuditS2TransportCheckCoverageTests.swift` against a real `chatbots-cli`
+child: connect, five round trips, the state push and both refusals. It could not be executed before
+A215 — the check started connecting before its engine had a listener, and one attempt spent the whole
+budget — which is why this task stayed open while that one was fixed rather than being closed on the
+certificate branch alone.

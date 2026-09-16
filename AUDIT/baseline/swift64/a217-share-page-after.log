@@ -1,0 +1,12 @@
+# A217 — the share-page tests after the chain was removed (green)
+
+$ swift test --filter 'AuditShareLinkTests|SharedConversationTests'
+  ✔ Suite "A shared conversation page" passed after 0.005 seconds.
+  ✔ Suite "Sharing over HTTP" passed after 0.069 seconds.
+  ✔ Suite "A share page carries no origin from the request (A217)" passed after 0.074 seconds.
+  ✔ Test run with 14 tests in 3 suites passed after 0.074 seconds.
+
+$ caddy adapt --config Caddyfile --adapter caddyfile   (the edit is valid Caddy)
+  exit=0
+  and the /s/* route now normalises the upstream Host like every other block:
+   {"request": {"set": {"Host": ["{http.reverse_proxy.upstream.hostport}"]}}}

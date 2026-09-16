@@ -3,7 +3,8 @@
 <!-- agent-harnesses:begin -->
 > **One instruction file.** This is it. Codex, DeepSeek Harness, OpenCode,
 > Qwen Code, Qoder and Zed read `AGENTS.md` directly, and Claude Code reads it
-> through the committed `CLAUDE.md`, which contains nothing but `@AGENTS.md`.
+> through the committed `CLAUDE.md`, which is the `@AGENTS.md` import plus a
+> comment saying why it is committed rather than a symlink.
 > **Edit only this file** — do not add a second set of instructions anywhere.
 >
 > Do **not** add `.rules`, `.cursorrules`, `.windsurfrules`, `.clinerules`,
@@ -23,13 +24,15 @@ Swift 6.4 / SwiftPM, package floor macOS 26, Apple Silicon only.
 
 ## Layout
 
-- `Sources/ChatBotsCore/` — the engine-agnostic domain (46 files): the conversation
+- `Sources/ChatBotsCore/` — the engine-agnostic domain (51 files): the conversation
   engine, research moderator, personas, conversation store, `EngineService.swift`,
   `HTTPServer.swift`, and the two **generated** files `WebAssets.swift` and
   `NameLists.swift`.
 - `Sources/ChatBotsApp/` — SwiftUI views. `Sources/ChatBotsCLI/` and
   `Sources/ChatBotsProbe/` — terminal runners.
-- `Tests/ChatBotsCoreTests/` — mirrors the core; the suite is **swift-testing**.
+- `Tests/ChatBotsCoreTests/` — mirrors the core, and `Tests/ChatBotsAppTests/` — the
+  app target's own. Both are **swift-testing**, and `tools/audit-checks.sh` measures
+  every test bundle rather than naming one.
 - `web/` (`index.html`, `app.js`, `style.css`) and the six `names/*.txt` lists are
   the **sources** for the two generated files.
 - `tools/` — install/start scripts, `audit-checks.sh`, the embed scripts, notices and
@@ -88,8 +91,9 @@ release, and nothing enforces the value against a release.
   both by name, and `--check` fails CI when they are stale.
 - **The suite is swift-testing, not XCTest.** A successful run still prints
   `Test Suite 'All tests' … Executed 0 tests`. The real result is the
-  `Test run with 824 tests in 139 suites` line, which is what `audit-checks.sh`
-  greps. Do not read the XCTest zero as "no tests ran".
+  `Test run with N tests in M suites` line, which is what `audit-checks.sh`
+  greps — `1052 tests in 196 suites` when this was written, and the line, not the
+  number, is the thing to read. Do not read the XCTest zero as "no tests ran".
 - **The website listens on every interface and `/api/*` has no password**, so anyone
   on the LAN can read and steer conversations. The engine itself is loopback-only on
   7789 and is never exposed directly; `--local-only` inserts `bind 127.0.0.1`.

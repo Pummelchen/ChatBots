@@ -1,0 +1,429 @@
+Fetching https://github.com/ibireme/yyjson.git from cache
+Fetching https://github.com/apple/swift-argument-parser from cache
+Fetching https://github.com/apple/swift-collections.git from cache
+Fetching https://github.com/apple/swift-numerics from cache
+Fetching https://github.com/huggingface/swift-transformers from cache
+Fetching https://github.com/huggingface/swift-jinja.git from cache
+Fetched https://github.com/apple/swift-argument-parser from cache (0.71s)
+Fetched https://github.com/apple/swift-numerics from cache (0.71s)
+Fetched https://github.com/huggingface/swift-jinja.git from cache (0.71s)
+Fetched https://github.com/ibireme/yyjson.git from cache (0.71s)
+Fetched https://github.com/huggingface/swift-transformers from cache (0.71s)
+Fetched https://github.com/apple/swift-collections.git from cache (0.71s)
+Fetching https://github.com/apple/swift-crypto.git from cache
+Fetching https://github.com/swiftlang/swift-syntax.git from cache
+Fetching https://github.com/Pummelchen/WebTransport.git from cache
+Fetching https://github.com/huggingface/swift-huggingface from cache
+Fetching https://github.com/apple/swift-asn1.git from cache
+Fetching https://github.com/mattt/EventSource.git from cache
+Fetched https://github.com/swiftlang/swift-syntax.git from cache (0.77s)
+Fetched https://github.com/apple/swift-crypto.git from cache (0.78s)
+Fetching https://github.com/ml-explore/mlx-swift from cache
+Fetching https://github.com/ml-explore/mlx-swift-lm.git from cache
+Fetched https://github.com/huggingface/swift-huggingface from cache (0.94s)
+Fetched https://github.com/Pummelchen/WebTransport.git from cache (0.94s)
+Fetched https://github.com/apple/swift-asn1.git from cache (0.65s)
+Fetched https://github.com/mattt/EventSource.git from cache (0.65s)
+Fetched https://github.com/ml-explore/mlx-swift from cache (0.65s)
+warning: 'mlx-swift-lm': skipping cache due to an error: The file “maintenance.lock” doesn’t exist.
+[1/20990] Fetching mlx-swift-lm
+Fetched https://github.com/ml-explore/mlx-swift-lm.git (11.67s)
+Computing version for https://github.com/Pummelchen/WebTransport.git
+Computed https://github.com/Pummelchen/WebTransport.git at 1.3.7 (13.75s)
+Computing version for https://github.com/huggingface/swift-transformers
+Computed https://github.com/huggingface/swift-transformers at 1.3.4 (0.55s)
+Computing version for https://github.com/huggingface/swift-huggingface
+Computed https://github.com/huggingface/swift-huggingface at 0.10.1 (0.57s)
+Computing version for https://github.com/ml-explore/mlx-swift-lm.git
+Computed https://github.com/ml-explore/mlx-swift-lm.git at 3.31.4 (0.57s)
+Computing version for https://github.com/ibireme/yyjson.git
+Computed https://github.com/ibireme/yyjson.git at 0.12.0 (0.74s)
+Computing version for https://github.com/apple/swift-crypto.git
+Computed https://github.com/apple/swift-crypto.git at 4.5.2 (0.49s)
+Computing version for https://github.com/apple/swift-collections.git
+Computed https://github.com/apple/swift-collections.git at 1.6.0 (0.33s)
+Computing version for https://github.com/huggingface/swift-jinja.git
+Computed https://github.com/huggingface/swift-jinja.git at 2.5.0 (0.51s)
+Computing version for https://github.com/mattt/EventSource.git
+Computed https://github.com/mattt/EventSource.git at 1.5.1 (0.29s)
+Computing version for https://github.com/swiftlang/swift-syntax.git
+Computed https://github.com/swiftlang/swift-syntax.git at 603.0.2 (0.68s)
+Computing version for https://github.com/ml-explore/mlx-swift
+Computed https://github.com/ml-explore/mlx-swift at 0.31.6 (0.58s)
+Computing version for https://github.com/apple/swift-asn1.git
+Computed https://github.com/apple/swift-asn1.git at 1.7.2 (0.35s)
+Computing version for https://github.com/apple/swift-argument-parser
+Computed https://github.com/apple/swift-argument-parser at 1.8.2 (0.53s)
+Computing version for https://github.com/apple/swift-numerics
+Computed https://github.com/apple/swift-numerics at 1.1.1 (0.28s)
+Creating working copy for https://github.com/huggingface/swift-transformers
+Working copy of https://github.com/huggingface/swift-transformers resolved at 1.3.4
+Creating working copy for https://github.com/apple/swift-collections.git
+Working copy of https://github.com/apple/swift-collections.git resolved at 1.6.0
+Creating working copy for https://github.com/ibireme/yyjson.git
+Working copy of https://github.com/ibireme/yyjson.git resolved at 0.12.0
+Creating working copy for https://github.com/swiftlang/swift-syntax.git
+Working copy of https://github.com/swiftlang/swift-syntax.git resolved at 603.0.2
+Creating working copy for https://github.com/mattt/EventSource.git
+Working copy of https://github.com/mattt/EventSource.git resolved at 1.5.1
+Creating working copy for https://github.com/apple/swift-asn1.git
+Working copy of https://github.com/apple/swift-asn1.git resolved at 1.7.2
+Creating working copy for https://github.com/ml-explore/mlx-swift-lm.git
+Working copy of https://github.com/ml-explore/mlx-swift-lm.git resolved at 3.31.4
+Creating working copy for https://github.com/huggingface/swift-jinja.git
+Working copy of https://github.com/huggingface/swift-jinja.git resolved at 2.5.0
+Creating working copy for https://github.com/apple/swift-crypto.git
+Working copy of https://github.com/apple/swift-crypto.git resolved at 4.5.2
+Creating working copy for https://github.com/apple/swift-numerics
+Working copy of https://github.com/apple/swift-numerics resolved at 1.1.1
+Creating working copy for https://github.com/ml-explore/mlx-swift
+Working copy of https://github.com/ml-explore/mlx-swift resolved at 0.31.6
+Creating working copy for https://github.com/apple/swift-argument-parser
+Working copy of https://github.com/apple/swift-argument-parser resolved at 1.8.2
+Creating working copy for https://github.com/Pummelchen/WebTransport.git
+Working copy of https://github.com/Pummelchen/WebTransport.git resolved at 1.3.7
+Creating working copy for https://github.com/huggingface/swift-huggingface
+Working copy of https://github.com/huggingface/swift-huggingface resolved at 0.10.1
+Building for debugging...
+[Computing dependencies]
+[Provisioning 57 / 64]
+[Pre-planning 1 / 1362]
+[Planning deferred tasks]
+[Starting]
+[30 / 806] chatbots-cli-product
+warning: missing creator for mutated node: ('/Users/node2/chatbots-phase-e/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+[295 / 806]
+[305 / 814] Crypto
+[309 / 850]
+[312 / 850] _NumericsShims
+[315 / 877]
+[319 / 908]
+[342 / 987]
+[352 / 999]
+[382 / 999]
+[388 / 999]
+[398 / 999]
+[405 / 999]
+[417 / 999] RealModule
+[420 / 999] RealModule
+[423 / 999] InternalCollectionsUtilities
+[429 / 999]
+[435 / 999]
+[443 / 999] InternalCollectionsUtilities
+[451 / 999]
+[460 / 1000] InternalCollectionsUtilities
+[469 / 1009]
+[474 / 1009]
+[481 / 1009] yyjson
+[488 / 1009]
+[491 / 1009]
+[495 / 1009]
+[497 / 1009]
+[499 / 1009] MLXHuggingFaceMacros
+[504 / 1009]
+[518 / 1020] MLXHuggingFaceMacros
+[522 / 1020]
+[526 / 1020] ComplexModule
+[534 / 1020] WebTransportQUICCore
+[544 / 1029] WebTransportQUICCore
+[548 / 1029] WebTransportQUICCore
+[556 / 1029] EventSource
+[562 / 1029] Jinja
+[574 / 1029] WebTransportTLSCore
+[583 / 1029] WebTransportUDPApple
+[586 / 1029] WebTransportQUICCore
+[587 / 1029] EventSource
+[593 / 1029] Crypto
+[594 / 1029] Crypto-product
+[596 / 1029] HuggingFace
+[600 / 1029] Numerics
+[608 / 1033]
+[615 / 1035]
+[620 / 1037] Numerics
+[626 / 1037] WebTransportCryptoApple
+[633 / 1060] ArgumentParser
+[634 / 1068] WebTransportCryptoApple
+[648 / 1068] WebTransportTLSCore
+[653 / 1104]
+[663 / 1104]
+[675 / 1104]
+[683 / 1104] WebTransportHTTP3Core
+[688 / 1104]
+[689 / 1104]
+[693 / 1104]
+[695 / 1104] WebTransportHTTP3Core
+[700 / 1104] WebTransportNetworkRuntime
+[706 / 1104] WebTransportCryptoApple
+[709 / 1104] WebTransportCryptoApple
+[711 / 1104] WebTransportHTTP3Core
+[717 / 1104] encuda-product
+[720 / 1105] ArgumentParser
+[723 / 1105] HuggingFace
+[725 / 1105] HuggingFace
+[727 / 1111] encuda-product
+[728 / 1111] encuda-product
+[729 / 1111] encuda-product
+[731 / 1111] encuda-product
+[733 / 1111] HuggingFace
+[735 / 1111] HuggingFace
+[738 / 1111]
+[740 / 1112] encuda-product
+[748 / 1120]
+[751 / 1120] HuggingFace
+[757 / 1120]
+[760 / 1120] WebTransportNetworkRuntime
+[764 / 1120] WebTransportNetworkRuntime
+[773 / 1120] WebTransportNetworkRuntime
+[775 / 1121]
+[778 / 1122]
+[780 / 1123] Cmlx
+[781 / 1123] Cmlx
+[782 / 1125] MLX
+[785 / 1136] WebTransport
+[795 / 1208] MLX
+[796 / 1208]
+In file included from /Users/node2/chatbots-phase-e/.build/checkouts/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/steel_attention.metal:6:
+In file included from /Users/node2/chatbots-phase-e/.build/checkouts/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/../../../steel/attn/kernels/steel_attention.h:3:
+In file included from /Users/node2/chatbots-phase-e/.build/checkouts/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/../../../steel/attn/attn.h:6:
+In file included from /Users/node2/chatbots-phase-e/.build/checkouts/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/../../../steel/attn/../../steel/attn/mma.h:11:
+/Users/node2/chatbots-phase-e/.build/checkouts/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/../../../steel/attn/../../steel/utils/integral_constant.h:108:6: warning: constexpr if is a C++17 extension [-Wc++17-extensions]
+  if constexpr (start < stop) {
+     ^
+In file included from /Users/node2/chatbots-phase-e/.build/checkouts/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/steel_attention.metal:6:
+/Users/node2/chatbots-phase-e/.build/checkouts/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/../../../steel/attn/kernels/steel_attention.h:356:16: warning: constexpr if is a C++17 extension [-Wc++17-extensions]
+            if constexpr (is_bool) {
+               ^
+/Users/node2/chatbots-phase-e/.build/checkouts/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/../../../steel/attn/kernels/steel_attention.h:426:14: warning: constexpr if is a C++17 extension [-Wc++17-extensions]
+          if constexpr (BD == 128) {
+             ^
+/Users/node2/chatbots-phase-e/.build/checkouts/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/../../../steel/attn/kernels/steel_attention.h:436:14: warning: constexpr if is a C++17 extension [-Wc++17-extensions]
+          if constexpr (BD == 128) {
+             ^
+4 warnings generated.
+[798 / 1208]
+[800 / 1208]
+[802 / 1208]
+[804 / 1208] Cmlx
+[805 / 1208]
+[816 / 1208]
+[820 / 1208] Cmlx
+[823 / 1208]
+[825 / 1208]
+[828 / 1208]
+[830 / 1208] Cmlx
+[831 / 1208]
+[832 / 1208]
+[833 / 1208]
+[838 / 1208] Cmlx
+[841 / 1208] Cmlx
+[842 / 1208] Cmlx
+[844 / 1208]
+[846 / 1208]
+[851 / 1208] Cmlx
+[858 / 1208] Cmlx
+[865 / 1208] Cmlx
+[866 / 1208]
+[868 / 1208]
+[871 / 1208]
+[873 / 1208]
+[876 / 1208] Cmlx
+[879 / 1208] Cmlx
+[880 / 1208]
+[882 / 1208]
+[883 / 1208]
+[886 / 1208] Cmlx
+[890 / 1208] Cmlx
+[892 / 1208] Cmlx
+[893 / 1208] Cmlx
+[894 / 1208]
+[897 / 1208]
+[900 / 1208]
+[904 / 1208]
+[908 / 1208]
+[909 / 1208] Cmlx
+[910 / 1208] Cmlx
+[912 / 1208] Cmlx
+[913 / 1208]
+[915 / 1208] Cmlx
+[917 / 1208]
+[918 / 1208] Cmlx
+[920 / 1208] Cmlx
+[921 / 1208] Cmlx
+[922 / 1208] Cmlx
+[927 / 1208] Cmlx
+[929 / 1208] Cmlx
+[930 / 1208] Hub
+[938 / 1208] Cmlx
+[939 / 1208] Cmlx
+[940 / 1208] Cmlx
+[941 / 1208] Cmlx
+[942 / 1208] Cmlx
+[943 / 1208] Cmlx
+[944 / 1208] Cmlx
+[946 / 1208] Cmlx
+[947 / 1208] Cmlx
+[948 / 1208] Cmlx
+[951 / 1208] Cmlx
+[952 / 1208] Cmlx
+[953 / 1208] Cmlx
+[954 / 1208] Cmlx
+[955 / 1208] Cmlx
+[959 / 1208] Cmlx
+[960 / 1208] Cmlx
+[961 / 1208] Cmlx
+[963 / 1208] Cmlx
+[964 / 1208] Cmlx
+[965 / 1208] Cmlx
+[967 / 1208] Cmlx
+[968 / 1208] Cmlx
+[969 / 1208] Cmlx
+[971 / 1208] Cmlx
+[972 / 1208] Cmlx
+[973 / 1208] Cmlx
+[976 / 1208] Cmlx
+[977 / 1208] Cmlx
+[978 / 1208] Cmlx
+[982 / 1208] Cmlx
+[989 / 1208] Cmlx
+[991 / 1208] Cmlx
+[994 / 1208] Cmlx
+[995 / 1208] Cmlx
+[996 / 1208] Cmlx
+[997 / 1208] Cmlx
+[999 / 1208] Cmlx
+[1000 / 1208] Cmlx
+[1001 / 1208] Cmlx
+[1002 / 1208] Cmlx
+[1004 / 1208] Cmlx
+[1005 / 1208] Cmlx
+[1006 / 1208] Cmlx
+[1008 / 1208] Cmlx
+[1010 / 1208] Cmlx
+[1011 / 1208] Cmlx
+[1013 / 1208] Cmlx
+[1014 / 1208] Cmlx
+[1016 / 1208] Cmlx
+[1017 / 1208] Cmlx
+[1019 / 1208] Cmlx
+[1020 / 1208] Cmlx
+[1021 / 1208] Cmlx
+[1022 / 1208] Cmlx
+[1023 / 1208] Cmlx
+[1026 / 1208] Cmlx
+[1028 / 1208] Cmlx
+[1029 / 1208] Cmlx
+[1030 / 1208] Cmlx
+[1032 / 1208] Cmlx
+[1034 / 1208] Cmlx
+[1036 / 1208] Cmlx
+[1039 / 1208] Cmlx
+[1042 / 1208] Cmlx
+[1044 / 1208] Cmlx
+[1046 / 1208] mlx-swift_Cmlx
+[1047 / 1208] WebTransportNetworkRuntime
+[1050 / 1208] MLX
+[1051 / 1208] MLXNN
+[1054 / 1208] MLX
+[1055 / 1208] WebTransport
+[1058 / 1208] MLX
+[1059 / 1208] Hub
+[1060 / 1208] Hub
+[1061 / 1208] Hub
+[1064 / 1208] Tokenizers
+[1066 / 1208] Cmlx
+[1067 / 1209]
+[1073 / 1210] mlx-swift_Cmlx
+[1081 / 1241]
+[1087 / 1241]
+[1090 / 1241] MLXNN
+[1098 / 1259]
+[1103 / 1259] Tokenizers
+[1110 / 1259] Tokenizers
+[1116 / 1259] MLXNN
+[1125 / 1259]
+[1132 / 1259] Tokenizers
+[1135 / 1259] Tokenizers
+[1136 / 1259] MLXNN-product
+[1139 / 1260] Tokenizers
+[1139 / 1260] MLXNN
+[1142 / 1260] MLXOptimizers
+[1151 / 1263] MLXOptimizers
+[1152 / 1264] MLXOptimizers
+[1153 / 1264] MLXLMCommon
+[1157 / 1283]
+[1159 / 1283]
+[1162 / 1283] Cmlx
+[1164 / 1283] Cmlx
+[1167 / 1283]
+[1176 / 1283] MLXLMCommon
+[1183 / 1284]
+[1185 / 1286] MLXVLM
+[1189 / 1304] MLXLLM
+[1190 / 1306] MLXHuggingFace
+[1191 / 1306] MLXVLM
+[1193 / 1306] MLXVLM
+[1196 / 1306] MLXHuggingFace
+[1203 / 1306] MLXVLM
+[1211 / 1306] MLXVLM-product
+[1220 / 1306] MLXLLM
+[1221 / 1306] MLXLLM
+[1222 / 1306] MLXLLM-product
+[1223 / 1306] MLXLLM-product
+[1224 / 1306] MLXLLM-product
+[1225 / 1306] MLXHuggingFace-product
+[1229 / 1307] MLXLMCommon-product
+[1230 / 1307] MLXLLM
+[1230 / 1307] ChatBotsCore
+[1235 / 1322]
+[1236 / 1322]
+[1242 / 1322] ChatBotsCore
+[1243 / 1322] ChatBotsCore
+[1245 / 1322] MLXLLM
+[1257 / 1322] chatbots-probe-product
+[1263 / 1324] chatbots-cli-product
+[1263 / 1324]
+[1265 / 1326] ChatBots
+[1267 / 1330] chatbots-cli-product
+[1268 / 1330] chatbots-probe-product
+[1271 / 1340] ChatBots-product
+[1273 / 1349] chatbots-cli-product
+[1274 / 1349] chatbots-probe-product
+[1276 / 1349] ChatBots-product
+[1278 / 1349] ChatBots-product
+[1279 / 1349] ChatBots-product
+[1282 / 1349] ChatBots
+[1288 / 1349] ChatBotsCore
+[1291 / 1349] ChatBots
+[1292 / 1349] ChatBots
+[1293 / 1349] ChatBots
+[1294 / 1349] ChatBotsAppTests-product
+[1296 / 1349] chatbots-cli-product
+[1297 / 1349] chatbots-cli-product
+[1299 / 1349]
+[1303 / 1349] ChatBots
+[1305 / 1349] ChatBotsCoreTests-product
+[1308 / 1350] ChatBotsCoreTests-product
+[1312 / 1350] chatbots-probe-product
+[1313 / 1350] chatbots-probe-product
+[1314 / 1350] ChatBotsCoreTests-product
+[1316 / 1363] ChatBots
+[1317 / 1363]
+[1321 / 1363] chatbots-cli-product
+[1330 / 1363] ChatBotsCoreTests-product
+[1330 / 1363] chatbots-cli-product
+[1332 / 1363] ChatBots
+[1334 / 1363] ChatBots
+[1347 / 1364] ChatBotsCoreTests-product
+[1347 / 1364] ChatBotsAppTests-product
+[1351 / 1373] ChatBotsAppTests-product
+[1353 / 1373] ChatBotsAppTests-product
+[1354 / 1373] ChatBotsAppTests-product
+[1361 / 1373] ChatBotsAppTests-product
+[1361 / 1373] AllIncludingTests
+[1361 / 1373] ChatBotsAppTests-product
+[1363 / 1373] ChatBotsAppTests-product
+[1365 / 1373] ChatBotsAppTests-product
+[1367 / 1373] ChatBotsCoreTests-product
+[1369 / 1373] ChatBotsCoreTests-product
+[1371 / 1373] ChatBotsCoreTests-product
+Build complete! (79,38 secs)

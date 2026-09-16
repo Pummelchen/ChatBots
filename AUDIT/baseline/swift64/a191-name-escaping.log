@@ -1,0 +1,103 @@
+A191 — a name with a quote, a backslash or a newline in it
+Host: 27.0 / arm64, python 3.14.7
+
+--- The probe, unmutated ---
+$ python3 AUDIT/baseline/swift64/a191-probe/name-escaping.py
+the escapes
+  ok    'a"b' becomes "a\"b"
+  ok    'a\\b' becomes "a\\b"
+  ok    'a\nb' becomes "a\nb"
+  ok    'a\tb' becomes "a\tb"
+  ok    'a\x01b' becomes "a\u{1}b"
+  ok    'Grüße' becomes "Grüße"
+  ok    'Ada' becomes "Ada"
+
+the old interpolation, compiled — this is the finding
+  'a"b' as the old generator wrote it: compiles=False
+  ok    the old interpolation for 'a"b' does not compile
+  'a\\b' as the old generator wrote it: compiles=False
+  ok    the old interpolation for 'a\\b' does not compile
+  'a\nb' as the old generator wrote it: compiles=False
+  ok    the old interpolation for 'a\nb' does not compile
+
+what the generator now writes, compiled
+  ok    the escaped form of 'a"b' compiles and prints it back
+  ok    the escaped form of 'a\\b' compiles and prints it back
+  ok    the escaped form of 'a\nb' compiles and prints it back
+  ok    the escaped form of 'a\x01b' compiles and prints it back
+  ok    the escaped form of 'Grüße' compiles and prints it back
+  ok    the escaped form of 'Ada' compiles and prints it back
+
+the whole generator, over a list with such a name in it
+  ok    the generated file compiles with a hostile name in the lists
+  ok    and it carries the name
+
+the counterweight: the committed file is still the generator's output
+  ok    tools/embed-names.py --check passes
+
+all A191 probe checks passed
+exit=0
+
+--- The Python checks CI runs ---
+  ruff check  : All checks passed!
+clean
+  ruff format : 1 file already formatted
+clean
+  pyright     : 0 errors, 0 warnings, 0 informations
+  py_compile  : clean
+
+--- M1: the names go in unescaped again (the pre-fix behaviour) ---
+  FAIL  the generated file compiles with a hostile name in the lists — /var/folders/7l/ry9rvd3d72z864w_jd2my37m0000gn/T/tmp6rr032c1/NameLists.swift:38:37: error: expected ',' separator
+  FAIL  and it carries the name
+2 A191 probe check(s) failed
+
+--- M2: quotes are escaped but backslashes are not ---
+  FAIL  'a\\b' becomes "a\\b" — got '"a\\b"'
+  FAIL  the escaped form of 'a\\b' compiles and prints it back — compiles=False, printed '/var/folders/7l/ry9rvd3d72z864w_jd2my37m0000gn/T/tmp8lb6g2t3/probe.swift:1:15: error: invalid escape sequence in literal\n1 | let name = "a\\b"\n  |               `- error: invalid escape sequence in literal\n2 | print(name)\n3 |'
+  FAIL  the generated file compiles with a hostile name in the lists — /var/folders/7l/ry9rvd3d72z864w_jd2my37m0000gn/T/tmpc96ploja/NameLists.swift:38:57: error: invalid escape sequence in literal
+3 A191 probe check(s) failed
+
+--- M3: a normal name is escaped too (over-correction) ---
+  FAIL  'a"b' becomes "a\"b" — got '"a\\"bX"'
+  FAIL  'a\\b' becomes "a\\b" — got '"a\\\\bX"'
+  FAIL  'a\nb' becomes "a\nb" — got '"a\\nbX"'
+  FAIL  'a\tb' becomes "a\tb" — got '"a\\tbX"'
+  FAIL  'a\x01b' becomes "a\u{1}b" — got '"a\\u{1}bX"'
+  FAIL  'Grüße' becomes "Grüße" — got '"GrüßeX"'
+  FAIL  'Ada' becomes "Ada" — got '"AdaX"'
+  FAIL  the escaped form of 'a"b' compiles and prints it back — compiles=True, printed 'a"bX'
+  FAIL  the escaped form of 'a\\b' compiles and prints it back — compiles=True, printed 'a\\bX'
+  FAIL  the escaped form of 'a\nb' compiles and prints it back — compiles=True, printed 'a\nbX'
+  FAIL  the escaped form of 'a\x01b' compiles and prints it back — compiles=True, printed 'a\x01bX'
+  FAIL  the escaped form of 'Grüße' compiles and prints it back — compiles=True, printed 'GrüßeX'
+  FAIL  the escaped form of 'Ada' compiles and prints it back — compiles=True, printed 'AdaX'
+  FAIL  tools/embed-names.py --check passes — NameLists.swift is out of date with names/.
+14 A191 probe check(s) failed
+
+--- RESTORED: unmutated again ---
+all A191 probe checks passed
+
+--- What each mutation shows ---
+M1 the names go in unescaped again: the whole-generator check fails, and so does the assertion that the
+generated file carries the name — the finding, reproduced end to end, with the generated Swift failing to
+compile exactly where it is written. M2 quotes escaped but backslashes not: the backslash assertion fails
+and both compiled checks fail with "invalid escape sequence in literal", which is the failure the compiled
+half of the probe exists to see. M3 the escaping corrupts ordinary names: every assertion fails, including
+plain `Ada` — the counterweight, so a fix that escaped everything out of caution would be caught rather than
+shipped.
+
+--- FULL GATE at the fix commit (tools/audit-checks.sh) ---
+PASS  build: swift build --build-tests
+PASS  tests: 1033 tests in 192 suites
+PASS  coverage: Sources/ TOTAL 6505 regions 2570 covered 60.49%, 20541 lines 9845 covered 52.07%
+PASS  swiftlint: 253 finding(s), within the recorded waiver of 255
+PASS  swift-format: 739 diagnostic(s), within the recorded waiver of 744
+PASS  web: deltas merge (34 cases)
+PASS  web: the verdict rule (12 cases)
+
+All 6 Mac-only gates passed.
+
+--- The generated file is unchanged ---
+$ git diff --stat Sources/ChatBotsCore/NameLists.swift
+(empty: every name in names/ is plain text, so escaping them changes nothing the file did not already
+contain — the fix is about the names the lists do not have yet.)

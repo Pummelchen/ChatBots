@@ -1,0 +1,82 @@
+# A135 — the Metal kernels, where MLX looks for them (2026-09-15)
+
+## The statement was false, and the artefact says so
+# `tools/make-app.sh` and `tools/fetch-metal.sh` both said mlx-swift's SwiftPM build does not compile
+# the Metal kernels. Under Xcode 27 with the Metal toolchain installed it does:
+$ ls .build/out/Intermediates.noindex/mlx-swift.build/Debug/mlx-swift_Cmlx-b.build/Metal/ | wc -l
+27
+$ swift AUDIT/baseline/swift64/a135-probe/metallib-probe.swift \
+      .build/out/Products/Release/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib
+functions: 382
+steel: 18
+first: rbits, rbitsc, vjp_layer_normfloat16
+
+# The build's metallib and the downloaded one are different files, and the build's is larger:
+#   build   3 836 652 bytes  0214ad23cc2fa1df…
+#   release 3 789 548 bytes  4cb8ef6cbb43e43f…   (the pinned Cmlx.xcframework asset)
+
+## What the download was actually for: MLX has to be able to *find* a metallib
+# `mlx/backend/metal/device.cpp:136-180`, in order:
+#   1. `mlx.metallib` beside the running binary
+#   2. `Resources/mlx.metallib` beside the running binary
+#   3. a SwiftPM resource bundle, via `Bundle.main.bundleURL` then `Bundle.allBundles()`
+#   4. `Resources/default.metallib` beside the running binary
+#   5. the compile-time METAL_PATH
+# The app's engine is `ChatBots.app/Contents/MacOS/chatbots-cli`, a bare executable that
+# `make-app.sh` gives the SwiftPM bundles at `Contents/Resources/` — a place (3) does not reach from
+# there. So the engine needs a colocated metallib, which is what the fetch put in
+# `Contents/MacOS/`.
+
+## The measurement that decides which metallib can be installed
+# A first version of `AuditS2MetalLibraryTests` installed the *build's* metallib beside the running
+# test binary and evaluated a kernel:
+$ swift test --filter MetalLibraryTests          # with the build's metallib colocated
+  ✔ Test "An MLX kernel runs ..." passed after 0.889 seconds.
+$ swift test --filter MetalLibraryTests          # with nothing colocated
+  MLX error: Failed to load the default metallib. library not found library not found library not
+  found library not found  at .../mlx-c/mlx/c/array.cpp:232
+  ✘ Test run failed.
+
+# So the build's own metallib runs a Metal kernel, and a colocated file is what MLX needs. That is
+# what makes replacing the download with a copy possible at all.
+#
+# That first version was replaced, and the reason is worth keeping: installing a file into the test
+# bundle's `Contents/MacOS/` breaks the *build*, because the next `codesign` of that bundle fails —
+# "code object is not signed at all. In subcomponent: …/ChatBotsCoreTests.xctest/Contents/MacOS/
+# mlx.metallib". It is the same trap `make-app.sh` records at its signing step, met from the other
+# side. The tests that ship read the artefact instead of moving it.
+
+## `make-app.sh` now installs the build's metallib
+$ bash tools/make-app.sh
+  ==> Metal kernels from the build: default.metallib
+  ==> Ad-hoc signing
+  Built: dist/ChatBots.app                                            (2m07s, no download)
+$ find dist/ChatBots.app -name '*.metallib'
+  Contents/MacOS/mlx.metallib
+  Contents/Resources/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib
+$ shasum -a 256 dist/ChatBots.app/Contents/MacOS/mlx.metallib \
+              .build/out/Products/Release/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib
+  0214ad23cc2fa1df… (both: the app carries the metallib its own build produced)
+# The pinned, digest-checked download in `tools/fetch-metal.sh` stays as the branch taken when the
+# build produced no metallib, which is why that script is still here and still fails closed (A24,
+# A185). A normal build no longer downloads ~190 MB.
+
+## What was not verified here, and why
+# Full inference against the build's metallib needs a checkpoint, and this host has none (`models/` is
+# absent, and there is no Hugging Face cache). What is verified is that the library opens, contains
+# MLX's kernels — including the steel attention kernels the download was said to be needed for — and
+# runs a real GPU kernel. If a phase-E host has weights, `chatbots-cli --check` against this app
+# bundle closes the remaining gap.
+
+## The full gate, with the fix
+$ bash tools/audit-checks.sh
+PASS  build: swift build --build-tests
+PASS  tests: 937 tests in 167 suites
+PASS  coverage: TOTAL 6255 2571 58.90% (regions) · 19748 9688 50.94% (lines)
+PASS  swiftlint: 254 finding(s), within the recorded waiver of 255
+PASS  swift-format: 739 diagnostic(s), within the recorded waiver of 744
+PASS  web: deltas merge (31 cases)
+All 6 Mac-only gates passed.
+
+# 935 tests in 166 suites before this task; the two added read the build's metallib and the packaging
+# branch. `shellcheck tools/make-app.sh tools/fetch-metal.sh` is clean.

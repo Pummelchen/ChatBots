@@ -34,4 +34,26 @@ struct AuditTransportCheckTimeoutTests {
         // fit — the A30/A62 shape of a parse that kills the process instead of reporting.
         #expect(TransportCheck.clientTimeoutMilliseconds(.seconds(100_000_000)) == Int32.max)
     }
+
+    @Test("One connect attempt is given its own short deadline")
+    func oneConnectAttemptCannotSpendTheWholeRun() {
+        // The retry loop allows six attempts. If one attempt can take the whole budget the other
+        // five never happen, which is what the check did: it reported "the transport does NOT work"
+        // about an engine that bound its port two seconds later, having spent thirty seconds on a
+        // single attempt that began before the listener existed (A215).
+        let runBudget = TransportCheck.clientTimeoutMilliseconds(.seconds(30))
+        #expect(TransportCheck.connectAttemptMilliseconds(.seconds(30)) == 2_000)
+        #expect(TransportCheck.connectAttemptMilliseconds(.seconds(30)) < runBudget)
+        #expect(
+            TransportCheck.connectAttemptMilliseconds(.seconds(30)) * 6 <= runBudget,
+            "six attempts must fit in the run they belong to")
+    }
+
+    @Test("An attempt never outlives the run that allows it")
+    func anAttemptIsBoundedByItsRun() {
+        // A caller asking for half a second gets half-second attempts, not two-second ones: an
+        // attempt that outlives its run reports a failure for a run that is already over.
+        #expect(TransportCheck.connectAttemptMilliseconds(.milliseconds(500)) == 500)
+        #expect(TransportCheck.connectAttemptMilliseconds(.zero) == 1)
+    }
 }

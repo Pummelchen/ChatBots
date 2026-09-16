@@ -1,0 +1,59 @@
+# A174 — a send the engine did not take keeps the moderator's draft (2026-09-15)
+
+## The refusal is real, and its text is worth keeping the draft for
+# A private engine on a spare port, one message of 3 000 characters:
+$ chatbots-cli --serve --transport http --port 7811 &
+$ curl -s -o - -w 'HTTP %{http_code}\n' -H 'Content-Type: application/json' \
+      -d "{\"text\": \"$(python3 -c 'print("x"*3000)')\"}" http://127.0.0.1:7811/api/message
+HTTP 409 {"error":"a message is limited to 2000 characters"}
+
+# `api.post` throws on that, and `run` answered nothing before this change, so `send` had already
+# emptied the box by then. With no engine listening the request never leaves the page at all, which is
+# the second way the text was lost.
+
+## The page: five wiring checks, against both versions
+$ node tools/check-web-deltas.js          # with the old web/app.js
+  FAIL  the command helper reports whether the engine took the command
+  FAIL  the page posts the message before it empties the box
+  FAIL  and it empties the box only when the send was accepted
+  FAIL  so that what is typed during the request is not thrown away
+  FAIL  and a second Return cannot post the same text twice
+5 deltas check(s) failed
+
+$ node tools/check-web-deltas.js          # with the fix
+  ok    the command helper reports whether the engine took the command
+  ok    the page posts the message before it empties the box
+  ok    and it empties the box only when the send was accepted
+  ok    so that what is typed during the request is not thrown away
+  ok    and a second Return cannot post the same text twice
+all deltas checks passed
+
+## The Mac app: the same six tests, against both behaviours
+# Mutation: `deliverModeratorDraft` clears the draft regardless of the outcome, which is what the
+# controller did before the change.
+$ swift test --filter ModeratorDraftTests
+  ✘ Test "With no engine the draft stays and the reason is shown" recorded an issue:
+    Expectation failed: controller.moderatorDraft == "Is this still here?"
+  ✘ Test "The button's action is the same path, not a second one beside it" recorded an issue:
+    Expectation failed: controller.moderatorDraft == "Typed once"
+  ✘ Test run with 6 tests in 1 suite failed after 0.003 seconds with 2 issues.
+
+$ swift test --filter ModeratorDraftTests     # with the fix
+  ✔ Test run with 6 tests in 1 suite passed after 0.003 seconds.
+
+# The two that fail under the mutation are the ones that exercise a send the engine did not take.
+# The other four pin the rule itself: cleared on success, kept on refusal, and what was typed while
+# the request was in flight is never cleared with it.
+
+## The full gate, with the fix
+$ bash tools/audit-checks.sh
+PASS  build: swift build --build-tests
+PASS  tests: 923 tests in 163 suites
+PASS  coverage: TOTAL 6248 2585 58.63% (regions) · 19718 9722 50.69% (lines)
+PASS  swiftlint: 254 finding(s), within the recorded waiver of 255
+PASS  swift-format: 739 diagnostic(s), within the recorded waiver of 744
+PASS  web: deltas merge (31 cases)
+All 6 Mac-only gates passed.
+
+# 917 tests in 162 suites before this task; the six added are `ModeratorDraftTests`, and the web
+# gate's 26 cases become 31. Lint and format are unchanged at their pre-change counts.

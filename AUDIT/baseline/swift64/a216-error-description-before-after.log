@@ -1,0 +1,30 @@
+# A216 — a transport failure reported by number, and by reason (2026-09-15)
+
+## The test, against the old behaviour
+# Mutation: `ErrorText.describe` reduced to `error.localizedDescription`, which is what the client
+# called before the fix. The assertion that pins the behaviour fails, so the test is not decoration.
+
+$ swift test --filter ClientErrorDescriptionTests
+  ✘ Test "An error that describes itself is quoted, not reduced to a code" recorded an issue
+    at AuditS2ClientErrorDescriptionTests.swift:36:9: Expectation failed:
+    described == "QUIC DATAGRAM is not available on this connection"
+  ✘ Test run with 4 tests in 1 suite failed after 0.006 seconds with 1 issue.
+
+## The user-visible half: a client with nothing to listen to
+# `chatbots-cli --check-client --transport-port 7999`, no listener on that port, the same command
+# twice — once against the old wording, once against the new one.
+
+# BEFORE
+$ chatbots-cli --check-client --transport-port 7999
+client: could NOT connect to 127.0.0.1:7999
+  Could not connect to the conversation engine: The operation couldn’t be completed. (WebTransportNetworkRuntime.WebTransportNetworkRuntimeError error 2.)
+
+# AFTER
+$ chatbots-cli --check-client --transport-port 7999
+client: could NOT connect to 127.0.0.1:7999
+  Could not connect to the conversation engine: network runtime operation timed out after 10000ms
+
+# `error 2` is a case index in a type that is not this repository's — `invalidTransport` — and it
+# changes meaning with the order of that enum's cases. The second line names the wait that expired.
+# The same collapse was visible on the installer's own smoke test while A215 was being diagnosed,
+# where the check reported a number for a transport that was refusing for a stated reason.

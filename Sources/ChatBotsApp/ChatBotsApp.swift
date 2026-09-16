@@ -86,12 +86,6 @@ struct ChatBotsApp: App {
     @StateObject private var theme = ThemeStore()
     @StateObject private var zoom = ZoomStore()
 
-    /// Below this the two panes stop being usable side by side. Scaled with the text size:
-    /// at 200% text the same 720 points would clip every label, so the floor rises with it.
-    private var minimumWindowSize: NSSize {
-        NSSize(width: 720 * zoom.scale, height: 480 * (1 + (zoom.scale - 1) * 0.5))
-    }
-
     var body: some Scene {
         // The title bar is left fully standard: close / minimize / zoom, double-click to
         // zoom, drag to move, drag edges to resize. `WindowConfigurator` only sets the
@@ -101,7 +95,6 @@ struct ChatBotsApp: App {
                 .themePalette(theme.palette)
                 .environmentObject(theme)
                 .environmentObject(endpoints)
-                .environmentObject(settings)
                 .environmentObject(zoom)
                 // Start the engine, attach to it, and only then restore the seats' saved
                 // endpoints.
@@ -135,7 +128,9 @@ struct ChatBotsApp: App {
                 // The black theme is dark-only regardless of the Mac's setting; the
                 // original theme follows the system.
                 .preferredColorScheme(theme.mode == .black ? .dark : nil)
-                .background(WindowConfigurator(palette: theme.palette))
+                .background(
+                    WindowConfigurator(
+                        palette: theme.palette, minimumSize: zoom.minimumWindowSize))
         }
         .defaultSize(width: 1280, height: 780)
         // `.contentMinSize` would cap the window at the content's maximum size — with a
@@ -200,12 +195,19 @@ struct ChatBotsApp: App {
 
                 Divider()
 
-                Button("Bigger Text") { zoom.step(larger: true) }
-                    .keyboardShortcut("+", modifiers: .command)
-                    .disabled(!zoom.canEnlarge)
-                Button("Smaller Text") { zoom.step(larger: false) }
-                    .keyboardShortcut("-", modifiers: .command)
-                    .disabled(!zoom.canReduce)
+                // The label says where the step goes, which is what the property beside it was
+                // written for and nothing read (A177). It falls back to the plain name at the end of
+                // the range, which is also where the item is disabled.
+                Button(zoom.nextLargerPercent.map { "Bigger Text (\($0)%)" } ?? "Bigger Text") {
+                    zoom.step(larger: true)
+                }
+                .keyboardShortcut("+", modifiers: .command)
+                .disabled(!zoom.canEnlarge)
+                Button(zoom.nextSmallerPercent.map { "Smaller Text (\($0)%)" } ?? "Smaller Text") {
+                    zoom.step(larger: false)
+                }
+                .keyboardShortcut("-", modifiers: .command)
+                .disabled(!zoom.canReduce)
                 Button("Actual Text Size") { zoom.reset() }
                     .keyboardShortcut("0", modifiers: .command)
                     .disabled(zoom.percent == zoom.resetPercent)
@@ -278,7 +280,7 @@ enum HelpWindow {
         let alert = NSAlert()
         alert.messageText = "ChatBots"
         alert.informativeText = """
-            Two local LLMs discuss a topic you set, with you as moderator.
+            Two models discuss a topic you set, with you as moderator.
 
             Start / Restart   ⌘↩
             Pause / Resume    ⇧⌘P
@@ -286,8 +288,9 @@ enum HelpWindow {
             Clear transcript  ⌘K
             Steer both models ⇧⌘↩
 
-            Both models run in-process on the GPU via MLX. Your moderator messages go \
-            into the shared log, so both models read them.
+            Each seat's model runs in the engine process the app starts: on this Mac's \
+            GPU through MLX, or against the endpoint you configured for that seat. Your \
+            moderator messages go into the shared log, so both read them.
             """
         alert.addButton(withTitle: "OK")
         alert.alertStyle = .informational
@@ -304,13 +307,15 @@ enum HelpWindow {
 /// handles frame autosave so the size and position survive relaunch.
 struct WindowConfigurator: NSViewRepresentable {
     let palette: AppPalette
+    /// The floor for a drag, from the one rule in `ZoomStore` rather than a number of its own (A177).
+    let minimumSize: CGSize
 
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async {
             guard let window = view.window else { return }
             window.title = "ChatBots"
-            window.contentMinSize = NSSize(width: 720, height: 480)
+            window.contentMinSize = NSSize(width: minimumSize.width, height: minimumSize.height)
             window.collectionBehavior.insert(.fullScreenPrimary)
             // Traffic lights are only hidden by `.fullSizeContentView`; make sure nothing
             // has turned them off.
@@ -320,14 +325,25 @@ struct WindowConfigurator: NSViewRepresentable {
             applyAppearance(to: window)
             Self.fitOnScreen(window)
             window.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+            // `activate()`, not the `activateIgnoringOtherApps:` this used to call: the macOS 27 SDK
+            // annotates that one `API_TO_BE_DEPRECATED` and names this as the replacement, and it is a
+            // request rather than a command — the app asks to come forward and the system decides,
+            // which is what cooperative activation means. The window is still made key and ordered
+            // front above, so a user who launched the app gets it; what no longer happens is taking
+            // focus from whatever else was frontmost, which is the behaviour the deprecation is for
+            // (A180).
+            NSApp.activate()
         }
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
         guard let window = nsView.window else { return }
-        DispatchQueue.main.async { applyAppearance(to: window) }
+        DispatchQueue.main.async {
+            // A text size can change while the window is open, and the floor moves with it.
+            window.contentMinSize = NSSize(width: minimumSize.width, height: minimumSize.height)
+            applyAppearance(to: window)
+        }
     }
 
     /// Sizes and centres the window so it always fits the screen it opens on.

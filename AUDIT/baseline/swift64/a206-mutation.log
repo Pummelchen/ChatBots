@@ -1,0 +1,13 @@
+the tree as it stands
+  ok    the guard passes with the declarations removed
+
+one of them put back, as a file-scope function
+  ok    the guard fails on the mutation
+        ↳ Sources/ still declares func closeStreams
+
+the mutation taken out again
+  ok    the guard passes again after the restore
+  ok    the file is byte for byte what it was
+  ok    and its checksum is the one taken before the mutation
+
+all A206 probe checks passed

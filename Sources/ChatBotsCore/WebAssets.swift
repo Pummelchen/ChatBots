@@ -24,6 +24,8 @@ public enum WebAssets {
             return Asset(contentType: "text/html; charset=utf-8", body: Data(indexHTML.utf8))
         case "/style.css":
             return Asset(contentType: "text/css; charset=utf-8", body: Data(styleCSS.utf8))
+        case "/deltas.js":
+            return Asset(contentType: "application/javascript; charset=utf-8", body: Data(deltasJS.utf8))
         case "/app.js":
             return Asset(contentType: "application/javascript; charset=utf-8", body: Data(appJS.utf8))
         case "/favicon.ico":
@@ -121,6 +123,9 @@ public enum WebAssets {
            who is speaking is the thing a viewer most wants to change. -->
       <div class="persona-row">
         <button class="persona-picker" title="Change who this participant is"></button>
+        <!-- The checkpoint this seat runs. A native select rather than a sheet: the list is short,
+             and it is the control a phone gets for free. Filled from the engine's own catalogue. -->
+        <select class="model-picker" title="Change the checkpoint this seat runs"></select>
       </div>
       <div class="params"></div>
       <div class="transcript"></div>
@@ -204,6 +209,8 @@ public enum WebAssets {
 <div id="toast" class="toast" hidden></div>
 <div id="profile-badge" class="profile-badge" hidden></div>
 
+<script src="/deltas.js"></script>
+<script src="/votes.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>
@@ -1034,6 +1041,23 @@ body[data-device="tablet"] .toggle-text { display: inline; }
 
 .persona-picker:disabled { opacity: 0.6; }
 
+/* The checkpoint select, beside the persona picker and styled to match it. It sizes to its content
+   rather than the row, because a repository id is long and the persona picker is what the eye should
+   land on. */
+.model-picker {
+  font: inherit;
+  font-size: var(--font-small);
+  color: var(--text);
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: calc(2px * var(--scale)) calc(6px * var(--scale));
+  margin-left: calc(6px * var(--scale));
+  max-width: 46%;
+}
+
+.model-picker:disabled { opacity: 0.6; }
+
 /* The list itself. A native-feeling panel rather than a floating dropdown, because it can
    hold the whole cast and works the same with a finger and a mouse. */
 .persona-sheet {
@@ -1128,6 +1152,111 @@ body[data-view="phone"] {
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25), 0 18px 60px rgba(0, 0, 0, 0.45);
   }
 }
+
+"""
+
+    static let deltasJS = """
+// ChatBots — what the page does with the state the engine sends it.
+//
+// Two pure rules, both about incoming state rather than about drawing: how a per-token fragment is
+// folded into the live entries (`applyDelta`), and which of two snapshots is newer (`isStale`). They
+// live here rather than in `app.js` because they are the parts that are easy to get wrong and
+// impossible to run inside a page — `tools/check-web-deltas.js` exercises both in Node.
+//
+// The engine publishes each fragment as it is produced, as `delta` on the event stream, and the
+// server sends a whole snapshot once per turn. The page draws the reply being written from
+// `state.snapshot.live`, so streaming a reply means merging those fragments into that array as they
+// arrive — not adding a second rendering path beside the one that draws a finished turn.
+//
+// No DOM in this file, which is the point: the merge is the part that is easy to get wrong (a turn
+// that starts must clear what the previous turn left, reasoning accumulates separately from the
+// answer, an unknown agent must not invent a seat), and keeping it here lets
+// `tools/check-web-deltas.js` run it in Node against those cases (A165).
+
+(function (global) {
+  "use strict";
+
+  /** A live entry for a seat that has none yet, with every field the renderer reads. */
+  function emptyLive(seatID) {
+    return {
+      seatID: seatID,
+      isGenerating: true,
+      text: "",
+      reasoning: "",
+      activity: null,
+      toolLog: [],
+      stats: null,
+    };
+  }
+
+  /**
+   * Merge one delta into `snapshot`, in place.
+   *
+   * Returns whether the snapshot changed in a way the page draws. `false` means the delta was
+   * ignored — an unknown `kind`, or an agent that is not one of the seats — and the caller can then
+   * skip a redraw.
+   */
+  function applyDelta(snapshot, delta) {
+    if (!snapshot || !delta || !delta.agentID) return false;
+    const seats = snapshot.seats || [];
+    if (!seats.some((seat) => seat.id === delta.agentID)) return false;
+
+    if (!snapshot.live) snapshot.live = [];
+    let live = snapshot.live.find((entry) => entry.seatID === delta.agentID);
+    if (!live) {
+      live = emptyLive(delta.agentID);
+      snapshot.live.push(live);
+    }
+
+    if (delta.kind === "started") {
+      // A turn is beginning for this seat: whatever is here belongs to the previous one, and the
+      // snapshot that would have cleared it may not have arrived yet.
+      live.text = "";
+      live.reasoning = "";
+      live.isGenerating = true;
+    } else if (delta.kind === "token") {
+      live.text = (live.text || "") + (delta.text || "");
+      live.isGenerating = true;
+    } else if (delta.kind === "reasoning") {
+      live.reasoning = (live.reasoning || "") + (delta.text || "");
+      live.isGenerating = true;
+    } else {
+      // `tool` and any kind added later are carried by the snapshot that follows the turn.
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Whether `next` was produced before `current`, and must therefore not replace it.
+   *
+   * The engine stamps every snapshot with a monotonic revision, which orders two produced inside the
+   * same second — its wall clock cannot, because `serverTime` is ISO-8601 to the second — and keeps
+   * ordering them when the clock moves backwards. The app has had this guard since A110; the page
+   * applied whatever arrived last, so a `GET /api/state` racing the first pushed snapshot could put
+   * the older one on screen and leave it there until the next turn (A171).
+   *
+   * A snapshot from an engine that predates the field carries no revision, and then the clock is the
+   * only ordering available — the same fallback `APISnapshot.isOlder(than:)` makes, so the two front
+   * ends cannot disagree about which state is newer.
+   */
+  function isStale(next, current) {
+    if (!current) return false;
+    const nextRevision = next && next.revision;
+    const currentRevision = current.revision;
+    if (typeof nextRevision === "number" && typeof currentRevision === "number") {
+      return nextRevision < currentRevision;
+    }
+    const nextTime = Date.parse((next && next.serverTime) || "");
+    const currentTime = Date.parse(current.serverTime || "");
+    if (Number.isNaN(nextTime) || Number.isNaN(currentTime)) return false;
+    return nextTime < currentTime;
+  }
+
+  const api = { applyDelta: applyDelta, emptyLive: emptyLive, isStale: isStale };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  else global.ChatBotsDeltas = api;
+})(typeof window !== "undefined" ? window : globalThis);
 
 """
 
@@ -1303,10 +1432,20 @@ body[data-view="phone"] {
       $(id)?.classList.toggle("on", viewMode === mode);
     }
 
-    $("profile-badge").textContent =
-      screenInfo.matched
-        ? `${screenInfo.matched.name} · ${screenInfo.matched.width}×${screenInfo.matched.height}`
-        : `${screenInfo.width}×${screenInfo.height} · unknown device`;
+    // The stylesheet has said since it was written that this is "a debug label, shown only when
+    // ?profile is in the URL" — and nothing ever unhid it, so the text was written into an element
+    // that `[hidden] { display: none !important; }` keeps invisible (A172). The condition the comment
+    // describes is what is implemented here, rather than deleting a deliberate debug surface.
+    const badge = $("profile-badge");
+    badge.textContent = screenInfo.matched
+      ? `${screenInfo.matched.name} · ${screenInfo.matched.width}×${screenInfo.matched.height}`
+      : `${screenInfo.width}×${screenInfo.height} · unknown device`;
+    badge.hidden = !profileRequested();
+  }
+
+  /// Whether the URL asks for the debug label.
+  function profileRequested() {
+    return new URLSearchParams(location.search).has("profile");
   }
 
   function setViewMode(mode) {
@@ -1355,9 +1494,9 @@ body[data-view="phone"] {
     for (const el of document.querySelectorAll(".msg[data-id]")) {
       const cast = voteFor(el.dataset.id);
       for (const button of el.querySelectorAll(".vote")) {
-        const isStrong = button.getAttribute("aria-label") === "Moved it forward";
-        const on = cast && ((isStrong && cast === "strong") || (!isStrong && cast === "weak"));
-        if (on) button.dataset.on = "1";
+        // The verdict is read from the button rather than from its label, and the comparison is the
+        // same one the click handler makes (A160).
+        if (window.ChatBotsVotes.isOn(cast, button.dataset.verdict)) button.dataset.on = "1";
         else delete button.dataset.on;
       }
     }
@@ -1441,11 +1580,17 @@ body[data-view="phone"] {
       button.textContent = verdict === "strong" ? "▲" : "▼";
       button.title = title;
       button.setAttribute("aria-label", title);
-      if (cast === verdict) button.dataset.on = "1";
+      button.dataset.verdict = verdict;
+      if (window.ChatBotsVotes.isOn(cast, verdict)) button.dataset.on = "1";
       button.onclick = () => {
         // Clicking the verdict already cast withdraws it, so a mis-click does not have to be
         // reversed by casting its opposite — which would leave a wrong judgement in the record.
-        const next = cast === verdict ? null : verdict;
+        //
+        // The verdict on record is read *now*, not taken from the `cast` this row was built with: a
+        // turn is drawn once and its marks are redrawn in place, so a captured value is the one from
+        // the moment the row appeared — normally none — and clicking the cast verdict re-cast it
+        // instead of withdrawing it (A160).
+        const next = window.ChatBotsVotes.nextVerdict(voteFor(message.id), verdict);
         run(() => api.post("/api/vote", { id: message.id, verdict: next }));
       };
       row.append(button);
@@ -1684,6 +1829,10 @@ body[data-view="phone"] {
   // ── State → interface ─────────────────────────────────────────────────────────────
 
   function apply(next) {
+    // One guard for every path a snapshot arrives by. `GET /api/state` at load races the first pushed
+    // snapshot, and before this the older of the two could be applied last and stay on screen until the
+    // next turn — the app-side client has refused stale snapshots since A110 (A171).
+    if (window.ChatBotsDeltas.isStale(next, state.snapshot)) return;
     const first = state.snapshot === null;
     state.snapshot = next;
     // A seat count change replaces the panes, so it is handled before anything draws.
@@ -1837,6 +1986,35 @@ body[data-view="phone"] {
         }
       }
 
+      const modelPicker = pane.root.querySelector(".model-picker");
+      if (modelPicker) {
+        // The catalogue comes from the engine, so the page offers exactly what the app's own picker
+        // does. An engine too old to send one leaves the select empty rather than showing a list the
+        // page invented.
+        const models = s.availableModels || [];
+        if (modelPicker.dataset.filledModels !== String(models.length)) {
+          modelPicker.textContent = "";
+          for (const model of models) {
+            const option = document.createElement("option");
+            option.value = model.id;
+            option.textContent = model.sizeLabel ? `${model.name} · ${model.sizeLabel}` : model.name;
+            option.title = model.summary;
+            modelPicker.append(option);
+          }
+          modelPicker.dataset.filledModels = String(models.length);
+        }
+        modelPicker.value = seat.model;
+        // Fixed once the conversation has started, for the reason the engine refuses it: the seat's
+        // engine is the one a turn in flight is generating on.
+        modelPicker.disabled = !s.canAttach;
+        modelPicker.title = models.find((m) => m.id === seat.model)?.summary || seat.model;
+        if (modelPicker.dataset.wiredModel !== "1") {
+          modelPicker.dataset.wiredModel = "1";
+          modelPicker.addEventListener("change", () =>
+            run(() => api.post("/api/seat", { seat: seat.id, modelID: modelPicker.value })));
+        }
+      }
+
       const live = s.live.find((l) => l.seatID === seat.id);
       const busy = live && live.isGenerating;
       const stateEl = pane.root.querySelector(".state");
@@ -1981,12 +2159,19 @@ body[data-view="phone"] {
 
   // ── Commands ──────────────────────────────────────────────────────────────────────
 
+  // Run one command and answer whether the engine took it.
+  //
+  // The answer matters to `send` below and to nothing else: a command that is refused, or an engine
+  // that cannot be reached, arrives here as a thrown error, and the caller that has to decide what a
+  // failure means needs to know it happened (A174).
   async function run(fn) {
     try {
       const next = await fn();
       if (next && next.seats) apply(next);
+      return true;
     } catch (error) {
       toast(error.message);
+      return false;
     }
   }
 
@@ -2385,13 +2570,31 @@ body[data-view="phone"] {
     await run(() => api.post("/api/research/budget", { value: depth }));
   }
 
+  // Whether a send is in flight.
+  //
+  // The box used to be emptied *before* the request, which is also what stopped a second Return from
+  // posting the same text twice. Emptying it afterwards — so a refused send keeps what was typed —
+  // needs that guard to be explicit (A174).
+  let sending = false;
+
   async function send() {
     const box = $("message");
     const text = box.value.trim();
-    if (!text) return;
-    box.value = "";
-    autosize(box);
-    await run(() => api.post("/api/message", { text }));
+    if (!text || sending) return;
+    sending = true;
+    try {
+      // The box is emptied only once the engine has taken the message. Emptying it first meant a
+      // send the engine refused, or one that never left the page because the engine could not be
+      // reached, silently discarded what the moderator had typed (A174).
+      if (!(await run(() => api.post("/api/message", { text })))) return;
+      // Only the text that was sent: anything typed while the request was in flight stays.
+      if (box.value.trim() === text) {
+        box.value = "";
+        autosize(box);
+      }
+    } finally {
+      sending = false;
+    }
   }
 
   function autosize(box) {
@@ -2560,6 +2763,13 @@ body[data-view="phone"] {
     const source = new EventSource("/api/events");
     source.addEventListener("snapshot", (event) => apply(JSON.parse(event.data)));
     source.addEventListener("turn", () => { /* the following snapshot carries it */ });
+    // The engine's own per-token events. Listening only for `snapshot` meant a reply appeared in one
+    // piece when the turn ended, so a long research turn looked frozen while it was working while
+    // the engine was publishing the words as it wrote them (A165). `applyDelta` merges a fragment
+    // into the live entries the renderer already draws from; nothing else about drawing changes.
+    source.addEventListener("delta", (event) => {
+      if (window.ChatBotsDeltas.applyDelta(state.snapshot, JSON.parse(event.data))) drawLive();
+    });
     source.onerror = () => toast("Lost the connection to the server — reconnecting…");
   }
 

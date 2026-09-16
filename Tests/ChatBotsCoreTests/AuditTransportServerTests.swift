@@ -92,11 +92,11 @@ struct AuditTransportServerTests {
     @Test("A connected client is no longer served after the server stops")
     func stoppedServerStopsServing() async throws {
         let running = try await startEngine()
-        defer { Task { await running.stop() } }
+        defer { TransportTeardown.register { await running.stop() } }
 
         let client = makeClient(port: running.port)
         try await client.connect()
-        defer { Task { await client.disconnect() } }
+        defer { TransportTeardown.register { await client.disconnect() } }
 
         #expect(running.server.sessionCount == 1, "the session should be subscribed")
         let before = try await client.state()

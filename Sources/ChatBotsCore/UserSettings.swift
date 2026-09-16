@@ -126,9 +126,28 @@ public struct UserSettings: Codable, Sendable, Equatable {
         return copy
     }
 
-    /// Encode for storage.
+    /// Encode for storage, with the cloud API keys removed.
+    ///
+    /// The keys live in the macOS Keychain — which is what the endpoint sheet tells the user — and this
+    /// payload goes to `UserDefaults`, a plist under `~/Library/Preferences` that anything running as
+    /// this user can read. `APIEndpointStore` already nils the key when it copies an endpoint around;
+    /// this is the other half, and the half that was missing: the key was written to the plist by the
+    /// only function that writes settings at all (A139). Nothing is lost by leaving it out, because
+    /// `applyAPIEndpoints` re-applies the Keychain value at launch.
     public func encoded() -> Data? {
-        try? JSONEncoder().encode(self)
+        try? JSONEncoder().encode(withoutSecrets())
+    }
+
+    /// A copy with every seat's API key cleared.
+    ///
+    /// Public so a call site can show what will be stored, and so the rule is testable without going
+    /// through the encoder.
+    public func withoutSecrets() -> UserSettings {
+        var copy = self
+        for index in copy.seats.indices {
+            copy.seats[index].openAI.apiKey = nil
+        }
+        return copy
     }
 
     /// Decode from storage, tolerating a payload written by an older or newer build.

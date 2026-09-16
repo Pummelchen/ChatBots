@@ -1,0 +1,34 @@
+the pre-fix program, with a hostile port (this is the finding)
+sed: 1: "s|http://:7788|http://: ...": bad flag in substitute command: 'e'
+  --port '7990|e' -> 
+  --port '7990'   -> http://:7990 {
+  --port '.*'     -> http://:.* {
+  --port '7990&x' -> http://:7990http://:7788x {
+  (with '.*' as --port the local-only pattern '/^http:\/\/:.* {/' matches every line ending in ' {')
+
+the validation itself, extracted from the script so nothing can be started
+  ok    the validation refuses --port '7990|e'
+  ok    the validation refuses --port '.*'
+  ok    the validation refuses --port 'x'
+  ok    the validation refuses --port '99999'
+  ok    the validation refuses --port '0'
+  ok    the validation refuses --port '-1'
+  ok    the validation refuses --port '7788 '
+  ok    the validation refuses --engine '7789|e'
+
+and both options go through it, which is what makes the values above unreachable
+  ok    --port is validated where it is read
+  ok    --engine is validated where it is read
+
+a valid port still passes
+  ok    a valid --port 1 is accepted
+  ok    a valid --port 7788 is accepted
+  ok    a valid --port 65535 is accepted
+  ok    a valid --port 7990 is accepted
+  ok    a valid --port 07 is accepted
+
+the counterweight: a real port still generates the config
+  ok    a real port reaches the site address
+  ok    a real engine port reaches the reverse proxy
+
+all A188 probe checks passed

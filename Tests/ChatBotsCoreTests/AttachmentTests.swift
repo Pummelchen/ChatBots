@@ -35,7 +35,9 @@ private struct FakeExtractor: DocumentExtracting {
     var imageData: Data?
     var throwsError: DocumentError?
 
-    func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument {
+    func extract(data: Data, from url: URL, kind: DocumentKind, limits: AttachmentLimits) throws
+        -> AttachedDocument
+    {
         if let throwsError { throw throwsError }
         let truncated = text.count > limits.maximumTextCharacters
         return AttachedDocument(
@@ -100,6 +102,55 @@ struct DocumentKindTests {
         #expect(DocumentKind.forFilename("scan.jpeg") == .image)
         #expect(DocumentKind.forFilename("mystery.xyz") == nil)
         #expect(DocumentKind.forFilename("noextension") == nil)
+    }
+
+    @Test("An RTF file is rich text, not Word, and its chip says so")
+    func richTextIsReachable() {
+        // The finding, as an assertion: `.word` listed `rtf` and `rtfd` before `.richText` did, and
+        // `forExtension` takes the first match — so `.richText` was unreachable, an RTF file was
+        // labelled "Word", and the rich-text case, label and symbol were dead code (A205).
+        #expect(DocumentKind.forFilename("doc.rtf") == .richText)
+        #expect(DocumentKind.forFilename("notes.rtfd") == .richText)
+        #expect(DocumentKind.forFilename("DOC.RTF") == .richText, "case must not matter")
+        #expect(DocumentKind.richText.label == "Rich text")
+        #expect(DocumentKind.richText.symbol == "doc.rtf")
+        // Word keeps the formats that really are Word's.
+        #expect(DocumentKind.forFilename("report.docx") == .word)
+        #expect(DocumentKind.forFilename("legacy.doc") == .word)
+        #expect(DocumentKind.forFilename("open.odt") == .word)
+        #expect(DocumentKind.forFilename("flat.wordml") == .word)
+    }
+
+    @Test("Every kind is reachable from the extensions it advertises")
+    func everyKindIsReachable() {
+        // The general form of the defect above, so the next case added cannot repeat it: a kind whose
+        // extensions are all claimed by an earlier case can never be returned by `forExtension`.
+        for kind in DocumentKind.allCases {
+            #expect(!kind.extensions.isEmpty, "\(kind) advertises no extension")
+            let reachable = kind.extensions.contains { DocumentKind.forExtension($0) == kind }
+            #expect(
+                reachable,
+                "no extension of \(kind) maps back to it — something earlier claims them all")
+        }
+    }
+
+    @Test("No extension belongs to two kinds")
+    func extensionsAreDisjoint() {
+        // The cause of the defect: `rtf` and `rtfd` were in both `.word` and `.richText`, so the order
+        // of the cases decided the label.
+        var seen: [String: DocumentKind] = [:]
+        for kind in DocumentKind.allCases {
+            for ext in kind.extensions {
+                if let other = seen[ext] {
+                    Issue.record("\(ext) is claimed by both \(other) and \(kind)")
+                }
+                seen[ext] = kind
+            }
+        }
+        // And the panel still offers every one of them exactly once.
+        let offered = DocumentKind.documentExtensions
+        #expect(offered.count == Set(offered).count, "the open panel would show a duplicate type")
+        #expect(offered.contains("rtf"))
     }
 
     @Test("Images are distinguished from documents")
