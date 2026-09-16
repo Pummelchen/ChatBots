@@ -26,10 +26,6 @@ APP="$ROOT/dist/ChatBots.app"
 LOG_FILE="$ROOT/.install.log"
 BUILD_LOG="$ROOT/.install-build.log"
 
-# The default checkpoint, matching `AgentSpec.defaultModelID`.
-MODEL_ID="mlx-community/Qwen3.5-4B-MLX-4bit"
-MODEL_DIR_NAME="Qwen3.5-4B-MLX-4bit"
-
 # A connection that stalls *once established* is the failure `--retry` cannot see: curl keeps waiting
 # for the next byte and the install looks hung — the outcome the model-loading step below calls the
 # worst for someone who just wants the app, and guards against with its own timeout (A193).
@@ -196,11 +192,28 @@ else
 fi
 
 # ── Models ──────────────────────────────────────────────────────────────────────────
+# The checkpoint comes from the source rather than from a copy of it (A208). `AgentSpec.defaultModelID`
+# is what the app looks up when it loads a model, and this installer has to download the same one into
+# the directory the app will look in: `ModelStore.localCheckpoint` tries the tail of the repo id under
+# `models/` (`ModelStore.swift`), so the directory name is derived from the id rather than written down
+# beside it. The macOS minimum used to be duplicated here in exactly this way, and A121 removed the
+# copy rather than adding a check that policed it; this is the same fact in a place where a mismatch
+# costs a 3 GB download the app can never see.
+#
 # Resumable and verified: each file is checked against the size the server reports, so an
 # interrupted download is detected and continued rather than silently accepted. A file whose
 # size cannot be learned is refused rather than recorded as 0 and then waved through — see
 # `file_list_is_complete` and `download_file` below.
 step "Downloading the models"
+MODEL_ID="$(sed -n 's/.*static let defaultModelID = "\([^"]*\)".*/\1/p' \
+  "$ROOT/Sources/ChatBotsCore/ChatModels.swift" | head -1)"
+if [ -z "$MODEL_ID" ]; then
+  die "Could not read the default checkpoint from Sources/ChatBotsCore/ChatModels.swift.
+
+Its \`AgentSpec.defaultModelID\` is the model this installer downloads, so without it there is
+nothing to fetch — the declaration may have been renamed or moved. Nothing was downloaded."
+fi
+MODEL_DIR_NAME="${MODEL_ID##*/}"
 info "Checkpoint: $MODEL_ID"
 mkdir -p "$MODELS_DIR"
 MODEL_DIR="$MODELS_DIR/$MODEL_DIR_NAME"

@@ -273,7 +273,7 @@ public struct OpenAIEndpoint: Sendable, Hashable, Codable {
 
     public init(
         baseURL: String = "http://localhost:1234",
-        model: String = "mlx-community/Qwen3.5-4B-MLX-4bit",
+        model: String = AgentSpec.defaultModelID,
         apiKey: String? = nil,
         compatibility: APICompatibility? = nil
     ) {
@@ -289,7 +289,9 @@ public struct OpenAIEndpoint: Sendable, Hashable, Codable {
         self.baseURL = baseURL
         self.model =
             try container.decodeIfPresent(String.self, forKey: .model)
-            ?? "mlx-community/Qwen3.5-4B-MLX-4bit"
+            // The default checkpoint, not a copy of its name (A208). Older saved settings predate the
+            // field, and this is what they meant.
+            ?? AgentSpec.defaultModelID
         self.apiKey = try container.decodeIfPresent(String.self, forKey: .apiKey)
         // Older saved settings predate the field; infer from the URL.
         self.compatibility =

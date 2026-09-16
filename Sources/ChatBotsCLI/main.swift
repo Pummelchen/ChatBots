@@ -65,7 +65,9 @@ struct Options {
     var backendA: AgentSpec.Backend = .mlx
     var backendB: AgentSpec.Backend = .mlx
     var baseURL = "http://localhost:1234"
-    var apiModel = "mlx-community/Qwen3.5-4B-MLX-4bit"
+    /// The model an OpenAI-compatible server is assumed to be serving, which is the checkpoint this
+    /// project ships and the installer downloads — named here rather than copied (A208).
+    var apiModel = AgentSpec.defaultModelID
     var apiKey: String?
     /// Where the certificate and the conversations live, when it is not the default. Nil means
     /// `RunDirectory.current`: the project's `.run` in a checkout, Application Support otherwise.
