@@ -727,9 +727,9 @@ public final class HTTPServer: @unchecked Sendable {
 
     /// Take ownership of an open event stream.
     ///
-    /// Every read and write of `streams` goes through `stateLock` — here, in `stop()`, in
-    /// `closeStreams()` and in `finish()` — because the last of those runs on the network queue
-    /// while the first three can run on the main actor.
+    /// Every read and write of `streams` goes through `stateLock` — here, in `stop()` and in
+    /// `finish()` — because the last of those runs on the network queue while the other can run on
+    /// the main actor.
     private func addStream(_ stream: EventStream) {
         stateLock.lock()
         streams.append(stream)
@@ -858,16 +858,6 @@ public final class HTTPServer: @unchecked Sendable {
         for stream in open { stream.close() }
         for connection in active { connection.cancel() }
         markStopped()
-    }
-
-    /// Close every open event stream. Used when the conversation is reset, so a connected
-    /// page re-reads the state rather than waiting on events that will never come.
-    public func closeStreams() {
-        stateLock.lock()
-        let open = streams
-        streams.removeAll()
-        stateLock.unlock()
-        for stream in open { stream.close() }
     }
 
     /// How many event streams the server is still holding open.
@@ -1032,10 +1022,10 @@ public final class HTTPServer: @unchecked Sendable {
                     // Appended under `stateLock`, like every other access to `streams`.
                     //
                     // This said "no lock: `streams` is only ever touched on the main actor", and
-                    // that was never true: `stop()`, `closeStreams()` and `finish()` all mutate
-                    // the same array under the lock, and `finish()` runs on the network queue.
-                    // Appending here without it is a concurrent mutation of a Swift array — the
-                    // kind that corrupts or crashes rather than merely reporting a stale value.
+                    // that was never true: `stop()` and `finish()` mutate the same array under the
+                    // lock, and `finish()` runs on the network queue. Appending here without it is a
+                    // concurrent mutation of a Swift array — the kind that corrupts or crashes
+                    // rather than merely reporting a stale value.
                     self.addStream(stream)
                     // Head first, then the opening events, then the socket is left open —
                     // which is what makes server-sent events work. The head comes from the same

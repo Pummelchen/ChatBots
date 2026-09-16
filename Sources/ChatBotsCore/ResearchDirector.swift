@@ -58,8 +58,6 @@ public struct ResearchDirection: Sendable, Equatable {
     public var subQuestion: String?
     /// Which rule produced this direction.
     public var kind: Kind = .rotation
-
-    public var isDirected: Bool { seatID != nil }
 }
 
 /// The sub-questions a research topic divides into.
@@ -397,7 +395,7 @@ public struct ResearchDirector: Sendable {
         if !unsupported.isEmpty { return true }
         if conflicts.contains(where: { !settled.contains($0.key) }) { return true }
         if unanswered != nil { return true }
-        if quietestSeatIgnoring(settledQuestions: settled) != nil { return true }
+        if quietestSeat() != nil { return true }
         return false
     }
 
@@ -620,9 +618,12 @@ public struct ResearchDirector: Sendable {
                 kind: .unaddressedSubject)
         }
 
-        // 4. Someone who has barely been heard from, on a question the room has stopped
-        // arguing about, is worth the floor more than a rotation that happens to be next.
-        if let quietest = quietestSeatIgnoring(settledQuestions: settled) {
+        // 4. Someone who has barely been heard from is worth the floor more than a rotation that
+        // happens to be next. The rule used to say "on a question the room has stopped arguing
+        // about" and take a `settledQuestions` parameter it never read; the settled-question part is
+        // not something this can do — the counts are per seat, not per seat per question — so the
+        // parameter is gone and the comment says what the rule is (A206).
+        if let quietest = quietestSeat() {
             return ResearchDirection(
                 seatID: quietest,
                 instruction:
@@ -763,7 +764,12 @@ public struct ResearchDirector: Sendable {
         return score
     }
 
-    private func quietestSeatIgnoring(settledQuestions: Set<ResearchSubQuestion>) -> String? {
+    /// The seat that has contributed least, when it is genuinely behind.
+    ///
+    /// The name this had — `quietestSeatIgnoring(settledQuestions:)` — promised a rule the function
+    /// could not keep: it took the settled sub-questions and never read them, because the counts it
+    /// ranks are per seat and not per seat per question (A206).
+    private func quietestSeat() -> String? {
         let analysts = analystIDs.isEmpty
             ? seats.filter { isAnalyst($0) && $0.personaID != AnalystLibrary.moderatorID }
             : seats.filter { analystIDs.contains($0.id) }

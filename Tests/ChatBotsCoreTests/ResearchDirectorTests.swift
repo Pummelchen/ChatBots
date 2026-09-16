@@ -302,7 +302,7 @@ struct ResearchProseTests {
 
         // Nothing in this transcript was read as a conflict or a gap, so what is left is
         // coverage — and the assignment must still name a subject and a seat, not shrug.
-        #expect(direction.isDirected)
+        #expect(direction.seatID != nil)
         #expect(direction.seatID != "mod")
         #expect(direction.subQuestion != nil)
         #expect(!direction.instruction.isEmpty)
@@ -412,7 +412,6 @@ struct ResearchDirectorDecisionTests {
         let direction = director.direction()
         #expect(direction.seatID == nil, "the rotation is the honest answer")
         #expect(direction.reason.contains("rotation"))
-        #expect(direction.isDirected == false)
     }
 
     @Test("An analyst who has barely been heard from gets the floor")

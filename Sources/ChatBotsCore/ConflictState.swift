@@ -196,8 +196,6 @@ public struct ConflictState: Sendable, Hashable, Codable {
     /// The most recent beats, for the prompt. Bounded, because only the last few matter and an
     /// unbounded list would grow the prompt every turn.
     public private(set) var recentBeats: [String] = []
-    /// Detected positions, by seat, for a reversal to be visible later.
-    public private(set) var positions: [String: String] = [:]
 
     public struct Pair: Hashable, Sendable, Codable {
         public var from: String
@@ -375,13 +373,6 @@ public struct ConflictState: Sendable, Hashable, Codable {
         for key in feelings.keys { feelings[key]?.clamp() }
     }
 
-    /// Record the seat's own account of where it stands, so a later reversal can be noticed.
-    public mutating func notePosition(_ position: String, for seat: String, sequence: Int) {
-        let trimmed = position.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        positions[seat] = String(trimmed.prefix(200))
-    }
-
     /// What to tell a seat about the room.
     ///
     /// Deliberately terse. The model is mid-conversation and does not need a report; it needs
@@ -412,9 +403,11 @@ public struct ConflictState: Sendable, Hashable, Codable {
 
     /// The seat the room currently rates highest, if anyone stands out.
     ///
-    /// Used for "whoever is currently winning", which several characters aim at. Returns nil
-    /// rather than an arbitrary name when the counts are level, because a preferred target of
-    /// "whoever is winning" should not pick someone at random.
+    /// This is what "whoever is currently winning" means mechanically, and several characters aim at
+    /// it: `PromptBuilder.socialContext` names the seat for them, so the phrase a persona is given is
+    /// a fact about this room rather than something for the model to infer from the beats alone
+    /// (A206). Returns nil rather than an arbitrary name when the counts are level, because a
+    /// preferred target of "whoever is winning" should not pick someone at random.
     public var leadingSeat: String? {
         guard let best = beatsWon.max(by: { $0.value < $1.value })?.value, best > 0 else {
             return nil

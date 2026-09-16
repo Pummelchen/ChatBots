@@ -33,7 +33,6 @@ public actor OpenAIResponsesEngine: LLMEngine {
     /// long as the engine does, which is what makes the connection pool reusable (A201).
     private var cachedClient: OpenAIResponsesClient?
     private var ready = false
-    private var lastError: String?
     private var lastStatsValue: TurnStats?
 
     public init(
@@ -146,10 +145,8 @@ public actor OpenAIResponsesEngine: LLMEngine {
                             .utf8))
             }
             ready = true
-            lastError = nil
             onStateChange(.ready)
         } catch {
-            lastError = error.localizedDescription
             onStateChange(.failed(error.localizedDescription))
             throw error
         }

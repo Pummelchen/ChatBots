@@ -59,7 +59,7 @@ struct AuditResearchCoverageTests {
             seats: seats, turns: [line(1, from: "eco", sourcedSoup)])
         let direction = read.direction()
 
-        #expect(direction.isDirected, "the moderator must keep working rather than rotate")
+        #expect(direction.seatID != nil, "the moderator must keep working rather than rotate")
         #expect(direction.subQuestion != nil)
         #expect(direction.seatID != "mod")
     }
