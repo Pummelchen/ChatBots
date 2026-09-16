@@ -350,40 +350,6 @@ public enum LengthFraming {
     }
 }
 
-/// Newline-delimited framing.
-///
-/// JSON encoders escape newlines inside strings, so a bare newline can only be a delimiter —
-/// the payload cannot forge one.
-///
-/// The transport carries tagged, length-framed messages on its single stream, so nothing in
-/// the engine sends over this. It is kept as the protocol's second framing primitive and its
-/// behaviour is pinned by `ProtocolTests`; whether the project still wants it is an open
-/// question rather than an oversight.
-public enum LineFraming {
-
-    public static func frame(_ payload: Data) -> Data {
-        var out = payload
-        out.append(UInt8(ascii: "\n"))
-        return out
-    }
-
-    /// Every complete line in the buffer, and whatever tail is still partial.
-    ///
-    /// The tail is returned rather than dropped: it is the beginning of a message whose end
-    /// has not arrived, and discarding it would lose that message silently.
-    public static func read(from buffer: Data) -> (messages: [Data], remainder: Data) {
-        var messages: [Data] = []
-        var start = buffer.startIndex
-        while let newline = buffer[start...].firstIndex(of: UInt8(ascii: "\n")) {
-            if newline > start {
-                messages.append(Data(buffer[start..<newline]))
-            }
-            start = buffer.index(after: newline)
-        }
-        return (messages, Data(buffer[start...]))
-    }
-}
-
 public enum ProtocolError: LocalizedError, Equatable {
     case messageTooLarge(Int)
     case cannotEncode(String)

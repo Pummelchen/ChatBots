@@ -191,40 +191,6 @@ struct LengthFramingTests {
     }
 }
 
-@Suite("Newline framing")
-struct LineFramingTests {
-
-    @Test("Every complete line is returned and the partial tail is kept")
-    func splitsAndKeepsTheTail() {
-        let buffer = Data("one\ntwo\nthree".utf8)
-        let (messages, remainder) = LineFraming.read(from: buffer)
-        #expect(messages.map { String(decoding: $0, as: UTF8.self) } == ["one", "two"])
-        // "three" has no newline yet, so it is the start of a message still arriving. Dropping
-        // it would lose that message silently.
-        #expect(String(decoding: remainder, as: UTF8.self) == "three")
-    }
-
-    @Test("A trailing newline leaves nothing pending")
-    func trailingNewline() {
-        let (messages, remainder) = LineFraming.read(from: Data("one\ntwo\n".utf8))
-        #expect(messages.count == 2)
-        #expect(remainder.isEmpty)
-    }
-
-    @Test("An empty line is skipped rather than decoded")
-    func emptyLinesSkipped() {
-        let (messages, _) = LineFraming.read(from: Data("one\n\ntwo\n".utf8))
-        #expect(messages.count == 2)
-    }
-
-    @Test("Nothing complete means nothing emitted")
-    func partialOnly() {
-        let (messages, remainder) = LineFraming.read(from: Data("half a mess".utf8))
-        #expect(messages.isEmpty)
-        #expect(String(decoding: remainder, as: UTF8.self) == "half a mess")
-    }
-}
-
 @Suite("Protocol messages")
 struct ProtocolMessageTests {
 
@@ -238,9 +204,11 @@ struct ProtocolMessageTests {
             .setShowReasoning(false),
             .setMode(.research),
             .setResearchBudget(.deep),
-            .updateSeat(.init(seatID: "Agent 1", name: "Mira", personaID: "villain",
-                              thinking: .high, backend: .openAIResponses,
-                              baseURL: "https://api.deepseek.com/v1", apiModel: "deepseek-v4-flash")),
+            .updateSeat(
+                .init(
+                    seatID: "Agent 1", name: "Mira", personaID: "villain",
+                    thinking: .high, backend: .openAIResponses,
+                    baseURL: "https://api.deepseek.com/v1", apiModel: "deepseek-v4-flash")),
             .addAttachment(filename: "paper.pdf", contents: Data([0x25, 0x50, 0x44, 0x46])),
             .removeAttachment(id: "5E3A"),
             .clearAttachments,
@@ -336,17 +304,18 @@ struct ProtocolMessageTests {
         // A multi-byte character can straddle a read boundary. The framing holds the partial
         // bytes rather than decoding them, which is what stops a replacement character.
         let event = EngineEvent.output(.init(agentID: "A", text: "Grüße 🥚", kind: "token"))
-        let framed = LineFraming.frame(try ProtocolCodec.encode(event))
+        let framed = LengthFraming.frame(try ProtocolCodec.encode(event))
 
         var buffer = Data()
         var decoded: [EngineEvent] = []
         for byte in framed {
             buffer.append(byte)
-            let (messages, remainder) = LineFraming.read(from: buffer)
+            // One byte at a time: most reads are `.incomplete`, and the one that completes the
+            // frame is the one that decodes it.
+            guard case .message(let payload, let remainder) = try LengthFraming.read(from: buffer)
+            else { continue }
             buffer = remainder
-            for message in messages {
-                decoded.append(try ProtocolCodec.decodeEvent(message))
-            }
+            decoded.append(try ProtocolCodec.decodeEvent(payload))
         }
         #expect(decoded.count == 1)
         guard case .output(let delta) = decoded[0] else {
