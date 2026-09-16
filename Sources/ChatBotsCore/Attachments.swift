@@ -30,12 +30,18 @@ public enum DocumentKind: String, CaseIterable, Sendable, Codable {
     case image
 
     /// Extensions offered in the open panel, per kind.
+    ///
+    /// No extension appears twice, and every kind's list contains at least one extension that maps
+    /// back to it. Both are asserted in `AttachmentTests`; the reason is A205, where `.word` listed
+    /// `rtf` and `rtfd` ahead of `.richText`, and `forExtension` takes the first match — so rich text
+    /// was unreachable, an RTF file was labelled "Word", and the case, its label and its symbol were
+    /// dead.
     public var extensions: [String] {
         switch self {
         case .plainText: ["txt", "text", "log", "csv", "tsv", "json", "xml", "yaml", "yml"]
         case .markdown: ["md", "markdown", "mdown"]
         case .pdf: ["pdf"]
-        case .word: ["docx", "doc", "odt", "rtf", "rtfd", "wordml"]
+        case .word: ["docx", "doc", "odt", "wordml"]
         case .richText: ["rtf", "rtfd"]
         case .html: ["html", "htm", "webarchive"]
         case .image: ["png", "jpg", "jpeg", "bmp", "gif", "tiff", "tif", "heic", "webp"]

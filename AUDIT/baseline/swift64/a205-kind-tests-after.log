@@ -1,0 +1,24 @@
+# A205 — the kind tests after the fix (green), and the enum at HEAD for comparison
+
+$ swift test --filter DocumentKindTests
+  ✔ Test "Each kind has a label and a symbol" passed after 0.001 seconds.
+  ✔ Test "An RTF file is rich text, not Word, and its chip says so" passed after 0.001 seconds.
+  ✔ Test "Extensions map to the right kind" passed after 0.001 seconds.
+  ✔ Test "Every kind is reachable from the extensions it advertises" passed after 0.001 seconds.
+  ✔ Test "No extension belongs to two kinds" passed after 0.001 seconds.
+  ✔ Test "Images are distinguished from documents" passed after 0.001 seconds.
+  ✔ Suite "File kinds" passed after 0.001 seconds.
+  ✔ Test run with 6 tests in 1 suite passed after 0.001 seconds.
+
+$ swift test --filter RealExtractorTests   (the user-visible half: a real .rtf)
+  ◇ Test "A real .rtf is converted to plain text" started.
+  ✔ Test "A real .rtf is converted to plain text" passed after 0.228 seconds.
+  ✔ Test run with 10 tests in 1 suite passed after 0.240 seconds.
+
+and the enum as it was committed:
+  38:        case .word: ["docx", "doc", "odt", "rtf", "rtfd", "wordml"]
+  39:        case .richText: ["rtf", "rtfd"]
+  53:        case .word: "Word"
+  54:        case .richText: "Rich text"
+  66:        case .word: "doc.text.fill"
+  67:        case .richText: "doc.rtf"

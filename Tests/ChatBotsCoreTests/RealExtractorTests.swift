@@ -127,6 +127,11 @@ struct RealExtractorTests {
         try #require(result.status == 0)
 
         let document = try SystemDocumentExtractor.ingestor.add(url: rtf)
+        // Rich text, not Word: the kind decides the chip's label and symbol, and `.word` used to claim
+        // `rtf` first (A205). Through the real extractor, on a real file, so this is the user-visible
+        // half of that finding rather than a rule about a list.
+        #expect(document.kind == .richText)
+        #expect(document.kind.label == "Rich text")
         #expect(document.text.contains("Rich text body."))
     }
 

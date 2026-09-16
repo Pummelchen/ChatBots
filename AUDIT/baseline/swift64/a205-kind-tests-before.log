@@ -1,0 +1,44 @@
+# A205 — the kind tests against the enum as it was (red)
+
+$ swift test --filter DocumentKindTests
+  ↳ Testing Library Version: 2084
+  ↳ Target Platform: arm64e-apple-macos14.0
+  ✔ Test "Each kind has a label and a symbol" passed after 0.001 seconds.
+  ✔ Test "Extensions map to the right kind" passed after 0.001 seconds.
+  ✔ Test "Images are distinguished from documents" passed after 0.001 seconds.
+  ✘ Test "Every kind is reachable from the extensions it advertises" recorded an issue at AttachmentTests.swift:131:13: Expectation failed: reachable
+  ↳ no extension of .richText maps back to it — something earlier claims them all
+  ↳ reachable → <not evaluated>
+  ✘ Test "No extension belongs to two kinds" recorded an issue at AttachmentTests.swift:145:33: Issue recorded
+  ↳ rtf is claimed by both .word and .richText
+  ✘ Test "No extension belongs to two kinds" recorded an issue at AttachmentTests.swift:145:33: Issue recorded
+  ↳ rtfd is claimed by both .word and .richText
+  ✘ Test "Every kind is reachable from the extensions it advertises" failed after 0.001 seconds with 1 issue.
+  ✘ Test "No extension belongs to two kinds" recorded an issue at AttachmentTests.swift:152:9: Expectation failed: offered.count == Set(offered).count
+  ↳ the open panel would show a duplicate type
+  ↳ offered.count == Set(offered).count → false
+  ↳   offered.count → 24
+  ↳   Set(offered).count → 22
+  ✘ Test "An RTF file is rich text, not Word, and its chip says so" recorded an issue at AttachmentTests.swift:112:9: Expectation failed: DocumentKind.forFilename("doc.rtf") == .richText
+  ↳ // The finding, as an assertion: `.word` listed `rtf` and `rtfd` before `.richText` did, and
+  ↳ // `forExtension` takes the first match — so `.richText` was unreachable, an RTF file was
+  ↳ // labelled "Word", and the rich-text case, label and symbol were dead code (A205).
+  ↳ DocumentKind.forFilename("doc.rtf") == .richText → false
+  ↳   DocumentKind.forFilename("doc.rtf") → .word
+  ↳     some → .word
+  ↳     some → .richText
+  ✘ Test "No extension belongs to two kinds" failed after 0.001 seconds with 3 issues.
+  ✘ Test "An RTF file is rich text, not Word, and its chip says so" recorded an issue at AttachmentTests.swift:113:9: Expectation failed: DocumentKind.forFilename("notes.rtfd") == .richText
+  ↳ DocumentKind.forFilename("notes.rtfd") == .richText → false
+  ↳   DocumentKind.forFilename("notes.rtfd") → .word
+  ↳     some → .word
+  ↳     some → .richText
+  ✘ Test "An RTF file is rich text, not Word, and its chip says so" recorded an issue at AttachmentTests.swift:114:9: Expectation failed: DocumentKind.forFilename("DOC.RTF") == .richText
+  ↳ case must not matter
+  ↳ DocumentKind.forFilename("DOC.RTF") == .richText → false
+  ↳   DocumentKind.forFilename("DOC.RTF") → .word
+  ↳     some → .word
+  ↳     some → .richText
+  ✘ Test "An RTF file is rich text, not Word, and its chip says so" failed after 0.001 seconds with 3 issues.
+  ✘ Suite "File kinds" failed after 0.001 seconds with 7 issues.
+  ✘ Test run with 6 tests in 1 suite failed after 0.001 seconds with 7 issues.
