@@ -11,14 +11,43 @@ cd "$(dirname "$0")/.."
 ROOT="$PWD"
 CONFIG="${CONFIG:-release}"
 APP="$ROOT/dist/ChatBots.app"
+SCRATCH=""
 
-# The bundle's version, stated once. `CFBundleShortVersionString` is what a person reads;
-# `CFBundleVersion` is what macOS compares, and it has to increase for an update to be offered.
-# Both are written into Info.plist below, which is why they live here rather than as two
-# literals inside it — the version used to exist only as two strings in a heredoc, tied to
-# no release or tag.
-APP_VERSION="1.0"
-APP_BUILD="1"
+# `--scratch` builds into a directory of its own, which is what a release does so that the
+# package comes from a clean build rather than an incremental one; `--out` puts the bundle
+# somewhere other than `dist/`, which is how a release stages it. `--help` exists because
+# every script here answers it.
+usage() {
+  sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'
+  printf '\nusage: tools/make-app.sh [--scratch <build-dir>] [--out <app-path>]\n'
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --scratch) SCRATCH="${2:?--scratch needs a directory}"; shift 2 ;;
+    --out) APP="${2:?--out needs an app path}"; shift 2 ;;
+    -h | --help) usage; exit 0 ;;
+    *) printf 'unknown argument: %s\n' "$1" >&2; exit 2 ;;
+  esac
+done
+
+# The version comes from `VERSION` at the repository root, the one authoritative value; this
+# script derives it rather than declaring a copy (RELEASE.md §1.3). Both plist keys are written
+# from it below: `CFBundleShortVersionString` is what a person reads, `CFBundleVersion` is what
+# macOS compares, and this project versions by semantic version only, so they are the same
+# value. A missing or malformed file fails here rather than producing a bundle that misreports
+# what it is.
+VERSION_FILE="$ROOT/VERSION"
+if [ ! -f "$VERSION_FILE" ]; then
+  printf 'error: no VERSION at the repository root; run tools/set-version.sh <X.Y.Z>\n' >&2
+  exit 1
+fi
+APP_VERSION="$(tr -d '[:space:]' < "$VERSION_FILE")"
+if ! printf '%s' "$APP_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+  printf 'error: VERSION holds "%s", which is not a semantic version\n' "$APP_VERSION" >&2
+  exit 1
+fi
+APP_BUILD="$APP_VERSION"
 
 # The bundle identifier. `local.*` because this build is assembled and ad-hoc signed on the
 # machine that runs it, which is what makes it a local build rather than a distributed one; a
@@ -49,11 +78,16 @@ echo "==> Building ($CONFIG)"
 # One invocation per product on purpose: `swift build` takes a single `--product`, and passing
 # several silently builds only the last one. That is what produced a bundle containing the probe
 # and not the engine while writing this fix.
+build_args=(-c "$CONFIG")
+if [ -n "$SCRATCH" ]; then
+  build_args+=(--scratch-path "$SCRATCH")
+  echo "==> Building into $SCRATCH"
+fi
 for product in ChatBots chatbots-cli chatbots-probe; do
-  swift build -c "$CONFIG" --product "$product"
+  swift build "${build_args[@]}" --product "$product"
 done
 
-BIN="$(swift build -c "$CONFIG" --show-bin-path)"
+BIN="$(swift build "${build_args[@]}" --show-bin-path)"
 
 echo "==> Assembling $APP"
 rm -rf "$APP"

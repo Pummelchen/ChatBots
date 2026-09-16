@@ -87,6 +87,11 @@ jobs:
       # Mac gate (`tools/mac-checks.sh`) and CI judge exactly the same list — see `docs/toolchain.md`.
       - name: No tracked code file is over 500 lines
         run: bash tools/check-file-sizes.sh
+      # The version is stated once, in `VERSION` at the root, and everything else derives from
+      # it (RELEASE.md §1.3). This is the Linux-side half of that rule: the file parses, the
+      # bundle builder carries no copy, and the release notes for it exist.
+      - name: The version is stated once and its mirrors agree
+        run: bash tools/check-identity.sh
       # The bundle said 14.0 while the package needs macOS 26, so the app would launch on
       # Sonoma and Sequoia and fail at the transport instead of the system saying why. The two
       # declarations are one fact and are now checked as one.
