@@ -255,28 +255,29 @@ Run on the branch named above, not on `main`: `main` is deliberately untouched u
 the branch then goes back by pull request. `main` had moved nine commits while the audit ran, so it
 was merged into the branch first (`686bf70`) — a pull request against a diverged `main` would have
 conflicted, and merging afterwards would have meant running the acceptance against one commit and
-merging another. The merge's own run was green (`runs/2-merge-commit-686bf70/`); the acceptance below
-is the run after the ledger gained its last task, A218, which was found by reading the record this
-section was being written into.
+merging another. That merge's own run was green (`runs/2-merge-commit-686bf70/`), as was the run after
+A218 (`runs/3-commit-e5ce7851/`); the acceptance below is the run after the ledger gained its *last*
+task, A219 — the two instruction documents `main` had added mid-audit, whose figures the re-audit's own
+measurements contradicted.
 
 | | |
 | --- | --- |
-| Commit tested | `e5ce7851ec2d057cb1e54d758b51519c0d708380` (`audit/2026-09-15`) |
+| Commit tested | `7ed87f55d20f233ae7861b92b95e6c4aae469eab` (`audit/2026-09-15`) |
 | Host | `node2` (`Node2.local`), a Mac that did not develop these fixes, from a fresh clone of the pushed branch |
 | Result | **23 passed, 0 failed** — `AUDIT/baseline/phaseE-2026-09-15/summary.txt` |
-| Evidence | `AUDIT/baseline/phaseE-2026-09-15/` — the run's own logs, the identity of what was tested, and the summary. The instrumented build trees are `.gitignore`d; the logs are committed. Two earlier runs are under `runs/`: the first stopped on `pyright is not installed` on the host, the second was green on the merge commit. |
+| Evidence | `AUDIT/baseline/phaseE-2026-09-15/` — the run's own logs, the identity of what was tested, and the summary. The instrumented build trees are `.gitignore`d; the logs are committed. Three earlier runs are under `runs/`: the first stopped on `pyright is not installed` on the host, the second was green on the merge commit, the third was green at 218 tasks and was superseded when A219 changed the ledger. |
 
 The figures it produced: 1052 tests in 196 suites; 0 compiler errors and 0 compiler warnings; ASan and
-TSan clean; coverage `Sources/` 60.41 % of regions; `gitleaks` 0 findings over the full history;
+TSan clean; coverage `Sources/` 60.42 % of regions; `gitleaks` 0 findings over the full history;
 `osv-scanner` no issues; `semgrep` 3 findings, all covered by a written waiver (461 rules run over 101
 files); `shellcheck` 0 findings over every tracked script, `ruff` and `pyright` clean; `swiftlint` 253
 and `swift-format` 739, both inside their recorded waivers; `verify-done-commits.sh` backed 202 ·
-skipped 16 · unbacked 0; the ledger at **218 tasks with none open and none blocked**; and the generated
+skipped 17 · unbacked 0; the ledger at **219 tasks with none open and none blocked**; and the generated
 files — the web interface, the name lists and the ledger's own status tables — all in step.
 
 One thing this paragraph cannot claim: it was written after the run, so the head is the tested commit
 plus this documentation commit. The alternative — writing the acceptance before the run that fills it
-in — would be worse; what the run itself checked is that the tree was clean at `e5ce7851` and that
+in — would be worse; what the run itself checked is that the tree was clean at `7ed87f55` and that
 `ledger.json`, not prose, decided every count.
 
 ## Git operations performed, with rollback (§0)
