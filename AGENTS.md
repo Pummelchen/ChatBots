@@ -42,9 +42,13 @@ Swift 6.4 / SwiftPM, package floor macOS 26, Apple Silicon only.
   `app-controls.js`, `app-lineup.js`, `app-commands.js`; and `deltas.js`, `votes.js`) and the
   six `names/*.txt` lists are the **sources** for the two generated files.
 - `tools/` — the install and start scripts (`lib/` holds the phases they source), `mac-checks.sh`
-  (the Mac gate), `check-file-sizes.sh` (the 500-line rule, which CI calls too), the embed and notice
-  tools, the pinned-tool fetchers, the device-capture helpers and the static-analysis waivers in
-  `analysis-waivers.txt`.
+  (the Mac gate), `check-file-sizes.sh` (the 500-line rule, which CI calls too), `make-release.sh`
+  (the packaging and publishing command) with `check-identity.sh` and `set-version.sh`, the embed
+  and notice tools, the pinned-tool fetchers, the device-capture helpers and the static-analysis
+  waivers in `analysis-waivers.txt`.
+- `VERSION` — the one authoritative version. `docs/release-notes-v<version>.md` is the notes for
+  the release of that version; the notes for a release that has not happened yet end in
+  `SHA256_PENDING` and `ARCHIVE_BYTES_PENDING`, which `tools/make-release.sh` substitutes.
 - `docs/` — `toolchain.md` (what to install and which versions the gates expect),
   `webtransport-plan.md`, and the screenshots the README and wiki use.
 - `Caddyfile` fronts the engine on `:7788`; `SECURITY.md` states the trust boundary and
@@ -69,10 +73,16 @@ Warnings-as-errors is **not** a flag here: `Package.swift` sets
 
 ## Identity
 
-`tools/make-app.sh` declares `APP_VERSION="1.0"` and `APP_BUILD="1"` once and
-expands them into the bundle's `Info.plist` (`CFBundleShortVersionString`,
-`CFBundleVersion`). There is no root `VERSION` or `BUILD_NUMBER`, no tag and no
-release, and nothing enforces the value against a release.
+`VERSION` at the repository root is the one authoritative value, a semantic version
+(`1.0.0`); the tag is `v` plus it. Nothing else declares it: `tools/make-app.sh` reads
+the file and writes both `CFBundleShortVersionString` and `CFBundleVersion` from it, so
+the bundle cannot misreport what it is. `tools/check-identity.sh` fails when the file is
+malformed, when the bundle builder has grown a copy of its own, or when the release notes
+for that version are missing; it runs in CI and as the eighth gate of
+`tools/mac-checks.sh`, and `tools/make-release.sh` checks the built bundle's copy.
+`tools/set-version.sh <X.Y.Z>` is the one command a bump needs. The shipped checkpoint is
+a *decision* rather than a number a release propagates, so it keeps one declaration and a
+test that pins it (`Tests/ChatBotsCoreTests/DefaultCheckpointTests.swift`).
 
 ## Gates
 
@@ -82,17 +92,19 @@ release, and nothing enforces the value against a release.
   `third-party-notices.py`, `bash -n` over every tracked shell script, `python3 -m
   py_compile` over the Python, `shellcheck`, `ruff`, `pyright`, `gitleaks` over the
   full history, `semgrep` (through `tools/semgrep-waivers.py`), `osv-scanner`, and
-  `tools/check-file-sizes.sh` — no code file over 500 lines. None of them is advisory:
-  a finding fails the job.
+  `tools/check-file-sizes.sh` — no code file over 500 lines — and
+  `tools/check-identity.sh`, which fails when `VERSION` and anything derived from it
+  disagree. None of them is advisory: a finding fails the job.
 - The two toolchain pinning checks: the three release binaries CI installs are fetched
   by `tools/fetch-analysis-tools.sh` with a pinned SHA-256 each, and a step fails if
   those versions disagree with `tools/toolchain-versions.txt`.
 - Two structural assertions: the bundle's `LSMinimumSystemVersion` must equal
   `Package.swift`'s `.macOS(.vN)`, and `install.sh` must not hardcode an OS literal.
-- The mac-only gate is `tools/mac-checks.sh`, seven gates in one command: the file-size
+- The mac-only gate is `tools/mac-checks.sh`, eight gates in one command: the file-size
   check, `swift build --build-tests`, `swift test --enable-code-coverage`,
   `llvm-cov report`, `swiftlint lint`, `swift-format lint` over `Sources`/`Tests`
-  excluding the two generated files, and the two Node web-rule checks. swiftlint and
+  excluding the two generated files, the two Node web-rule checks, and the identity
+  check. swiftlint and
   swift-format are judged against **recorded waivers** in
   `tools/analysis-waivers.txt`, not against zero — that file also carries the semgrep
   findings this project accepts, and is the only place either gate reads them from.
@@ -112,7 +124,7 @@ release, and nothing enforces the value against a release.
 - **The suite is swift-testing, not XCTest.** A successful run still prints
   `Test Suite 'All tests' … Executed 0 tests`. The real result is the
   `Test run with N tests in M suites` line, which is what `mac-checks.sh`
-  greps — `1052 tests in 196 suites` when this was written, and the line, not the
+  greps — `1048 tests in 195 suites` when this was written, and the line, not the
   number, is the thing to read. Do not read the XCTest zero as "no tests ran".
 - **The website listens on every interface and `/api/*` has no password**, so anyone
   on the LAN can read and steer conversations. The engine itself is loopback-only on

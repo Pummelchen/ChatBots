@@ -193,11 +193,17 @@ Leave previous releases' notes and performance tables alone.
 
 # Part 2 — This repository
 
-## ChatBots — Swift, no release yet
+## ChatBots — Swift, first release `1.0.0`
 
-- **Identity** semantic version, not yet established. The only version literals are
-  `APP_VERSION` and `APP_BUILD` in `tools/make-app.sh`, expanded into the bundle's
-  `Info.plist`; nothing enforces either against a release.
+- **Identity** semantic version, established and single-sourced: `VERSION` at the repository
+  root is the authority and the tag is `v` plus it. Nothing else declares the value —
+  `tools/make-app.sh` derives the bundle's `CFBundleShortVersionString` and `CFBundleVersion`
+  from the file — and `tools/check-identity.sh` fails when the file is malformed, when the
+  bundle builder has grown a copy of its own, or when the notes for that version are missing.
+  It runs in CI, as the eighth gate of `tools/mac-checks.sh`, and (against the built bundle)
+  inside `tools/make-release.sh`. `tools/set-version.sh <X.Y.Z>` is the one command a bump
+  needs: it writes the file and then runs the check. The shipped checkpoint is a decision
+  rather than a propagated number, so it keeps its own declaration and test.
 - **Code scanning** runs CodeQL **default setup** — there is no `codeql.yml` here —
   and AI Scan for pull requests is disabled. The Autofind job asks
   `api.individual.githubcopilot.com` for a model an individual Copilot plan does not
@@ -206,8 +212,17 @@ Leave previous releases' notes and performance tables alone.
   that serves that model. If Swift CodeQL coverage is wanted, the pattern that works
   is advanced setup on `xcode-27` with `build-mode: manual`, because default setup
   autobuilds with a Swift 6.3.3 image that cannot parse this package's 6.4 manifest.
-- **Before the first release** this needs a runnable artifact: a version literal that
-  cannot drift, one script that builds and packages native `arm64` only, a dry run,
-  and a Release carrying the archive plus its digest. `tools/make-app.sh` builds the
-  app for this Mac, but no release artifact — an archive and its digest — is produced
-  yet, so the release gate below cannot be exercised.
+- **Packaging** is `tools/make-release.sh`. It checks the §1.4 preconditions and records them,
+  runs the gates (or reuses a gate log from the same commit), builds the three products from a
+  clean scratch path and scans that log for warnings, asserts `lipo -archs` is exactly `arm64`
+  on every Mach-O in the bundle, assembles `ChatBots-<version>-macos-arm64.tar.gz` (the app
+  bundle, the two command-line products with the resource bundles they need, `LICENSE`,
+  `THIRD-PARTY-NOTICES.md`, `SECURITY.md` and a generated `README-binaries.txt`), writes the
+  `.sha256` beside it, substitutes the digest into the notes, and stops. `--publish` is the
+  explicit flag: it tags the commit that was built, pushes the tag, creates the Release with
+  the archive and its checksum, and downloads both again to verify them. The staging directory
+  `dist/release/<version>/` keeps the record: preconditions, gate output, the build log and the
+  notes as published.
+- **What the first release deliberately does not do**: it is ad-hoc signed and not notarised,
+  and it ships no model weights — `tools/install.sh` in a checkout downloads those. Both facts,
+  and every check that could not run, are named in `docs/release-notes-v<version>.md`.
