@@ -4,8 +4,8 @@
 // files it found:
 //
 //   * `try? existing` made *any* read failure look like a first run, so a damaged identity was replaced
-//     with a new key — a new fingerprint, so every client that pinned the old one refused to connect,
-//     and the failure looked like a broken engine;
+//     with a new key — the certificate the engine served changed with no explanation, and the
+//     fingerprint recorded in a log no longer matched what came back;
 //   * `.rsa(sizeInBits: 2048)` was written into the identity whatever the key actually was, and the
 //     transport hardcoded its own 2048 as well;
 //   * the certificate and the key were never checked to be a pair, and the `hostnames` argument was
@@ -55,11 +55,11 @@ struct CertificateStoreAuditTests {
             timeout: 30)
     }
 
-    @Test("A corrupt certificate is reported, and the pinned identity is left alone")
+    @Test("A corrupt certificate is reported, and the stored identity is left alone")
     func corruptCertificateIsNotReplaced() throws {
         // The finding's first claim. Before the fix the load failed, `try?` turned that into "no identity
-        // yet", and the store quietly generated a new key: the certificate every client had pinned was
-        // gone and the reason was invisible.
+        // yet", and the store quietly generated a new key: the certificate the engine had been serving
+        // was replaced and the reason was invisible.
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let identity = try CertificateStore.loadOrCreate(in: directory)
@@ -69,7 +69,7 @@ struct CertificateStoreAuditTests {
 
         do {
             _ = try CertificateStore.loadOrCreate(in: directory)
-            Issue.record("a corrupt certificate was replaced behind the clients' backs")
+            Issue.record("a corrupt certificate was replaced behind the caller's back")
         } catch {
             // The answer names the file it could not read, which is the part an operator can act on.
             #expect(error.localizedDescription.contains("certificate"))
@@ -78,7 +78,7 @@ struct CertificateStoreAuditTests {
         #expect(
             try Data(contentsOf: certificate) == Data("this is not a certificate".utf8),
             "the refused load rewrote the certificate")
-        // And the pinned identity is still the one on disk, unchanged by the attempt.
+        // And the identity on disk is the one that was there, unchanged by the attempt.
         #expect(identity.fingerprintSHA256.count == 32)
     }
 

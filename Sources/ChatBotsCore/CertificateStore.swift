@@ -1,15 +1,21 @@
 // ChatBotsCore — the engine's TLS identity, generated once and kept
 //
 // WebTransport runs over QUIC, which is always encrypted. A local engine therefore needs a
-// certificate, and the client verifies it by pinning its SHA-256 fingerprint.
+// certificate, and this store keeps the same one across restarts.
+//
+// **What the fingerprint is for, and what it is not.** The client does *not* verify it: the transport
+// is configured with the library's `.localDevelopmentSelfSigned` policy, a loopback-only bypass of
+// platform certificate validation, so the engine's SHA-256 is **reported and logged but not
+// enforced** — that is the trade `SECURITY.md` states, and the note at the top of
+// `WebTransportClient.swift` says the same from the client's side. A stable identity is what makes
+// the report worth anything (the value a person compares against a log is the same one today as
+// yesterday), and it is what a trust callback would need if the trade is ever revisited.
 //
 // **The certificate has to survive a restart.** The library's `.developmentSelfSigned` case
 // generates a fresh key and certificate every time a server is constructed, and says so in its
-// own documentation: the fingerprint changes across restarts, which makes it unusable for
-// anything that pins. A client that trusted yesterday's fingerprint would refuse to connect
-// today, and the failure would look like a broken engine. So the identity is generated once,
-// stored, and reused — the same self-signed certificate on every launch, which is what makes
-// pinning meaningful.
+// own documentation: the fingerprint changes across restarts. So the identity is generated once,
+// stored, and reused — the same self-signed certificate on every launch, and the same fingerprint
+// reported for it.
 //
 // **Nothing goes near the keychain.** The certificate and its key are read as DER bytes from
 // the app's own folder and handed to the transport directly, which resolves them with
@@ -31,7 +37,7 @@ import CryptoKit
 import Foundation
 import Security
 
-/// A TLS identity on disk, with the fingerprint a client pins.
+/// A TLS identity on disk, with the SHA-256 fingerprint the engine reports for it.
 public struct EngineIdentity: Sendable, Equatable {
     /// The certificate, DER encoded, leaf first.
     public var certificateChainDER: [Data]
@@ -39,7 +45,8 @@ public struct EngineIdentity: Sendable, Equatable {
     public var privateKeyDER: Data
     /// Which curve or size the key is, so the transport can build it.
     public var keyKind: KeyKind
-    /// SHA-256 of the certificate, which is what a client pins.
+    /// SHA-256 of the certificate — the value a client would pin, reported and logged rather than
+    /// enforced. See the note at the top of this file.
     public var fingerprintSHA256: Data
 
     public enum KeyKind: Sendable, Equatable {
@@ -105,18 +112,19 @@ public enum CertificateStore {
         hostnames: [String] = ["localhost", "127.0.0.1", "::1"],
         validityDays: Int = 3650
     ) throws -> EngineIdentity {
-        // A long validity, deliberately. The certificate is pinned by fingerprint, so its
-        // expiry is not what carries the trust — but an identity that expires mid-use would
-        // break a running install for no benefit.
+        // A long validity, deliberately. Nothing here carries trust by expiry — the client accepts the
+        // loopback certificate without checking it (see the note at the top of this file) — but an
+        // identity that expires mid-use would break a running install for no benefit.
         let certificate = directory.appending(path: "webtransport-cert.pem")
         let privateKey = directory.appending(path: "webtransport-key.pem")
 
         // Generate only when there is nothing to read. This was `if let identity = try? existing(…)`, so
         // *any* read failure — a permission change, a truncated file, a half-finished copy — was
-        // indistinguishable from a first run, and the store quietly generated a new key: a new fingerprint,
-        // so every client that had pinned the old one refused to connect and the failure looked like a
-        // broken engine (A155). One file present is still "an identity exists": the other being gone is a
-        // failure to report, not a reason to rotate the identity out from under the clients.
+        // indistinguishable from a first run, and the store quietly replaced the identity: the
+        // certificate the engine serves changed with no explanation, and the fingerprint recorded in a
+        // log or a check no longer matched what came back (A155). One file present is still "an identity
+        // exists": the other being gone is a failure to report, not a reason to rotate the identity out
+        // from under the run that is serving with it.
         let manager = FileManager.default
         guard
             !manager.fileExists(atPath: certificate.path),
@@ -168,13 +176,13 @@ public enum CertificateStore {
     ///
     /// The message names the file to delete, because refusing without a way forward would leave an
     /// install that cannot start: the surviving half is useless on its own, so the operator's move is to
-    /// remove it and let the next start generate a new identity — which they are told costs every client
-    /// its pin (A155).
+    /// remove it and let the next start generate a new identity — which they are told changes the
+    /// fingerprint the engine reports (A155).
     private static func incomplete(missing: String, surviving: String) -> CertificateStoreError {
         .unusableIdentity(
             """
             \(missing) is missing, so the stored identity is incomplete. Delete \(surviving) beside it to \
-            generate a new one — which changes the fingerprint every client pins.
+            generate a new one — which changes the fingerprint the engine reports.
             """)
     }
 
@@ -227,7 +235,7 @@ public enum CertificateStore {
                 """
                 the stored certificate and private key are not a pair, so the engine cannot prove it owns \
                 the certificate it presents. Delete both files beside \(certificate.lastPathComponent) to \
-                generate a new identity — which changes the fingerprint every client pins.
+                generate a new identity — which changes the fingerprint the engine reports.
                 """)
         }
     }
@@ -251,8 +259,8 @@ public enum CertificateStore {
         throw CertificateStoreError.unusableIdentity(
             """
             the stored certificate does not cover \(hostnames.joined(separator: ", ")). Delete the \
-            identity in \(directory.path) to generate one that does — which changes the fingerprint every \
-            client pins.
+            identity in \(directory.path) to generate one that does — which changes the fingerprint the \
+            engine reports.
             """)
     }
 

@@ -104,7 +104,8 @@ event, exit non-zero on failure. This is the smoke test the installer runs.
 
 The check starts the engine itself, and two details of that are load-bearing (A215). It tells the
 engine where the certificate lives — `--run-directory`, the same directory the check loaded its
-identity from — so the fingerprint it pins is the one on the other end of the socket. And each
+identity from — so the fingerprint it reports is the one on the other end of the socket (reported,
+not enforced: A195 corrected this paragraph and the comments it summarised). And each
 connect attempt gets a short deadline of its own rather than the run's whole budget: a connect that
 begins before the engine has bound its port does not fail, it waits, so an attempt allowed the whole
 budget leaves the retry loop no attempt at all and the check reports a broken transport for an engine

@@ -122,7 +122,8 @@ public final class WebTransportEngineServer {
         self.configuration = configuration
     }
 
-    /// The fingerprint a client must pin.
+    /// SHA-256 of the certificate this server presents — the value a client reports and logs rather
+    /// than enforces. See the note at the top of `CertificateStore`.
     public var fingerprintSHA256: Data { identity.fingerprintSHA256 }
 
     // MARK: - Lifecycle

@@ -1,0 +1,34 @@
+# A195 — the pin-claim guard, before the comments were corrected
+
+$ swift test --filter CertificatePinClaimTests
+  ◇ Test "The policy document and the client's own note still say the same thing" started.
+  ✔ Test "The fingerprint is still reported everywhere it was (the counterweight)" passed after 0.001 seconds.
+  ✔ Test "The policy document and the client's own note still say the same thing" passed after 0.003 seconds.
+  ✘ Test "The store says what the fingerprint is for, in the policy document's words" recorded an issue at AuditS3CertificatePinClaimTests.swift:97:9: Expectation failed: store.contains("reported and logged but not enforced")
+  ↳ the store does not state the trade in the words SECURITY.md uses
+  ✘ Test "The store says what the fingerprint is for, in the policy document's words" recorded an issue at AuditS3CertificatePinClaimTests.swift:100:9: Expectation failed: store.contains("does *not* verify it")
+  ↳ the store does not say the client declines to verify the certificate
+  ✘ Test "The store says what the fingerprint is for, in the policy document's words" recorded an issue at AuditS3CertificatePinClaimTests.swift:103:9: Expectation failed: store.contains("SECURITY.md")
+  ↳ the store does not point at the policy document that decides this
+  ✘ Test "The store says what the fingerprint is for, in the policy document's words" failed after 0.006 seconds with 3 issues.
+  ✘ Test "No source file claims the client pins or enforces the certificate" recorded an issue at AuditS3CertificatePinClaimTests.swift:89:17: Expectation failed: !words.contains(claim)
+  ↳     claim → "a client must pin"
+  ✘ Test "No source file claims the client pins or enforces the certificate" recorded an issue at AuditS3CertificatePinClaimTests.swift:89:17: Expectation failed: !words.contains(claim)
+  ↳     claim → "the client verifies it by pinning"
+  ✘ Test "No source file claims the client pins or enforces the certificate" recorded an issue at AuditS3CertificatePinClaimTests.swift:89:17: Expectation failed: !words.contains(claim)
+  ↳     claim → "what makes pinning meaningful"
+  ✘ Test "No source file claims the client pins or enforces the certificate" recorded an issue at AuditS3CertificatePinClaimTests.swift:89:17: Expectation failed: !words.contains(claim)
+  ↳     claim → "the fingerprint a client pins"
+  ✘ Test "No source file claims the client pins or enforces the certificate" recorded an issue at AuditS3CertificatePinClaimTests.swift:89:17: Expectation failed: !words.contains(claim)
+  ↳     claim → "which is what a client pins"
+  ✘ Test "No source file claims the client pins or enforces the certificate" recorded an issue at AuditS3CertificatePinClaimTests.swift:89:17: Expectation failed: !words.contains(claim)
+  ↳     claim → "costs every client its pin"
+  ✘ Test "No source file claims the client pins or enforces the certificate" recorded an issue at AuditS3CertificatePinClaimTests.swift:89:17: Expectation failed: !words.contains(claim)
+  ↳     claim → "every client that had pinned"
+  ✘ Test "No source file claims the client pins or enforces the certificate" recorded an issue at AuditS3CertificatePinClaimTests.swift:89:17: Expectation failed: !words.contains(claim)
+  ↳     claim → "fingerprint pinned here"
+  ✘ Test "No source file claims the client pins or enforces the certificate" recorded an issue at AuditS3CertificatePinClaimTests.swift:89:17: Expectation failed: !words.contains(claim)
+  ↳     claim → "fingerprint pinned above"
+  ✘ Test "No source file claims the client pins or enforces the certificate" failed after 0.336 seconds with 9 issues.
+  ✘ Suite "The certificate comments match the trust the client gives them (A195)" failed after 0.336 seconds with 12 issues.
+  ✘ Test run with 4 tests in 1 suite failed after 0.336 seconds with 12 issues.

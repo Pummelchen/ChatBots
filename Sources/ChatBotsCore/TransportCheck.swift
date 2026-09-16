@@ -128,7 +128,8 @@ public enum TransportCheck {
     ///
     /// - Parameter directory: where the certificate lives, so the check uses the same identity
     ///   a real run would rather than creating another. The engine it starts is told the same
-    ///   directory, so the fingerprint pinned here is the one on the other end of the socket.
+    ///   directory, so the fingerprint this check reports is the one on the other end of the socket
+    ///   (reported, not enforced — see `CertificateStore`).
     /// - Parameter timeout: the whole check's budget — the client's request deadline and the
     ///   connect retries are both taken from it.
     /// - Parameter executable: the engine to spawn, defaulting to the process's own executable.
@@ -192,8 +193,8 @@ public enum TransportCheck {
             "--port", String(port - 1),
             // The identity and the conversations, named outright. Without this the child resolves
             // its own run directory — the project's `.run`, or Application Support — and the
-            // fingerprint pinned above, taken from `directory`, is not the fingerprint the child
-            // serves with. The check then fails as "could not connect", which is a verdict about the
+            // fingerprint reported above, taken from `directory`, is not the one the child serves
+            // with. The check then fails as "could not connect", which is a verdict about the
             // caller's directory rather than about the transport (A215).
             "--run-directory", directory.path,
         ]

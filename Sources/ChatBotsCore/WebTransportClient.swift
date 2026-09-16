@@ -6,7 +6,7 @@
 // **On trust.** The transport is configured with the library's `localDevelopmentSelfSigned`
 // policy, which is a loopback-only bypass of platform certificate validation — it does not
 // verify our fingerprint. So the security of this channel rests on the socket being bound to
-// loopback and on the operating system keeping other users out, not on the pin.
+// loopback and on the operating system keeping other users out, not on the fingerprint.
 //
 // That is a real limitation and worth stating rather than implying more: a malicious process
 // running as the same user on this machine could present its own certificate and be accepted.

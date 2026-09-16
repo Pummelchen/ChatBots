@@ -30,12 +30,13 @@ struct CertificateStoreTests {
         #expect(identity.fingerprintDisplay.contains(":"))
     }
 
-    @Test("The same identity comes back on the next load, which is what pinning needs")
+    @Test("The same identity comes back on the next load, which is what a steady report needs")
     func isStableAcrossLoads() throws {
         // The reason this type exists. The library's development identity is regenerated on
-        // every server construction, so its fingerprint changes each restart and a pinned
-        // client would refuse to connect. If this test ever fails, the app will break on
-        // relaunch in a way that looks like a dead engine.
+        // every server construction, so its fingerprint changes each restart. Nothing enforces
+        // the value (A195) — but the fingerprint the engine reports is what a person and the
+        // transport check compare, so a value that changed for no reason would make every
+        // record of it stale on relaunch and look like a dead engine.
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
 
@@ -105,31 +106,31 @@ struct CertificateStoreTests {
     @Test("A partial identity on disk is reported with a way out, not silently replaced")
     func partialStateIsReported() throws {
         // This test used to assert the opposite — that a missing key was regenerated — and that
-        // expectation was the defect A155 records: a damaged identity was read as "no identity here", the
-        // store generated a new key, and every client that had pinned the old certificate refused to
-        // connect. The failure is now the store's, with the file named and the way out in the message; the
-        // cost of the way out (a new fingerprint) is stated rather than paid in silence.
+        // expectation was the defect A155 records: a damaged identity was read as "no identity here" and
+        // the store generated a new key, replacing the certificate the engine had been serving without
+        // saying so. The failure is now the store's, with the file named and the way out in the message;
+        // the cost of the way out (a new fingerprint to report) is stated rather than paid in silence.
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let identity = try CertificateStore.loadOrCreate(in: directory)
 
         let certificate = directory.appending(path: "webtransport-cert.pem")
-        let pinned = try Data(contentsOf: certificate)
+        let stored = try Data(contentsOf: certificate)
 
         // Remove the key, as an interrupted first run would.
         try FileManager.default.removeItem(at: directory.appending(path: "webtransport-key.pem"))
 
         do {
             _ = try CertificateStore.loadOrCreate(in: directory)
-            Issue.record("a partial identity was regenerated in place of the pinned one")
+            Issue.record("a partial identity was regenerated in place of the stored one")
         } catch let error as CertificateStoreError {
             #expect(error.errorDescription?.contains("webtransport-key.pem") == true)
             #expect(error.errorDescription?.contains("Delete") == true, "no way out in the message")
         }
 
-        // The certificate the clients pinned is byte for byte the one that was there: a refused load
-        // changed nothing on disk.
-        #expect(try Data(contentsOf: certificate) == pinned, "the refused load rewrote the certificate")
+        // The certificate is byte for byte the one that was there: a refused load changed nothing on
+        // disk.
+        #expect(try Data(contentsOf: certificate) == stored, "the refused load rewrote the certificate")
         #expect(identity.fingerprintSHA256.count == 32)
     }
 
