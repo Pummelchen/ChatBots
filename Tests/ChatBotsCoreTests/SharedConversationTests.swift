@@ -141,8 +141,8 @@ struct SharedConversationPageTests {
         #expect(entries?.count == 1)
         #expect(entries?.first?["text"] as? String == text)
         // The island carries the transcript and the topic, and nothing about where the page was
-        // reached: the `shareBase` key that used to be here had no reader (A217), and its absence is
-        // asserted where the page is fetched over a socket (`AuditShareLinkTests`).
+        // reached: the `shareBase` key that used to be here had no reader, and its absence is
+        // asserted where the page is fetched over a socket (`ShareLinkTests`).
         #expect(object?["shareBase"] == nil)
     }
 
@@ -242,8 +242,9 @@ struct SharedConversationHTTPTests {
         let (data, response) = try await session.data(from: URL(string: "\(base)/s/\(id)")!)
         let status = (response as? HTTPURLResponse)?.statusCode
         #expect(status == 200)
-        #expect((response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Type")?
-            .contains("text/html") == true)
+        #expect(
+            (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Type")?
+                .contains("text/html") == true)
         let page = String(decoding: data, as: UTF8.self)
         #expect(page.contains("A shared question"))
         #expect(page.contains("id=\"play\""))
@@ -285,8 +286,8 @@ struct SharedConversationHTTPTests {
         let list = try JSONSerialization.jsonObject(with: listData) as? [[String: Any]]
         let id = try #require(list?.first?["id"] as? String)
 
-        // The page used to be handed an origin built from the request's `Host` (A99) and wrote it into
-        // its JSON island, where nothing ever read it (A217). It is rendered from the record alone now,
+        // The page used to be handed an origin built from the request's `Host` and wrote it into
+        // its JSON island, where nothing ever read it. It is rendered from the record alone now,
         // so neither a proxy's host nor the engine's own base appears in it — and the page still
         // arrives with the conversation in it, which is the part that matters. The island carries
         // JSONSerialization's escapes (`\/` for a slash, `\u003c` for `<`), so the page is unescaped

@@ -19,9 +19,9 @@
 // The cost is that a child process has to be found, started, waited for and reaped, which is
 // what this file is.
 
+import ChatBotsCore
 import Combine
 import Foundation
-import ChatBotsCore
 
 @MainActor
 public final class EngineSupervisor: ObservableObject {
@@ -130,7 +130,7 @@ public final class EngineSupervisor: ObservableObject {
         //
         // This used to set `.failed` and then call `stop()`, whose last act was `state = .idle`,
         // so the reason the app exists to show was overwritten before `ChatBotsApp` could read
-        // it and no banner ever appeared (audit A50). The teardown here does not touch `state`,
+        // it and no banner ever appeared. The teardown here does not touch `state`,
         // and the failure is assigned after it, so nothing can overwrite it.
         //
         // The child is still running — it is the answering that timed out, not the process — so
@@ -314,7 +314,8 @@ public final class EngineSupervisor: ObservableObject {
             return nil
         }
         let tail = text.suffix(maximumCharacters)
-        let cleaned = tail
+        let cleaned =
+            tail
             .split(separator: "\n")
             .suffix(4)
             .joined(separator: " ")

@@ -73,7 +73,7 @@ struct TavilyKeyTests {
             .deletingLastPathComponent()  // ChatBotsCoreTests
             .deletingLastPathComponent()  // Tests
             .deletingLastPathComponent()  // the package root
-            .appending(path: "Sources/ChatBotsCore/TavilyClient.swift")
+            .appending(path: "Sources/ChatBotsCore/Research/TavilyClient.swift")
         let text = try String(contentsOf: sources, encoding: .utf8)
 
         // A real Tavily key is `tvly-` followed by a long token. The documented placeholder is

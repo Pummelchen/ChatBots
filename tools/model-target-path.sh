@@ -12,9 +12,9 @@
 #
 #   * A checkpoint may list a nested path — `original/config.json` is the usual one — and `curl -o`
 #     fails when the directory does not exist. The installer created only the model directory itself,
-#     so a fresh install of any such checkpoint died on the first nested file (A186).
+#     so a fresh install of any such checkpoint died on the first nested file.
 #   * A name is not trusted to stay inside the model directory: `../../x` would write outside it, which
-#     is the shape A29 found in attachment names. A name containing `..` at all is refused rather than
+#     is the shape the attachment-name check also guards. A name containing `..` at all is refused rather than
 #     resolved, because the check has to be simple enough to be obviously right.
 #
 # Kept as a script rather than a shell function inside the installer so it can be tested without

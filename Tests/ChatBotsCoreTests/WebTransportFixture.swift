@@ -1,6 +1,6 @@
 // ChatBotsCoreTests — a WebTransport server and the clients that talk to it.
 //
-// Extracted from `AuditS3TransportSessionRulesTests` (A157) when a second suite needed it (A158). The
+// Extracted from `TransportSessionRulesTests` when a second suite needed it. The
 // fixture knows three things the transport tests all need: a real listener with a stub engine behind it, a
 // raw client that can misbehave — connect without speaking, send a payload no decoder reads — and the two
 // readers that turn a stream back into frames.
@@ -30,7 +30,7 @@ actor QuietTransportStub: LLMEngine {
 
 /// A seat that writes `fragments` short output events in its one turn, paced a little so the events reach
 /// the wire as fast as they are made: a burst that outran the server's writer would be dropped *there*, and
-/// a test about the client's own buffer would be measuring the wrong bound (A158).
+/// a test about the client's own buffer would be measuring the wrong bound.
 actor ChattyTransportStub: LLMEngine {
     nonisolated let spec: AgentSpec
     private let fragments: Int

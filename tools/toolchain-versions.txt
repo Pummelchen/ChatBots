@@ -1,6 +1,6 @@
 # The tool versions the CI runner installs, as one fact in two places that must agree.
 #
-# `tools/fetch-audit-tools.sh` is the authority: it holds each version, the download URL, and the
+# `tools/fetch-analysis-tools.sh` is the authority: it holds each version, the download URL, and the
 # SHA-256 of the release asset, which it verifies before unpacking, because a version-pinned URL is not
 # integrity — a release asset can be replaced by anyone with release rights. The Python and Node tools
 # are not in that script on purpose: PyPI and npm refuse to publish a version twice, so for them the

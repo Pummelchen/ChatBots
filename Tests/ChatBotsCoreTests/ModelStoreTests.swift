@@ -123,11 +123,11 @@ struct ModelStoreTests {
         #expect(ModelStore.availableCheckpoints(in: root).isEmpty)
     }
 
-    /// Strengthened under A53. This test used to write an *empty* index file and assert the
+    /// Strengthened after a partial-download defect. This test used to write an *empty* index file and assert the
     /// directory complete, which codified the defect: the index is a map from tensor name to
     /// shard, and an index-only directory is exactly what an interrupted download leaves. The
     /// assertion now requires the shards to exist as well, so it is strictly stronger. The
-    /// partial cases are covered in `AuditModelStoreTests`.
+    /// partial cases are covered in `ShardedCheckpointTests`.
     @Test("A sharded checkpoint counts as complete only with its shards")
     func shardedCheckpoint() throws {
         let root = try temporaryRoot()

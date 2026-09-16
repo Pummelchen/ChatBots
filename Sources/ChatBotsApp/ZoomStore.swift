@@ -21,7 +21,7 @@ final class ZoomStore: ObservableObject {
     /// The steps ⌘+ and ⌘− move through.
     ///
     /// The list and every comparison over it live in `ChatBotsCore.TextZoom`, so the suite that
-    /// covers them asserts the code the app runs rather than a copy of it (A167). These are aliases
+    /// covers them asserts the code the app runs rather than a copy of it. These are aliases
     /// kept so the views that read them read the same values.
     static let levels = TextZoom.levels
     static let `default` = TextZoom.default
@@ -51,7 +51,7 @@ final class ZoomStore: ObservableObject {
     /// The scale ⌘+ would go to, as a percentage, or `nil` at the top of the range.
     ///
     /// The menu reads these to say what ⌘+ will do rather than only what it is called; `nil` is also
-    /// when its item is disabled, so the label and the button cannot disagree (A177).
+    /// when its item is disabled, so the label and the button cannot disagree.
     var nextLargerPercent: Int? {
         TextZoom.next(from: scale, larger: true).map(TextZoom.percent(of:))
     }
@@ -70,7 +70,7 @@ final class ZoomStore: ObservableObject {
     /// size: at 200% the same 720 points would clip every label. It is one rule because there were
     /// three — a declaration in `ChatBotsApp` that nothing read, a hard-coded 720×480 on the window
     /// and a 700×460 frame minimum in `ContentView` — which disagreed about the base size and about
-    /// whether to scale at all (A177). The window's minimum is what a drag is clamped by; the frame's
+    /// whether to scale at all. The window's minimum is what a drag is clamped by; the frame's
     /// is what the layout asks for where there is no window to clamp it.
     ///
     /// A function of the scale rather than only a property, so the rule can be asserted at 100 % and

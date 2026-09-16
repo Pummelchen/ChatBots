@@ -1,6 +1,6 @@
 // ChatBotsCoreTests — a raw loopback connection, for tests that need to write HTTP by hand
 //
-// Extracted from `AuditHTTPLimitTests` (A37) when a second suite needed it (A151). A malformed request
+// Extracted from `HTTPLimitTests` when a second suite needed it. A malformed request
 // cannot be produced by `URLSession`, and the server's own reaction to one is what those tests are about,
 // so the bytes are written directly.
 
@@ -52,7 +52,8 @@ final class RawConnection {
     /// on the client's own queue. `resumed` makes the race safe: whichever of the receive and
     /// the timer arrives first wins, and the continuation is resumed exactly once.
     func receiveOnce(timeout: Duration) async -> Data? {
-        let seconds = Double(timeout.components.seconds)
+        let seconds =
+            Double(timeout.components.seconds)
             + Double(timeout.components.attoseconds) / 1_000_000_000_000_000_000
         return await withCheckedContinuation { continuation in
             let resumed = Atomic<Bool>(false)

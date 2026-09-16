@@ -26,8 +26,52 @@ TARGET: pathlib.Path = ROOT / "Sources" / "ChatBotsCore" / "WebAssets.swift"
 FILES: Sequence[tuple[str, str, str, *tuple[str, ...]]] = [
     ("indexHTML", "index.html", "text/html; charset=utf-8", "/", "/index.html"),
     ("styleCSS", "style.css", "text/css; charset=utf-8", "/style.css"),
+    ("stylePanesCSS", "style-panes.css", "text/css; charset=utf-8", "/style-panes.css"),
+    (
+        "stylePanelsCSS",
+        "style-panels.css",
+        "text/css; charset=utf-8",
+        "/style-panels.css",
+    ),
     ("deltasJS", "deltas.js", "application/javascript; charset=utf-8", "/deltas.js"),
+    ("votesJS", "votes.js", "application/javascript; charset=utf-8", "/votes.js"),
     ("appJS", "app.js", "application/javascript; charset=utf-8", "/app.js"),
+    (
+        "appCoreJS",
+        "app-core.js",
+        "application/javascript; charset=utf-8",
+        "/app-core.js",
+    ),
+    (
+        "appScreenJS",
+        "app-screen.js",
+        "application/javascript; charset=utf-8",
+        "/app-screen.js",
+    ),
+    (
+        "appTranscriptJS",
+        "app-transcript.js",
+        "application/javascript; charset=utf-8",
+        "/app-transcript.js",
+    ),
+    (
+        "appControlsJS",
+        "app-controls.js",
+        "application/javascript; charset=utf-8",
+        "/app-controls.js",
+    ),
+    (
+        "appLineupJS",
+        "app-lineup.js",
+        "application/javascript; charset=utf-8",
+        "/app-lineup.js",
+    ),
+    (
+        "appCommandsJS",
+        "app-commands.js",
+        "application/javascript; charset=utf-8",
+        "/app-commands.js",
+    ),
 ]
 
 HEADER: str = """// ChatBotsCore — the web interface, embedded

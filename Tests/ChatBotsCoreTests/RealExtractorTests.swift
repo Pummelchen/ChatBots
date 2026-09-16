@@ -11,7 +11,6 @@ import CoreText
 import Foundation
 import Testing
 
-
 private let scratch = FileManager.default.temporaryDirectory
     .appending(path: "chatbots-extract-\(UUID().uuidString)")
 
@@ -128,7 +127,7 @@ struct RealExtractorTests {
 
         let document = try SystemDocumentExtractor.ingestor.add(url: rtf)
         // Rich text, not Word: the kind decides the chip's label and symbol, and `.word` used to claim
-        // `rtf` first (A205). Through the real extractor, on a real file, so this is the user-visible
+        // `rtf` first. Through the real extractor, on a real file, so this is the user-visible
         // half of that finding rather than a rule about a list.
         #expect(document.kind == .richText)
         #expect(document.kind.label == "Rich text")
@@ -139,9 +138,10 @@ struct RealExtractorTests {
     func image() throws {
         let url = try scratchFile("chart.png")
         // A real 1x1 PNG, so the bytes are a genuine image.
-        let png = Data(base64Encoded: """
-            iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==
-            """)!
+        let png = Data(
+            base64Encoded: """
+                iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==
+                """)!
         try png.write(to: url)
 
         let document = try SystemDocumentExtractor.ingestor.add(url: url)

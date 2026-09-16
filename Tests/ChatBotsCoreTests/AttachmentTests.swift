@@ -108,7 +108,7 @@ struct DocumentKindTests {
     func richTextIsReachable() {
         // The finding, as an assertion: `.word` listed `rtf` and `rtfd` before `.richText` did, and
         // `forExtension` takes the first match — so `.richText` was unreachable, an RTF file was
-        // labelled "Word", and the rich-text case, label and symbol were dead code (A205).
+        // labelled "Word", and the rich-text case, label and symbol were dead code.
         #expect(DocumentKind.forFilename("doc.rtf") == .richText)
         #expect(DocumentKind.forFilename("notes.rtfd") == .richText)
         #expect(DocumentKind.forFilename("DOC.RTF") == .richText, "case must not matter")
@@ -311,7 +311,7 @@ struct AttachmentPromptTests {
             for: spec, others: [AgentSpec.seat(index: 1)], conversation: conversation)
         // One system message, because the Qwen template refuses a second one. The material is
         // not part of it: document text arrives over the unauthenticated attachment API, so it
-        // is untrusted data and belongs in the user turn beside the log, fenced (audit A103).
+        // is untrusted data and belongs in the user turn beside the log, fenced.
         let systemMessages = prompt.filter { $0.role == .system }
         #expect(systemMessages.count == 1, "the brief is still one message")
         #expect(

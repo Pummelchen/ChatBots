@@ -51,13 +51,20 @@ brew install swift-format swiftlint llvm gitleaks osv-scanner semgrep ruff pyrig
 Then the gates this repository has:
 
 ```sh
-tools/mac-checks.sh       # the Mac-only gates: build, tests + coverage, swiftlint, swift-format, web
+tools/mac-checks.sh       # the Mac-only gates: sizes, build, tests + coverage, swiftlint, swift-format, web
+tools/check-file-sizes.sh # the same size gate on its own: no tracked code file over 500 lines
 ```
 
-CI runs the rest on Linux: the generated files are in step, the notices tool passes, the shell, Python
-and JavaScript are linted and scanned, and `gitleaks` and `osv-scanner` are clean. The Swift gates
-cannot run there — no hosted image is macOS 26 on Apple silicon with MLX — so they live in
-`tools/mac-checks.sh` and are run on a Mac.
+CI runs the rest on Linux: the generated files are in step, no tracked code file is over 500 lines, the
+notices tool passes, the shell, Python and JavaScript are linted and scanned, and `gitleaks` and
+`osv-scanner` are clean. The Swift gates cannot run there — no hosted image is macOS 26 on Apple silicon
+with MLX — so they live in `tools/mac-checks.sh` and are run on a Mac.
+
+The size limit is one number in one script. `tools/check-file-sizes.sh` asks git for the tracked files,
+measures the code (Swift, JavaScript, CSS, HTML, shell, Python) and exempts the two generated files,
+`WebAssets.swift` and `NameLists.swift`, whose length is a function of the sources they are built from.
+Both CI and `tools/mac-checks.sh` call that script rather than repeating the rule, so the two can never
+disagree about which file is too long.
 
 ## Pinning
 

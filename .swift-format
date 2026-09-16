@@ -1,4 +1,4 @@
-// .swift-format — the ChatBots Swift style for swift-format (audit A06).
+// .swift-format — the ChatBots Swift style for swift-format.
 //
 // swift-format reads this JSON with `//` comments. Before it existed, `swift-format lint
 // --recursive Sources Tests` reported 30,059 diagnostics against this repository's own

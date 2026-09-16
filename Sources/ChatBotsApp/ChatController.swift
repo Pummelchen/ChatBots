@@ -8,9 +8,9 @@
 import AppKit
 import ChatBotsCore
 import Combine
-import UniformTypeIdentifiers
 import Foundation
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Live state of one seat's pane.
 @MainActor
@@ -146,7 +146,7 @@ public final class ChatController: ObservableObject {
     ///
     /// Held here rather than fetched by the view so the list survives the sheet being closed and
     /// reopened, and so there is one place that knows when it is out of date.
-    @Published public private(set) var savedConversations: [SavedConversationSummary] = []
+    @Published public internal(set) var savedConversations: [SavedConversationSummary] = []
     /// Which mode the room is in. The engine's to decide, like everything else about the
     /// conversation, so the app shows what it is told rather than what it last asked for.
     @Published public private(set) var mode: DiscussionMode = .entertainment
@@ -155,8 +155,8 @@ public final class ChatController: ObservableObject {
     /// The finished report, with its markdown, when there is one.
     @Published public private(set) var report: APISnapshot.ReportSummary?
     /// The line-ups and scenarios the engine ships, for the picker.
-    @Published public private(set) var rosters: [Roster] = []
-    @Published public private(set) var scenarios: [Scenario] = []
+    @Published public internal(set) var rosters: [Roster] = []
+    @Published public internal(set) var scenarios: [Scenario] = []
     /// The audience's verdicts, by contribution id, and the scorecard. Both come from the
     /// engine so the app and the browser cannot show different scores.
     @Published public private(set) var votes: [String: String] = [:]
@@ -166,17 +166,17 @@ public final class ChatController: ObservableObject {
 
     /// Bumped when the single-thread view should follow the newest message. One signal for
     /// the whole thread rather than one per seat, because the thread is a single list.
-    @Published public private(set) var threadScrollSignal = 0
+    @Published public internal(set) var threadScrollSignal = 0
 
     // MARK: Internals
 
     /// The connection to the engine. The app is a client of one now rather than containing
     /// it, so this is the only way anything reaches a model.
-    public private(set) var client: WebTransportEngineClient?
+    public internal(set) var client: WebTransportEngineClient?
     /// What the engine says it is doing, so the interface can show a failure rather than
     /// nothing happening.
-    @Published public private(set) var engineConnection: String?
-    private var pumpTasks: [Task<Void, Never>] = []
+    @Published public internal(set) var engineConnection: String?
+    var pumpTasks: [Task<Void, Never>] = []
     /// True while a state from the engine is being applied, so the property observers do not
     /// mistake it for a user edit and save it back.
     private var isApplyingRemoteState = false
@@ -188,14 +188,25 @@ public final class ChatController: ObservableObject {
 
     /// Snapshots actually applied. A poll reads it before its request and again after, so a
     /// snapshot cannot be applied out of order behind one that landed while it was in flight.
-    private var appliedSnapshotCount = 0
+    var appliedSnapshotCount = 0
 
     /// Called whenever anything the user set changes, so it can be written to disk.
     var onSettingsChanged: (() -> Void)?
     /// The moderator's identity as restored from settings, pushed to the engine when the
     /// connection comes up. The engine is a separate process and does not read the app's
     /// preferences, so somebody has to tell it.
-    public private(set) var restoredModerator = ModeratorIdentity()
+    public internal(set) var restoredModerator = ModeratorIdentity()
+
+    /// Documents restored from settings that the engine has not been given.
+    ///
+    /// Held so a relaunch cannot destroy them. The engine is a separate, freshly started
+    /// process holding nothing, and the app cannot hand a stored document to it: a document the
+    /// moderator added was read *by the engine*, and what this side saved is the engine's
+    /// description of it, never the file. So they are shown and saved until the moderator
+    /// re-adds the file, and `setAttachments` says which ones the models cannot currently see.
+    var restoredAttachments: [AttachedDocument] = []
+    /// The restore notice currently in the banner, so refreshing it never eats another message.
+    var attachmentRestoreNotice: String?
 
     public init(
         specs: [AgentSpec] = AgentSpec.SeatRoster.specs(),
@@ -219,177 +230,12 @@ public final class ChatController: ObservableObject {
         observeSeatSettings()
     }
 
-    // MARK: - Connecting
-
-    /// Attach to an engine and start drawing from it.
-    ///
-    /// Called once the supervisor reports an engine answering. Everything the interface shows
-    /// comes from here: the transcript, the status, the seat settings, the statistics and the
-    /// streamed output.
-    public func connect(host: String = "127.0.0.1", port: UInt16) async {
-        disconnect()
-
-        var configuration = WebTransportEngineClient.Configuration()
-        configuration.host = host
-        configuration.port = port
-        let client = WebTransportEngineClient(configuration: configuration)
-
-        // The event stream delivers states and output fragments; it is started before the
-        // first request so nothing that happens in between is missed.
-        var lastError: String?
-        for attempt in 0..<8 {
-            do {
-                try await client.connect()
-                lastError = nil
-                break
-            } catch {
-                lastError = error.localizedDescription
-                try? await Task.sleep(for: .milliseconds(400 * (attempt + 1)))
-            }
-        }
-        guard client.isConnected else {
-            // A client that never connected is not a connection, so it is not stored: `client != nil`
-            // has to keep meaning "there is an engine to talk to". Storing it meant the seat endpoints
-            // were pushed through it, every one of those commands answered with a transport failure,
-            // and each failure replaced the reason the connection had actually failed with a symptom
-            // of it — before the banner that shows the reason was ever read (A175).
-            noteConnectionFailed(lastError ?? "Could not reach the engine.")
-            return
-        }
-        self.client = client
-        engineConnection = nil
-
-        // The current state first, so the interface is correct before any event arrives.
-        if let snapshot = try? await client.state() {
-            apply(snapshot)
-        }
-        // Then what this app knows that the engine does not: a freshly started engine has the
-        // default moderator, and the user's own name and persona live in this app's settings.
-        if !restoredModerator.isDefault {
-            _ = try? await client.send(.setModerator(restoredModerator))
-            if let snapshot = try? await client.state() { apply(snapshot) }
-        }
-        startPumps()
-
-        // A safety net, not the primary path.
-        //
-        // Pushed states should arrive whenever the log changes, and they are what keeps the
-        // transcript live. But a push that silently fails leaves a window that looks
-        // connected and never updates — the worst kind of failure, because nothing is
-        // obviously wrong. Polling is cheap here (one small request a second on loopback) and
-        // it turns that into a slow refresh rather than a frozen window.
-        pumpTasks.append(
-            Task { [weak self] in
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(1))
-                    guard let self, !Task.isCancelled else { return }
-                    // The poll's reply is the one snapshot whose arrival order relative to the
-                    // push feed is not the engine's order: it can be produced before a push the
-                    // pump applies while the request is in flight. The engine's revision orders
-                    // them, so `apply` would refuse the older one anyway; this in-flight check
-                    // is the belt to that braces, and it costs one integer comparison. Pushes are
-                    // the primary path and the poll exists for a push feed that has gone quiet,
-                    // so dropping a poll the engine has already superseded costs nothing.
-                    let appliedBefore = self.appliedSnapshotCount
-                    if let snapshot = try? await client.state(),
-                        self.appliedSnapshotCount == appliedBefore
-                    {
-                        self.apply(snapshot)
-                    }
-                    // A reader that stopped is why the window would otherwise never update.
-                    // This also carries the client's explicit failure for a reply it could not
-                    // match (A39), which the `try?` above would otherwise swallow. Once the
-                    // reader has gone, every later poll repeats the same sentence, so stop.
-                    if let error = client.readerError {
-                        self.engineConnection = "Live updates stopped: \(error)"
-                        return
-                    }
-                }
-            }
-        )
-    }
-
-    /// Stop drawing from the engine. The engine itself is the supervisor's business.
-    public func disconnect() {
-        for task in pumpTasks { task.cancel() }
-        pumpTasks.removeAll()
-        if let client {
-            Task { await client.disconnect() }
-        }
-        client = nil
-    }
-
-    /// Save the user's settings.
-    ///
-    /// Called from `didSet` on each bound property and from every seat change, so there is
-    /// no "unsaved" state to lose. The store coalesces bursts.
-    func saveSettings() {
-        // Skip while the panes are still being built, when observation may fire early.
-        guard isFullyInitialised else { return }
-        onSettingsChanged?()
-    }
-
-    private var isFullyInitialised = false
-
-    /// Seat settings live inside `AgentPaneState.spec`, which is mutated by the persona,
-    /// thinking and backend controls rather than by a binding, so they are watched
-    /// explicitly.
-    private func observeSeatSettings() {
-        for pane in panes {
-            pane.$spec
-                .dropFirst()
-                .sink { [weak self] _ in self?.saveSettings() }
-                .store(in: &settingsObservers)
-        }
-        isFullyInitialised = true
-    }
-
-    private var settingsObservers: [AnyCancellable] = []
-
-    /// Current settings, for the store to write.
-    var currentSeats: [AgentSpec] { panes.map(\.spec) }
-
-    /// Flush any pending write, for termination.
-    public func saveSettingsNow() {
-        onSettingsChanged?()
-    }
-
-    deinit {
-        flushTask?.cancel()
-    }
-
-    // MARK: - Stream consumption
-
-    private func startPumps() {
-        // Two pumps, because the engine sends two shapes of thing: a whole state whenever
-        // something changes, and fragments of output as a model writes.
-        //
-        // The state is authoritative and slow-moving; the fragments are fast and partial. The
-        // transcript, the statistics and the seat settings come from states, so they cannot
-        // drift. The visible text comes from fragments, so it arrives as it is written rather
-        // than in whole answers — which is what the pacing below turns into a smooth reveal.
-        pumpTasks.append(
-            Task { [weak self] in
-                guard let client = self?.client, let events = client.events else { return }
-                for await event in events {
-                    guard let self, !Task.isCancelled else { return }
-                    switch event {
-                    case .state(let snapshot):
-                        self.apply(snapshot)
-                    case .output(let delta):
-                        self.apply(delta)
-                    }
-                }
-            }
-        )
-    }
-
     /// Take a whole state from the engine.
     ///
     /// Deliberately does not touch the pane's visible text: the pacer owns that, and
     /// overwriting it mid-reveal would make the reply jump. Everything else is the engine's
     /// to decide.
-    private func apply(_ snapshot: APISnapshot) {
+    func apply(_ snapshot: APISnapshot) {
         // A snapshot the engine produced before one already applied must not be applied: it
         // would regress the transcript and the status to an older state. Snapshots reach the
         // controller down two paths — the push feed and the replies to commands and the poll —
@@ -500,143 +346,27 @@ public final class ChatController: ObservableObject {
         return snapshot.isOlder(than: lastSnapshot)
     }
 
-    /// Take one fragment of streamed output.
-    ///
-    /// Converted into the same event the in-process engine used to deliver, so the pacing,
-    /// the block handling and the rate sampling below are unchanged.
-    private func apply(_ delta: APISnapshot.OutputDelta) {
-        switch delta.kind {
-        case "token":
-            apply(.token(agentID: delta.agentID, text: delta.text))
-        case "reasoning":
-            apply(.reasoning(agentID: delta.agentID, text: delta.text))
-        case "tool":
-            // Sent as one string because a fragment has one text field; split back into the
-            // name and the query the display logic expects.
-            let parts = delta.text.split(separator: "(", maxSplits: 1)
-            apply(
-                .toolCall(
-                    agentID: delta.agentID,
-                    name: String(parts.first ?? ""),
-                    query: parts.count > 1
-                        ? String(parts[1]).trimmingCharacters(in: CharacterSet(charactersIn: ")"))
-                        : ""))
-        case "started":
-            // The prompt itself is not sent to a client — it is the engine's rendering of the
-            // log and can be enormous. The pacer only needs to know a turn has begun.
-            pane(delta.agentID)?.beginTurn()
-        default:
-            break
-        }
-    }
-
-    private func apply(_ event: TurnEvent) {
-        switch event {
-        // Streaming text is buffered and published on a timer. Republishing a growing
-        // string (and re-laying-out the transcript) for every token is what makes a
-        // streaming UI stutter; a turn finishes in well under a frame's worth of tokens
-        // at these rates either way.
-        case .token(let agentID, let text):
-            // Straight into the pacer: what arrives is queued, not shown. The queue is what
-            // absorbs a burst, and what builds the backfill that hides the next turn's wait.
-            pacer.enqueue(text, agentID: agentID, channel: StreamPacerPool.Channel.answer)
-            sampleGenerationRate(agentID: agentID, characters: text.count)
-
-        case .reasoning(let agentID, let text):
-            pacer.enqueue(text, agentID: agentID, channel: StreamPacerPool.Channel.reasoning)
-            sampleGenerationRate(agentID: agentID, characters: text.count)
-
-        case .toolCall(let agentID, let name, let query):
-            // `prefix` on a String counts grapheme clusters, so a query full of emoji or
-            // CJK is shortened without being cut mid-character.
-            pending[agentID, default: Delta()].activity = "\(name)(\(UTF8Text.prefix(query, 48)))"
-
-        case .turnStarted(let agentID, _):
-            flush()  // the previous turn's tail must land before its row is cleared
-            threadScrollSignal += 1
-            // A new turn on this seat invalidates anything still queued for the last one.
-            pacer.clear(agentID: agentID)
-            rateSamples[agentID] = nil
-            for pane in panes {
-                if pane.spec.id == agentID {
-                    pane.beginTurn()
-                } else if pane.isGenerating {
-                    pane.endTurn()
-                }
-            }
-
-        // A turn's end, its tool results and its failure are deliberately *not* handled here.
-        //
-        // The protocol forwards four fragment kinds — `token`, `reasoning`, `tool` and
-        // `started` — so these cases are unreachable from `apply(_ delta:)`. They are read
-        // instead from the snapshot's `live` view in `apply(_ snapshot)`: `isGenerating` ends
-        // the turn, `toolLog` carries the tool results and failures, and `activity` carries the
-        // engine's own note of a failed turn. Spelled out rather than left to `default: break`
-        // so the decision is visible and so a future fragment added to the protocol has to be
-        // considered here. A dedicated per-turn error banner is not available over this
-        // transport; the failure is still shown, in `notices`, which the snapshot carries.
-        case .turnFinished, .toolResult, .toolFailure, .turnFailed:
-            break
-        }
-    }
+    // MARK: - Pacing
 
     /// Buffered token deltas for one seat.
-    private struct Delta {
+    struct Delta {
         var text = ""
         var reasoning = ""
         var activity: String?
     }
 
-    private var pending: [String: Delta] = [:]
+    var pending: [String: Delta] = [:]
     private var flushTask: Task<Void, Never>?
     /// Reveals queued text at a steady rate instead of in model-sized bursts.
-    private let pacer = StreamPacerPool()
+    var pacer = StreamPacerPool()
     /// Per-seat rate sampling, used to match the reveal rate to this hardware.
-    private var rateSamples: [String: (characters: Int, since: Date)] = [:]
+    var rateSamples: [String: (characters: Int, since: Date)] = [:]
 
     /// True while a seat still has generated text waiting to be shown. A turn is not
     /// visually finished until this is false, which is what lets the next speaker begin
     /// the moment this one stops appearing to type.
     public func isDisplaying(agentID: String) -> Bool {
         pacer.backlog(agentID: agentID) > 0
-    }
-
-    /// Applies buffered *non-text* deltas to the panes.
-    ///
-    /// Streamed text no longer passes through here: it goes into the pacer, which releases
-    /// it at a steady rate. This only carries the cheap state changes.
-    private func flush() {
-        guard !pending.isEmpty else { return }
-        let buffered = pending
-        pending.removeAll(keepingCapacity: true)
-
-        for (agentID, delta) in buffered {
-            guard let pane = pane(agentID) else { continue }
-            if let activity = delta.activity { pane.activity = activity }
-        }
-    }
-
-    /// Record how fast this seat is producing characters, so the reveal rate can match it.
-    ///
-    /// Sampled over a window rather than per token, because per-token arrival is bursty by
-    /// nature and would make the reveal rate jitter with it.
-    private func sampleGenerationRate(agentID: String, characters: Int) {
-        let now = Date.now
-        guard var sample = rateSamples[agentID] else {
-            rateSamples[agentID] = (characters, now)
-            return
-        }
-        sample.characters += characters
-        let elapsed = now.timeIntervalSince(sample.since)
-        guard elapsed >= 0.5 else {
-            rateSamples[agentID] = sample
-            return
-        }
-        let rate = Double(sample.characters) / elapsed
-        rateSamples[agentID] = (0, now)
-        // The rate the reveal is paced at, and the only thing the measurement is for: it was also
-        // assigned to a `measuredGenerationRate` that no view read (A177).
-        pacer.observe(agentID: agentID, charactersPerSecond: rate)
     }
 
     private func startFlushLoop() {
@@ -655,7 +385,7 @@ public final class ChatController: ObservableObject {
 
     /// Release whatever text is due, and finish any turn whose text has now been fully
     /// shown.
-    private func reveal(elapsed: Double) {
+    func reveal(elapsed: Double) {
         for release in pacer.drain(elapsed: elapsed) {
             guard let pane = pane(release.agentID) else { continue }
             switch release.channel {
@@ -672,339 +402,49 @@ public final class ChatController: ObservableObject {
         }
     }
 
-    private func pane(_ agentID: String) -> AgentPaneState? {
+    func pane(_ agentID: String) -> AgentPaneState? {
         panes.first { $0.spec.id == agentID }
     }
 
-    // MARK: - Controls
+    // MARK: - Settings
 
-    public func startOrRestart() {
-        errorBanner = nil
-        // Stop and reset first when there is something to clear, then start. The engine
-        // refuses to start without a topic, so the topic is set before the start rather than
-        // being assumed to have arrived already.
-        run { client in
-            if self.status.isActive { _ = try await client.send(.stop) }
-            if !self.turns.isEmpty { _ = try await client.send(.reset) }
-            _ = try await client.send(.setTopic(self.topic))
-            _ = try await client.send(.start)
-        }
+    /// Save the user's settings.
+    ///
+    /// Called from `didSet` on each bound property and from every seat change, so there is
+    /// no "unsaved" state to lose. The store coalesces bursts.
+    func saveSettings() {
+        // Skip while the panes are still being built, when observation may fire early.
+        guard isFullyInitialised else { return }
+        onSettingsChanged?()
     }
 
-    public func togglePause() {
-        run { client in
-            _ = try await client.send(self.status.isPaused ? .resume : .pause)
-        }
-    }
+    private var isFullyInitialised = false
 
-    public func stop() {
-        run { client in _ = try await client.send(.stop) }
-        // An explicit stop means stop: drop whatever is still queued rather than continuing
-        // to type it out.
+    /// Seat settings live inside `AgentPaneState.spec`, which is mutated by the persona,
+    /// thinking and backend controls rather than by a binding, so they are watched
+    /// explicitly.
+    private func observeSeatSettings() {
         for pane in panes {
-            pacer.clear(agentID: pane.id)
-            pane.endTurn()
+            pane.$spec
+                .dropFirst()
+                .sink { [weak self] _ in self?.saveSettings() }
+                .store(in: &settingsObservers)
         }
+        isFullyInitialised = true
     }
 
-    public func reset() {
-        run { client in _ = try await client.send(.reset) }
-        // Drop anything still queued for display: a fresh conversation must not begin by
-        // revealing the tail of the one that was just cleared.
-        for pane in panes {
-            pacer.clear(agentID: pane.id)
-            pane.endTurn()
-        }
-        rateSamples.removeAll()
-        errorBanner = nil
+    private var settingsObservers: [AnyCancellable] = []
+
+    /// Current settings, for the store to write.
+    var currentSeats: [AgentSpec] { panes.map(\.spec) }
+
+    /// Flush any pending write, for termination.
+    public func saveSettingsNow() {
+        onSettingsChanged?()
     }
 
-    /// Send the moderator's message.
-    ///
-    /// The send is returned as a task rather than started and forgotten: the button action ignores it,
-    /// and a test can await it instead of polling for the outcome it produces (A174).
-    @discardableResult
-    public func sendModeratorMessage() -> Task<Void, Never> {
-        let text = moderatorDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return Task {} }
-        return Task { [weak self] in await self?.deliverModeratorDraft(text) }
-    }
-
-    /// Send the moderator's message, and keep the draft unless the engine took it.
-    ///
-    /// Split from the button's action so the rule below has a caller a test can drive without
-    /// racing the task the button starts.
-    func deliverModeratorDraft(_ text: String) async {
-        let accepted = await deliver(.steer(text))
-        moderatorDraft = Self.draft(afterSendOf: text, accepted: accepted, current: moderatorDraft)
-    }
-
-    /// What the moderator's draft becomes once a send has been attempted.
-    ///
-    /// Cleared only when the engine accepted the message, and only when the box still holds what was
-    /// sent: the moderator may have started the next line while the request was in flight, and
-    /// clearing *that* would be this defect one step later. A send that was refused — a message over
-    /// the engine's limit, or an engine that cannot be reached at all — keeps what was typed, which
-    /// is the only copy of it (A174).
-    static func draft(afterSendOf sent: String, accepted: Bool, current: String) -> String {
-        guard accepted else { return current }
-        return current.trimmingCharacters(in: .whitespacesAndNewlines) == sent ? "" : current
-    }
-
-    /// Send one command and answer whether the engine accepted it.
-    ///
-    /// `run` is fire-and-forget: it reports a failure into `engineConnection` and returns, so a
-    /// caller whose next step depends on the outcome has nothing to read. This is that caller's
-    /// version (A174).
-    @discardableResult
-    private func deliver(_ request: EngineRequest) async -> Bool {
-        guard let client else {
-            reportNoClient()
-            return false
-        }
-        do {
-            _ = try await client.send(request)
-            return true
-        } catch {
-            engineConnection = error.localizedDescription
-            return false
-        }
-    }
-
-    /// Change one seat's thinking level. Applies from its next turn.
-    public func setThinking(_ mode: ThinkingMode, for agentID: String) {
-        run { client in
-            _ = try await client.send(
-                .updateSeat(.init(seatID: agentID, thinking: mode)))
-        }
-    }
-
-    /// Send one command and apply whatever the engine answers with.
-    ///
-    /// Every command answers with the whole state, so the interface never has to guess what
-    /// changed — and a refusal arrives the same way as a success, carrying the reason.
-    ///
-    /// **Why there is no second command queue here (audit A48).** Each command runs in its own
-    /// task, which used to let two sends overlap against a client that routed replies by queue
-    /// position, so replies could cross. That is fixed on the client (A39): `send` takes a
-    /// one-request-wide slot with a FIFO queue behind it, so the order commands register in is
-    /// the order they reach the wire, a reply is checked against the request it answers, and one
-    /// that cannot be matched fails the reader explicitly instead of being handed to the next
-    /// waiter. A queue here would duplicate that guarantee without adding one — the controls are
-    /// already mutually exclusive by run state, and the only concurrent sender is the poll,
-    /// which is a read. What the controller does owe is to surface the client's new explicit
-    /// failure, which the `catch` below does for a command and the poll does for itself.
-    private func run(_ body: @escaping (WebTransportEngineClient) async throws -> Void) {
-        guard let client else {
-            reportNoClient()
-            return
-        }
-        Task { [weak self] in
-            do {
-                try await body(client)
-            } catch {
-                self?.engineConnection = error.localizedDescription
-            }
-        }
-    }
-
-    /// Say that a command had nowhere to go, without covering a reason that is already there.
-    ///
-    /// A control pressed while nothing is connected has to say something, and "Not connected to the
-    /// engine." is the right thing to say when nothing else explains it. When something else does —
-    /// `connect` failing with "Could not reach the engine: …" — that reason is more specific and
-    /// still true, and the controls `applyAPIEndpoints` fires one after another must not overwrite it
-    /// with a symptom (A175). `connect` clears the message when a connection is actually made, so a
-    /// message that is present is always about the connection that is not.
-    private func reportNoClient() {
-        if engineConnection == nil { engineConnection = "Not connected to the engine." }
-    }
-
-    /// Record a connection that could not be made: the reason, and no client.
-    ///
-    /// The failure half of `connect`, in one place so that "a client that never connected is not a
-    /// connection" is stated once rather than implied by the order of two assignments (A175). Being a
-    /// method also means the failure path — which the whole finding is about — can be driven without
-    /// waiting out eight real connect attempts.
-    func noteConnectionFailed(_ reason: String) {
-        client = nil
-        engineConnection = reason
-    }
-
-    /// The whole conversation as plain text.
-    ///
-    /// One shared log walked once, so each message appears exactly once — including the
-    /// messages the two seats addressed to each other, which are the conversation rather
-    /// than duplicates of it. Timestamps are the format the moderator asked for.
-    public func transcriptAsText(exportedAt: Date = Date.now) -> String {
-        TranscriptWriter.text(
-            topic: topic,
-            turns: turns,
-            participants: currentSeats,
-            exportedAt: exportedAt
-        )
-    }
-
-    public func copyConversation() {
-        let text = transcriptAsText()
-        guard !text.isEmpty else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-    }
-
-    /// Save the conversation to a text file, through the standard macOS save dialog.
-    ///
-    /// Returns the chosen URL, or nil if the moderator cancelled.
-    @discardableResult
-    public func saveConversation() -> URL? {
-        let panel = NSSavePanel()
-        panel.title = "Save Conversation"
-        panel.message = "Save the full conversation log as a plain text file."
-        panel.prompt = "Save"
-        panel.allowedContentTypes = [.plainText]
-        panel.isExtensionHidden = false
-        panel.canCreateDirectories = true
-        panel.nameFieldStringValue = TranscriptWriter.suggestedFilename(topic: topic)
-
-        guard panel.runModal() == .OK, let url = panel.url else { return nil }
-
-        let text = transcriptAsText()
-        do {
-            // Atomic, so a failure part-way through cannot leave a half-written log where
-            // the moderator expects a complete one.
-            try Data(text.utf8).write(to: url, options: .atomic)
-            errorBanner = nil
-            return url
-        } catch {
-            errorBanner = "Could not save the conversation: \(error.localizedDescription)"
-            return nil
-        }
-    }
-
-    /// Rename a seat.
-    ///
-    /// The name is what the moderator sees, what the transcript is tagged with, and what
-    /// the *models* are told each participant is called. The seat's internal id is
-    /// untouched, so the log stays addressable and settings keep loading.
-    ///
-    /// Rejected while a conversation is running: history already carries the previous name,
-    /// and a rename halfway through would leave the shared log attributing turns to
-    /// different names for the same participant.
-    @discardableResult
-    public func renameSeat(_ agentID: String, to name: String) -> Bool {
-        guard turns.isEmpty, !isRunning else { return false }
-        guard let index = panes.firstIndex(where: { $0.id == agentID }) else { return false }
-
-        let trimmed = String(
-            name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(40))
-        var spec = panes[index].spec
-        // An emptied field falls back to the seat's kind rather than leaving it nameless.
-        spec.displayName = trimmed.isEmpty ? panes[index].seatKind : trimmed
-        panes[index].spec = spec
-
-        run { client in
-            _ = try await client.send(
-                .updateSeat(.init(seatID: agentID, name: spec.displayName)))
-        }
-        saveSettings()
-        return true
-    }
-
-    /// Whether seats may be renamed right now.
-    public var canRenameSeats: Bool { turns.isEmpty && !isRunning }
-
-    /// Change one seat's style. Applies from its next turn.
-    public func setPersona(_ personaID: String, for agentID: String) {
-        // The engine reseats the style and answers with the whole state, so the pane is
-        // updated from the reply rather than from a local guess at what changed.
-        run { client in
-            _ = try await client.send(
-                .updateSeat(.init(seatID: agentID, personaID: personaID)))
-        }
-        pane(agentID)?.spec.personaID = personaID
-        saveSettings()
-    }
-
-    /// Point one seat at a backend. Only offered before the conversation starts, because
-    /// switching mid-thread would change a participant's identity part-way through.
-    public func setBackend(_ backend: AgentSpec.Backend, for agentID: String) {
-        run { client in
-            _ = try await client.send(
-                .updateSeat(.init(seatID: agentID, backend: backend)))
-        }
-        pane(agentID)?.spec.backend = backend
-    }
-
-    /// Point one seat at a different MLX checkpoint.
-    ///
-    /// The engine replaces the seat's MLX engine with one for the new weights and releases the old
-    /// one, so the pane is updated from what was asked for and the next turn loads the new
-    /// checkpoint. A refusal — the room is running, or the id is empty — comes back as a message and
-    /// the pane keeps the model it has, because a change that did not happen must not be shown as one
-    /// that did (A173).
-    public func setModel(_ modelID: String, for agentID: String) {
-        let resolved = ModelCatalog.resolve(modelID)
-        guard !resolved.isEmpty else { return }
-        Task { [weak self] in
-            guard let self else { return }
-            // The pane follows the engine, not the click: the change is shown only once the engine has
-            // taken it, and a refusal — the room is running — arrives in `engineConnection` with the
-            // reason. Showing the new checkpoint on a seat that is still running the old one is the
-            // defect A173 records, and `deliver` is the awaiting send A174 added for exactly this.
-            guard await self.deliver(.updateSeat(.init(seatID: agentID, modelID: resolved))) else {
-                return
-            }
-            guard self.pane(agentID)?.spec.modelID != resolved else { return }
-            self.pane(agentID)?.spec.modelID = resolved
-            self.pane(agentID)?.spec.modelShortName = ModelNames.shortName(resolved)
-            self.saveSettings()
-        }
-    }
-
-    /// Point one seat at a different server or model id.
-    public func setEndpoint(_ endpoint: OpenAIEndpoint, for agentID: String) {
-        run { client in
-            _ = try await client.send(
-                .updateSeat(
-                    .init(
-                        seatID: agentID, backend: .openAIResponses, baseURL: endpoint.baseURL,
-                        apiModel: endpoint.model, apiKey: endpoint.apiKey)))
-        }
-        pane(agentID)?.spec.openAI = endpoint
-    }
-
-    /// Push every seat's configured endpoint into its engine.
-    ///
-    /// Called whenever the endpoint settings change and once at launch, so a seat is ready
-    /// before it is asked for a turn.
-    func applyAPIEndpoints(_ store: APIEndpointStore) {
-        for (index, pane) in panes.enumerated() where index < panes.count {
-            let endpoint = store.endpoint(forSeat: index)
-            pane.spec.openAI = endpoint
-            run { client in
-                _ = try await client.send(
-                    .updateSeat(
-                        .init(
-                            seatID: pane.id, baseURL: endpoint.baseURL,
-                            apiModel: endpoint.model, apiKey: endpoint.apiKey)))
-            }
-        }
-    }
-
-    /// Route every seat through the API, or back to the local models.
-    ///
-    /// The point of the API backend is that local weights need not be involved at all, so
-    /// this is a single switch rather than one per seat.
-    func useAPIForAllSeats(_ useAPI: Bool, store: APIEndpointStore) {
-        for pane in panes {
-            setBackend(useAPI ? .openAIResponses : .mlx, for: pane.id)
-        }
-        applyAPIEndpoints(store)
-    }
-
-    /// True when no seat is using the local MLX models.
-    public var isCloudOnly: Bool {
-        !panes.isEmpty && panes.allSatisfy { $0.spec.backend == .openAIResponses }
+    deinit {
+        flushTask?.cancel()
     }
 
     // MARK: - Derived
@@ -1041,492 +481,5 @@ public final class ChatController: ObservableObject {
     public var contextUsage: (tokens: Int, window: Int, fraction: Double) {
         guard let snapshot = lastSnapshot else { return (0, 0, 0) }
         return (snapshot.contextTokens, snapshot.contextWindow, snapshot.contextFraction)
-    }
-
-    // MARK: - Source material
-
-    /// Documents and images the moderator has added: what the engine is holding, plus anything
-    /// restored from settings that the engine could not be given (see `setAttachments`).
-    ///
-    /// Rebuilt from the state rather than kept separately, so the app and the engine cannot
-    /// disagree about what is attached. The extracted text is the engine's and is not sent
-    /// back, so a rebuilt document carries the engine's own summary and token count rather than
-    /// recomputing them from fields this side never had — recomputing produced "0 words" on
-    /// every chip (audit A46). The body itself is not here, which is why the chip does not
-    /// offer to show it.
-    ///
-    /// An image's bytes are not among the fields the engine sends either (A144, A214): this used to
-    /// decode `imageBase64` back into `imageData`, and nothing in the app ever read it — the chip
-    /// draws the document's kind as a symbol, not the picture. The engine keeps the bytes; sending
-    /// them cost a base64 copy of every attached image in every state push.
-    public var attachments: [AttachedDocument] {
-        let held = (lastSnapshot?.attachments ?? []).map { attachment in
-            AttachedDocument(
-                id: UUID(uuidString: attachment.id) ?? UUID(),
-                name: attachment.name,
-                kind: DocumentKind(rawValue: attachment.kind) ?? .plainText,
-                text: "",
-                byteCount: 0,
-                pageCount: nil,
-                wasTruncated: attachment.wasTruncated,
-                imageData: nil,
-                engineSummary: attachment.summary,
-                engineTokens: attachment.tokens)
-        }
-        guard !restoredAttachments.isEmpty else { return held }
-        // A restored file the engine has since been given — an adopted engine that already had
-        // it, or the moderator re-added it — is the engine's; the stored copy is superseded by
-        // name. Matching by id would show the same file twice, since a re-upload gets a new id.
-        let heldNames = Set(held.map(\.name))
-        return held + restoredAttachments.filter { !heldNames.contains($0.name) }
-    }
-
-    /// The attachments the models cannot currently see: restored from a saved conversation but
-    /// not loaded into this engine.
-    ///
-    /// The chip renders from this rather than from the banner, so dismissing the notice cannot
-    /// leave a chip implying the models can read material they cannot (audit A112). The state is
-    /// derived from `restoredAttachments`, which is what `setAttachments` and `addFiles` keep in
-    /// step, so a file that is re-added leaves this set immediately.
-    public var attachmentsNotLoaded: Set<UUID> {
-        Set(restoredAttachments.map(\.id))
-    }
-
-    /// Documents restored from settings that the engine has not been given.
-    ///
-    /// Held so a relaunch cannot destroy them. The engine is a separate, freshly started
-    /// process holding nothing, and the app cannot hand a stored document to it: a document the
-    /// moderator added was read *by the engine*, and what this side saved is the engine's
-    /// description of it, never the file. So they are shown and saved until the moderator
-    /// re-adds the file, and `setAttachments` says which ones the models cannot currently see.
-    private var restoredAttachments: [AttachedDocument] = []
-    /// The restore notice currently in the banner, so refreshing it never eats another message.
-    private var attachmentRestoreNotice: String?
-
-    /// Push the attachment set to the engine.
-    ///
-    /// Adding a file already happened over the request channel, so this only reconciles the
-    /// engine with the app's view — it removes what is gone. Adding here would re-upload, which
-    /// a restored document cannot be: the app never kept its body.
-    ///
-    /// An attachment is kept when its name is wanted as well as when its id is, because a
-    /// restored document carries the id of whichever engine first accepted it. Matching on ids
-    /// alone would delete the engine's copy of a file the moderator restored.
-    private func syncAttachments(_ documents: [AttachedDocument]) {
-        let wantedIDs = Set(documents.map(\.id.uuidString))
-        let wantedNames = Set(documents.map(\.name))
-        for present in lastSnapshot?.attachments ?? [] {
-            if wantedIDs.contains(present.id) { continue }
-            if wantedNames.contains(present.name) { continue }
-            run { client in _ = try await client.send(.removeAttachment(id: present.id)) }
-        }
-    }
-
-    /// Keep the "restored but not loaded" notice in step with `restoredAttachments`.
-    ///
-    /// It is a warning the moderator has to read, not a transient error: until the file is
-    /// added again the models cannot see it, and the list is kept so the relaunch that dropped
-    /// it is not also the relaunch that forgot it. Nothing is shown once every restored file is
-    /// either loaded or removed.
-    private func refreshAttachmentRestoreNotice() {
-        let notice: String?
-        if restoredAttachments.isEmpty {
-            notice = nil
-        } else {
-            let count = restoredAttachments.count
-            let names = restoredAttachments.map(\.name).joined(separator: ", ")
-            notice =
-                "\(count) saved source file\(count == 1 ? "" : "s") could not be loaded into this "
-                + "engine. The file itself was not kept, only what was read from it, so the "
-                + "models cannot see \(count == 1 ? "it" : "them") until "
-                + "\(count == 1 ? "it is" : "they are") added again: \(names)"
-        }
-        // Replace a previous notice, but never overwrite a different message the moderator has
-        // not read yet.
-        if errorBanner == nil || errorBanner == attachmentRestoreNotice {
-            errorBanner = notice
-        }
-        attachmentRestoreNotice = notice
-    }
-
-    /// True when every seat's model can accept images, which is what decides whether the
-    /// image part of the interface is offered at all. A conversation where one participant
-    /// cannot see the picture is worse than being told upfront that images are unavailable.
-    public var allSeatsSupportVision: Bool {
-        panes.allSatisfy { $0.spec.visionSupport.allowsImages }
-    }
-
-    /// Which seats cannot see, for the explanation shown when images are unavailable.
-    public var seatsWithoutVision: [String] {
-        panes.filter { !$0.spec.visionSupport.allowsImages }.map { $0.spec.displayName }
-    }
-
-    /// Files may only be added before the conversation starts: the material is context for
-    /// the discussion, and adding it midway would leave earlier turns ignorant of it.
-    public var canAttachFiles: Bool { turns.isEmpty && !isRunning }
-
-    /// Add files through the standard open panel.
-    @discardableResult
-    public func attachFiles(allowImages: Bool? = nil) -> Int {
-        guard canAttachFiles else {
-            errorBanner = "Source material must be added before the conversation starts."
-            return 0
-        }
-        let imagesAllowed = allowImages ?? allSeatsSupportVision
-
-        let panel = NSOpenPanel()
-        panel.title = "Add Source Material"
-        panel.message = imagesAllowed
-            ? "Choose documents or images. Text is extracted so the models can read it."
-            : "Choose documents. Images need every seat to support vision."
-        panel.prompt = "Add"
-        panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
-        var types: [UTType] = [.plainText, .pdf, .rtf, .html]
-        if let markdown = UTType(filenameExtension: "md") { types.append(markdown) }
-        if let word = UTType(filenameExtension: "docx") { types.append(word) }
-        if let legacyWord = UTType(filenameExtension: "doc") { types.append(legacyWord) }
-        if imagesAllowed { types.append(contentsOf: [.png, .jpeg, .bmp, .gif, .tiff, .heic]) }
-        panel.allowedContentTypes = types
-
-        guard panel.runModal() == .OK else { return 0 }
-        return addFiles(panel.urls, allowImages: imagesAllowed)
-    }
-
-    /// Add already-chosen files. Returns how many were accepted.
-    ///
-    /// The file is sent to the engine and extracted there, rather than being read here.
-    ///
-    /// That is a change of direction from the in-process design, and it is deliberate: the
-    /// engine holds the attachment, so the engine must be the one that decides what is in the
-    /// file. Extracting here as well would mean two implementations of "what does this
-    /// document say" that could disagree, and the app's copy would be the one on screen while
-    /// the engine used its own.
-    ///
-    /// The cost is that the whole file crosses the wire. On loopback, for a document a person
-    /// chose by hand, that is nothing.
-    /// Returns how many files were accepted for upload.
-    ///
-    /// The upload runs in the background: reading a large PDF and sending it should not freeze
-    /// the window, and the engine publishes the new attachment list when it is done, so there
-    /// is no local state to keep in step.
-    @discardableResult
-    public func addFiles(_ urls: [URL], allowImages: Bool = true) -> Int {
-        guard let client else {
-            errorBanner = "Not connected to the engine."
-            return 0
-        }
-        let imagesAllowed = allowImages && allSeatsSupportVision
-
-        // Checked before reading, so an unreadable or unwanted file costs nothing.
-        var queued: [(name: String, data: Data)] = []
-        var failures: [String] = []
-        for url in urls {
-            let name = url.lastPathComponent
-            if !imagesAllowed, let kind = DocumentKind.forFilename(name), kind.isImage {
-                failures.append(
-                    DocumentError.imageNotAllowed.errorDescription ?? "Images are unavailable.")
-                continue
-            }
-            do {
-                queued.append((name, try Data(contentsOf: url)))
-            } catch {
-                failures.append("\(name): \(error.localizedDescription)")
-            }
-        }
-
-        guard !queued.isEmpty else {
-            errorBanner = failures.first
-            return 0
-        }
-
-        errorBanner = nil
-        let pending = queued
-        Task { [weak self] in
-            var rejected: [String] = failures
-            for file in pending {
-                do {
-                    try await client.addAttachment(filename: file.name, contents: file.data)
-                    // The engine now holds the real file, so a stored copy of the same name is
-                    // no longer "restored but not loaded".
-                    self?.restoredAttachments.removeAll { $0.name == file.name }
-                } catch {
-                    // The engine's reason, which is what the user needs to read.
-                    rejected.append("\(file.name): \(error.localizedDescription)")
-                }
-            }
-            guard let self else { return }
-            self.errorBanner = rejected.isEmpty ? nil : rejected.joined(separator: "\n")
-            self.refreshAttachmentRestoreNotice()
-        }
-        return queued.count
-    }
-
-    /// Seed the attached material at launch, before any turn can run.
-    ///
-    /// The engine is a separate, freshly started process holding nothing, and a document the
-    /// moderator added was extracted *there*: what settings kept is the engine's description of
-    /// the file, never the file. So the stored list cannot be re-uploaded from here, and this
-    /// does not pretend otherwise. It keeps the list (see `restoredAttachments`), leaves it in
-    /// `attachments` so the chips and the saved settings survive the relaunch, reconciles away
-    /// anything the engine holds that is no longer wanted, and tells the moderator which files
-    /// the models cannot see until they are added again.
-    ///
-    /// Returns false when something could not be loaded, true when the engine already holds
-    /// everything asked for. The launch path ignores the result and reads the notice instead.
-    @discardableResult
-    public func setAttachments(_ documents: [AttachedDocument]) -> Bool {
-        // A file the engine already holds under the same name is loaded, not restored, so the
-        // stored copy is superseded rather than reported as missing.
-        let heldNames = Set((lastSnapshot?.attachments ?? []).map(\.name))
-        restoredAttachments = documents.filter { !heldNames.contains($0.name) }
-        syncAttachments(documents)
-        refreshAttachmentRestoreNotice()
-        return restoredAttachments.isEmpty
-    }
-
-    public func removeAttachment(_ id: UUID) {
-        restoredAttachments.removeAll { $0.id == id }
-        syncAttachments(attachments.filter { $0.id != id })
-        refreshAttachmentRestoreNotice()
-        saveSettings()
-    }
-
-    public func removeAllAttachments() {
-        restoredAttachments.removeAll()
-        syncAttachments([])
-        refreshAttachmentRestoreNotice()
-        saveSettings()
-    }
-
-    /// Ask for a vision override on a seat, for an API model whose family cannot be
-    /// recognised from its id.
-    public func setVisionOverride(_ agentID: String, _ support: VisionSupport?) {
-        guard var spec = panes.first(where: { $0.id == agentID })?.spec else { return }
-        spec.visionOverride = support
-        pane(agentID)?.spec = spec
-        saveSettings()
-    }
-
-    /// Where the log gets condensed, for display.
-    public var compactThreshold: Double { lastSnapshot?.compactThreshold ?? 0.7 }
-
-    /// Condense the log now, rather than waiting for the threshold.
-    public func compactNow() {
-        errorBanner = nil
-        run { client in _ = try await client.send(.compact) }
-    }
-
-    // MARK: - Kept conversations
-
-    /// What the engine has kept, newest first.
-    public func refreshSavedConversations() {
-        run { [weak self] client in
-            let reply = try await client.send(.listSavedConversations)
-            let list = reply.saved ?? []
-            await MainActor.run { self?.savedConversations = list }
-        }
-    }
-
-    /// Replace what is on screen with a conversation the engine kept.
-    ///
-    /// The engine answers with the whole state, so the transcript, the topic and the seats all
-    /// come from one reply and cannot disagree with each other. A conversation can only be
-    /// swapped while nothing is running: loading mid-run would leave the turn in flight writing
-    /// into a transcript that is no longer on screen.
-    public func loadSavedConversation(id: String) {
-        errorBanner = nil
-        run { [weak self] client in
-            let reply = try await client.send(.loadSavedConversation(id: id))
-            if let reason = reply.refusal {
-                await MainActor.run { self?.errorBanner = reason }
-                return
-            }
-            guard let snapshot = reply.snapshot else { return }
-            await MainActor.run { self?.apply(snapshot) }
-        }
-    }
-
-    /// Forget one kept conversation. The file on disk is removed, not just hidden.
-    public func deleteSavedConversation(id: String) {
-        errorBanner = nil
-        run { [weak self] client in
-            let reply = try await client.send(.deleteSavedConversation(id: id))
-            if let reason = reply.refusal {
-                await MainActor.run { self?.errorBanner = reason }
-                return
-            }
-            self?.refreshSavedConversations()
-        }
-    }
-
-    /// Start a fresh conversation without restarting the app or the engine.
-    public func beginNewConversation() {
-        errorBanner = nil
-        run { [weak self] client in
-            let reply = try await client.send(.newConversation)
-            if let snapshot = reply.snapshot {
-                await MainActor.run { self?.apply(snapshot) }
-            }
-            self?.refreshSavedConversations()
-        }
-    }
-
-    /// Dismiss the connection notice once it has been read.
-    public func clearConnectionMessage() { engineConnection = nil }
-
-    /// Where this engine's HTTP server is, so a share link can be built without being told a
-    /// port. Nil when the engine is WebTransport-only, and then there is nothing to share to.
-    public var shareBase: String? {
-        guard let base = lastSnapshot?.shareBase, !base.isEmpty else { return nil }
-        return base
-    }
-
-    /// A read-only link to one kept conversation, if the engine has a page to serve.
-    public func shareLink(for id: String) -> URL? {
-        shareBase.flatMap { URL(string: "\($0)/s/\(id)") }
-    }
-
-    /// Whether a kept conversation can be opened right now. Loading replaces the transcript, so
-    /// it is refused while a turn is generating rather than silently discarding that turn.
-    public var canLoadSavedConversation: Bool { !isRunning }
-
-    // MARK: - Mode, line-ups and scenarios
-
-    /// Switch the room between a show and an investigation.
-    ///
-    /// The engine refuses once a conversation has started, and the refusal is shown rather than
-    /// pre-empted: a disabled control would hide which rule was being applied.
-    public func setMode(_ value: DiscussionMode) {
-        errorBanner = nil
-        run { client in
-            let reply = try await client.send(.setMode(value))
-            if let reason = reply.refusal { await MainActor.run { self.errorBanner = reason } }
-        }
-    }
-
-    /// Set how hard a research session looks before concluding.
-    public func setResearchDepth(_ depth: ResearchBudget.Depth) {
-        errorBanner = nil
-        run { client in
-            let reply = try await client.send(.setResearchBudget(depth))
-            if let reason = reply.refusal { await MainActor.run { self.errorBanner = reason } }
-        }
-    }
-
-    /// Fetch the line-ups and scenarios for the mode the engine is in.
-    public func refreshLineup() {
-        let mode = self.mode
-        run { [weak self] client in
-            let rosters = try await client.send(.listRosters(mode)).rosters ?? []
-            let scenarios = try await client.send(.listScenarios(mode)).scenarios ?? []
-            await MainActor.run {
-                self?.rosters = rosters
-                self?.scenarios = scenarios
-            }
-        }
-    }
-
-    /// Apply a line-up, or a draw. The engine reports the seed in the log either way.
-    public func applyRoster(id: String) {
-        errorBanner = nil
-        run { client in
-            let reply = try await client.send(
-                .applyRoster(id: id, seed: RosterLibrary.freshSeed()))
-            if let reason = reply.refusal { await MainActor.run { self.errorBanner = reason } }
-        }
-    }
-
-    /// Put a whole scenario — question, panel and budget — in place at once.
-    public func applyScenario(id: String) {
-        errorBanner = nil
-        run { client in
-            let reply = try await client.send(.applyScenario(id: id))
-            if let reason = reply.refusal { await MainActor.run { self.errorBanner = reason } }
-        }
-    }
-
-    /// Whether who is in the room, and what they are asked, can still be changed.
-    public var canChangeLineup: Bool { !isRunning }
-
-    // MARK: - The human moderator
-
-    /// The moderator's chosen persona, or neutral.
-    ///
-    /// The engine reports the persona's *display* name, because that is what a person reads;
-    /// the picker needs the identifier, so it is resolved back through the same library the
-    /// engine used. An unknown name falls back to neutral rather than to a wrong persona.
-    public var moderatorPersonaID: String {
-        guard let reported = lastSnapshot?.moderatorPersona else { return PersonaLibrary.neutral.id }
-        if reported == PersonaCatalog.style(
-            id: PersonaLibrary.neutral.id, mode: mode, seatIndex: 0
-        ).name {
-            return PersonaLibrary.neutral.id
-        }
-        return availablePersonas.first { $0.name == reported }?.id ?? PersonaLibrary.neutral.id
-    }
-
-    /// The personas this mode offers, for the identity picker.
-    public var availablePersonas: [APIPersona] { lastSnapshot?.availablePersonas ?? [] }
-
-    public func setModerator(name: String, personaID: String) {
-        errorBanner = nil
-        let identity = ModeratorIdentity(name: name, personaID: personaID)
-        // Kept here as well as in the engine, because the engine will not remember it across a
-        // restart and this is the only place that will.
-        restoredModerator = identity
-        saveSettings()
-        run { client in
-            let reply = try await client.send(.setModerator(identity))
-            if let reason = reply.refusal { await MainActor.run { self.errorBanner = reason } }
-        }
-    }
-
-    // MARK: - The audience
-
-    /// Score one contribution, or withdraw the score by passing the same verdict again.
-    ///
-    /// Voting twice with the same verdict clears it rather than re-casting, so a mis-click is
-    /// undone by clicking the same button — reversing it by casting the opposite would leave a
-    /// judgement in the record that nobody made.
-    public func castVote(turnID: String, verdict: AudienceVote.Verdict) {
-        errorBanner = nil
-        let next: AudienceVote.Verdict? = votes[turnID] == verdict.rawValue ? nil : verdict
-        run { client in
-            let reply = try await client.send(.castVote(turnID: turnID, verdict: next))
-            if let reason = reply.refusal { await MainActor.run { self.errorBanner = reason } }
-        }
-    }
-
-    /// What the audience decided about one contribution, if anything.
-    public func vote(for turnID: UUID) -> AudienceVote.Verdict? {
-        votes[turnID.uuidString].flatMap(AudienceVote.Verdict.init(rawValue:))
-    }
-
-    public func clearVotes() {
-        errorBanner = nil
-        run { client in
-            let reply = try await client.send(.clearVotes)
-            if let reason = reply.refusal { await MainActor.run { self.errorBanner = reason } }
-        }
-    }
-
-    /// Save the report the engine produced, as markdown.
-    @discardableResult
-    public func saveReport() -> URL? {
-        guard let report, !report.markdown.isEmpty else { return nil }
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.plainText]
-        panel.nameFieldStringValue =
-            TranscriptWriter.suggestedFilename(topic: report.question, at: report.producedAt)
-                .replacingOccurrences(of: ".txt", with: ".md")
-        guard panel.runModal() == .OK, let url = panel.url else { return nil }
-        do {
-            try report.markdown.write(to: url, atomically: true, encoding: .utf8)
-            return url
-        } catch {
-            errorBanner = error.localizedDescription
-            return nil
-        }
     }
 }

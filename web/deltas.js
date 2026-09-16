@@ -13,7 +13,7 @@
 // No DOM in this file, which is the point: the merge is the part that is easy to get wrong (a turn
 // that starts must clear what the previous turn left, reasoning accumulates separately from the
 // answer, an unknown agent must not invent a seat), and keeping it here lets
-// `tools/check-web-deltas.js` run it in Node against those cases (A165).
+// `tools/check-web-deltas.js` run it in Node against those cases.
 
 (function (global) {
   "use strict";
@@ -74,9 +74,9 @@
    *
    * The engine stamps every snapshot with a monotonic revision, which orders two produced inside the
    * same second — its wall clock cannot, because `serverTime` is ISO-8601 to the second — and keeps
-   * ordering them when the clock moves backwards. The app has had this guard since A110; the page
+   * ordering them when the clock moves backwards. The app has carried this guard since it was introduced; the page
    * applied whatever arrived last, so a `GET /api/state` racing the first pushed snapshot could put
-   * the older one on screen and leave it there until the next turn (A171).
+   * the older one on screen and leave it there until the next turn.
    *
    * A snapshot from an engine that predates the field carries no revision, and then the clock is the
    * only ordering available — the same fallback `APISnapshot.isOlder(than:)` makes, so the two front

@@ -7,7 +7,7 @@
 //     Network/Connection.swift:5833: Fatal error: Neither nw nor nwGroup is initialized
 //
 // which reads as a catastrophic product failure rather than as a test-runtime collision, and which
-// Phase E would have reported as a crash (A102, and one of A108's two sources of flakiness).
+// would have been reported as a crash (one of the two sources of flakiness).
 // Serialising the suites was the recorded next step, and this is that, applied across suites rather
 // than within each of them. `.serialized` stays on each suite because the tests that bind a fixed
 // port also need their own ordering.
@@ -24,7 +24,7 @@ import Testing
 /// blocking a cooperative thread while another test needs it to make progress is a deadlock, and
 /// under a bounded thread pool it is a reliable one.
 ///
-/// A waiter cancelled while it is queued leaves the queue and never takes the gate (A168). It used to
+/// A waiter cancelled while it is queued leaves the queue and never takes the gate. It used to
 /// stay queued: the continuation was orphaned, `release()` handed the gate to a task that would never
 /// resume, and every later transport suite blocked forever — a hung suite that reads as a product
 /// hang rather than as a harness defect. Cancellation throws `CancellationError` instead of returning
@@ -104,7 +104,7 @@ actor TransportGate {
 /// The five transport suites each ended their tests with `defer { Task { await running.stop() } }`,
 /// which returns immediately: the gate was released while the listener was still closing, and the
 /// next suite acquired it into exactly the overlap the gate exists to prevent — the recorded symptom
-/// being Network.framework's `Fatal error: Neither nw nor nwGroup is initialized` (A169). A `defer`
+/// being Network.framework's `Fatal error: Neither nw nor nwGroup is initialized`. A `defer`
 /// cannot await, so the work is registered here instead and the suite trait runs it before it lets
 /// the gate go.
 ///
@@ -139,11 +139,11 @@ enum TransportTeardown {
 ///
 /// Applied as a suite trait, so a suite cannot be added to this file's list and then forgotten.
 ///
-/// **What the scope actually covers, measured rather than assumed (A169).** A `TestScoping` trait on a
+/// **What the scope actually covers, measured rather than assumed.** A `TestScoping` trait on a
 /// suite wraps the *suite*, not each test in it: instrumenting `provideScope` for a four-test suite
 /// printed one entry, with work registered by two of those tests before the first release. `.serialized`
 /// on the suite is what orders the tests within it. What the gate therefore guarantees is that only one
-/// transport suite — and so one QUIC runtime — is live at a time, which is what A102 needed; it does not
+/// transport suite — and so one QUIC runtime — is live at a time, which is what the gate needed; it does not
 /// make the tests inside a suite hold it one at a time. This doc comment used to claim the gate was taken
 /// "for each of its tests", which was wrong and had never been measured.
 struct TransportSerialized: SuiteTrait, TestScoping {
@@ -158,8 +158,8 @@ struct TransportSerialized: SuiteTrait, TestScoping {
     /// Take `gate`, run `body`, run the teardowns `body` registered, then release.
     ///
     /// Separated from `provideScope` because this is the part with an invariant in it, and a `Test`
-    /// value cannot be constructed by a test — so `AuditS1TeardownTests` exercises this directly, with
-    /// a gate of its own, rather than asserting a copy of it (A169).
+    /// value cannot be constructed by a test — so `TeardownTests` exercises this directly, with
+    /// a gate of its own, rather than asserting a copy of it.
     ///
     /// `@MainActor` because the body captures the test's own objects through the teardowns it
     /// registers, and neither those objects nor the closures are `Sendable`. Every suite that uses this
@@ -186,7 +186,7 @@ struct TransportSerialized: SuiteTrait, TestScoping {
             throw error
         }
         // Before the release, which is the whole point: the gate is what says "no other transport
-        // suite is running", and a listener that has not finished closing still is one (A169).
+        // suite is running", and a listener that has not finished closing still is one.
         await TransportTeardown.drain()
         await gate.release()
     }

@@ -9,7 +9,7 @@
 // clicking the verdict already cast means "take it back". Casting its opposite instead would put a
 // judgement in the record that nobody made, which is the reason the withdrawal is worth having.
 //
-// A160 is why this file exists: the row captured the verdict it was built with, and a turn is drawn once —
+// This file exists because the row captured the verdict it was built with, and a turn is drawn once —
 // its marks are redrawn in place — so the captured value was normally "none", and clicking the cast verdict
 // re-cast it instead of withdrawing it.
 

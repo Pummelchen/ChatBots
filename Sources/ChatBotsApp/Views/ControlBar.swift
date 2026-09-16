@@ -152,7 +152,7 @@ struct ControlBar: View {
     /// body that set `errorBanner = nil` and nothing else, under help text promising "Pre-load
     /// weights so the first turn starts immediately". A client cannot warm a seat — the engine
     /// loads weights on the first turn — so the control lied about what it did and was removed
-    /// (audit A51) rather than left as a placeholder. Which model each seat runs is still shown,
+    /// rather than left as a placeholder. Which model each seat runs is still shown,
     /// as `spec.backendLabel` in the seat's own pane header.
     private var actionRow: some View {
         HStack(spacing: 6) {
@@ -175,7 +175,7 @@ struct ControlBar: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
-                        .disabled(!controller.canStart)
+            .disabled(!controller.canStart)
             .help("Load both models and begin the conversation")
 
             Button {
@@ -185,7 +185,7 @@ struct ControlBar: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-                        .disabled(!status.isActive && !status.isPaused)
+            .disabled(!status.isActive && !status.isPaused)
             .keyboardShortcut("p", modifiers: [.command, .shift])
 
             Button {
@@ -195,7 +195,7 @@ struct ControlBar: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-                        .disabled(!status.isActive && !status.isPaused)
+            .disabled(!status.isActive && !status.isPaused)
             .keyboardShortcut(".", modifiers: .command)
         }
     }
@@ -210,7 +210,7 @@ struct ControlBar: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-                        .disabled(controller.turns.isEmpty)
+            .disabled(controller.turns.isEmpty)
             .help("Save the full conversation log to a text file")
 
             Button {
@@ -220,7 +220,7 @@ struct ControlBar: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-                        .help("Reopen a conversation the engine kept, or start a new one")
+            .help("Reopen a conversation the engine kept, or start a new one")
             .sheet(isPresented: $showSaved) {
                 SavedConversationsSheet(controller: controller) { showSaved = false }
                     // A sheet is a separate presentation context, so it does not inherit the
@@ -235,7 +235,7 @@ struct ControlBar: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-                        .help("Choose who is in the room, or let the app choose")
+            .help("Choose who is in the room, or let the app choose")
             .sheet(isPresented: $showLineup) {
                 LineupSheet(controller: controller) { showLineup = false }
                     .environmentObject(zoom)
@@ -248,8 +248,8 @@ struct ControlBar: View {
                     Label("Report", systemImage: "doc.text.magnifyingglass")
                 }
                 .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-                            .help("The report the investigation produced")
+                .controlSize(.small)
+                .help("The report the investigation produced")
                 .sheet(isPresented: $showReport) {
                     ReportSheet(controller: controller) { showReport = false }
                         .environmentObject(zoom)
@@ -263,7 +263,7 @@ struct ControlBar: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-                        .disabled(controller.isRunning)
+            .disabled(controller.isRunning)
             .help("Forget the transcript. Loaded models stay in memory.")
         }
     }

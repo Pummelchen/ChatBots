@@ -24,19 +24,26 @@ Swift 6.4 / SwiftPM, package floor macOS 26, Apple Silicon only.
 
 ## Layout
 
-- `Sources/ChatBotsCore/` — the engine-agnostic domain (51 files): the conversation
-  engine, research moderator, personas, conversation store, `EngineService.swift`,
-  `HTTPServer.swift`, and the two **generated** files `WebAssets.swift` and
-  `NameLists.swift`.
-- `Sources/ChatBotsApp/` — SwiftUI views. `Sources/ChatBotsCLI/` and
-  `Sources/ChatBotsProbe/` — terminal runners.
-- `Tests/ChatBotsCoreTests/` — mirrors the core, and `Tests/ChatBotsAppTests/` — the
-  app target's own. Both are **swift-testing**, and `tools/mac-checks.sh` measures
-  every test bundle rather than naming one.
-- `web/` (`index.html`, `app.js`, `style.css`, `deltas.js`, `votes.js`) and the six
-  `names/*.txt` lists are the **sources** for the two generated files.
-- `tools/` — the install and start scripts, `mac-checks.sh` (the Mac gate), the embed
-  and notice tools, the pinned-tool fetchers, and the static-analysis waivers in
+- `Sources/ChatBotsCore/` — the engine-agnostic domain: 99 files in topic directories. `Engine/`
+  (the MLX engine, the engine service and the turn loop), `Conversation/` (the engine that drives a
+  room), `Room/` (seats, personas, rosters, modes and the social library), `Prompt/`, `Research/`
+  (the moderator, its reading and the report), `HTTP/` (the server and its API), `Transport/`
+  (WebTransport and certificates), `OpenAI/`, `Attachments/`, `Models/` and `Support/`. The two
+  **generated** files, `WebAssets.swift` and `NameLists.swift`, stay at the target root because the
+  embed tools write them there by name.
+- `Sources/ChatBotsApp/` — the SwiftUI app, with `Views/` holding the window and its rows.
+  `Sources/ChatBotsCLI/` — `main.swift` plus one file per mode. `Sources/ChatBotsProbe/` — the
+  transport probe.
+- `Tests/ChatBotsCoreTests/` and `Tests/ChatBotsAppTests/` — **swift-testing**, one file per subject
+  with its fixtures beside it; `tools/mac-checks.sh` measures every test bundle rather than naming
+  one.
+- `web/` (`index.html`; the stylesheets `style.css`, `style-panes.css`, `style-panels.css`;
+  the module entry `app.js` with `app-core.js`, `app-screen.js`, `app-transcript.js`,
+  `app-controls.js`, `app-lineup.js`, `app-commands.js`; and `deltas.js`, `votes.js`) and the
+  six `names/*.txt` lists are the **sources** for the two generated files.
+- `tools/` — the install and start scripts (`lib/` holds the phases they source), `mac-checks.sh`
+  (the Mac gate), `check-file-sizes.sh` (the 500-line rule, which CI calls too), the embed and notice
+  tools, the pinned-tool fetchers, the device-capture helpers and the static-analysis waivers in
   `analysis-waivers.txt`.
 - `docs/` — `toolchain.md` (what to install and which versions the gates expect),
   `webtransport-plan.md`, and the screenshots the README and wiki use.
@@ -74,19 +81,23 @@ release, and nothing enforces the value against a release.
   the generated files must be in step with their sources — plus
   `third-party-notices.py`, `bash -n` over every tracked shell script, `python3 -m
   py_compile` over the Python, `shellcheck`, `ruff`, `pyright`, `gitleaks` over the
-  full history, `semgrep` (through `tools/semgrep-waivers.py`) and `osv-scanner`. None
-  of them is advisory: a finding fails the job.
+  full history, `semgrep` (through `tools/semgrep-waivers.py`), `osv-scanner`, and
+  `tools/check-file-sizes.sh` — no code file over 500 lines. None of them is advisory:
+  a finding fails the job.
 - The two toolchain pinning checks: the three release binaries CI installs are fetched
   by `tools/fetch-analysis-tools.sh` with a pinned SHA-256 each, and a step fails if
   those versions disagree with `tools/toolchain-versions.txt`.
 - Two structural assertions: the bundle's `LSMinimumSystemVersion` must equal
   `Package.swift`'s `.macOS(.vN)`, and `install.sh` must not hardcode an OS literal.
-- The mac-only gate is `tools/mac-checks.sh`: `swift build --build-tests`,
-  `swift test --enable-code-coverage`, `llvm-cov report`, `swiftlint lint`, and
-  `swift-format lint` over `Sources`/`Tests` excluding the two generated files.
-  swiftlint and swift-format are judged against **recorded waivers** in
+- The mac-only gate is `tools/mac-checks.sh`, seven gates in one command: the file-size
+  check, `swift build --build-tests`, `swift test --enable-code-coverage`,
+  `llvm-cov report`, `swiftlint lint`, `swift-format lint` over `Sources`/`Tests`
+  excluding the two generated files, and the two Node web-rule checks. swiftlint and
+  swift-format are judged against **recorded waivers** in
   `tools/analysis-waivers.txt`, not against zero — that file also carries the semgrep
   findings this project accepts, and is the only place either gate reads them from.
+  The size limit is one number in one script (`tools/check-file-sizes.sh`), called by
+  both CI and `mac-checks.sh`, so the two cannot disagree about which file is too long.
 - No git hooks and no pre-commit config.
 
 ## Traps

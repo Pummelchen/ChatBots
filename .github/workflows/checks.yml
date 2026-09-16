@@ -82,6 +82,11 @@ jobs:
       # parse check are scoped to that directory rather than to every `*.py` in the tree.
       - name: The helper scripts parse
         run: for script in tools/*.py; do python3 -m py_compile "$script"; done
+      # A file that outgrows a reader is usually two responsibilities wearing one name, and the
+      # split is cheapest while the file is still small. The check lives in one script so that the
+      # Mac gate (`tools/mac-checks.sh`) and CI judge exactly the same list — see `docs/toolchain.md`.
+      - name: No tracked code file is over 500 lines
+        run: bash tools/check-file-sizes.sh
       # The bundle said 14.0 while the package needs macOS 26, so the app would launch on
       # Sonoma and Sequoia and fail at the transport instead of the system saying why. The two
       # declarations are one fact and are now checked as one.
@@ -119,16 +124,18 @@ jobs:
       # The installer declared the minimum a third time, as 14, so a Sonoma user downloaded the
       # checkpoint and built the app before the bundle's own minimum refused to launch it. It
       # now reads the requirement from Package.swift; this catches a literal creeping back in.
+      # The comparison moved into `tools/lib/install-checks.sh`, which `tools/install.sh` sources,
+      # so the grep covers the entry point and every phase file rather than only the entry point.
       - name: The installer does not declare its own minimum macOS
         run: |
           set -eu
-          if grep -nE 'OS_MAJOR.*-lt[[:space:]]*[0-9]' tools/install.sh; then
-            echo "::error::install.sh compares the OS version against a literal; read it from Package.swift"
+          if grep -nE 'OS_MAJOR.*-lt[[:space:]]*[0-9]' tools/install.sh tools/lib/*.sh; then
+            echo "::error::the installer compares the OS version against a literal; read it from Package.swift"
             exit 1
           fi
           # Anchored on `OS_MAJOR` rather than on `-lt <number>`, because the script compares other
           # counters against literals and those are not this defect.
-          echo "install.sh reads the minimum macOS from Package.swift"
+          echo "the installer reads the minimum macOS from Package.swift"
 
   static-analysis:
     name: Lint, type-check and scan
@@ -209,10 +216,11 @@ jobs:
       - name: No secret in the full history
         run: gitleaks git --log-opts=--all --redact --no-banner
       # Scoped to the source trees the repository ships, so no captured scanner output or build
-      # product is mistaken for code. Three findings in `tools/cdp.py` are waived in writing in
-      # `tools/analysis-waivers.txt` and deliberately left visible rather than suppressed, so
-      # `--error` would fail on exactly the findings this project has justified: the allowlist is what
-      # decides, and it is one implementation, called by this job and by `tools/mac-checks.sh`.
+      # product is mistaken for code. Three findings in `tools/cdp.py` and `tools/cdp_protocol.py`
+      # are waived in writing in `tools/analysis-waivers.txt` and deliberately left visible rather
+      # than suppressed, so `--error` would fail on exactly the findings this project has justified:
+      # the allowlist is what decides, and it is one implementation, called by this job and by
+      # `tools/mac-checks.sh`.
       # Without `--quiet`, so the job log carries the summary the scan resolves: how many rules ran,
       # how many targets were scanned, and what was skipped. The rule set comes from the registry at
       # scan time and is not covered by the version pin — the header says so.

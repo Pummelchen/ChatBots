@@ -39,7 +39,7 @@ func parseOptions() -> Options {
             // Validated rather than swallowed. `UInt16(String)` returns nil for a non-numeric or
             // out-of-range value, so `--port abc` or `--port 70000` used to fall through to 7790
             // and the probe reported on an engine the caller had not named — the silent-fallback
-            // class A62 removed from the CLI's `--transport-port` (A113). Zero is refused too: it
+            // class removed from the CLI's `--transport-port`. Zero is refused too: it
             // announces a destination nothing can be listening on.
             let portRaw = next() ?? ""
             guard let port = UInt16(portRaw), port != 0 else {
@@ -55,7 +55,7 @@ func parseOptions() -> Options {
             // `allSucceeded` true, so the probe printed "all cycles succeeded" over an
             // untested transport, and a negative value formed `0..<(-n)`, whose `Range`
             // has a precondition, killing the probe. This is the check the supervisor's
-            // pre-connect probe runs, so a green light has to have probed something (A59).
+            // pre-connect probe runs, so a green light has to have probed something.
             let cyclesRaw = next() ?? ""
             guard let count = Int(cyclesRaw), count >= 1 else {
                 FileHandle.standardError.write(
@@ -68,7 +68,7 @@ func parseOptions() -> Options {
         case "--hold":
             // A non-numeric or negative value used to be accepted and then ignored by the
             // `holdSeconds > 0` gate, so `--hold abc` and `--hold -5` both silently did not hold
-            // while the probe went on to report success (A113). A hold of nothing is not a hold,
+            // while the probe went on to report success. A hold of nothing is not a hold,
             // so it is refused rather than quietly reinterpreted.
             let holdRaw = next() ?? ""
             guard let seconds = Int(holdRaw), seconds >= 1 else {
@@ -103,7 +103,7 @@ func parseOptions() -> Options {
 @MainActor
 func probe(port: UInt16, cycles: Int, holdSeconds: Int, quiet: Bool) async -> Bool {
     // Defence in depth behind the parser: "no cycles ran" is not "all cycles succeeded", and
-    // this must not depend on every caller having validated the count first (A59).
+    // this must not depend on every caller having validated the count first.
     guard cycles >= 1 else {
         print("cycles must be at least 1 — a probe that runs no cycles proves nothing")
         return false

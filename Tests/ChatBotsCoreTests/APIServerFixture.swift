@@ -1,7 +1,7 @@
 // ChatBotsCoreTests — a running engine behind an HTTP server, for tests that drive its routes over a
 // real socket.
 //
-// Extracted from `AuditS2MalformedBodyTests` (A142) when a second suite needed it (A153). The two are
+// Extracted from `MalformedBodyTests` when a second suite needed it. The two are
 // about the same rule one step apart: a body the server cannot read must not change the room, whether
 // it cannot be read because it is not the JSON the route takes or because the framing around it was
 // never decoded.

@@ -94,27 +94,29 @@ nesting:
   type_level: 2
 
 file_length:
-  # The project organises by domain, not by line count: 22 files exceed SwiftLint's default
-  # 400 and several are large on purpose. WebAssets.swift is excluded as generated above.
-  # 600/1200 leaves 9 genuinely oversized files visible: ConversationEngine (1,361, error),
-  # ChatController (1,275, error), MLXEngine (860), main.swift (840), ChatModels (809),
-  # APIServer (755), HTTPServer (648), ResearchDirectorTests (646), OpenAIResponsesClient
-  # (638). The 13 files between 400 and 600 are tolerated by this threshold.
+  # Nothing reaches this threshold, and that is the point: the project's own limit is 500 lines,
+  # enforced by `tools/check-file-sizes.sh` on every push and again inside `tools/mac-checks.sh`,
+  # and every authored file is under it. WebAssets.swift is excluded as generated above. The
+  # 600/1200 pair stays as the backstop for a file nobody ran the size check on — a threshold set
+  # to the same 500 would report what that check already reports, one command later.
   warning: 600
   error: 1200
 
 type_body_length:
-  # Container types here hold a whole domain (ConversationEngine, MLXEngine, SocialLibrary).
-  # 11 findings at the default 250/350; 400/800 leaves the 4 largest visible
-  # (ConversationEngine 839 error, ChatController 762, MLXEngine 492, SocialLibrary 445).
+  # Container types here hold a whole domain, and after the file-size split exactly one still
+  # spans more than this: `SocialLibrary`'s 36 character definitions (432). 400/800 reports that
+  # one and nothing else — the engines and the conversation engine now hold their declarations
+  # and their behaviour in separate files.
   warning: 400
   error: 800
 
 function_body_length:
-  # SwiftLint default 50/100. 21 findings; this codebase's parsers and request handlers do
-  # run long. 80/160 leaves the 8 unwieldiest visible: MLXEngine (198, error),
-  # EngineService (121), TransportCheck (117), ConflictState (109), main.swift (90),
-  # ConflictReader (89), ResearchDirector (89), EngineService (86).
+  # SwiftLint default 50/100. Nine functions run long, and each is a long ordered sequence whose
+  # length is its subject: `CommandLine.parse` (159), `EngineService.handle` (153),
+  # `TurnLoop.runTurn` (123), `TransportCheck.run` (122), `ResearchReading.read` (114),
+  # `ConflictState.apply` (109), `ConflictReader.signals` (103), `ServeCommand.run` (101) and
+  # `EngineService.snapshot` (91). 80/160 keeps them visible without reporting the ordinary
+  # parser-sized function beside them.
   warning: 80
   error: 160
 

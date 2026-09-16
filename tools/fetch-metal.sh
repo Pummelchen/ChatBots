@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fetches MLX's compiled Metal kernel library (mlx.metallib).
 #
-# Why this is needed — corrected under Xcode 27 (A135). This used to say that mlx-swift's
+# Why this is needed — corrected under Xcode 27. This used to say that mlx-swift's
 # SwiftPM build does not compile the Metal kernels, and that is false: with the Metal toolchain
 # installed the build compiles every kernel into
 # `mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib`, and that file runs — measured by
@@ -111,7 +111,7 @@ if [[ ! -f "$LIB" ]]; then
     # A stalled transfer fails and is retried instead of waiting forever: curl aborts a connection
     # that has stopped moving (`--speed-limit`/`--speed-time`), `--retry` also covers a handshake
     # that never completes, and each retry starts the archive again so there is no partial file to
-    # resume from (A193).
+    # resume from.
     curl -fL --connect-timeout 20 --speed-limit 1024 --speed-time 30 \
       --retry 3 --progress-bar -o "$ZIP.partial" "$URL"
     mv "$ZIP.partial" "$ZIP"
@@ -178,7 +178,7 @@ done
 # This used to be two `if`s with no else: a `--bin` that did not exist and a `--into` target with no
 # `Contents/MacOS` were both skipped in silence, and the script exited 0 having installed nothing —
 # inviting exactly the failure it exists to prevent, MLX throwing "Failed to load the default
-# metallib" the first time a model touches the GPU (A184). A bundle without the library is not a
+# metallib" the first time a model touches the GPU. A bundle without the library is not a
 # bundle, so a destination that cannot be written is an error, not a note.
 installed=0
 

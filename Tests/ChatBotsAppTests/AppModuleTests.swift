@@ -1,9 +1,9 @@
-// ChatBotsAppTests — the application target, which had no test target at all (A166).
+// ChatBotsAppTests — the application target, which had no test target at all.
 //
 // The only test target depended on `ChatBotsCore`, and `ChatBots` is an executable target, so
 // everything in `Sources/ChatBotsApp` — the controller, the supervisor, the stores, the zoom — was
 // outside every gate, and `coverage.log` covered `ChatBotsCore` alone. The audit's own convention is
-// that unmeasured code is where defects survive; `AuditFinalSnapshotRevisionTests.swift` recorded
+// that unmeasured code is where defects survive; `SnapshotRevisionTests.swift` recorded
 // outright that the app-side call could not be imported.
 //
 // What is covered here is the app's *logic*: the stores, the supervisor's state and the zoom, which
@@ -28,7 +28,7 @@ private func scratchDefaults(_ name: String = UUID().uuidString) -> UserDefaults
 }
 
 @MainActor
-@Suite("The settings store (A166)")
+@Suite("The settings store")
 struct SettingsStoreTests {
 
     @Test("What is saved is what the next store loads")
@@ -68,7 +68,7 @@ struct SettingsStoreTests {
 
     @Test("A key an older build left in the preferences plist is removed when it is loaded")
     func staleKeyIsScrubbedOnLoad() throws {
-        // What A139 is about: the key was written to the plist, so the fix has to remove one that is
+        // The defect: the key was written to the plist, so the fix has to remove one that is
         // already there, not only stop writing new ones.
         let defaults = scratchDefaults()
         var spec = AgentSpec.seat(index: 0)
@@ -97,7 +97,7 @@ struct SettingsStoreTests {
 }
 
 @MainActor
-@Suite("The API endpoint store (A166)")
+@Suite("The API endpoint store")
 struct APIEndpointStoreTests {
 
     @Test("A per-seat endpoint edit lands on that seat and no other")
@@ -129,7 +129,7 @@ struct APIEndpointStoreTests {
 }
 
 @MainActor
-@Suite("The engine supervisor's published state (A166)")
+@Suite("The engine supervisor's published state")
 struct EngineSupervisorStateTests {
 
     @Test("Every state has a label a user can read")

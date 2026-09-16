@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The pinned analysis binaries the CI job runs, fetched and verified before they are unpacked.
 #
-# Why this exists (A187). The workflow piped each release asset straight into `tar`:
+# Why this exists. The workflow piped each release asset straight into `tar`:
 #
 #     curl -fsSL "https://github.com/…/shellcheck-v0.11.0.linux.x86_64.tar.xz" | tar -xJ -C "$tools"
 #
@@ -9,7 +9,7 @@
 # anyone with release rights on that repository, and the job then executes whatever is there — the
 # same repository whose `tools/fetch-metal.sh` pins a SHA-256 for its own download, and whose workflow
 # header claimed the tools were pinned. Every asset here is checked against a pinned SHA-256 before it
-# is unpacked, and an empty pin is an error rather than "no verification needed" (the rule A24 set).
+# is unpacked, and an empty pin is an error rather than "no verification needed", by design.
 #
 # The Python and Node tools are deliberately not handled here. `pip install ruff==0.16.7` and
 # `npm install --global pyright@1.1.414` name artefacts those registries refuse to publish twice, so
@@ -97,7 +97,7 @@ verify() {
 }
 
 fetch() {
-    # Bounded the way the installer's downloads are (A193): a connection that stalls once established
+    # Bounded the way the installer's downloads are: a connection that stalls once established
     # must fail this step — visibly, with the digest check never reached — rather than hold the job
     # until its own timeout, and a handshake that never completes is bounded separately.
     curl -fsSL --connect-timeout 20 --speed-limit 1024 --speed-time 30 -o "$2" "$1"
