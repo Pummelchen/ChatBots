@@ -15,8 +15,10 @@ request. The previous `audit/2026-09-13` audit was landed on `main` as a fast-fo
 > **Reading the phase sections below.** They are the 2026-09-13 audit's own plan and status, kept as
 > the record of how that audit ran. The 2026-09-15 re-audit re-ran Phase A and Phase B against the
 > Swift 6.4 toolchain and those results are appended to [`environment.md`](environment.md) and
-> [`inventory.md`](inventory.md); it is **in Phase C**, and its Phase E has not been run. Where the
-> two disagree about counts, `ledger.json` decides and nothing hand-written here does.
+> [`inventory.md`](inventory.md); **its Phase C is complete** — 218 tasks, all DONE, in
+> [`ledger.json`](ledger.json) — and **its Phase E has been run**, on `node2` from a fresh clone of the
+> branch head; the acceptance is at the end of the Phase E section below. Where the two disagree about
+> counts, `ledger.json` decides and nothing hand-written here does.
 
 ## Phase A — inventory, baseline, environment ✅ complete
 

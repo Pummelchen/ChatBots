@@ -255,6 +255,7 @@ resolved figures are recorded in `plan.md`).
 | --- | --- | --- | --- |
 | `node1` | Xcode 27 Metal Toolchain component (27A266a, 839 MB) | A133 — without it this package cannot build | Xcode ▸ Settings ▸ Components |
 | `node2` | Xcode 27 Metal Toolchain component (27A266a, 839 MB) | A133 and Phase E: node2 is the acceptance host and cannot build without it | Xcode ▸ Settings ▸ Components |
+| `node2` | `pyright` 1.1.414 (`npm install --global pyright@1.1.414`) | the first Phase E run reported `pyright is not installed`, so the acceptance host could not run one of the twelve sections; installed at the version recorded in the table above rather than at whatever the registry served that day | `npm uninstall --global pyright` |
 
 ## A credential was sitting in plaintext in two wiki clones (A212)
 

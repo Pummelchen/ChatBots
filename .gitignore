@@ -45,8 +45,10 @@ __pycache__/
 
 # Phase E's instrumented build trees. `AUDIT/phase-e.sh` writes its logs and summary beside them,
 # and those are committed as the acceptance evidence; the scratch directories are several GB of
-# `.build` copies and are not.
+# `.build` copies and are not. The re-audit keeps its evidence in a directory of its own, so both
+# patterns are here.
 AUDIT/baseline/phaseE/scratch-*/
+AUDIT/baseline/phaseE-*/scratch-*/
 
 # `swift test --enable-code-coverage` makes every product in that build instrumented, so running one
 # by hand — `chatbots-cli --check --model-a …`, which is how a checkpoint is verified — writes this
