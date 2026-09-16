@@ -3711,6 +3711,23 @@
       "commit": "39cdb47",
       "notes": "A found-while-writing-a-record finding rather than a found-while-testing one, which is what the Phase D rule in `plan.md` is for: the ledger gains an id the moment something is found, whether the instrument was a probe, a scanner or a reader. It is also the reason the re-audit's acceptance run is repeated after this record is committed: the ledger is part of what Phase E verifies (section 11 counts tasks and open ones, section 10 checks every DONE task against a commit), so a task added after a green run would leave the acceptance describing a tree that no longer exists.",
       "blocked_reason": null
+    },
+    {
+      "id": "A219",
+      "severity": "S3",
+      "unit": "docs / instruction and release files",
+      "file_line": "AGENTS.md:6,26,32,91-93; RELEASE.md:167-175,200-204",
+      "title": "The two instruction documents carried test counts and a file count the re-audit had moved, and described CLAUDE.md as containing nothing but the import",
+      "category": "docs",
+      "status": "DONE",
+      "host_used": "node1",
+      "discovered_by": "the owner, on being told the branch had merged main's two new documents; measured here before editing",
+      "evidence_before": "`AGENTS.md`: \"the `Test run with 824 tests in 139 suites` line\" — the suite is 1052 tests in 196 suites; `Sources/ChatBotsCore/` \"(46 files)\" — it holds 51; the layout did not mention `Tests/ChatBotsAppTests/`, whose tests the gate counts; and both it and `RELEASE.md` said the committed `CLAUDE.md` contains *nothing but* the `@AGENTS.md` import, while the file also carries the three-line comment that explains why it is committed rather than a symlink. `RELEASE.md`: \"Nothing here produces a binary yet\" — `tools/make-app.sh` builds the app and `swift build` produces `chatbots-cli`; what does not exist is a release artifact.",
+      "fix_summary": "Measured, then corrected. The suite line in `AGENTS.md` now reads `Test run with N tests in M suites` with `1052 tests in 196 suites` as the figures when it was written, because the line rather than the number is what the gate reads and a hard count goes stale on the next test. The domain file count is 51. The layout names `Tests/ChatBotsAppTests/` and says the Mac gate measures every bundle. Both documents now describe `CLAUDE.md` as the import plus the comment that explains it. `RELEASE.md`'s Part 2 says no *release artifact* — an archive and its digest — is produced yet, rather than that no binary is.",
+      "evidence_after": "`ls Sources/ChatBotsCore/*.swift | wc -l` → 51; `swift test` → `1052 tests in 196 suites` (the Phase E run's own summary in `AUDIT/baseline/phaseE-2026-09-15/`); `wc -l CLAUDE.md` → 5, one of which is `@AGENTS.md`; `ls -l .build/release/chatbots-cli` → a 49 MB binary, which is also why `RELEASE.md`'s `.build/release` spelling was left alone: it holds in this repository. Neither file is read by any gate (`grep -n 'AGENTS\\|RELEASE' AUDIT/phase-e.sh .github/workflows/checks.yml` → nothing), so no gate's outcome changes with them.",
+      "commit": "1cf5f75",
+      "notes": "The documents are `main`'s, merged into the branch after Phase B, so no earlier pass read them; the owner asked for them to be checked and edited if needed, and this is the same shape as A218 — material that arrived late being brought into line with what the tree does, with an id rather than a silent edit. Two things were deliberately left alone. `RELEASE.md`'s `.build/release` spelling (Part 1 §1.2.4) is checked against this repository and holds. And its identity rule — \"a second declaration in a test is a defect\" — is about version mirrors and does not apply to A208's test pinning the *shipped checkpoint*; that test is deliberate and its reasoning is in A208's entry, but it is flagged in the closing report so the owner can decide whether the rule should reach further.",
+      "blocked_reason": null
     }
   ]
 }
