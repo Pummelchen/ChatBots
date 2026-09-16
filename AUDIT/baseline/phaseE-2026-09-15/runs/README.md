@@ -2,7 +2,7 @@
 
 The top level of this directory is the acceptance run: a fresh clone of the branch head on `node2`,
 every section of `AUDIT/phase-e.sh` green. The runs below are kept because each one is part of the
-record — two stopped for a reason worth naming, and one was superseded when the ledger changed.
+record — one stopped for a reason worth naming, and three were superseded when the ledger changed.
 
 ## `1-pyright-missing/` — 22 passed, 1 failed
 
@@ -28,3 +28,10 @@ overturned: the ledger then gained its last task (A219, the two instruction docu
 mid-audit), and the ledger is part of what Phase E checks — sections 10 and 11 count tasks, check every
 DONE task against a commit, and require none open. So the acceptance was run again on the head that
 contains it, and the top level is that run.
+
+## `4-commit-7ed87f55/` — 23 passed, 0 failed
+
+Green at 219 tasks, the head that carried the acceptance for the audit's landing (pull request #10).
+It was superseded the same way as the one before it: A220 — the ship-decision guard's failure message
+and the boundary in `RELEASE.md` §1.3 — changed the ledger again, so the acceptance was run once more
+for the head that the follow-up pull request merges.

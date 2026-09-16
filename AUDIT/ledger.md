@@ -29,8 +29,8 @@ been run.
 <!-- BEGIN GENERATED: ledger status — rendered from ledger.json by AUDIT/render-ledger.sh -->
 | Metric | Count |
 | --- | --- |
-| Tasks enumerated | 219 |
-| DONE | 219 |
+| Tasks enumerated | 220 |
+| DONE | 220 |
 | START | 0 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
@@ -39,7 +39,7 @@ been run.
 
 Nothing is open.
 
-### Every task — 219
+### Every task — 220
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -185,6 +185,7 @@ Nothing is open.
 | A218 | S3 | DONE | 39cdb47 | docs / audit record | A point in the Phase E section lost the first half of its sentence and the clause that gave it an antecedent |
 | A219 | S3 | DONE | 1cf5f75 | docs / instruction and release files | The two instruction documents carried test counts and a file count the re-audit had moved, and described CLAUDE.md as containing nothing but the import |
 | A22 | S2 | DONE | 18100dd | start script | stop_all kills a stale PID from a pid file without checking the process is ours |
+| A220 | S3 | DONE | caed4ff | tests / release rules | The one test that pins the shipped checkpoint failed without saying what else moves with it, and RELEASE.md's identity rule did not say where it stops |
 | A23 | S2 | DONE | 38fbe08 | device capture tool | capture-devices.py prints a viewport mismatch but cannot fail the run |
 | A24 | S2 | DONE | b803b3c | installer | A native binary artifact is downloaded with no integrity check and embedded in the signed app |
 | A25 | S3 | DONE | ba18733 | installer | install.sh interpolates the project path into `bash -c`, so an apostrophe in the path is command injection |

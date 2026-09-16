@@ -217,5 +217,6 @@ ok     A216  d3a4316 touches Sources/ChatBotsCore/ErrorText.swift
 ok     A217  b20a177 touches Sources/ChatBotsCore/APIServer.swift
 skip   A218  names no source path
 skip   A219  names no source path
+ok     A220  caed4ff touches Tests/ChatBotsCoreTests/AuditS3DefaultCheckpointTests.swift
 
-backed 202 · skipped 17 · unbacked 0
+backed 203 · skipped 17 · unbacked 0

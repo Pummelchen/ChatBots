@@ -1,8 +1,8 @@
 Phase E acceptance run
 branch: audit/2026-09-15
-commit: e5dfaed9a0a175ec47307ffcd282b3ffe4b49ba0
+commit: 7ed87f55d20f233ae7861b92b95e6c4aae469eab
 
-  PASS|the tree is clean, so the evidence describes commit e5dfaed9
+  PASS|the tree is clean, so the evidence describes commit 7ed87f55
   PASS|on the audit branch 'audit/2026-09-15', where the audit was developed
   PASS|no try!, as!, -Wno-, or inline lint suppression in tracked Swift
   PASS|0 placeholder markers in tracked source
@@ -10,7 +10,7 @@ commit: e5dfaed9a0a175ec47307ffcd282b3ffe4b49ba0
   PASS|tests: 1052 tests in 196 suites
   PASS|AddressSanitizer: exit 0, no report
   PASS|ThreadSanitizer: exit 0, no report
-  PASS|coverage: TOTAL                                                  6491              2570    60.41%        2518              1075    57.31%       20519              9843    52.03%           0                 0         -
+  PASS|coverage: TOTAL                                                  6491              2569    60.42%        2518              1076    57.27%       20519              9849    52.00%           0                 0         -
   PASS|gitleaks over the full history: 0 findings
   PASS|osv-scanner: no issues found
   PASS|semgrep: 3 finding(s), all covered by a recorded waiver — Ran 461 rules on 101 files: 3 findings.
@@ -19,11 +19,11 @@ commit: e5dfaed9a0a175ec47307ffcd282b3ffe4b49ba0
   PASS|pyright: clean
   PASS|swiftlint: 253 finding(s), within the recorded waiver of 255
   PASS|swift-format: 739 diagnostic(s), within the recorded waiver of 744
-  PASS|verify-done-commits.sh: backed 203 · skipped 17 · unbacked 0
-  PASS|ledger: 220 tasks, none open, 0 blocked
+  PASS|verify-done-commits.sh: backed 202 · skipped 17 · unbacked 0
+  PASS|ledger: 219 tasks, none open, 0 blocked
   PASS|every BLOCKED task carries a blocked_reason
   PASS|the embedded web interface matches web/
   PASS|the embedded name lists match names/
-  PASS|ledger.md status region is in step with ledger.json (220 tasks)
+  PASS|ledger.md status region is in step with ledger.json (219 tasks)
 
 23 passed, 0 failed
