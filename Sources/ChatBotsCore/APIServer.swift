@@ -445,25 +445,6 @@ public final class APIServer {
         return nil
     }
 
-    /// A `Host` header that is safe to reflect into a URL, or nil.
-    ///
-    /// Reflecting the header is how the engine learns the origin that actually served the page — the
-    /// value it passes to the share page as `shareBase`, which the page does not read yet (A217). The
-    /// value is client-supplied either way: anything carrying a path, a userinfo `@`, whitespace or a
-    /// character a host or port cannot contain is refused rather than interpolated. A refused value
-    /// falls back to the configured base.
-    ///
-    /// `nonisolated` because it is a pure function of its argument: the server is main-actor
-    /// isolated, and a caller that only wants to know whether a string is a host should not have to
-    /// hop to that actor to find out.
-    nonisolated static func validShareHost(_ host: String?) -> String? {
-        guard let host, !host.isEmpty, host.count <= 255 else { return nil }
-        let allowed = CharacterSet(
-            charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-:[]")
-        guard host.unicodeScalars.allSatisfy({ allowed.contains($0) }) else { return nil }
-        return host
-    }
-
     /// The shared dispatch, so a caller can treat both transports alike.
     public var engineService: EngineService { service }
 
@@ -530,10 +511,11 @@ public final class APIServer {
     private func route(_ request: HTTPRequest) async -> HTTPResponse {
         // A conversation somebody can open, with replay controls. Checked before the switch
         // because the path is a prefix rather than a fixed route, and transport-specific rather
-        // than an engine command: it is a page, and the engine does not render pages.
+        // than an engine command: it is a page, and the engine does not render pages. The request's
+        // `Host` is deliberately not read: the page needs no origin, so nothing from the header is
+        // reflected anywhere (A217).
         if request.method == "GET", request.path.hasPrefix("/s/") {
-            return await sharedPage(
-                id: String(request.path.dropFirst(3)), host: request.headers["host"])
+            return await sharedPage(id: String(request.path.dropFirst(3)))
         }
 
         // Transport-specific, and none of it is the engine's business.
@@ -654,24 +636,21 @@ public final class APIServer {
     /// index read while a conversation was streaming stalled the stream (A147). A malformed id never
     /// reaches the store at all, which is what it did before as well — the difference is that a
     /// well-formed id nobody has heard of no longer decodes the history to find that out.
-    private func sharedPage(id: String, host: String?) async -> HTTPResponse {
+    ///
+    /// The page is rendered from the record alone. It used to be handed an origin derived from the
+    /// request's `Host` (validated by `validShareHost`), which the page wrote into its JSON island and
+    /// never read; the field, the reflection and the validator are gone (A217). The link a reader
+    /// copies is built by the front ends: the web interface from the origin the browser is reading at,
+    /// with the engine's reported base as its fallback (`web/app.js`), and the desktop app from that
+    /// reported base, which `--share-base` sets (`ChatController.shareLink(for:)`, A99).
+    private func sharedPage(id: String) async -> HTTPResponse {
         guard let uuid = UUID(uuidString: id) else { return sharedPageNotFound() }
         guard let record = await service.store.conversationOffMainActor(id: uuid) else {
             return sharedPageNotFound()
         }
-        // The address the page was reached on, checked before it is reflected (A99), so a phone that
-        // reached the page through Caddy hands the engine Caddy's address rather than its own. It
-        // travels to the page as `shareBase`, and the page renders no links, so nothing reads it
-        // (A217). The link a reader copies is built by the front ends instead: the web interface from
-        // the origin the browser is reading at, with the engine's reported base as its fallback
-        // (`web/app.js`), and the desktop app from that reported base, which `--share-base` sets
-        // (`ChatController.shareLink(for:)`, A99).
-        let base =
-            Self.validShareHost(host).map { "http://\($0)" }
-            ?? service.shareBase ?? "http://127.0.0.1:\(port)"
         return HTTPResponse(
             contentType: "text/html; charset=utf-8",
-            body: Data(SharedConversationPage.html(record, shareBase: base).utf8),
+            body: Data(SharedConversationPage.html(record).utf8),
             // The share page carries its own inline stylesheet and replay script, so it says so
             // rather than inheriting the interface's policy, which has no inline grant.
             headers: ["Content-Security-Policy": HTTPResponse.inlinePagePolicy])
