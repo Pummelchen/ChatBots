@@ -12,7 +12,12 @@
 # Everything it produces is staged under `dist/release/<version>/` (git-ignored, like `dist/`),
 # including the record of what was checked and the exact build log.
 #
-# usage: bash tools/make-release.sh [--publish] [--gates-log <file>] [--scratch <dir>] [--keep-staging]
+# `--reuse-staging` publishes the artifact a previous dry run already built: it re-checks that the
+# record names this same commit, that the archive still matches its digest, and that the clean
+# build passed, so a publish retry does not need a second clean build. Without it the release is
+# built from scratch.
+#
+# usage: bash tools/make-release.sh [--publish] [--gates-log <file>] [--scratch <dir>] [--reuse-staging]
 # exit:  0 when the run finished (see the report for whether it published), 1 failed check, 2 usage
 
 set -euo pipefail
@@ -23,7 +28,7 @@ ROOT="$PWD"
 PUBLISH=0
 GATES_LOG=""
 SCRATCH=""
-KEEP_STAGING=0
+REUSE=0
 
 usage() {
     # The header comment, and only it: stop at the first line that is not one.
@@ -35,7 +40,7 @@ while [ $# -gt 0 ]; do
         --publish) PUBLISH=1; shift ;;
         --gates-log) GATES_LOG="${2:?--gates-log needs a file}"; shift 2 ;;
         --scratch) SCRATCH="${2:?--scratch needs a directory}"; shift 2 ;;
-        --keep-staging) KEEP_STAGING=1; shift ;;
+        --reuse-staging) REUSE=1; shift ;;
         -h | --help) usage; exit 0 ;;
         *)
             printf 'unknown argument: %s\n' "$1" >&2
@@ -77,14 +82,14 @@ SCRATCH="${SCRATCH:-$ROOT/.build/release-scratch-$VERSION}"
 SLUG="$(git remote get-url origin | sed -E 's#(git@|https://)github\.com[:/]##; s#\.git$##')"
 
 mkdir -p "$STAGE"
-: > "$RECORD"
+[ "$REUSE" -eq 1 ] || : > "$RECORD"
 
 record() {
     printf '%s\n' "$1" | tee -a "$RECORD"
 }
 
 record "release record — ChatBots $VERSION ($TAG)"
-record "started: $(date -u '+%Y-%m-%dT%H:%M:%SZ')  host: $(hostname -s)  publish: $PUBLISH"
+record "started: $(date -u '+%Y-%m-%dT%H:%M:%SZ')  host: $(hostname -s)  publish: $PUBLISH  reuse: $REUSE"
 record "repository: $SLUG"
 
 # ---------------------------------------------------------------- preconditions (RELEASE.md §1.4)
@@ -145,6 +150,20 @@ fi
 
 # ---------------------------------------------------------------- gates (RELEASE.md §1.5)
 
+if [ "$REUSE" -eq 1 ]; then
+    step "2/7  reusing the staged release"
+    grep -q "at $HEAD_SHA" "$RECORD" || die "the record at $RECORD is not for $HEAD_SHA; run without --reuse-staging"
+    grep -q "clean build succeeded" "$RECORD" || die "the record shows no clean build; run without --reuse-staging"
+    [ -f "$ARCHIVE" ] || die "the staged archive $ARCHIVE is gone; run without --reuse-staging"
+    [ -f "$CHECKSUM" ] || die "the staged checksum is gone; run without --reuse-staging"
+    [ -f "$STAGE/release-notes.md" ] || die "the staged notes are gone; run without --reuse-staging"
+    ( cd "$STAGE" && shasum -a 256 -c "$NAME.tar.gz.sha256" ) >/dev/null \
+        || die "the staged archive no longer matches its checksum"
+    SHA256="$(awk '{ print $1 }' "$CHECKSUM")"
+    BYTES="$(stat -f%z "$ARCHIVE")"
+    record "  reusing $ARCHIVE from the earlier run at $HEAD_SHA"
+    record "  sha256 $SHA256 — verified against the checksum beside it"
+else
 step "2/7  gates"
 if [ -n "$GATES_LOG" ]; then
     # A gate run that already happened on this same commit may be reused; its output is copied
@@ -273,11 +292,15 @@ record "  $NAME.tar.gz — $BYTES bytes ($HUMAN), sha256 $SHA256"
 
 # ---------------------------------------------------------------- the notes (RELEASE.md §1.8)
 
+fi
+
 step "6/7  release notes"
 [ -f "$NOTES" ] || die "no release notes at $NOTES"
 if grep -q 'SHA256_PENDING' "$NOTES"; then
     sed -e "s/SHA256_PENDING/$SHA256/" -e "s/ARCHIVE_BYTES_PENDING/$BYTES/" "$NOTES" \
         > "$STAGE/release-notes.md"
+elif [ -f "$STAGE/release-notes.md" ] && grep -q "$SHA256" "$STAGE/release-notes.md"; then
+    : # already substituted by the run that built this archive
 elif grep -q "$SHA256" "$NOTES"; then
     cp "$NOTES" "$STAGE/release-notes.md"
 else
@@ -314,12 +337,16 @@ fi
 git push origin "refs/tags/$TAG"
 record "  pushed tag $TAG"
 
-gh release create "$TAG" "$ARCHIVE" "$CHECKSUM" \
-    --repo "$SLUG" \
-    --title "ChatBots $VERSION" \
-    --notes-file "$STAGE/release-notes.md" \
-    --latest
-record "  created the Release for $TAG"
+if gh release view "$TAG" --repo "$SLUG" >/dev/null 2>&1; then
+    record "  the Release for $TAG already exists; verifying it instead of recreating it"
+else
+    gh release create "$TAG" "$ARCHIVE" "$CHECKSUM" \
+        --repo "$SLUG" \
+        --title "ChatBots $VERSION" \
+        --notes-file "$STAGE/release-notes.md" \
+        --latest
+    record "  created the Release for $TAG"
+fi
 
 step "verifying the published release (RELEASE.md §1.9)"
 VERIFY_DIR="$(mktemp -d)"
@@ -335,9 +362,5 @@ record "  assets: $ASSETS"
 record "  downloaded archive verifies against its checksum; notes quote the digest"
 record "  url: $(gh release view "$TAG" --repo "$SLUG" --json url -q .url)"
 record "finished: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-
-if [ "$KEEP_STAGING" -eq 0 ]; then
-    printf '\nStaging kept at %s (delete it when the release is confirmed).\n' "$STAGE"
-fi
 
 printf '\nPublished: %s\n' "$(gh release view "$TAG" --repo "$SLUG" --json url -q .url)"
