@@ -230,10 +230,11 @@ history; `osv-scanner` no issues; `semgrep` 3 findings, all covered by a written
 recorded waivers; `verify-done-commits.sh` backed 116 · skipped 14 · unbacked 0; the ledger at 130
 tasks with none open; and the generated files — the web interface, the name lists and the ledger's own
 status tables — all in step.
-inction is the whole reason it
-exists: every number in this audit that was wrong was wrong because it was derived by hand from
-formatted output — A19 recorded a task DONE whose commit contained no source change, and A28 found
-three counts that were the line counts of captured files rather than finding counts. Each check
+
+The script reads every figure it reports from the tool that produced it, and that distinction is the
+whole reason it exists: every number in this audit that was wrong was wrong because it was derived by
+hand from formatted output — A19 recorded a task DONE whose commit contained no source change, and A28
+found three counts that were the line counts of captured files rather than finding counts. Each check
 here reads its figure from the tool's own report, and the ones that can only *report* a number
 rather than enforce a floor say so.
 
