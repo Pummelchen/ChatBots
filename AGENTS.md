@@ -106,12 +106,11 @@ release, and nothing enforces the value against a release.
 - `docs/webtransport-plan.md` says "Status: implemented"; its 372-test figure is
   historical, not current.
 
-<!-- release-rules:begin -->
 ## Releasing
 
-**Read [`RELEASE.md`](RELEASE.md) before cutting a release.** It carries the
-generic rules every Pummelchen repository follows, plus this repository's own
-section. Do not improvise a release.
+**Read [`RELEASE.md`](RELEASE.md) before cutting a release.** It is this repository's
+own release standard — edited here, not deployed from anywhere — and it carries both
+the general rules and this repository's own section. Do not improvise a release.
 
 The non-negotiables:
 
@@ -126,4 +125,3 @@ The non-negotiables:
 - **Dry run first**; publish only on an explicit flag.
 - **Never fetch a model, dataset or dependency to make a gate pass.** A check that
   cannot run is reported *not checked*, and the release notes must name it.
-<!-- release-rules:end -->
