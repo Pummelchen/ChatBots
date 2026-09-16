@@ -9,22 +9,13 @@
     "type" : "Cyclomatic Complexity"
   },
   {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/ResearchReport.swift",
-    "line" : 635,
-    "reason" : "File should contain 600 lines or less: currently contains 635",
-    "rule_id" : "file_length",
+    "character" : 13,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/WebTransportServer.swift",
+    "line" : 250,
+    "reason" : "Function should have complexity 10 or less; currently complexity is 12",
+    "rule_id" : "cyclomatic_complexity",
     "severity" : "Warning",
-    "type" : "File Length"
-  },
-  {
-    "character" : 19,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/ResearchReport.swift",
-    "line" : 451,
-    "reason" : "Function should have 5 parameters or less: it currently has 7",
-    "rule_id" : "function_parameter_count",
-    "severity" : "Warning",
-    "type" : "Function Parameter Count"
+    "type" : "Cyclomatic Complexity"
   },
   {
     "character" : 21,
@@ -45,13 +36,22 @@
     "type" : "Function Body Length"
   },
   {
-    "character" : 13,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/WebTransportServer.swift",
-    "line" : 250,
-    "reason" : "Function should have complexity 10 or less; currently complexity is 12",
-    "rule_id" : "cyclomatic_complexity",
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/ResearchReport.swift",
+    "line" : 635,
+    "reason" : "File should contain 600 lines or less: currently contains 635",
+    "rule_id" : "file_length",
     "severity" : "Warning",
-    "type" : "Cyclomatic Complexity"
+    "type" : "File Length"
+  },
+  {
+    "character" : 19,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/ResearchReport.swift",
+    "line" : 451,
+    "reason" : "Function should have 5 parameters or less: it currently has 7",
+    "rule_id" : "function_parameter_count",
+    "severity" : "Warning",
+    "type" : "Function Parameter Count"
   },
   {
     "character" : 13,
@@ -61,6 +61,15 @@
     "rule_id" : "for_where",
     "severity" : "Warning",
     "type" : "Prefer For-Where"
+  },
+  {
+    "character" : 13,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/SystemProcess.swift",
+    "line" : 131,
+    "reason" : "Function should have complexity 10 or less; currently complexity is 11",
+    "rule_id" : "cyclomatic_complexity",
+    "severity" : "Warning",
+    "type" : "Cyclomatic Complexity"
   },
   {
     "character" : 1,
@@ -649,12 +658,48 @@
   },
   {
     "character" : 13,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/SystemProcess.swift",
-    "line" : 131,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/OpenAIResponsesClient.swift",
+    "line" : 645,
+    "reason" : "Function should have complexity 10 or less; currently complexity is 21",
+    "rule_id" : "cyclomatic_complexity",
+    "severity" : "Error",
+    "type" : "Cyclomatic Complexity"
+  },
+  {
+    "character" : 12,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/OpenAIResponsesClient.swift",
+    "line" : 791,
     "reason" : "Function should have complexity 10 or less; currently complexity is 11",
     "rule_id" : "cyclomatic_complexity",
     "severity" : "Warning",
     "type" : "Cyclomatic Complexity"
+  },
+  {
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/OpenAIResponsesClient.swift",
+    "line" : 860,
+    "reason" : "File should contain 600 lines or less: currently contains 860",
+    "rule_id" : "file_length",
+    "severity" : "Warning",
+    "type" : "File Length"
+  },
+  {
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/OpenAIResponsesClient.swift",
+    "line" : 206,
+    "reason" : "Line should be 120 characters or less; currently it has 122 characters",
+    "rule_id" : "line_length",
+    "severity" : "Warning",
+    "type" : "Line Length"
+  },
+  {
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/OpenAIResponsesClient.swift",
+    "line" : 588,
+    "reason" : "Limit vertical whitespace to a single empty line; currently 2",
+    "rule_id" : "vertical_whitespace",
+    "severity" : "Warning",
+    "type" : "Vertical Whitespace"
   },
   {
     "character" : 5,
@@ -721,48 +766,12 @@
   },
   {
     "character" : 13,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/OpenAIResponsesClient.swift",
-    "line" : 645,
-    "reason" : "Function should have complexity 10 or less; currently complexity is 21",
-    "rule_id" : "cyclomatic_complexity",
-    "severity" : "Error",
-    "type" : "Cyclomatic Complexity"
-  },
-  {
-    "character" : 12,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/OpenAIResponsesClient.swift",
-    "line" : 791,
-    "reason" : "Function should have complexity 10 or less; currently complexity is 11",
-    "rule_id" : "cyclomatic_complexity",
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/ThinkingStripper.swift",
+    "line" : 223,
+    "reason" : "`where` clauses are preferred over a single `if` inside a `for`",
+    "rule_id" : "for_where",
     "severity" : "Warning",
-    "type" : "Cyclomatic Complexity"
-  },
-  {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/OpenAIResponsesClient.swift",
-    "line" : 860,
-    "reason" : "File should contain 600 lines or less: currently contains 860",
-    "rule_id" : "file_length",
-    "severity" : "Warning",
-    "type" : "File Length"
-  },
-  {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/OpenAIResponsesClient.swift",
-    "line" : 206,
-    "reason" : "Line should be 120 characters or less; currently it has 122 characters",
-    "rule_id" : "line_length",
-    "severity" : "Warning",
-    "type" : "Line Length"
-  },
-  {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/OpenAIResponsesClient.swift",
-    "line" : 588,
-    "reason" : "Limit vertical whitespace to a single empty line; currently 2",
-    "rule_id" : "vertical_whitespace",
-    "severity" : "Warning",
-    "type" : "Vertical Whitespace"
+    "type" : "Prefer For-Where"
   },
   {
     "character" : 1,
@@ -819,6 +828,69 @@
     "type" : "Vertical Whitespace"
   },
   {
+    "character" : 14,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/MLXEngine.swift",
+    "line" : 462,
+    "reason" : "Closure parameters should be on the same line as opening brace",
+    "rule_id" : "closure_parameter_position",
+    "severity" : "Warning",
+    "type" : "Closure Parameter Position"
+  },
+  {
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/MLXEngine.swift",
+    "line" : 942,
+    "reason" : "File should contain 600 lines or less: currently contains 942",
+    "rule_id" : "file_length",
+    "severity" : "Warning",
+    "type" : "File Length"
+  },
+  {
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/MLXEngine.swift",
+    "line" : 378,
+    "reason" : "Line should be 120 characters or less; currently it has 128 characters",
+    "rule_id" : "line_length",
+    "severity" : "Warning",
+    "type" : "Line Length"
+  },
+  {
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/MLXEngine.swift",
+    "line" : 617,
+    "reason" : "Line should be 120 characters or less; currently it has 193 characters",
+    "rule_id" : "line_length",
+    "severity" : "Warning",
+    "type" : "Line Length"
+  },
+  {
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/MLXEngine.swift",
+    "line" : 679,
+    "reason" : "Line should be 200 characters or less; currently it has 210 characters",
+    "rule_id" : "line_length",
+    "severity" : "Error",
+    "type" : "Line Length"
+  },
+  {
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/MLXEngine.swift",
+    "line" : 681,
+    "reason" : "Line should be 120 characters or less; currently it has 183 characters",
+    "rule_id" : "line_length",
+    "severity" : "Warning",
+    "type" : "Line Length"
+  },
+  {
+    "character" : 52,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/MLXEngine.swift",
+    "line" : 753,
+    "reason" : "Multi-line collection literals should have trailing commas",
+    "rule_id" : "trailing_comma",
+    "severity" : "Warning",
+    "type" : "Trailing Comma"
+  },
+  {
     "character" : 1,
     "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/EngineProtocol.swift",
     "line" : 346,
@@ -826,15 +898,6 @@
     "rule_id" : "line_length",
     "severity" : "Warning",
     "type" : "Line Length"
-  },
-  {
-    "character" : 13,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/ThinkingStripper.swift",
-    "line" : 223,
-    "reason" : "`where` clauses are preferred over a single `if` inside a `for`",
-    "rule_id" : "for_where",
-    "severity" : "Warning",
-    "type" : "Prefer For-Where"
   },
   {
     "character" : 19,
@@ -963,69 +1026,6 @@
     "type" : "Vertical Whitespace"
   },
   {
-    "character" : 14,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/MLXEngine.swift",
-    "line" : 462,
-    "reason" : "Closure parameters should be on the same line as opening brace",
-    "rule_id" : "closure_parameter_position",
-    "severity" : "Warning",
-    "type" : "Closure Parameter Position"
-  },
-  {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/MLXEngine.swift",
-    "line" : 942,
-    "reason" : "File should contain 600 lines or less: currently contains 942",
-    "rule_id" : "file_length",
-    "severity" : "Warning",
-    "type" : "File Length"
-  },
-  {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/MLXEngine.swift",
-    "line" : 378,
-    "reason" : "Line should be 120 characters or less; currently it has 128 characters",
-    "rule_id" : "line_length",
-    "severity" : "Warning",
-    "type" : "Line Length"
-  },
-  {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/MLXEngine.swift",
-    "line" : 617,
-    "reason" : "Line should be 120 characters or less; currently it has 193 characters",
-    "rule_id" : "line_length",
-    "severity" : "Warning",
-    "type" : "Line Length"
-  },
-  {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/MLXEngine.swift",
-    "line" : 679,
-    "reason" : "Line should be 200 characters or less; currently it has 210 characters",
-    "rule_id" : "line_length",
-    "severity" : "Error",
-    "type" : "Line Length"
-  },
-  {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/MLXEngine.swift",
-    "line" : 681,
-    "reason" : "Line should be 120 characters or less; currently it has 183 characters",
-    "rule_id" : "line_length",
-    "severity" : "Warning",
-    "type" : "Line Length"
-  },
-  {
-    "character" : 52,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/MLXEngine.swift",
-    "line" : 753,
-    "reason" : "Multi-line collection literals should have trailing commas",
-    "rule_id" : "trailing_comma",
-    "severity" : "Warning",
-    "type" : "Trailing Comma"
-  },
-  {
     "character" : 16,
     "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/ConversationStore.swift",
     "line" : 345,
@@ -1042,24 +1042,6 @@
     "rule_id" : "type_body_length",
     "severity" : "Warning",
     "type" : "Type Body Length"
-  },
-  {
-    "character" : 13,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/Roster.swift",
-    "line" : 189,
-    "reason" : "Variable name 'z' should be between 2 and 40 characters long",
-    "rule_id" : "identifier_name",
-    "severity" : "Warning",
-    "type" : "Identifier Name"
-  },
-  {
-    "character" : 19,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/ConflictReader.swift",
-    "line" : 36,
-    "reason" : "Function body should span 80 lines or less excluding comments and whitespace: currently spans 103 lines",
-    "rule_id" : "function_body_length",
-    "severity" : "Warning",
-    "type" : "Function Body Length"
   },
   {
     "character" : 12,
@@ -1116,22 +1098,22 @@
     "type" : "Type Body Length"
   },
   {
-    "character" : 12,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/TransportCheck.swift",
-    "line" : 142,
-    "reason" : "Function should have complexity 10 or less; currently complexity is 17",
-    "rule_id" : "cyclomatic_complexity",
-    "severity" : "Warning",
-    "type" : "Cyclomatic Complexity"
-  },
-  {
     "character" : 19,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/TransportCheck.swift",
-    "line" : 142,
-    "reason" : "Function body should span 80 lines or less excluding comments and whitespace: currently spans 122 lines",
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/ConflictReader.swift",
+    "line" : 36,
+    "reason" : "Function body should span 80 lines or less excluding comments and whitespace: currently spans 103 lines",
     "rule_id" : "function_body_length",
     "severity" : "Warning",
     "type" : "Function Body Length"
+  },
+  {
+    "character" : 13,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/Roster.swift",
+    "line" : 189,
+    "reason" : "Variable name 'z' should be between 2 and 40 characters long",
+    "rule_id" : "identifier_name",
+    "severity" : "Warning",
+    "type" : "Identifier Name"
   },
   {
     "character" : 12,
@@ -1213,6 +1195,132 @@
     "rule_id" : "statement_position",
     "severity" : "Warning",
     "type" : "Statement Position"
+  },
+  {
+    "character" : 12,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/TransportCheck.swift",
+    "line" : 142,
+    "reason" : "Function should have complexity 10 or less; currently complexity is 17",
+    "rule_id" : "cyclomatic_complexity",
+    "severity" : "Warning",
+    "type" : "Cyclomatic Complexity"
+  },
+  {
+    "character" : 19,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/TransportCheck.swift",
+    "line" : 142,
+    "reason" : "Function body should span 80 lines or less excluding comments and whitespace: currently spans 122 lines",
+    "rule_id" : "function_body_length",
+    "severity" : "Warning",
+    "type" : "Function Body Length"
+  },
+  {
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/ResearchSession.swift",
+    "line" : 130,
+    "reason" : "Line should be 120 characters or less; currently it has 177 characters",
+    "rule_id" : "line_length",
+    "severity" : "Warning",
+    "type" : "Line Length"
+  },
+  {
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/ResearchSession.swift",
+    "line" : 134,
+    "reason" : "Line should be 120 characters or less; currently it has 142 characters",
+    "rule_id" : "line_length",
+    "severity" : "Warning",
+    "type" : "Line Length"
+  },
+  {
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/DocumentImport.swift",
+    "line" : 286,
+    "reason" : "Line should be 120 characters or less; currently it has 128 characters",
+    "rule_id" : "line_length",
+    "severity" : "Warning",
+    "type" : "Line Length"
+  },
+  {
+    "character" : 13,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/APIServer.swift",
+    "line" : 511,
+    "reason" : "Function should have complexity 10 or less; currently complexity is 15",
+    "rule_id" : "cyclomatic_complexity",
+    "severity" : "Warning",
+    "type" : "Cyclomatic Complexity"
+  },
+  {
+    "character" : 13,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/APIServer.swift",
+    "line" : 739,
+    "reason" : "Function should have complexity 10 or less; currently complexity is 41",
+    "rule_id" : "cyclomatic_complexity",
+    "severity" : "Error",
+    "type" : "Cyclomatic Complexity"
+  },
+  {
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/APIServer.swift",
+    "line" : 972,
+    "reason" : "File should contain 600 lines or less: currently contains 972",
+    "rule_id" : "file_length",
+    "severity" : "Warning",
+    "type" : "File Length"
+  },
+  {
+    "character" : 17,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/APIServer.swift",
+    "line" : 914,
+    "reason" : "Case statements should vertically aligned with their closing brace",
+    "rule_id" : "switch_case_alignment",
+    "severity" : "Warning",
+    "type" : "Switch and Case Statement Alignment"
+  },
+  {
+    "character" : 17,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/APIServer.swift",
+    "line" : 918,
+    "reason" : "Case statements should vertically aligned with their closing brace",
+    "rule_id" : "switch_case_alignment",
+    "severity" : "Warning",
+    "type" : "Switch and Case Statement Alignment"
+  },
+  {
+    "character" : 17,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/APIServer.swift",
+    "line" : 922,
+    "reason" : "Case statements should vertically aligned with their closing brace",
+    "rule_id" : "switch_case_alignment",
+    "severity" : "Warning",
+    "type" : "Switch and Case Statement Alignment"
+  },
+  {
+    "character" : 17,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/APIServer.swift",
+    "line" : 927,
+    "reason" : "Case statements should vertically aligned with their closing brace",
+    "rule_id" : "switch_case_alignment",
+    "severity" : "Warning",
+    "type" : "Switch and Case Statement Alignment"
+  },
+  {
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/APIServer.swift",
+    "line" : 864,
+    "reason" : "Limit vertical whitespace to a single empty line; currently 2",
+    "rule_id" : "vertical_whitespace",
+    "severity" : "Warning",
+    "type" : "Vertical Whitespace"
+  },
+  {
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/APIServer.swift",
+    "line" : 938,
+    "reason" : "Limit vertical whitespace to a single empty line; currently 3",
+    "rule_id" : "vertical_whitespace",
+    "severity" : "Warning",
+    "type" : "Vertical Whitespace"
   },
   {
     "character" : 12,
@@ -1342,144 +1450,9 @@
   },
   {
     "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/ResearchSession.swift",
-    "line" : 130,
-    "reason" : "Line should be 120 characters or less; currently it has 177 characters",
-    "rule_id" : "line_length",
-    "severity" : "Warning",
-    "type" : "Line Length"
-  },
-  {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/ResearchSession.swift",
-    "line" : 134,
-    "reason" : "Line should be 120 characters or less; currently it has 142 characters",
-    "rule_id" : "line_length",
-    "severity" : "Warning",
-    "type" : "Line Length"
-  },
-  {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/DocumentImport.swift",
-    "line" : 286,
-    "reason" : "Line should be 120 characters or less; currently it has 128 characters",
-    "rule_id" : "line_length",
-    "severity" : "Warning",
-    "type" : "Line Length"
-  },
-  {
-    "character" : 1,
     "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsApp/UserSettingsStore.swift",
     "line" : 53,
     "reason" : "Line should be 120 characters or less; currently it has 140 characters",
-    "rule_id" : "line_length",
-    "severity" : "Warning",
-    "type" : "Line Length"
-  },
-  {
-    "character" : 13,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/APIServer.swift",
-    "line" : 511,
-    "reason" : "Function should have complexity 10 or less; currently complexity is 15",
-    "rule_id" : "cyclomatic_complexity",
-    "severity" : "Warning",
-    "type" : "Cyclomatic Complexity"
-  },
-  {
-    "character" : 13,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/APIServer.swift",
-    "line" : 739,
-    "reason" : "Function should have complexity 10 or less; currently complexity is 41",
-    "rule_id" : "cyclomatic_complexity",
-    "severity" : "Error",
-    "type" : "Cyclomatic Complexity"
-  },
-  {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/APIServer.swift",
-    "line" : 972,
-    "reason" : "File should contain 600 lines or less: currently contains 972",
-    "rule_id" : "file_length",
-    "severity" : "Warning",
-    "type" : "File Length"
-  },
-  {
-    "character" : 17,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/APIServer.swift",
-    "line" : 914,
-    "reason" : "Case statements should vertically aligned with their closing brace",
-    "rule_id" : "switch_case_alignment",
-    "severity" : "Warning",
-    "type" : "Switch and Case Statement Alignment"
-  },
-  {
-    "character" : 17,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/APIServer.swift",
-    "line" : 918,
-    "reason" : "Case statements should vertically aligned with their closing brace",
-    "rule_id" : "switch_case_alignment",
-    "severity" : "Warning",
-    "type" : "Switch and Case Statement Alignment"
-  },
-  {
-    "character" : 17,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/APIServer.swift",
-    "line" : 922,
-    "reason" : "Case statements should vertically aligned with their closing brace",
-    "rule_id" : "switch_case_alignment",
-    "severity" : "Warning",
-    "type" : "Switch and Case Statement Alignment"
-  },
-  {
-    "character" : 17,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/APIServer.swift",
-    "line" : 927,
-    "reason" : "Case statements should vertically aligned with their closing brace",
-    "rule_id" : "switch_case_alignment",
-    "severity" : "Warning",
-    "type" : "Switch and Case Statement Alignment"
-  },
-  {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/APIServer.swift",
-    "line" : 864,
-    "reason" : "Limit vertical whitespace to a single empty line; currently 2",
-    "rule_id" : "vertical_whitespace",
-    "severity" : "Warning",
-    "type" : "Vertical Whitespace"
-  },
-  {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/APIServer.swift",
-    "line" : 938,
-    "reason" : "Limit vertical whitespace to a single empty line; currently 3",
-    "rule_id" : "vertical_whitespace",
-    "severity" : "Warning",
-    "type" : "Vertical Whitespace"
-  },
-  {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/OpenAIResponsesEngine.swift",
-    "line" : 144,
-    "reason" : "Line should be 120 characters or less; currently it has 148 characters",
-    "rule_id" : "line_length",
-    "severity" : "Warning",
-    "type" : "Line Length"
-  },
-  {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/OpenAIResponsesEngine.swift",
-    "line" : 268,
-    "reason" : "Line should be 120 characters or less; currently it has 124 characters",
-    "rule_id" : "line_length",
-    "severity" : "Warning",
-    "type" : "Line Length"
-  },
-  {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/OpenAIResponsesEngine.swift",
-    "line" : 332,
-    "reason" : "Line should be 120 characters or less; currently it has 144 characters",
     "rule_id" : "line_length",
     "severity" : "Warning",
     "type" : "Line Length"
@@ -1513,21 +1486,30 @@
   },
   {
     "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/Attachments.swift",
-    "line" : 405,
-    "reason" : "Line should be 120 characters or less; currently it has 141 characters",
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/OpenAIResponsesEngine.swift",
+    "line" : 144,
+    "reason" : "Line should be 120 characters or less; currently it has 148 characters",
     "rule_id" : "line_length",
     "severity" : "Warning",
     "type" : "Line Length"
   },
   {
     "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsApp/ChatBotsApp.swift",
-    "line" : 276,
-    "reason" : "Limit vertical whitespace to a single empty line; currently 2",
-    "rule_id" : "vertical_whitespace",
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/OpenAIResponsesEngine.swift",
+    "line" : 268,
+    "reason" : "Line should be 120 characters or less; currently it has 124 characters",
+    "rule_id" : "line_length",
     "severity" : "Warning",
-    "type" : "Vertical Whitespace"
+    "type" : "Line Length"
+  },
+  {
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/OpenAIResponsesEngine.swift",
+    "line" : 332,
+    "reason" : "Line should be 120 characters or less; currently it has 144 characters",
+    "rule_id" : "line_length",
+    "severity" : "Warning",
+    "type" : "Line Length"
   },
   {
     "character" : 13,
@@ -1576,6 +1558,24 @@
   },
   {
     "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsApp/ChatBotsApp.swift",
+    "line" : 276,
+    "reason" : "Limit vertical whitespace to a single empty line; currently 2",
+    "rule_id" : "vertical_whitespace",
+    "severity" : "Warning",
+    "type" : "Vertical Whitespace"
+  },
+  {
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsCore/Attachments.swift",
+    "line" : 405,
+    "reason" : "Line should be 120 characters or less; currently it has 141 characters",
+    "rule_id" : "line_length",
+    "severity" : "Warning",
+    "type" : "Line Length"
+  },
+  {
+    "character" : 1,
     "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsApp/Views/ModeratorIdentitySheet.swift",
     "line" : 57,
     "reason" : "Line should be 120 characters or less; currently it has 171 characters",
@@ -1606,6 +1606,15 @@
     "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsApp/Views/ChatPane.swift",
     "line" : 220,
     "reason" : "Line should be 120 characters or less; currently it has 185 characters",
+    "rule_id" : "line_length",
+    "severity" : "Warning",
+    "type" : "Line Length"
+  },
+  {
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsApp/Views/AgentHeader.swift",
+    "line" : 287,
+    "reason" : "Line should be 120 characters or less; currently it has 135 characters",
     "rule_id" : "line_length",
     "severity" : "Warning",
     "type" : "Line Length"
@@ -1674,13 +1683,31 @@
     "type" : "Vertical Whitespace"
   },
   {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsApp/Views/AgentHeader.swift",
-    "line" : 287,
-    "reason" : "Line should be 120 characters or less; currently it has 135 characters",
-    "rule_id" : "line_length",
+    "character" : 13,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsApp/ChatController.swift",
+    "line" : 392,
+    "reason" : "Function should have complexity 10 or less; currently complexity is 15",
+    "rule_id" : "cyclomatic_complexity",
     "severity" : "Warning",
-    "type" : "Line Length"
+    "type" : "Cyclomatic Complexity"
+  },
+  {
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsApp/ChatController.swift",
+    "line" : 1532,
+    "reason" : "File should contain 1200 lines or less: currently contains 1532",
+    "rule_id" : "file_length",
+    "severity" : "Error",
+    "type" : "File Length"
+  },
+  {
+    "character" : 14,
+    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsApp/ChatController.swift",
+    "line" : 119,
+    "reason" : "Class body should span 800 lines or less excluding comments and whitespace: currently spans 847 lines",
+    "rule_id" : "type_body_length",
+    "severity" : "Error",
+    "type" : "Type Body Length"
   },
   {
     "character" : 74,
@@ -1719,6 +1746,24 @@
     "type" : "Trailing Comma"
   },
   {
+    "character" : 61,
+    "file" : "/Users/node2/chatbots-phase-e/Tests/ChatBotsCoreTests/BuiltInKeyTests.swift",
+    "line" : 70,
+    "reason" : "Multi-line collection literals should have trailing commas",
+    "rule_id" : "trailing_comma",
+    "severity" : "Warning",
+    "type" : "Trailing Comma"
+  },
+  {
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Tests/ChatBotsCoreTests/AuditClientsSupport.swift",
+    "line" : 139,
+    "reason" : "Line should be 120 characters or less; currently it has 124 characters",
+    "rule_id" : "line_length",
+    "severity" : "Warning",
+    "type" : "Line Length"
+  },
+  {
     "character" : 13,
     "file" : "/Users/node2/chatbots-phase-e/Tests/ChatBotsCoreTests/LineupTests.swift",
     "line" : 110,
@@ -1735,51 +1780,6 @@
     "rule_id" : "identifier_name",
     "severity" : "Warning",
     "type" : "Identifier Name"
-  },
-  {
-    "character" : 61,
-    "file" : "/Users/node2/chatbots-phase-e/Tests/ChatBotsCoreTests/BuiltInKeyTests.swift",
-    "line" : 70,
-    "reason" : "Multi-line collection literals should have trailing commas",
-    "rule_id" : "trailing_comma",
-    "severity" : "Warning",
-    "type" : "Trailing Comma"
-  },
-  {
-    "character" : 13,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsApp/ChatController.swift",
-    "line" : 392,
-    "reason" : "Function should have complexity 10 or less; currently complexity is 15",
-    "rule_id" : "cyclomatic_complexity",
-    "severity" : "Warning",
-    "type" : "Cyclomatic Complexity"
-  },
-  {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsApp/ChatController.swift",
-    "line" : 1532,
-    "reason" : "File should contain 1200 lines or less: currently contains 1532",
-    "rule_id" : "file_length",
-    "severity" : "Error",
-    "type" : "File Length"
-  },
-  {
-    "character" : 14,
-    "file" : "/Users/node2/chatbots-phase-e/Sources/ChatBotsApp/ChatController.swift",
-    "line" : 119,
-    "reason" : "Class body should span 800 lines or less excluding comments and whitespace: currently spans 847 lines",
-    "rule_id" : "type_body_length",
-    "severity" : "Error",
-    "type" : "Type Body Length"
-  },
-  {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Tests/ChatBotsCoreTests/AuditClientsSupport.swift",
-    "line" : 139,
-    "reason" : "Line should be 120 characters or less; currently it has 124 characters",
-    "rule_id" : "line_length",
-    "severity" : "Warning",
-    "type" : "Line Length"
   },
   {
     "character" : 1,
@@ -1845,6 +1845,15 @@
     "type" : "Redundant Void Return"
   },
   {
+    "character" : 21,
+    "file" : "/Users/node2/chatbots-phase-e/Tests/ChatBotsCoreTests/UTF8Tests.swift",
+    "line" : 41,
+    "reason" : "Prefer failable `String(bytes:encoding:)` initializer when converting `Data` to `String`",
+    "rule_id" : "optional_data_string_conversion",
+    "severity" : "Warning",
+    "type" : "Optional Data -> String Conversion"
+  },
+  {
     "character" : 20,
     "file" : "/Users/node2/chatbots-phase-e/Tests/ChatBotsCoreTests/HTTPTests.swift",
     "line" : 182,
@@ -1888,15 +1897,6 @@
     "rule_id" : "identifier_name",
     "severity" : "Warning",
     "type" : "Identifier Name"
-  },
-  {
-    "character" : 21,
-    "file" : "/Users/node2/chatbots-phase-e/Tests/ChatBotsCoreTests/UTF8Tests.swift",
-    "line" : 41,
-    "reason" : "Prefer failable `String(bytes:encoding:)` initializer when converting `Data` to `String`",
-    "rule_id" : "optional_data_string_conversion",
-    "severity" : "Warning",
-    "type" : "Optional Data -> String Conversion"
   },
   {
     "character" : 45,
@@ -1980,10 +1980,28 @@
     "type" : "Line Length"
   },
   {
+    "character" : 65,
+    "file" : "/Users/node2/chatbots-phase-e/Tests/ChatBotsCoreTests/AttachmentTests.swift",
+    "line" : 354,
+    "reason" : "Multi-line collection literals should have trailing commas",
+    "rule_id" : "trailing_comma",
+    "severity" : "Warning",
+    "type" : "Trailing Comma"
+  },
+  {
     "character" : 1,
     "file" : "/Users/node2/chatbots-phase-e/Tests/ChatBotsCoreTests/ConflictTests.swift",
     "line" : 267,
     "reason" : "Line should be 120 characters or less; currently it has 126 characters",
+    "rule_id" : "line_length",
+    "severity" : "Warning",
+    "type" : "Line Length"
+  },
+  {
+    "character" : 1,
+    "file" : "/Users/node2/chatbots-phase-e/Tests/ChatBotsCoreTests/FourSeatTests.swift",
+    "line" : 101,
+    "reason" : "Line should be 120 characters or less; currently it has 129 characters",
     "rule_id" : "line_length",
     "severity" : "Warning",
     "type" : "Line Length"
@@ -2014,24 +2032,6 @@
     "rule_id" : "optional_data_string_conversion",
     "severity" : "Warning",
     "type" : "Optional Data -> String Conversion"
-  },
-  {
-    "character" : 65,
-    "file" : "/Users/node2/chatbots-phase-e/Tests/ChatBotsCoreTests/AttachmentTests.swift",
-    "line" : 354,
-    "reason" : "Multi-line collection literals should have trailing commas",
-    "rule_id" : "trailing_comma",
-    "severity" : "Warning",
-    "type" : "Trailing Comma"
-  },
-  {
-    "character" : 1,
-    "file" : "/Users/node2/chatbots-phase-e/Tests/ChatBotsCoreTests/FourSeatTests.swift",
-    "line" : 101,
-    "reason" : "Line should be 120 characters or less; currently it has 129 characters",
-    "rule_id" : "line_length",
-    "severity" : "Warning",
-    "type" : "Line Length"
   },
   {
     "character" : 13,
@@ -2124,6 +2124,33 @@
     "type" : "Closure Parameter Position"
   },
   {
+    "character" : 21,
+    "file" : "/Users/node2/chatbots-phase-e/Tests/ChatBotsCoreTests/SavedConversationHTTPTests.swift",
+    "line" : 53,
+    "reason" : "Tuples should have at most 3 members",
+    "rule_id" : "large_tuple",
+    "severity" : "Warning",
+    "type" : "Large Tuple"
+  },
+  {
+    "character" : 36,
+    "file" : "/Users/node2/chatbots-phase-e/Tests/ChatBotsCoreTests/SavedConversationHTTPTests.swift",
+    "line" : 122,
+    "reason" : "Prefer `a is X` to `a as? X != nil`",
+    "rule_id" : "prefer_type_checking",
+    "severity" : "Warning",
+    "type" : "Prefer Type Checking"
+  },
+  {
+    "character" : 97,
+    "file" : "/Users/node2/chatbots-phase-e/Tests/ChatBotsCoreTests/SavedConversationHTTPTests.swift",
+    "line" : 208,
+    "reason" : "Multi-line collection literals should have trailing commas",
+    "rule_id" : "trailing_comma",
+    "severity" : "Warning",
+    "type" : "Trailing Comma"
+  },
+  {
     "character" : 17,
     "file" : "/Users/node2/chatbots-phase-e/Tests/ChatBotsCoreTests/ProtocolTests.swift",
     "line" : 73,
@@ -2176,33 +2203,6 @@
     "rule_id" : "optional_data_string_conversion",
     "severity" : "Warning",
     "type" : "Optional Data -> String Conversion"
-  },
-  {
-    "character" : 21,
-    "file" : "/Users/node2/chatbots-phase-e/Tests/ChatBotsCoreTests/SavedConversationHTTPTests.swift",
-    "line" : 53,
-    "reason" : "Tuples should have at most 3 members",
-    "rule_id" : "large_tuple",
-    "severity" : "Warning",
-    "type" : "Large Tuple"
-  },
-  {
-    "character" : 36,
-    "file" : "/Users/node2/chatbots-phase-e/Tests/ChatBotsCoreTests/SavedConversationHTTPTests.swift",
-    "line" : 122,
-    "reason" : "Prefer `a is X` to `a as? X != nil`",
-    "rule_id" : "prefer_type_checking",
-    "severity" : "Warning",
-    "type" : "Prefer Type Checking"
-  },
-  {
-    "character" : 97,
-    "file" : "/Users/node2/chatbots-phase-e/Tests/ChatBotsCoreTests/SavedConversationHTTPTests.swift",
-    "line" : 208,
-    "reason" : "Multi-line collection literals should have trailing commas",
-    "rule_id" : "trailing_comma",
-    "severity" : "Warning",
-    "type" : "Trailing Comma"
   },
   {
     "character" : 1,
