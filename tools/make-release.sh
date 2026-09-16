@@ -191,8 +191,12 @@ if ! bash tools/make-app.sh --scratch "$SCRATCH" --out "$APP" > "$STAGE/clean-bu
     die "the clean build failed; the log is $STAGE/clean-build.log"
 fi
 
-if grep -nE '(^| )error:' "$STAGE/clean-build.log" >/dev/null; then
-    grep -nE '(^| )error:' "$STAGE/clean-build.log" >&2
+# The pattern wants a diagnostic that *is* an error: `path:line:col: error: …`, or SwiftPM's
+# own `error: …` at the start of a line. A warning whose prose happens to contain "an error:"
+# — the SwiftPM cache says exactly that — is not one, which is why the first version of this
+# scan failed a build that had succeeded.
+if grep -nE '(^|: )error: |^error: |The following build commands failed' "$STAGE/clean-build.log" >/dev/null; then
+    grep -nE '(^|: )error: |^error: |The following build commands failed' "$STAGE/clean-build.log" >&2
     die "the clean build reported errors"
 fi
 
@@ -200,14 +204,22 @@ fi
 # do not, but each one is written into the record verbatim, because "no warnings" and "no
 # warnings we looked at" are different sentences.
 grep -nE 'warning:' "$STAGE/clean-build.log" > "$STAGE/build-warnings.txt" || true
-if grep -E 'warning:.*(Sources|Tests)/' "$STAGE/build-warnings.txt" >/dev/null; then
-    grep -E 'warning:.*(Sources|Tests)/' "$STAGE/build-warnings.txt" >&2
+# "Ours" means the line names a file under this checkout's own Sources/ or Tests/ — not a
+# dependency that happens to keep its code in a directory called `Sources/`, which is most of
+# them. In practice our sources cannot warn at all (warnings are errors per target), so this is
+# the belt to that braces: it fails the release if one ever gets through.
+OURS="(^|[^-])(($ROOT/)?(Sources|Tests)/)"
+if grep -E "warning:.*$OURS" "$STAGE/build-warnings.txt" > "$STAGE/our-warnings.txt"; then
+    cat "$STAGE/our-warnings.txt" >&2
     die "the clean build warned about this repository's own sources"
 fi
+rm -f "$STAGE/our-warnings.txt"
 WARNING_COUNT="$(grep -c 'warning:' "$STAGE/clean-build.log" || true)"
-record "  clean build succeeded; $WARNING_COUNT warning line(s), none from Sources/ or Tests/"
+record "  clean build succeeded; $WARNING_COUNT warning line(s), none from this repository's sources"
 if [ "$WARNING_COUNT" -gt 0 ]; then
-    sed 's/^/    /' "$STAGE/build-warnings.txt" | while read -r line; do record "$line"; done
+    record "  warning kinds: $(grep -oE '\[-W[a-z0-9+-]+\]' "$STAGE/build-warnings.txt" | sort -u | tr '\n' ' ')"
+    head -5 "$STAGE/build-warnings.txt" | sed 's/^[0-9]*://' | sed 's/^/    /' | while read -r line; do record "$line"; done
+    [ "$WARNING_COUNT" -le 5 ] || record "    … and $((WARNING_COUNT - 5)) more, verbatim in build-warnings.txt"
 fi
 
 # ---------------------------------------------------------------- artifact checks
