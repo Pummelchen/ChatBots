@@ -872,8 +872,10 @@ if !options.attachments.isEmpty {
     // A sample conversation, for laying out the interface without waiting for a model.
     if options.seed { engine.seed(SampleConversation.turns(topic: engine.topic)) }
 
-    // Documents are read by the app's extractors, which live in the app target; the CLI
-    // links the same code, so the server can accept uploads too.
+    // Documents are read by `SystemDocumentExtractor`, from `ChatBotsCore`: the core keeps extraction
+    // behind an installed provider, and this process is what installs one, so the server it starts can
+    // accept uploads. (A207: this said the extractors were the app's and lived in the app target; the
+    // CLI does not link the app target, and no extractor is defined there.)
     DocumentIngestorProvider.install(SystemDocumentExtractor.ingestor)
 
     // Runtime state — the certificate, and the conversations this engine keeps — is the one

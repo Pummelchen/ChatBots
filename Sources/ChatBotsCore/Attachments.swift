@@ -11,8 +11,11 @@
 //     when *every* participating seat does. A conversation where one participant cannot see
 //     the picture is worse than being told upfront that images are unavailable.
 //
-// The extractors themselves live in the app target, which can use PDFKit and `textutil`;
-// this file holds the shapes and the rules, so they can be tested.
+// The extractors live beside this file, in `DocumentImport.swift`: that is where PDFKit and
+// `/usr/bin/textutil` are used (`PDFTextExtractor`, `TextutilExtractor`, `SystemDocumentExtractor`).
+// This file holds the shapes, the limits and the rules, which is the part that can be tested without
+// a file on disk. (A207: this said the extractors were defined in the app target, and there is no
+// extractor there at all.)
 
 import Foundation
 
@@ -336,10 +339,13 @@ public protocol DocumentExtracting: Sendable {
 
 /// Holds the extractor a front end installed.
 ///
-/// The core cannot read a PDF or a Word file itself — that needs PDFKit and `textutil`, which
-/// belong to the app target — so the front end installs an ingestor here at launch and the
-/// API uses it. Until one is installed, uploads are refused with a clear message rather than
-/// crashing.
+/// Extraction is installed rather than assumed: this module defines the shapes and the rules, and a
+/// process that wants to accept documents has to say which extractor it uses before an upload gets
+/// past the door. The extractor itself is in `DocumentImport.swift` — `SystemDocumentExtractor`,
+/// which uses PDFKit and `/usr/bin/textutil` — and `chatbots-cli` is what installs it, for the server
+/// it starts. (A207: this said the core could not read a PDF or a Word file and that the extractors
+/// were defined in the app target; both were false.) Until one is installed, uploads are refused with
+/// a clear message rather than crashing.
 public enum DocumentIngestorProvider {
     private static let lock = NSLock()
     private nonisolated(unsafe) static var installed: DocumentIngestor?
