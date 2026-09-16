@@ -10,10 +10,13 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>ChatBots</title>
 <link rel="stylesheet" href="/style.css">
+<!-- The same cascade, split by concern. Order matters and is the order the single stylesheet had. -->
+<link rel="stylesheet" href="/style-panes.css">
+<link rel="stylesheet" href="/style-panels.css">
 </head>
 <!-- The attributes the client fills in. `data-device` is derived from the live viewport and
-     drives every responsive rule; `data-layout` is the user's mode choice. Both are set by
-     app.js before first paint where possible, and CSS has sane defaults if it is not. -->
+     drives every responsive rule; `data-layout` is the user's mode choice. Both are set by the
+     client before first paint where possible, and CSS has sane defaults if it is not. -->
 <body data-device="phone" data-layout="thread" data-profile="unknown">
 
 <header class="bar">
@@ -171,8 +174,12 @@
 <div id="toast" class="toast" hidden></div>
 <div id="profile-badge" class="profile-badge" hidden></div>
 
+<!-- `deltas.js` and `votes.js` stay classic scripts because Node `require()`s them in
+     `tools/check-web-deltas.js` and `tools/check-web-votes.js`; `app.js` is an ES module and
+     imports the rest of the page. A module is deferred, so it runs after both, which is the
+     order these three have always had. -->
 <script src="/deltas.js"></script>
 <script src="/votes.js"></script>
-<script src="/app.js"></script>
+<script type="module" src="/app.js"></script>
 </body>
 </html>

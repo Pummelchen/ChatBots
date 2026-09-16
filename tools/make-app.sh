@@ -15,7 +15,7 @@ APP="$ROOT/dist/ChatBots.app"
 # The bundle's version, stated once. `CFBundleShortVersionString` is what a person reads;
 # `CFBundleVersion` is what macOS compares, and it has to increase for an update to be offered.
 # Both are written into Info.plist below, which is why they live here rather than as two
-# literals inside it — A78 found the version existing only as two strings in a heredoc, tied to
+# literals inside it — the version used to exist only as two strings in a heredoc, tied to
 # no release or tag.
 APP_VERSION="1.0"
 APP_BUILD="1"
@@ -89,7 +89,7 @@ cp "$BIN/chatbots-probe" "$APP/Contents/MacOS/chatbots-probe"
 # binary. MLX's own kernels are in one of those bundles too — under Xcode 27 with the Metal
 # toolchain installed the SwiftPM build compiles them — and the loop below is what puts them in
 # the app. What that does **not** do is put a metallib where MLX looks for one: see the note at
-# the `mlx.metallib` step further down (A135).
+# the `mlx.metallib` step further down.
 shopt -s nullglob
 for bundle in "$BIN"/*.bundle; do
   cp -R "$bundle" "$APP/Contents/Resources/"
@@ -112,7 +112,7 @@ shopt -u nullglob
 # replacing every white pixel would hollow them out.
 # The third-party notices, which have to travel with a distributed binary: the app ships the
 # packages pinned in `Package.resolved`, so their licence terms travel with it, and Apache-2.0
-# §4(a) requires a copy of the License to accompany the work (A77). `tools/third-party-notices.py`
+# §4(a) requires a copy of the License to accompany the work. `tools/third-party-notices.py`
 # keeps the inventory in that file in step with the lockfile; this is the copy that ships.
 NOTICES="$ROOT/THIRD-PARTY-NOTICES.md"
 if [[ ! -f "$NOTICES" ]]; then
@@ -149,12 +149,12 @@ fi
 # engine needs a colocated `Contents/MacOS/mlx.metallib`. That is why a metallib is installed here
 # at all.
 #
-# Which one: the build's own. Xcode 27 with the Metal toolchain (a build requirement since A133)
+# Which one: the build's own. Xcode 27 with the Metal toolchain (a build requirement)
 # compiles the kernels into `mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib`, and that
 # file runs — measured by placing it beside a binary and evaluating a kernel, which is what
-# `Tests/ChatBotsCoreTests/AuditS2MetalLibraryTests.swift` does
-# (`AUDIT/baseline/swift64/a135-metal-lib.log`). This used to download ~190 MB from the network
-# instead, for a reason that was never true under Xcode 27 (A135). The pinned, digest-checked
+# the core suite's metal-library test does. This used to download ~190 MB from the
+# network
+# instead, for a reason that was never true under Xcode 27. The pinned, digest-checked
 # download in `tools/fetch-metal.sh` stays as the fallback for a build that produced no metallib.
 BUILT_METALLIB="$BIN/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
 if [ -f "$BUILT_METALLIB" ]; then

@@ -34,7 +34,7 @@ struct ChatBotsApp: App {
         // process and the app never kept the files themselves, so this is the point where the
         // stored list is either already in the engine (an adopted one) or reported as not
         // loaded; it is never silently dropped and the settings are not rewritten empty. See
-        // `ChatController.setAttachments` (audit A47).
+        // `ChatController.setAttachments`.
         _ = restored.setAttachments(store.settings.attachments)
         // Every change writes: the topic as it is typed, and each seat's persona, thinking
         // level and backend as they are picked.
@@ -196,7 +196,7 @@ struct ChatBotsApp: App {
                 Divider()
 
                 // The label says where the step goes, which is what the property beside it was
-                // written for and nothing read (A177). It falls back to the plain name at the end of
+                // written for and nothing read. It falls back to the plain name at the end of
                 // the range, which is also where the item is disabled.
                 Button(zoom.nextLargerPercent.map { "Bigger Text (\($0)%)" } ?? "Bigger Text") {
                     zoom.step(larger: true)
@@ -249,7 +249,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ///
     /// The old path relied on SwiftUI delivering `onDisappear` and on `stop()` having sent
     /// SIGTERM; a child that ignored it, or a quit where the view never disappeared, left the
-    /// engine holding the GPU and the WebTransport port after the app was gone (audit A49).
+    /// engine holding the GPU and the WebTransport port after the app was gone.
     /// Answering `.terminateLater`, awaiting the teardown, and then replying removes that
     /// dependency and makes quitting wait. With no engine installed there is nothing to wait
     /// for and termination is immediate.
@@ -272,7 +272,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated { Self.flush?() }
     }
 }
-
 
 enum HelpWindow {
     @MainActor
@@ -307,7 +306,7 @@ enum HelpWindow {
 /// handles frame autosave so the size and position survive relaunch.
 struct WindowConfigurator: NSViewRepresentable {
     let palette: AppPalette
-    /// The floor for a drag, from the one rule in `ZoomStore` rather than a number of its own (A177).
+    /// The floor for a drag, from the one rule in `ZoomStore` rather than a number of its own.
     let minimumSize: CGSize
 
     func makeNSView(context: Context) -> NSView {
@@ -330,8 +329,7 @@ struct WindowConfigurator: NSViewRepresentable {
             // request rather than a command — the app asks to come forward and the system decides,
             // which is what cooperative activation means. The window is still made key and ordered
             // front above, so a user who launched the app gets it; what no longer happens is taking
-            // focus from whatever else was frontmost, which is the behaviour the deprecation is for
-            // (A180).
+            // focus from whatever else was frontmost, which is the behaviour the deprecation is for.
             NSApp.activate()
         }
         return view

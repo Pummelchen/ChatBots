@@ -34,7 +34,7 @@ struct CertificateStoreTests {
     func isStableAcrossLoads() throws {
         // The reason this type exists. The library's development identity is regenerated on
         // every server construction, so its fingerprint changes each restart. Nothing enforces
-        // the value (A195) — but the fingerprint the engine reports is what a person and the
+        // the value — but the fingerprint the engine reports is what a person and the
         // transport check compare, so a value that changed for no reason would make every
         // record of it stale on relaunch and look like a dead engine.
         let directory = temporaryDirectory()
@@ -79,7 +79,7 @@ struct CertificateStoreTests {
 
     @Test("A key that is readable by others is made private again the next time it is loaded")
     func keyPermissionsAreRepairedOnLoad() throws {
-        // The gap A138 records: generation set the mode and threw the result away, and the load path
+        // The gap this records: generation set the mode and threw the result away, and the load path
         // never looked. An identity that was already on disk — because an earlier version wrote it
         // under a permissive umask, or a backup restored it, or someone copied it — stayed readable by
         // every user on the machine for the life of the install, and nothing said so.
@@ -106,7 +106,7 @@ struct CertificateStoreTests {
     @Test("A partial identity on disk is reported with a way out, not silently replaced")
     func partialStateIsReported() throws {
         // This test used to assert the opposite — that a missing key was regenerated — and that
-        // expectation was the defect A155 records: a damaged identity was read as "no identity here" and
+        // expectation was the defect this records: a damaged identity was read as "no identity here" and
         // the store generated a new key, replacing the certificate the engine had been serving without
         // saying so. The failure is now the store's, with the file named and the way out in the message;
         // the cost of the way out (a new fingerprint to report) is stated rather than paid in silence.
@@ -153,6 +153,8 @@ struct CertificateStoreTests {
         var error: Unmanaged<CFError>?
         let key = SecKeyCreateWithData(
             identity.privateKeyDER as CFData, attributes as CFDictionary, &error)
-        #expect(key != nil, "Security.framework rejected the key: \(error.map { String(describing: $0.takeRetainedValue()) } ?? "?")")
+        #expect(
+            key != nil,
+            "Security.framework rejected the key: \(error.map { String(describing: $0.takeRetainedValue()) } ?? "?")")
     }
 }

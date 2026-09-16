@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 //
-// ChatBots — checks for the merge that turns the engine's per-token events into live text (A165).
+// ChatBots — checks for the merge that turns the engine's per-token events into live text.
 //
 // The page used to listen only for whole-turn snapshots, so a reply appeared in one piece when the
 // turn ended and a long research turn looked frozen while it was working. It now merges the `delta`
@@ -16,6 +16,21 @@
 const fs = require("fs");
 const path = require("path");
 const { applyDelta, emptyLive, isStale } = require(path.join(__dirname, "..", "web", "deltas.js"));
+
+// The page is split across ES modules, so the source checks read every one of them: a case
+// cannot pass because the code moved into a file this check did not know about. `deltas.js` and
+// `votes.js` are excluded because they are the shared pure rules, not the page itself. The paths
+// are literal on purpose — a name taken from a directory listing is what a path-traversal rule
+// flags — so a new page module has to be added here as well as to `web/index.html`.
+const appJS = [
+  fs.readFileSync(path.join(__dirname, "..", "web", "app.js"), "utf8"),
+  fs.readFileSync(path.join(__dirname, "..", "web", "app-core.js"), "utf8"),
+  fs.readFileSync(path.join(__dirname, "..", "web", "app-screen.js"), "utf8"),
+  fs.readFileSync(path.join(__dirname, "..", "web", "app-transcript.js"), "utf8"),
+  fs.readFileSync(path.join(__dirname, "..", "web", "app-controls.js"), "utf8"),
+  fs.readFileSync(path.join(__dirname, "..", "web", "app-lineup.js"), "utf8"),
+  fs.readFileSync(path.join(__dirname, "..", "web", "app-commands.js"), "utf8"),
+].join("\n");
 
 let failures = 0;
 
@@ -109,11 +124,11 @@ console.log("web/deltas.js");
   check("an empty fragment leaves the text a string", typeof liveOf(snap, "Agent 1").text === "string");
 }
 
-// ── which of two snapshots is newer (A171) ────────────────────────────────────────────────────────
+// ── which of two snapshots is newer ────────────────────────────────────────────────────────────────
 //
 // The page applied whatever arrived last, so the `GET /api/state` at load could race the first pushed
 // snapshot and leave the older one on screen until the next turn. The app-side client has refused
-// stale snapshots since A110; this is the same rule, and the same fallback when a snapshot carries no
+// stale snapshots since that guard was added; this is the same rule, and the same fallback when a snapshot carries no
 // revision.
 
 {
@@ -153,24 +168,23 @@ console.log("web/deltas.js");
 
 // ── and the page actually uses it ─────────────────────────────────────────────────────────────────
 //
-// The defect was not a missing rule — `APISnapshot.isOlder(than:)` has existed since A110 and the app
+// The defect was not a missing rule — `APISnapshot.isOlder(than:)` has existed since that guard was added and the app
 // uses it — but a page that applied whatever arrived last. A rule nothing calls is the thing this
 // file's tests would otherwise pass on, so the call is checked too.
 
 {
-  const appJS = fs.readFileSync(path.join(__dirname, "..", "web", "app.js"), "utf8");
   check(
     "every snapshot the page applies goes through the guard",
     /isStale\(next, state\.snapshot\)/.test(appJS));
 
-  // A172: the stylesheet documents the profile badge as "shown only when ?profile is in the URL", and
+  // The stylesheet documents the profile badge as "shown only when ?profile is in the URL", and
   // nothing implemented the condition — the text went into an element the stylesheet keeps hidden. The
-  // browser behaviour is not exercised here (there is no headless browser in this audit); what is
+  // browser behaviour is not exercised here (there is no headless browser in this check); what is
   // checked is that the page both reads `?profile` and applies it to the badge.
   check("the debug label reads ?profile", /has\("profile"\)/.test(appJS));
   check("and the badge is shown only when it is asked for", /badge\.hidden = !profileRequested\(\)/.test(appJS));
 
-  // A173: the page disables removing an attachment on `canAttach`, which turned out to be *right* —
+  // The page disables removing an attachment on `canAttach`, which turned out to be *right* —
   // `ConversationEngine.setAttachments` refuses once `turnsCompleted > 0`, so the engine's rule is the
   // page's. What was wrong was the other two sides: `EngineService` discarded that refusal and
   // reported success, and the Mac app's ✕ was `.disabled(false)`. The case below pins the page's side
@@ -179,7 +193,7 @@ console.log("web/deltas.js");
     "the page gates removing an attachment on the same flag the engine uses",
     /remove\.disabled = !state\.snapshot\.canAttach/.test(appJS));
 
-  // A174: the moderator's draft was emptied *before* the send, so a message the engine refused — or one
+  // The moderator's draft was emptied *before* the send, so a message the engine refused — or one
   // that never left the page because the engine could not be reached — silently discarded what had been
   // typed. The browser interaction is not exercised here; what is checked is the ordering that was
   // wrong, that the helper the ordering depends on reports the outcome, and that the guard which used to

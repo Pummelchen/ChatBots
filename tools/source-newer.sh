@@ -10,7 +10,7 @@
 # Comparing the *directory* mtime, which is what the start scripts did, does not answer this question:
 # a directory's modification time changes only when an entry is added or removed, so editing
 # `web/app.js` or `Sources/X.swift` left the old build in place and the rebuild the scripts promise
-# never ran. That is the "I changed it and nothing happened" case the guard exists for (A182), and a
+# never ran. That is the "I changed it and nothing happened" case the guard exists for, and a
 # directory has to be walked to see it.
 #
 # `stat -f '%m'` is BSD stat, which is the only stat on macOS; this script is macOS-only, like the

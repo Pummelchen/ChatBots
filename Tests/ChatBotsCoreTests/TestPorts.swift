@@ -8,7 +8,7 @@
 import Foundation
 
 #if canImport(Darwin)
-import Darwin
+    import Darwin
 #endif
 
 @MainActor private var nextTestPort = 7_900
@@ -23,7 +23,7 @@ import Darwin
 /// The counter alone is safe *within* a process but knows nothing about anything else, so a second
 /// run - another checkout, a CI job, someone running the suite twice - began at 7 900 as well and
 /// the two collided from the first server test onward. That is a flakiness source that has nothing
-/// to do with the code under test, which is the kind A28's lesson says to remove rather than
+/// to do with the code under test, which is the kind this suite's own history says to remove rather than
 /// explain away. Deliberately no `SO_REUSEADDR`: with it, a port already in use would probe as
 /// free, which is the one answer this must not give.
 @MainActor private func isLoopbackPortFree(_ port: UInt16) -> Bool {

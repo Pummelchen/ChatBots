@@ -54,7 +54,7 @@ validation: **the engine's fingerprint is reported and logged but not enforced.*
 process already running as your user could present its own certificate and be accepted. It is
 accepted because the alternative is no encrypted local channel at all, and because a process
 that can run as you can read the engine's files directly. See the comment at the top of
-`Sources/ChatBotsCore/WebTransportClient.swift`.
+`Sources/ChatBotsCore/Transport/WebTransportClient.swift`.
 
 ## Keys
 

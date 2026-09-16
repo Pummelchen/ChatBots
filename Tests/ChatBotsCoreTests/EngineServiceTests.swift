@@ -307,7 +307,7 @@ struct EngineServiceTests {
     }
 }
 
-// MARK: - Fields the user supplies are bounded (A143)
+// MARK: - Fields the user supplies are bounded
 
 @MainActor
 @Suite("User-supplied text is bounded")

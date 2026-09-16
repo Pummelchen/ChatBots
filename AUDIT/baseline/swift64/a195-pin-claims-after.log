@@ -1,9 +1,0 @@
-# A195 — the pin-claim guard, after the comments were corrected
-
-$ swift test --filter CertificatePinClaimTests
-  ✔ Test "The fingerprint is still reported everywhere it was (the counterweight)" passed after 0.001 seconds.
-  ✔ Test "The store says what the fingerprint is for, in the policy document's words" passed after 0.002 seconds.
-  ✔ Test "The policy document and the client's own note still say the same thing" passed after 0.003 seconds.
-  ✔ Test "No source file claims the client pins or enforces the certificate" passed after 0.328 seconds.
-  ✔ Suite "The certificate comments match the trust the client gives them (A195)" passed after 0.328 seconds.
-  ✔ Test run with 4 tests in 1 suite passed after 0.328 seconds.

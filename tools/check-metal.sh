@@ -10,7 +10,7 @@
 #     error: cannot execute tool 'metal' due to missing Metal Toolchain
 #
 # Checking that the compiler *exists* is not a check: on a machine where the component is absent,
-# `xcrun --find metal` prints a path and exits 0. Running it is the only honest test (A133).
+# `xcrun --find metal` prints a path and exits 0. Running it is the only honest test.
 #
 #   usage: tools/check-metal.sh [--quiet]
 #

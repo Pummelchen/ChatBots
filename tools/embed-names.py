@@ -49,8 +49,8 @@ def swift_literal(text: str) -> str:
 
     The lists are data files that people edit, and this used to paste each name straight into a
     `"…"` literal: a name with a quote, a backslash or a control character in it produced Swift that
-    does not compile, in a file nobody edits by hand and whose breakage surfaces as a build failure
-    (A191). The web embedder escapes its input for the same reason.
+    does not compile, in a file nobody edits by hand and whose breakage surfaces as a build failure.
+    The web embedder escapes its input for the same reason.
 
     Escaped by character rather than by a chain of `replace` calls so the order cannot matter, and
     anything below a space — which a Swift literal cannot carry literally — becomes `\u{…}`.

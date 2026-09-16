@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
-"""Check a semgrep report against the findings this audit waived in writing.
+"""Check a semgrep report against the findings this project waived in writing.
 
-`semgrep --error` fails on any finding, and three findings in `tools/cdp.py` are deliberately left
-visible: the plaintext websocket and the run-time URL are both correct for a loopback-only Chrome
-DevTools client, and the code now *enforces* what the scanner cannot see (a host check that refuses
-anything but loopback, a pinned scheme, a bounded read). They are not suppressed with `nosemgrep`,
-because that hides a finding rather than justifying it (A09) — so a gate has to distinguish "a
-finding this audit has justified" from "a new one", and a count cannot do that: swapping one finding
+`semgrep --error` fails on any finding, and three findings in `tools/cdp.py` and
+`tools/cdp_protocol.py` are deliberately left visible: the plaintext websocket and the run-time URL
+are both correct for a loopback-only Chrome DevTools client, and the code now *enforces* what the
+scanner cannot see (a host check that refuses anything but loopback, a pinned scheme, a bounded
+read). They are not suppressed with `nosemgrep`,
+because that hides a finding rather than justifying it — so a gate has to distinguish "a
+finding the project has justified" from "a new one", and a count cannot do that: swapping one finding
 for another leaves the total unchanged.
 
-The waivers are therefore an allowlist read from `AUDIT/plan.md`, matched on rule id *and* path
-suffix, and this is the one implementation of that check: the CI job and `AUDIT/phase-e.sh` both
-call it, because the CI job's own `semgrep --error` was wrong in exactly the way it could not be
-noticed — the workflow does not run on the audit branch, so it had never executed (A129).
+The waivers are therefore an allowlist read from `tools/analysis-waivers.txt`, matched on rule id
+*and* path suffix, and this is the one implementation of that check: the CI job calls it, and
+`tools/mac-checks.sh` runs the same scan so the hosted gate and a Mac cannot disagree about what
+has been justified.
 
     python3 tools/semgrep-waivers.py report.json [plan.md]
 
 Exit 0 when every finding matches a recorded waiver, 1 when one does not, 2 when the report cannot be
-read at all — a report that will not parse is not a clean one (A89).
+read at all — a report that will not parse is not a clean one.
 """
 
 from __future__ import annotations
@@ -29,9 +30,9 @@ import sys
 from typing import Any, cast
 
 ROOT: pathlib.Path = pathlib.Path(__file__).resolve().parent.parent
-PLAN: pathlib.Path = ROOT / "AUDIT" / "plan.md"
+WAIVERS: pathlib.Path = ROOT / "tools" / "analysis-waivers.txt"
 
-# `semgrep waiver: <rule id> <path>` — the shape AUDIT/plan.md records them in, and the single
+# `semgrep waiver: <rule id> <path>` — the shape tools/analysis-waivers.txt records them in, and the
 # source both this script and a reader use.
 WAIVER: re.Pattern[str] = re.compile(
     r"^semgrep waiver:\s+(\S+)\s+(\S+)\s*$", re.MULTILINE
@@ -70,9 +71,9 @@ def findings(path: pathlib.Path) -> tuple[list[tuple[str, str]], list[str]]:
 
     Raises:
         SystemExit: The report is missing, unparseable, incomplete or records an error. Reporting
-            "no unwaived findings" from a report that could not be read is the failure mode A89
-            recorded, and it happened again here: only `results` was read, so a failed scan printed
-            "0 finding(s), all covered by a recorded waiver" and exited 0 (A185).
+            "no unwaived findings" from a report that could not be read is the failure mode recorded
+            before, and it happened again here: only `results` was read, so a failed scan printed
+            "0 finding(s), all covered by a recorded waiver" and exited 0.
     """
     try:
         document = cast("dict[str, Any]", json.loads(path.read_text(encoding="utf-8")))
@@ -122,10 +123,10 @@ def findings(path: pathlib.Path) -> tuple[list[tuple[str, str]], list[str]]:
 
 def main() -> int:
     if len(sys.argv) < 2:
-        print("usage: semgrep-waivers.py report.json [plan.md]", file=sys.stderr)
+        print("usage: semgrep-waivers.py report.json [waivers.txt]", file=sys.stderr)
         return 2
     report = pathlib.Path(sys.argv[1])
-    plan = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 else PLAN
+    plan = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 else WAIVERS
 
     allowed = waivers(plan)
     found, warnings = findings(report)

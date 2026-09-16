@@ -1,0 +1,292 @@
+/* ChatBots — the panels: research, kept conversations, the line-up and the persona picker.
+ *
+ * The last of the three stylesheets. It follows `style.css` and `style-panes.css`, which is
+ * what keeps the cascade identical to the single file these were split from.
+ */
+
+
+/* ── Research session ─────────────────────────────────────────────────────────────── */
+
+/* The budget controls only mean anything before the run, so the bar appears with the
+   session and disappears with the report. */
+.research-bar {
+  display: flex;
+  align-items: center;
+  gap: calc(8px * var(--scale));
+  padding: calc(6px * var(--scale)) var(--pad);
+  background: var(--bg-sunken);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.research-bar .seg button { padding-inline: calc(8px * var(--scale)); }
+
+/* The report is the deliverable, so it takes the space rather than sitting in the log. */
+.report-panel {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(8px + var(--safe-top));
+  bottom: calc(8px + var(--safe-bottom));
+  width: min(760px, calc(var(--vw) - 16px));
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  z-index: 25;
+  overflow: hidden;
+}
+
+.report-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(9px * var(--scale)) var(--pad);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.report-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--pad);
+  font-size: var(--font-small);
+  line-height: 1.55;
+}
+
+.report-body h1 { font-size: calc(17px * var(--scale)); margin: 0 0 10px; }
+.report-body h2 {
+  font-size: calc(14px * var(--scale));
+  margin: 18px 0 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--line);
+}
+.report-body ul { margin: 0 0 8px; padding-left: 1.2em; }
+.report-body li { margin-bottom: 4px; }
+.report-body p { margin: 0 0 8px; }
+/* The claim labels are the point of the format, so they are emphasised. */
+.report-body strong { color: var(--seat-a); }
+
+@media (max-width: 780px) {
+  .report-panel { width: calc(var(--vw) - 12px); }
+  .report-head .spacer { display: none; }
+}
+
+/* The kept list borrows the report panel's shape: same furniture, different contents. */
+.kept-row {
+  display: flex;
+  align-items: flex-start;
+  gap: calc(10px * var(--scale));
+  padding: calc(8px * var(--scale)) 0;
+  border-bottom: 1px solid var(--line);
+}
+.kept-row:last-child { border-bottom: 0; }
+.kept-text { flex: 1 1 auto; min-width: 0; }
+.kept-topic {
+  font-weight: 600;
+  font-size: var(--font-body);
+  overflow-wrap: anywhere;
+}
+.kept-sub {
+  color: var(--text-secondary);
+  font-size: var(--font-small);
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+.kept-meta {
+  color: var(--text-faint);
+  font-size: var(--font-tiny);
+  font-family: ui-monospace, Menlo, monospace;
+  margin-top: 3px;
+}
+.kept-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+.kept-empty { color: var(--text-secondary); text-align: center; padding: calc(28px * var(--scale)) 0; }
+
+.lineup-section {
+  font-size: var(--font-small);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin: calc(14px * var(--scale)) 0 calc(4px * var(--scale));
+}
+.lineup-section:first-child { margin-top: 0; }
+.lineup-row {
+  display: flex;
+  align-items: flex-start;
+  gap: calc(10px * var(--scale));
+  padding: calc(7px * var(--scale)) 0;
+  border-bottom: 1px solid var(--line);
+}
+.lineup-row:last-child { border-bottom: 0; }
+.lineup-text { flex: 1 1 auto; min-width: 0; }
+.lineup-name { font-weight: 600; }
+.lineup-note { color: var(--text-secondary); font-size: var(--font-small); margin-top: 2px; }
+.lineup-who {
+  color: var(--text-faint);
+  font-size: var(--font-tiny);
+  font-family: ui-monospace, Menlo, monospace;
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+
+
+/* ── More than two seats ──────────────────────────────────────────────────────────── */
+
+/* Each seat gets its own tint, so a four-way conversation is still readable at a glance.
+   Distinct hues rather than shades: telling two blues apart under pressure is harder than
+   telling blue from amber. */
+.pane[data-seat="2"] .dot { background: var(--seat-c); }
+.pane[data-seat="3"] .dot { background: var(--seat-d); }
+.msg[data-seat="2"] { border-left-color: var(--seat-c); }
+.msg[data-seat="3"] { border-left-color: var(--seat-d); }
+.msg[data-seat="2"] .msg-who { color: var(--seat-c); }
+.msg[data-seat="3"] .msg-who { color: var(--seat-d); }
+
+@media (max-width: 780px) {
+  body[data-device="tablet"] #stage,
+  body[data-device="desktop"] #stage { grid-template-columns: 1fr; }
+}
+
+
+/* ── The persona picker ───────────────────────────────────────────────────────────── */
+
+.persona-row {
+  flex: 0 0 auto;
+  padding: calc(4px * var(--scale)) var(--pad);
+  border-bottom: 1px solid var(--line);
+}
+
+.persona-picker {
+  font: inherit;
+  font-size: var(--font-small);
+  color: var(--text);
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: calc(4px * var(--scale)) calc(9px * var(--scale));
+  width: 100%;
+  text-align: left;
+  min-height: calc(var(--tap) * 0.72);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.persona-picker:disabled { opacity: 0.6; }
+
+/* The checkpoint select, beside the persona picker and styled to match it. It sizes to its content
+   rather than the row, because a repository id is long and the persona picker is what the eye should
+   land on. */
+.model-picker {
+  font: inherit;
+  font-size: var(--font-small);
+  color: var(--text);
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: calc(2px * var(--scale)) calc(6px * var(--scale));
+  margin-left: calc(6px * var(--scale));
+  max-width: 46%;
+}
+
+.model-picker:disabled { opacity: 0.6; }
+
+/* The list itself. A native-feeling panel rather than a floating dropdown, because it can
+   hold the whole cast and works the same with a finger and a mouse. */
+.persona-sheet {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+  padding: 12px;
+}
+
+.persona-sheet-inner {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  width: min(720px, 100%);
+  max-height: min(80vh, 640px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
+}
+
+.persona-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: var(--pad);
+  border-bottom: 1px solid var(--line);
+}
+
+.persona-sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: calc(8px * var(--scale));
+}
+
+.persona-group {
+  font-size: var(--font-tiny);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  margin: calc(10px * var(--scale)) 0 calc(4px * var(--scale));
+}
+
+.persona-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: calc(7px * var(--scale)) calc(9px * var(--scale));
+  min-height: var(--tap);
+}
+
+.persona-item:hover { background: var(--bg-sunken); }
+.persona-item.on { border-color: var(--seat-a); background: var(--bg-sunken); }
+.persona-item b { font-weight: 600; white-space: nowrap; }
+.persona-item span { color: var(--text-dim); font-size: var(--font-tiny); }
+
+/* On a phone the sheet takes the screen, because a half-height list of 36 characters in a
+   centred box is worse than a full-screen one. */
+@media (max-width: 600px) {
+  .persona-sheet { padding: 0; align-items: flex-end; }
+  .persona-sheet-inner { width: 100%; max-height: 88vh; border-radius: 12px 12px 0 0; }
+}
+
+
+/* ── A forced phone view, on a wide screen ────────────────────────────────────────── */
+
+/* `?view=phone` on a desktop browser asks for the phone layout, which means the *shape* of a
+   phone and not merely the single column. Everything is composed against `--measure`, which
+   the client narrows to a phone's width, and the whole page is centred in a soft frame so it
+   reads as a phone rather than as a broken desktop layout. */
+body[data-view="phone"] {
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+
+@media (min-width: 700px) {
+  body[data-view="phone"] {
+    /* A frame, so it is obvious this is deliberate rather than a page that failed to fill
+       the window. */
+    border-inline: 1px solid var(--line);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25), 0 18px 60px rgba(0, 0, 0, 0.45);
+  }
+}

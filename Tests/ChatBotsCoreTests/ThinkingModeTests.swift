@@ -45,7 +45,7 @@ struct ThinkingModeTests {
         spec.thinking = .low
         #expect(spec.generationCap == 1_000 + 512)
 
-        // A43 fixed the engine's cap but left this public property on the old arithmetic,
+        // The engine's cap was fixed but this public property was left on the old arithmetic,
         // which made unlimited the *smallest* cap of any mode. It now delegates to the same
         // implementation the engine uses, so high can never exceed unlimited.
         spec.thinking = .high
@@ -55,7 +55,7 @@ struct ThinkingModeTests {
         spec.thinking = .unlimited
         #expect(
             spec.generationCap >= high,
-            "unlimited granted less headroom than high — the pre-A43 arithmetic is back")
+            "unlimited granted less headroom than high — the old arithmetic is back")
         #expect(spec.generationCap > 1_000, "unlimited is not the smallest cap")
 
         // And the whole ladder is monotone non-decreasing, agreeing with the engine helper
@@ -133,7 +133,10 @@ struct RepetitionDetectorTests {
         var fired = false
         // Feed in chunks, the way generation arrives.
         for chunk in Self.looping.chunked(into: 20) {
-            if detector.ingest(chunk) { fired = true; break }
+            if detector.ingest(chunk) {
+                fired = true
+                break
+            }
         }
         #expect(fired)
     }
@@ -169,8 +172,8 @@ struct RepetitionDetectorTests {
     }
 }
 
-private extension String {
-    func chunked(into size: Int) -> [String] {
+extension String {
+    fileprivate func chunked(into size: Int) -> [String] {
         var chunks: [String] = []
         var index = startIndex
         while index < endIndex {

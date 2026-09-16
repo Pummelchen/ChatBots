@@ -69,7 +69,7 @@ struct RunDirectoryTests {
     func anOverrideWins() throws {
         // `--run-directory` is how a caller says where its state lives, and the engine it starts as
         // a separate process is told the same thing. Without this, `TransportCheck` pinned one
-        // identity and the engine it started served another (A215).
+        // identity and the engine it started served another.
         let root = try scratch()
         let chosen = try scratch()
         defer { try? FileManager.default.removeItem(at: root) }

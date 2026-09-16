@@ -1,4 +1,0 @@
-waived:   javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket  tools/cdp.py
-waived:   javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket  tools/cdp.py
-waived:   python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected  tools/cdp.py
-semgrep: 3 finding(s), all covered by a recorded waiver

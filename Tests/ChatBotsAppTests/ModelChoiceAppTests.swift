@@ -1,7 +1,7 @@
 // ChatBotsAppTests — the pane follows the engine when the checkpoint changes
 //
 // `ChatController.setModel` sends the change and updates the pane only if the engine took it. The
-// order matters: showing a checkpoint on a seat that is still running the old one is the defect A173
+// order matters: showing a checkpoint on a seat that is still running the old one is the defect this
 // records, and the engine refuses a swap while a turn is in flight, so the click and the pane can
 // genuinely disagree. With no client the send cannot happen at all, which is the case this pins
 // without a socket.

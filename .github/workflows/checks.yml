@@ -2,52 +2,46 @@
 #
 # On a push to `main` — and on every pull request and manual run — on a hosted Linux runner:
 #
-#   * `generated-files` — the embedded interface and name lists are in step with `web/` and
-#     `names/`. This is the class of problem that has already bitten this repository once: for
-#     four commits Caddy served a page older than the engine's, and nothing failed until a
-#     person read both. macOS enforces the same invariant in `EmbeddedWebAssetTests`.
+#   * `generated-files` — the embedded interface and name lists are in step with `web/` and `names/`.
+#     This is the class of problem that has already bitten this repository once: for four commits
+#     Caddy served a page older than the engine's, and nothing failed until a person read both. macOS
+#     enforces the same invariant in `EmbeddedWebAssetTests`. The notices and parse checks live here
+#     too, and so does the one comparison between the bundle's minimum macOS and the package's.
 #   * `static-analysis` — the checks that genuinely run on Linux: `shellcheck -S style` over every
-#     tracked `*.sh` — `tools/`, `AUDIT/` and the probe scripts under `AUDIT/baseline/`, which the
-#     old `tools/*.sh` glob left unlinted (A192) — `ruff check` and `ruff format --check` over the
-#     Python, `pyright`, `gitleaks` over the full history, `semgrep` and `osv-scanner`. None of
-#     these is advisory: a finding fails the job, and the tools are installed at the exact versions
-#     recorded in `AUDIT/environment.md`.
+#     tracked `*.sh` (the list comes from git, so a script added in a new directory cannot escape the
+#     gate), `ruff check` and `ruff format --check` over the Python, `pyright`, `gitleaks` over the
+#     full history, `semgrep` and `osv-scanner`. None of these is advisory: a finding fails the job,
+#     and the tools are installed at the exact versions recorded in `docs/toolchain.md`.
 #
 #     One input is *not* pinned, and the job says so rather than letting the pin imply otherwise:
-#     semgrep's rule set is fetched from the Semgrep registry at scan time, so `--config auto`
-#     resolves a policy that no version pin covers. That is why the step runs without `--quiet`:
-#     the scan's own summary — rules run, targets scanned, findings — is then in the job log, and
-#     the figures it resolved are recorded in `AUDIT/plan.md`. Pinning the policy was considered
-#     and rejected in A192: the registry serves no versioned reference to the `auto` policy, and
-#     vendoring the resolved rule set would both freeze it and require the secret scan to skip the
-#     vendored file, which holds the registry's own example credentials.
+#     semgrep's rule set comes from the Semgrep registry at scan time, so `--config auto` resolves a
+#     policy that no version pin covers. That is why the step runs without `--quiet`: the scan's own
+#     summary — rules run, targets scanned, findings — lands in the job log.
 #
-#     The three that arrive as release binaries — shellcheck, gitleaks and osv-scanner — are
-#     each checked against a pinned SHA-256 before they are unpacked, which is `A187`:
-#     a version-pinned *URL* is not integrity, because a release asset can be replaced by
-#     anyone with release rights on the repository, and the job would then run whatever is
-#     there. `tools/fetch-audit-tools.sh` holds the versions and the digests. The Python and
-#     Node tools are not in that script on purpose: PyPI and npm refuse to publish a version
-#     twice, so for them the version is the pin.
+#     The three that arrive as release binaries — shellcheck, gitleaks and osv-scanner — are each
+#     checked against a pinned SHA-256 before they are unpacked: a version-pinned *URL* is not
+#     integrity, because a release asset can be replaced by anyone with release rights on the
+#     repository, and the job would then run whatever is there. `tools/fetch-analysis-tools.sh` holds the
+#     versions and the digests, and `tools/toolchain-versions.txt` carries the same three versions so
+#     a step below can compare them. The Python and Node tools are not in that script on purpose:
+#     PyPI and npm refuse to publish a version twice, so for them the version is the pin.
 #
-# Not on the push, and why: the Swift gates. The package requires macOS 26 and Apple-silicon
-# MLX, and no hosted runner image is either and none has a GPU, so a Swift job here would be
-# a red build that says nothing about the code. Those gates run on a Mac instead, in one
-# command:
+# Not on the push, and why: the Swift gates. The package requires macOS 26 and Apple-silicon MLX, and
+# no hosted runner image is either and none has a GPU, so a Swift job here would be a red build that
+# says nothing about the code. Those gates run on a Mac instead, in one command:
 #
-#   tools/audit-checks.sh
+#   tools/mac-checks.sh
 #
-# `swift build` with warnings-as-errors (set in `Package.swift`, so no build command can
-# bypass it), the full test suite with coverage, `swiftlint`, and `swift-format lint`. Until
-# a repository configuration exists for swiftlint and swift-format, that script reports the
-# pre-configuration baselines in `AUDIT/plan.md` rather than hiding them.
+# `swift build` with warnings-as-errors (set in `Package.swift`, so no build command can bypass it),
+# the full test suite with coverage, `swiftlint`, and `swift-format lint`. The two style gates are
+# judged against the recorded waivers in `tools/analysis-waivers.txt`, not against zero — that file
+# says what the residual is, by rule, and why it is accepted.
 #
-# Pinning: `actions/checkout` is pinned to a commit SHA below, because a tag can be moved and
-# a check that runs someone else's code should say exactly which code it ran. No other action
-# is used — each analysis tool is installed from a version-pinned release or package, which is
-# a stricter pin than an action tag and keeps third-party code out of the job, and the three
-# release binaries are additionally verified against a pinned digest (A187). Any action added
-# here later must be pinned the same way, with its version in a trailing comment.
+# Pinning: `actions/checkout` is pinned to a commit SHA below, because a tag can be moved and a check
+# that runs someone else's code should say exactly which code it ran. No other action is used — each
+# analysis tool is installed from a version-pinned release or package, which is a stricter pin than an
+# action tag and keeps third-party code out of the job. Any action added here later must be pinned the
+# same way, with its version in a trailing comment.
 name: checks
 
 on:
@@ -72,30 +66,27 @@ jobs:
         run: python3 tools/embed-web.py --check
       - name: The embedded name lists match names/
         run: python3 tools/embed-names.py --check
-      # The ledger's status tables are generated from `ledger.json`, which every gate reads (A118).
-      # They were hand-maintained until they drifted to 28 of the then-116 tasks while HANDOVER.md
-      # called the page the source of truth. Phase E checks the same invariant on the Mac.
-      - name: The ledger's status tables match ledger.json
-        run: bash AUDIT/render-ledger.sh --check
       # The app ships the packages pinned in Package.resolved, so their attribution has to travel
-      # with it. Adding a dependency is a one-line manifest edit that nothing else notices (A77).
+      # with it. Adding a dependency is a one-line manifest edit that nothing else notices.
       - name: The third-party notices cover the resolved dependencies
         run: python3 tools/third-party-notices.py
-      # Every tracked shell script, from git, for the same reason the lint step below does: the old
-      # `tools/*.sh AUDIT/*.sh` glob left the probe scripts unlinted — and unchecked — and a script
-      # added in a new directory would have escaped it the same way (A192). `bash -n` takes one file,
-      # so this is a loop; the process substitution keeps it in this shell, where a failure fails the
+      # Every tracked shell script, from git, so that a script added in a new directory cannot escape
+      # the gate — a glob only ever covers the place someone thought of. `bash -n` takes one file, so
+      # this is a loop; the process substitution keeps it in this shell, where a failure fails the
       # step instead of being hidden by a subshell's exit status.
       - name: The shell scripts parse
         run: |
           set -eu
           while IFS= read -r script; do bash -n "$script"; done < <(git ls-files '*.sh')
-      # `tools/` is the Python this repository ships. The two probe scripts under `AUDIT/baseline/`
-      # are research artifacts: they are outside the Python gates (parse, ruff, pyright) on purpose,
-      # and `plan.md` says so rather than leaving it to be inferred (A192 covered every tracked shell
-      # script, where the run is 0 findings; the Python probes are not, so their scope is unchanged).
+      # `tools/` is the Python this repository ships, and it is all of it: `ruff`, `pyright` and this
+      # parse check are scoped to that directory rather than to every `*.py` in the tree.
       - name: The helper scripts parse
         run: for script in tools/*.py; do python3 -m py_compile "$script"; done
+      # A file that outgrows a reader is usually two responsibilities wearing one name, and the
+      # split is cheapest while the file is still small. The check lives in one script so that the
+      # Mac gate (`tools/mac-checks.sh`) and CI judge exactly the same list — see `docs/toolchain.md`.
+      - name: No tracked code file is over 500 lines
+        run: bash tools/check-file-sizes.sh
       # The bundle said 14.0 while the package needs macOS 26, so the app would launch on
       # Sonoma and Sequoia and fail at the transport instead of the system saying why. The two
       # declarations are one fact and are now checked as one.
@@ -111,39 +102,40 @@ jobs:
             exit 1
           }
       # One fact in two places: the versions this workflow installs and the versions
-      # `AUDIT/environment.md` records as the audit's toolchain. They are read from each other rather
-      # than trusted to agree, which is the same shape as the check above and for the same reason —
-      # the record says which tools the audit ran, and a version bumped in only one of them makes that
-      # untrue (A187, A121).
+      # `tools/toolchain-versions.txt` records. They are read from each other rather than trusted to
+      # agree — a version bumped in only one of the two would otherwise install something other than
+      # what the repository says it needs.
       - name: The pinned tool versions match the recorded toolchain
         run: |
           set -eu
           failed=0
           for tool in shellcheck gitleaks osv-scanner; do
             variable="$(printf '%s' "$tool" | tr 'a-z-' 'A-Z_')_VERSION"
-            pinned="$(sed -n "s/^${variable}=//p" tools/fetch-audit-tools.sh)"
-            recorded="$(awk -F'|' -v t="$tool" '$2 ~ "`" t "`" {gsub(/ /, "", $3); print $3; exit}' AUDIT/environment.md)"
-            printf '%-12s script %-8s environment.md %s\n' "$tool" "${pinned:-missing}" "${recorded:-missing}"
+            pinned="$(sed -n "s/^${variable}=//p" tools/fetch-analysis-tools.sh)"
+            recorded="$(sed -n "s/^${tool}=//p" tools/toolchain-versions.txt)"
+            printf '%-12s script %-8s toolchain-versions.txt %s\n' "$tool" "${pinned:-missing}" "${recorded:-missing}"
             if [ -z "$pinned" ] || [ "$pinned" != "$recorded" ]; then failed=1; fi
           done
           [ "$failed" -eq 0 ] || {
-            echo "::error::tools/fetch-audit-tools.sh and AUDIT/environment.md disagree about a tool version"
+            echo "::error::tools/fetch-analysis-tools.sh and tools/toolchain-versions.txt disagree about a tool version"
             exit 1
           }
 
       # The installer declared the minimum a third time, as 14, so a Sonoma user downloaded the
-      # checkpoint and built the app before the bundle's own minimum refused to launch it (A121). It
+      # checkpoint and built the app before the bundle's own minimum refused to launch it. It
       # now reads the requirement from Package.swift; this catches a literal creeping back in.
+      # The comparison moved into `tools/lib/install-checks.sh`, which `tools/install.sh` sources,
+      # so the grep covers the entry point and every phase file rather than only the entry point.
       - name: The installer does not declare its own minimum macOS
         run: |
           set -eu
-          if grep -nE 'OS_MAJOR.*-lt[[:space:]]*[0-9]' tools/install.sh; then
-            echo "::error::install.sh compares the OS version against a literal; read it from Package.swift (A121)"
+          if grep -nE 'OS_MAJOR.*-lt[[:space:]]*[0-9]' tools/install.sh tools/lib/*.sh; then
+            echo "::error::the installer compares the OS version against a literal; read it from Package.swift"
             exit 1
           fi
           # Anchored on `OS_MAJOR` rather than on `-lt <number>`, because the script compares other
           # counters against literals and those are not this defect.
-          echo "install.sh reads the minimum macOS from Package.swift"
+          echo "the installer reads the minimum macOS from Package.swift"
 
   static-analysis:
     name: Lint, type-check and scan
@@ -156,9 +148,9 @@ jobs:
           fetch-depth: 0
 
       # No third-party action installs these. The three release binaries come from
-      # `tools/fetch-audit-tools.sh`, which holds their versions and digests in one place; the Python
+      # `tools/fetch-analysis-tools.sh`, which holds their versions and digests in one place; the Python
       # and Node tools are pinned here, and the step above has already checked every version against
-      # the toolchain `AUDIT/environment.md` records. If a repository configuration for one of these
+      # the toolchain `docs/toolchain.md` records. If a repository configuration for one of these
       # tools is added later, the tool discovers it from the working directory and this step needs no
       # change.
       - name: Install the pinned analysis tools
@@ -175,16 +167,16 @@ jobs:
           # `GITHUB_PATH` takes effect for the *next* step, not this one, so the version lines at the
           # bottom of this step resolved against whatever the runner already had: it printed the
           # runner's ShellCheck 0.9.0 rather than the pinned 0.11.0, and then died on
-          # `gitleaks: command not found` — exit 127, the first time the job ever ran (A131).
+          # `gitleaks: command not found` — exit 127, the first time the job ever ran.
           # Exporting here makes the step use the tools it just installed, which is the whole point of
           # those lines: they are meant to prove the pin, not the image.
           export PATH="$tools/bin:$tools/venv/bin:$PATH"
 
           # The three release binaries, each verified against its pinned SHA-256 before it is
-          # unpacked (A187). The versions and the digests live in the script, so the only copy of a pin
+          # unpacked. The versions and the digests live in the script, so the only copy of a pin
           # is the one that is checked; the step above fails if they disagree with the recorded
           # toolchain.
-          bash tools/fetch-audit-tools.sh --into "$tools/bin"
+          bash tools/fetch-analysis-tools.sh --into "$tools/bin"
 
           python3 -m venv "$tools/venv"
           "$tools/venv/bin/pip" install --quiet --disable-pip-version-check \
@@ -200,7 +192,7 @@ jobs:
           pyright --version
 
       # Every tracked shell script, taken from git so that a script added in a new directory cannot
-      # escape the gate; `tools/*.sh` alone left `AUDIT/` and the probe scripts unlinted (A192).
+      # escape the gate — a glob only covers the place someone thought of.
       # `-z`/`-0` keeps a path with a space in it one argument, and the count check means an empty
       # list fails the step instead of handing shellcheck nothing to read (which exits 0).
       - name: The shell scripts are clean
@@ -223,25 +215,22 @@ jobs:
       # reach the log.
       - name: No secret in the full history
         run: gitleaks git --log-opts=--all --redact --no-banner
-      # Scoped to the source trees the audit's baseline scanned, so the captured scanner
-      # output under AUDIT/ is not mistaken for code. `--error` is what makes a finding fail
-      # the job; without it semgrep exits 0 on findings.
-      # `--error` was wrong here. Three findings in `tools/cdp.py` are waived in writing in
-      # `AUDIT/plan.md` and deliberately left visible rather than suppressed, so `--error` failed on
-      # exactly the findings the audit had justified — and the workflow does not run on the audit
-      # branch, so this step had never executed (A129). The allowlist is one implementation shared
-      # with `AUDIT/phase-e.sh`, so the two gates cannot disagree about what is justified.
-      # Without `--quiet`, so the job log carries the summary the gate resolves: how many rules ran,
+      # Scoped to the source trees the repository ships, so no captured scanner output or build
+      # product is mistaken for code. Three findings in `tools/cdp.py` and `tools/cdp_protocol.py`
+      # are waived in writing in `tools/analysis-waivers.txt` and deliberately left visible rather
+      # than suppressed, so `--error` would fail on exactly the findings this project has justified:
+      # the allowlist is what decides, and it is one implementation, called by this job and by
+      # `tools/mac-checks.sh`.
+      # Without `--quiet`, so the job log carries the summary the scan resolves: how many rules ran,
       # how many targets were scanned, and what was skipped. The rule set comes from the registry at
-      # scan time and is not covered by the version pin — the header says so and `AUDIT/plan.md`
-      # records the figures (A192).
+      # scan time and is not covered by the version pin — the header says so.
       - name: The source passes semgrep, except the findings waived in writing
         run: |
           set -eu
           semgrep scan --config auto --json --output semgrep.json Sources tools web
           python3 tools/semgrep-waivers.py semgrep.json
       # Scoped to the lockfile, the object this check is about. `-r .` scans the whole tree, which is
-      # how the same step in `phase-e.sh` came to report 16 vulnerabilities from dependencies' own
-      # example projects inside the sanitizer scratch directories (A124, A130 for this copy).
+      # how an earlier copy of this step came to report 16 vulnerabilities from dependencies' own
+      # example projects inside a sanitizer scratch directory.
       - name: No known vulnerable dependency
         run: osv-scanner scan source --lockfile Package.resolved

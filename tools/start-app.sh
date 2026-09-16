@@ -34,7 +34,7 @@ ACTION=run
 #
 # `--port "${2:-}"; shift 2` with the option last shifted nothing — `shift 2` fails when only one
 # argument remains — so the case was re-entered with the same argument and the loop ran for ever
-# without printing anything (A181). A missing value is a usage error, and saying so is what a caller
+# without printing anything. A missing value is a usage error, and saying so is what a caller
 # needs; every option that takes one goes through here.
 require_value() {
   if [ $# -ge 2 ] && [ -n "$2" ]; then
@@ -89,7 +89,7 @@ if [ "$ACTION" = "stop" ]; then
   # The app, by exact process *name* — `pgrep -x ChatBots`, not `pkill -f <path>`: the pattern matched any
   # process whose command line merely mentions the bundle, which is how a `tail -f` on the app's log, a
   # second checkout, or an editor with the bundle open comes to be killed by a script that promises in the
-  # line above not to touch anything but its own (A190). This is the same rule A189 applied to the engine:
+  # line above not to touch anything but its own. This is the same rule the engine's ownership check applies:
   # the executable decides, never an argument. The name is all there is to go on here because the app was
   # opened with `open`, which gives the script no pid to record.
   app_pids="$(pgrep -x ChatBots 2>/dev/null || true)"

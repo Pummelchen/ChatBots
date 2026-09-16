@@ -38,7 +38,7 @@ final class UserSettingsStore: ObservableObject {
                 let loaded = try UserSettings.decoded(from: data)
                     .reconciled(supportedSeatCount: supported)
                 self.settings = loaded
-                // A payload written by a build before A139 carries the cloud API keys in cleartext, in
+                // A payload written by an older build carries the cloud API keys in cleartext, in
                 // a plist anything running as this user can read. `encoded()` no longer writes them, but
                 // that only helps from the next save onwards — this is what takes a key that is already
                 // on disk back out, immediately and before anything else reads it. The settings are

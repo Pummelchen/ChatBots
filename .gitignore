@@ -32,26 +32,15 @@ captures/
 # here as a submodule-like gitlink and the pages would be committed to the wrong repository.
 ChatBots.wiki/
 
-# An interrupted ledger write leaves this behind. It was committed once by accident (A19);
-# the ledger is only ever the file without the suffix.
-AUDIT/*.tmp
-
 # Python bytecode. The `static-analysis` CI job runs `python3 -m py_compile` over every helper
-# script, and running any of them locally leaves the same thing behind. A tree that is dirty for
-# the wrong reason is a tree nobody reads — and the audit's own checks (a clean tree in
-# AUDIT/phase-e.sh, and verify-done-commits.sh) depend on `git status` meaning something.
+# script, and running any of them locally leaves the same thing behind. A tree that is dirty for the
+# wrong reason is a tree nobody reads, and every gate that reads `git status` depends on it meaning
+# something.
 __pycache__/
 *.py[cod]
 
-# Phase E's instrumented build trees. `AUDIT/phase-e.sh` writes its logs and summary beside them,
-# and those are committed as the acceptance evidence; the scratch directories are several GB of
-# `.build` copies and are not. The re-audit keeps its evidence in a directory of its own, so both
-# patterns are here.
-AUDIT/baseline/phaseE/scratch-*/
-AUDIT/baseline/phaseE-*/scratch-*/
-
 # `swift test --enable-code-coverage` makes every product in that build instrumented, so running one
 # by hand — `chatbots-cli --check --model-a …`, which is how a checkpoint is verified — writes this
-# profile into the working directory. It is build output, not evidence: the coverage the audit keeps is
-# the report `tools/audit-checks.sh` produces.
+# profile into the working directory. It is build output, not evidence: the coverage this repository
+# keeps is the report `tools/mac-checks.sh` produces.
 *.profraw

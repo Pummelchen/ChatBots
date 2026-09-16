@@ -109,7 +109,7 @@ struct PromptShapeTests {
             for: spec(mode: .entertainment), others: [spec(mode: .entertainment, index: 1)],
             conversation: conversation(attachments: [text("study.md")]))
         expectTemplateCompatible(messages, "entertainment with an attachment")
-        // The document is data in the user turn, not a section of the system message (A103).
+        // The document is data in the user turn, not a section of the system message.
         let user = messages.filter { $0.role == .user }.map(\.content).joined(separator: "\n")
         #expect(user.contains("Ovoid shells resist point loads."))
         #expect(!messages[0].content.contains("Ovoid shells resist point loads."))
@@ -134,7 +134,7 @@ struct PromptShapeTests {
         expectTemplateCompatible(messages, "every optional section at once")
         #expect(messages.filter { $0.role == .system }.count == 1)
         // The system message carries pointers, not the data: the room's state and the source
-        // material are both in the user turn. A document's text is untrusted (A103), so it must
+        // material are both in the user turn. A document's text is untrusted, so it must
         // not be system-role instruction.
         let system = messages[0].content
         #expect(system.contains("Where things stand"), "the pointer to the room's state")

@@ -12,6 +12,7 @@
 
 import Foundation
 import Testing
+
 @testable import ChatBotsCore
 
 /// An engine that does nothing, so these tests are about the transport rather than generation.
@@ -311,15 +312,15 @@ struct WebTransportSessionTests {
 /// iteration, not an accept already in flight, and that accept returns its session **after** `stop()`
 /// has cleared both tables and while it is suspended in `session.close()` further down. The loop then
 /// registered the session and spawned a serve task that nothing cancelled and nothing closed: a
-/// client still being served, still holding its admission slot, on a server that had stopped (A198).
+/// client still being served, still holding its admission slot, on a server that had stopped.
 ///
 /// The window is widened on purpose — several sessions are live when `stop()` runs, so it spends
 /// longer in the close loop — and the late client connects into it.
 @Suite(
-    "A session accepted during stop() does not survive it (A198)", .serialized, TransportSerialized()
+    "A session accepted during stop() does not survive it", .serialized, TransportSerialized()
 )
 @MainActor
-struct AuditS1StopRaceTests {
+struct StopRaceTests {
     @Test("A client that connects while the server is stopping is not left being served")
     func connectsDuringStopAreNotOrphaned() async throws {
         let running = try await startEngine()

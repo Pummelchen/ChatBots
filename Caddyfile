@@ -55,11 +55,11 @@ http://:7788 {
 
 	# Kept conversations. `/s/<id>` is a page the engine renders and it does not live under
 	# `/api`, so without this block the catch-all below hands the path to the file server and
-	# every share link answers 404 — which is what the shipped configuration did (A99).
+	# every share link answers 404 — which is what the shipped configuration did.
 	#
 	# This block used to be the one that did *not* rewrite the upstream `Host`, because the engine
 	# derived the page's origin from it. The page renders no links and needs no origin, so nothing
-	# reads the header now and it is normalised here like every other block (A217). The link a
+	# reads the header now and it is normalised here like every other block. The link a
 	# reader copies is built by the front ends: the web interface from the origin the browser is
 	# reading at, with the engine's reported base as its fallback (`web/app.js`), and the desktop
 	# app from that reported base (`ChatController.shareLink(for:)`), which `--share-base` sets.
@@ -71,8 +71,8 @@ http://:7788 {
 
 	# The interface itself.
 	#
-	# The headers below are A76's browser-boundary set, repeated here because in this
-	# configuration Caddy is what serves the document. A76 emits them from the engine, but
+	# The headers below are the browser-boundary set, repeated here because in this
+	# configuration Caddy is what serves the document. The engine emits them, but
 	# this block serves ./web without going near the engine, so without these the page the
 	# browser actually loads would carry no CSP, no nosniff, no frame denial and no referrer
 	# policy — the API behind it would, and only the API. `header` inside this `handle`
@@ -80,12 +80,12 @@ http://:7788 {
 	# to the engine rather than overwritten from here.
 	#
 	# The policy is identical to HTTPResponse.interfacePolicy. It is safe for what this block
-	# serves — web/index.html, web/deltas.js, web/app.js and web/style.css — because the page loads
-	# its scripts and stylesheet as separate same-origin files, reaches the engine only through
-	# relative /api paths, and contains no inline script, inline event handler, inline style,
-	# external origin, frame, form or <base>; style.css has no url() or @import. That is what
-	# lets `script-src 'self'` stand without `'unsafe-inline'`, which is the directive that
-	# matters for rendered model and document text.
+	# serves — every file under `web/`: the page, its stylesheets and its scripts — because the
+	# page loads its scripts and stylesheets as separate same-origin files, reaches the engine
+	# only through relative /api paths, and contains no inline script, inline event handler,
+	# inline style, external origin, frame, form or <base>; no stylesheet has a url() or an
+	# @import. That is what lets `script-src 'self'` stand without `'unsafe-inline'`, which is
+	# the directive that matters for rendered model and document text.
 	handle {
 		root * ./web
 		file_server

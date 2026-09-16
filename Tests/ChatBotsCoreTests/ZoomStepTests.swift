@@ -1,14 +1,14 @@
-// ChatBotsCoreTests — the text-size steps (A167)
+// ChatBotsCoreTests — the text-size steps
 //
 // The step list and the clamping are pure logic, so they are asserted here rather than by pressing
 // keys — and they are asserted against `TextZoom` itself. What this suite used to do was re-declare
 // `levels` and `step` inside the test file and assert those against themselves, with a comment
 // claiming the assertions kept the two in step. They could not: nothing read the store's copy, so
 // changing the store — or deleting the logic outright — left this suite green. It read as coverage
-// and pinned nothing (A53/A67 are the same class).
+// and pinned nothing (the same class of defect either way).
 //
 // The logic moved into `ChatBotsCore` so that this file has something real to read: the app target
-// has no test target, which is why the copy existed at all (A166).
+// has no test target, which is why the copy existed at all.
 
 import ChatBotsCore
 import Testing

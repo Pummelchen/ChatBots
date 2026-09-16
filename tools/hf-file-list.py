@@ -21,12 +21,12 @@ type JsonValue = (
 )
 
 # Files a checkpoint offers that this installer does not download, each with its own reason rather
-# than one label that fits none of them (A194):
+# than one label that fits none of them:
 #
 #   * repository metadata and prose — `.gitattributes`, `README.md`, `LICENSE`, `LICENSE.txt`,
 #     `.gitignore` — which are not the model and would only be wasted bandwidth;
 #   * `tokenizer.model`, the SentencePiece vocabulary. That is a *model* file, not documentation: it
-#     is skipped because `Sources/ChatBotsCore/ModelStore.swift` treats `tokenizer.json` as the
+#     is skipped because `Sources/ChatBotsCore/Models/ModelStore.swift` treats `tokenizer.json` as the
 #     tokenizer a local checkpoint must have, so a checkpoint offering only `tokenizer.model` is
 #     rejected by the app as incomplete either way, and one offering both does not need the duplicate
 #     (~2 MB).

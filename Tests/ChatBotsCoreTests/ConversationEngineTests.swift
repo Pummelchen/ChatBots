@@ -320,8 +320,8 @@ func steeringStartsIdleConversation() async {
     let occurrences = prompt.components(separatedBy: "Why are eggs not round?").count - 1
     // Two is correct: the topic line in the opening brief and the moderator's own message in
     // the log. Three used to be "correct" because the system message interpolated the topic as
-    // well — which made the moderator's text system-role instruction to every seat (audit
-    // A103). The topic must not be in the system message at all.
+    // well — which made the moderator's text system-role instruction to every seat.
+    // The topic must not be in the system message at all.
     #expect(occurrences == 2, "the question reached the prompt \(occurrences) times")
     let system = messages.first { $0.role == .system }?.content ?? ""
     #expect(

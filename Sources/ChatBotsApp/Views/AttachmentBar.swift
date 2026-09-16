@@ -80,13 +80,13 @@ struct AttachmentChip: View {
     /// False when the file was restored from a saved conversation but this engine does not
     /// hold it, so the models cannot see it.
     ///
-    /// This is part of what the chip renders rather than something the banner says: A47's
+    /// This is part of what the chip renders rather than something the banner says: the
     /// notice is dismissable, and once it is gone an ordinary-looking chip implies the models
-    /// can read material they cannot (audit A112).
+    /// can read material they cannot.
     let isLoaded: Bool
     /// Whether removing is allowed at all. The engine refuses a change once a turn has completed, the
     /// page gates its ✕ on the same flag, and this is that flag passed down rather than the chip having
-    /// to know where it comes from (A173).
+    /// to know where it comes from.
     let canRemove: Bool
     let onRemove: () -> Void
 
@@ -139,7 +139,7 @@ struct AttachmentChip: View {
                 // document rebuilt from the engine has no body — the engine keeps it — so the
                 // affordance is absent rather than opening an empty popover, and the chip's
                 // figures come from the engine's own summary and token count instead of being
-                // recomputed from fields this side does not have (audit A46).
+                // recomputed from fields this side does not have.
                 Button {
                     showingText = true
                 } label: {
@@ -159,7 +159,7 @@ struct AttachmentChip: View {
                     .foregroundStyle(palette.textTertiary)
             }
             .buttonStyle(.plain)
-            // The same rule the engine enforces and the page gates on (A173): the ✕ used to be
+            // The same rule the engine enforces and the page gates on: the ✕ used to be
             // `.disabled(false)`, so a click during a running conversation did nothing at all — the
             // engine refused the change and the service reported success.
             .disabled(!canRemove)

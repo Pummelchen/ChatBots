@@ -125,10 +125,12 @@ Apple silicon (M1 or later) — the models run on the GPU, and Intel Macs are no
 The app uses that transport and nothing else; the website is the HTTP side of the same engine.
 Around 8 GB of free disk space; 16 GB of memory is comfortable.
 
-**To build from source: the Metal compiler, which Xcode 27 no longer ships.** On Xcode 26 and earlier
-it came with the toolchain; on Xcode 27 it is a separate component, and without it the build stops on
-the first GPU kernel with `cannot execute tool 'metal' due to missing Metal Toolchain`. Install it
-once (about 840 MB) and the build works:
+**To build from source: full Xcode 27 and the Metal compiler, which Xcode 27 no longer ships.** The
+Command Line Tools are not enough: the Metal component has to be downloaded by `xcodebuild`, which
+only full Xcode provides. On Xcode 26 and earlier the compiler came with the toolchain; on Xcode 27
+it is a separate component, and without it the build stops on the first GPU kernel with
+`cannot execute tool 'metal' due to missing Metal Toolchain`. Install it once (about 840 MB) and the
+build works:
 
 ```sh
 xcodebuild -downloadComponent MetalToolchain

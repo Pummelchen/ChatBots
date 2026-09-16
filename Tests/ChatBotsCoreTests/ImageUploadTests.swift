@@ -14,9 +14,10 @@ import Testing
 struct ImageUploadTests {
 
     /// A real 1×1 PNG, so the bytes are a genuine image rather than arbitrary data.
-    private let pngBytes = Data(base64Encoded: """
-        iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==
-        """)!
+    private let pngBytes = Data(
+        base64Encoded: """
+            iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==
+            """)!
 
     private func image(_ name: String = "cat.png", bytes: Data? = nil) -> AttachedDocument {
         AttachedDocument(
@@ -34,7 +35,7 @@ struct ImageUploadTests {
         #expect(image("x.png", bytes: gif).imageMediaType == "image/gif")
         // BMP and TIFF are **not** types the Responses API documents, so they are not declared
         // to it. Returning `image/bmp` / `image/tiff` here is what put an undocumented type on
-        // the wire and got the attachment rejected; intake now converts them (audit A101), so
+        // the wire and got the attachment rejected; intake now converts them, so
         // `nil` from the sniffer is the value that makes that conversion happen.
         let bmp = Data([0x42, 0x4D, 0x00, 0x00])
         #expect(image("x.png", bytes: bmp).imageMediaType == nil)
@@ -94,9 +95,10 @@ struct ImageRequestShapeTests {
 
     @Test("With an image the input becomes content blocks carrying the image")
     func imageInputBecomesBlocks() throws {
-        let body = client.body(for: request(images: [
-            .init(mediaType: "image/png", base64: "QUJD")
-        ]))
+        let body = client.body(
+            for: request(images: [
+                .init(mediaType: "image/png", base64: "QUJD")
+            ]))
         let input = try #require(body["input"] as? [[String: Any]])
         #expect(input.count == 1, "one user message")
 
@@ -113,10 +115,11 @@ struct ImageRequestShapeTests {
 
     @Test("Several images all travel with the one message")
     func multipleImages() throws {
-        let body = client.body(for: request(images: [
-            .init(mediaType: "image/png", base64: "QQ"),
-            .init(mediaType: "image/jpeg", base64: "Qg"),
-        ]))
+        let body = client.body(
+            for: request(images: [
+                .init(mediaType: "image/png", base64: "QQ"),
+                .init(mediaType: "image/jpeg", base64: "Qg"),
+            ]))
         let input = try #require(body["input"] as? [[String: Any]])
         let content = try #require(input[0]["content"] as? [[String: Any]])
         #expect(content.count == 3)

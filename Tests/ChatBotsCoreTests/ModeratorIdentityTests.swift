@@ -73,7 +73,7 @@ struct ModeratorIdentityTests {
             moderator: ModeratorIdentity(name: "Dana", personaID: "skeptic"))
         #expect(named.contains("Messages marked [Dana]"))
         // The persona resolves in the room's own library — the analysts — not the entertainment
-        // one, so the name the brief uses is the analyst's (audit A70).
+        // one, so the name the brief uses is the analyst's.
         #expect(named.contains("Skeptic"))
         #expect(named.contains("disconfirmation"), "the analyst's method is what makes it worth saying")
     }

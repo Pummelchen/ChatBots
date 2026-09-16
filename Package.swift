@@ -14,8 +14,7 @@ import PackageDescription
 //   actor-isolated throughout, so this describes the code rather than aspiring to it — and it
 //   is what makes the compiler check that claim.
 // * Warnings are errors. The baseline is zero compiler warnings in both the products and the
-//   test target, so a new warning is a regression and the build should say so. This is the
-//   gate AUDIT task A03 was opened to add: without it a fresh warning is invisible.
+//   test target, so a new warning is a regression and the build should say so.
 //
 // `treatAllWarnings(as: .error)` rather than `.unsafeFlags(["-warnings-as-errors"])`. Both
 // reach swiftc with the same flag, but this is the documented SwiftPM setting, it applies to
@@ -124,7 +123,7 @@ let package = Package(
 
         .testTarget(
             name: "ChatBotsCoreTests",
-            // The transport product as well as the core, since A157: two of the behaviours a transport
+            // The transport product as well as the core: two of the behaviours a transport
             // server has to have are about a *misbehaving* client — one that connects and says nothing, and
             // one that sends a frame no decoder can read — and `ChatBotsCore`'s own client cannot
             // misbehave on purpose. The tests that need it speak the library's own protocol.
@@ -136,7 +135,7 @@ let package = Package(
             swiftSettings: ownedTargetSettings
         ),
 
-        // The application target had no test target, so none of its logic was measured (A166). It is
+        // The application target had no test target, so none of its logic was measured. It is
         // an executable target, and SwiftPM builds one for testing by linking its objects into this
         // bundle; `@testable import ChatBots` is what that needs.
         .testTarget(
