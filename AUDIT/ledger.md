@@ -29,8 +29,8 @@ been run.
 <!-- BEGIN GENERATED: ledger status — rendered from ledger.json by AUDIT/render-ledger.sh -->
 | Metric | Count |
 | --- | --- |
-| Tasks enumerated | 217 |
-| DONE | 217 |
+| Tasks enumerated | 218 |
+| DONE | 218 |
 | START | 0 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
@@ -39,7 +39,7 @@ been run.
 
 Nothing is open.
 
-### Every task — 217
+### Every task — 218
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
@@ -182,6 +182,7 @@ Nothing is open.
 | A215 | S2 | DONE | e9b7f44 | verification / installer smoke test | The installer's transport check pins an identity it never gives the engine it starts, so it can fail for a reason that is not the transport |
 | A216 | S2 | DONE | d3a4316 | transport / diagnostics | A transport error is reported as a number, so the reason the engine refused is thrown away |
 | A217 | S3 | DONE | b20a177 | dead code / share page | The share page's `shareBase` island field, the `Host` reflection that fills it and the validator that guards the reflection have no consumer |
+| A218 | S3 | DONE | 39cdb47 | docs / audit record | A point in the Phase E section lost the first half of its sentence and the clause that gave it an antecedent |
 | A22 | S2 | DONE | 18100dd | start script | stop_all kills a stale PID from a pid file without checking the process is ours |
 | A23 | S2 | DONE | 38fbe08 | device capture tool | capture-devices.py prints a viewport mismatch but cannot fail the run |
 | A24 | S2 | DONE | b803b3c | installer | A native binary artifact is downloaded with no integrity check and embedded in the signed app |

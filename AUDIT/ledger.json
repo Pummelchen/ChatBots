@@ -3694,6 +3694,23 @@
       "commit": "b20a177",
       "notes": "This was the last open S3, and it was decided in favour of removal rather than of giving the field a consumer: the page is standalone and read-only, the browser already knows its own origin, and a reflected client-supplied header is a surface worth not having for nothing. Two test files were changed rather than deleted, and their assertions flipped to the property that now holds — which is stronger, because it is about the whole response rather than about a validator's return value: `AuditShareLinkTests` used to assert that `validShareHost` accepted and refused the right strings, and now fetches the page with a hostile `Host` and with an ordinary one and asserts that neither value appears anywhere in it, with the conversation's presence as the counterweight. `SharedConversationTests`' HTTP-level test does the same through `URLSession`, including the engine's own base. Both were checked to be *sensitive*: the pre-fix run fails them, and the before-log records that. One tool conflict is worth noting for whoever is next: a multi-line array literal with a single element is a trailing comma SwiftLint wants and swift-format does not, so the element is built as a `let` and the array written on one line — the same workaround earlier tasks in this audit used. Commit b20a177.",
       "blocked_reason": null
+    },
+    {
+      "id": "A218",
+      "severity": "S3",
+      "unit": "docs / audit record",
+      "file_line": "AUDIT/plan.md:235-239",
+      "title": "A point in the Phase E section lost the first half of its sentence and the clause that gave it an antecedent",
+      "category": "docs",
+      "status": "DONE",
+      "host_used": "node1",
+      "discovered_by": "Phase D — found while writing the re-audit's own acceptance record, from reading the section it was about to be appended to",
+      "evidence_before": "The paragraph after the 2026-09-13 acceptance table began `inction is the whole reason it exists:` — the word `distinction` was split across a line and the first half of it, together with the clause that gave `that distinction` an antecedent, was lost when the file was assembled. It is present on `main` as well: introduced by `0bf94f1` (the commit that scripted the acceptance run) and shipped in every clone since.",
+      "fix_summary": "The sentence is restored to what the surviving text requires and no more: the script reads every figure it reports from the tool that produced it, and that distinction is the whole reason it exists. The following sentences — the audit's own argument for reading figures from tools rather than by hand (A19, A28) — are unchanged, and they are what made the missing half reconstructible without inventing a claim.",
+      "evidence_after": "`AUDIT/plan.md:235-239` reads as a paragraph again; `git show origin/main:AUDIT/plan.md | grep -n 'inction is the whole reason'` matched before the fix and does not now. The placeholder sweep and the style gates are unaffected (it is prose in a Markdown file), and the Phase E run that follows this record verifies the tree that contains it.",
+      "commit": "39cdb47",
+      "notes": "A found-while-writing-a-record finding rather than a found-while-testing one, which is what the Phase D rule in `plan.md` is for: the ledger gains an id the moment something is found, whether the instrument was a probe, a scanner or a reader. It is also the reason the re-audit's acceptance run is repeated after this record is committed: the ledger is part of what Phase E verifies (section 11 counts tasks and open ones, section 10 checks every DONE task against a commit), so a task added after a green run would leave the acceptance describing a tree that no longer exists.",
+      "blocked_reason": null
     }
   ]
 }
