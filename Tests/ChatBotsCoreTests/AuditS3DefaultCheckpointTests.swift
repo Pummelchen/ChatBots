@@ -97,7 +97,25 @@ struct DefaultCheckpointTests {
     @Test("The shipped checkpoint is a repo id, so its tail is the directory the app looks in")
     func theValueIsARepoID() {
         let tail = AgentSpec.defaultModelID.split(separator: "/").last.map(String.init)
-        #expect(AgentSpec.defaultModelID == "mlx-community/Qwen3.5-4B-MLX-4bit")
+        // The one expectation in this package that pins the *value*, and deliberately so: which
+        // checkpoint ships is a product decision, not a number a release propagates, so a failure here
+        // is the point rather than friction. It exists because everything else derives from this
+        // declaration — the installer's id and directory, the CLI's defaults and help text, the OpenAI
+        // client's fallback, and `ModelCatalog.choices[0]`, whose name, summary, aliases and
+        // `approximateBytes` describe *this* model while being keyed by whatever the declaration says.
+        // A silent change would relabel whatever was substituted and leave the catalogue claiming 4B and
+        // 3.03 GB; `AuditModelChoiceTests` checks that an entry exists for the id and cannot see the id
+        // change underneath it. Resolving the id over the network instead is ruled out by
+        // `RELEASE.md` §1.2.7 and would make the suite non-hermetic.
+        #expect(
+            AgentSpec.defaultModelID == "mlx-community/Qwen3.5-4B-MLX-4bit",
+            """
+            The shipped checkpoint changed. If that is deliberate, four things describe the model and \
+            move with it: `ModelCatalog`'s first entry (name, summary, aliases, approximateBytes), the \
+            installer's documented download size, `tools/install.sh`'s comment about the declaration, and \
+            the CLI's `--help` text. If it is not, this is a typo, and it is the only hermetic guard on \
+            it.
+            """)
         #expect(tail == "Qwen3.5-4B-MLX-4bit", "the derived directory would be \(tail ?? "nothing")")
         #expect(AgentSpec.defaultModelID.contains("/"), "a bare name would make the tail rule a no-op")
     }

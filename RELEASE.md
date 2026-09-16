@@ -65,6 +65,14 @@ hope.
   the source of truth; a literal in a test means every bump fails a test that is
   not about the version, and the tempting fix — editing the test — is how a wrong
   version ships.
+- **A value that does not move with the version is a different thing.** The rule
+  above is about numbers a release *propagates*. Where the value **is** the
+  decision — the model this project ships, a protocol version it speaks — one
+  declaration plus a test that the declaration still says what was decided is the
+  *enforcement* the rule asks for, not the mirror it forbids: it is the only
+  hermetic way to catch a typo, since resolving the value over the network would
+  violate §1.2.7. Fail loudly there, and make the failure say what else moves with
+  the value.
 - **Multi-library projects version in lockstep.** Libraries that ship together and
   interoperate carry the **same** version, because a caller pairing them has no
   other way to know the pair is compatible. A library with no code change is
