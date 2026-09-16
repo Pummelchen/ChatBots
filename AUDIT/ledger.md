@@ -30,17 +30,16 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 217 |
-| DONE | 212 |
-| START | 5 |
+| DONE | 213 |
+| START | 4 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 5
+### Open — 4
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
 | A205 | S3 | START | — | dead code / wrong label | The .richText case is unreachable and an RTF file is labelled 'Word' |
-| A206 | S3 | START | — | dead code | Six declarations are written or named but never used, one with a documented rule the code does not implement |
 | A207 | S3 | START | — | docs / correctness | Three comments say the document extractors live in the app target and that the core cannot read a PDF or Word file; all three are false |
 | A208 | S3 | START | — | installer / dependencies | The checkpoint the installer downloads is a hand-copied duplicate of AgentSpec.defaultModelID and nothing keeps the two in step |
 | A217 | S3 | START | — | dead code / share page | The share page's `shareBase` island field, the `Host` reflection that fills it and the validator that guards the reflection have no consumer |
@@ -175,7 +174,7 @@ been run.
 | A203 | S2 | DONE | 2ac0bf1 | research / direction | The author of an unsupported claim can be directed to substantiate their own claim |
 | A204 | S2 | DONE | a562360 | prompt injection (A69 recurrence) | Raw display names are interpolated into the moderator instruction, bypassing the sanitiser A69 added |
 | A205 | S3 | START | — | dead code / wrong label | The .richText case is unreachable and an RTF file is labelled 'Word' |
-| A206 | S3 | START | — | dead code | Six declarations are written or named but never used, one with a documented rule the code does not implement |
+| A206 | S3 | DONE | d19edd7 | dead code | Six declarations are written or named but never used, one with a documented rule the code does not implement |
 | A207 | S3 | START | — | docs / correctness | Three comments say the document extractors live in the app target and that the core cannot read a PDF or Word file; all three are false |
 | A208 | S3 | START | — | installer / dependencies | The checkpoint the installer downloads is a hand-copied duplicate of AgentSpec.defaultModelID and nothing keeps the two in step |
 | A209 | S3 | DONE | 8d3fa2b | tests / CORS | A75's CORS test asserted 404 because there was no OPTIONS route; A136 refuses the request explicitly, so the assertion named the old mechanism rather than the property |
