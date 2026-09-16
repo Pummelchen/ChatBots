@@ -292,7 +292,7 @@ public struct AttachmentLimits: Sendable {
     ///
     /// A byte cap cannot bound a decode, because the formats that need converting are compressed: PNG
     /// and TIFF are, and a 663 KB file can declare a 6 500 × 6 500 canvas that decodes to 127 MB —
-    /// measured, with the numbers in `AUDIT/baseline/swift64/a148-image-decode-bomb.log`. At the 64 MB
+    /// measured. At the 64 MB
     /// byte cap that is tens of gigabytes, which is why the dimensions are read from the file's own
     /// metadata and refused before anything is decoded.
     ///

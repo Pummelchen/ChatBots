@@ -64,8 +64,7 @@ public enum ModelCatalog {
     ///
     /// Adding an entry is a claim that it has been measured, not that a repository exists: each of
     /// these has been loaded here, and driven through a real turn where the machine could hold it.
-    /// `AUDIT/baseline/swift64/model-choice-checkpoints.log` records which, and what the 9B costs on
-    /// an 8 GB Mac.
+    /// Each was measured on that machine; what the 9B costs on an 8 GB Mac is in its entry below.
     public static let choices: [ModelChoice] = [
         ModelChoice(
             id: AgentSpec.defaultModelID,

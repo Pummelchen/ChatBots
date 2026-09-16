@@ -31,13 +31,17 @@ Swift 6.4 / SwiftPM, package floor macOS 26, Apple Silicon only.
 - `Sources/ChatBotsApp/` — SwiftUI views. `Sources/ChatBotsCLI/` and
   `Sources/ChatBotsProbe/` — terminal runners.
 - `Tests/ChatBotsCoreTests/` — mirrors the core, and `Tests/ChatBotsAppTests/` — the
-  app target's own. Both are **swift-testing**, and `tools/audit-checks.sh` measures
+  app target's own. Both are **swift-testing**, and `tools/mac-checks.sh` measures
   every test bundle rather than naming one.
-- `web/` (`index.html`, `app.js`, `style.css`) and the six `names/*.txt` lists are
-  the **sources** for the two generated files.
-- `tools/` — install/start scripts, `audit-checks.sh`, the embed scripts, notices and
-  waiver tooling. `AUDIT/` — ledger, plan, environment, baseline.
-- `Caddyfile` fronts the engine on `:7788`.
+- `web/` (`index.html`, `app.js`, `style.css`, `deltas.js`, `votes.js`) and the six
+  `names/*.txt` lists are the **sources** for the two generated files.
+- `tools/` — the install and start scripts, `mac-checks.sh` (the Mac gate), the embed
+  and notice tools, the pinned-tool fetchers, and the static-analysis waivers in
+  `analysis-waivers.txt`.
+- `docs/` — `toolchain.md` (what to install and which versions the gates expect),
+  `webtransport-plan.md`, and the screenshots the README and wiki use.
+- `Caddyfile` fronts the engine on `:7788`; `SECURITY.md` states the trust boundary and
+  `RELEASE.md` the release standard.
 
 ## Build, test, run
 
@@ -66,32 +70,37 @@ release, and nothing enforces the value against a release.
 ## Gates
 
 - Linux CI (`.github/workflows/checks.yml`) on every push/PR:
-  `python3 tools/embed-web.py --check`, `python3 tools/embed-names.py --check`,
-  `bash AUDIT/render-ledger.sh --check` — the generated files and ledger tables must
-  be in step. Plus `third-party-notices.py`, `bash -n` over the shell scripts,
-  `python3 -m py_compile` over the Python, `shellcheck`, `ruff`, `pyright`,
-  `gitleaks`, `semgrep` (through `tools/semgrep-waivers.py`), and `osv-scanner`.
+  `python3 tools/embed-web.py --check` and `python3 tools/embed-names.py --check` —
+  the generated files must be in step with their sources — plus
+  `third-party-notices.py`, `bash -n` over every tracked shell script, `python3 -m
+  py_compile` over the Python, `shellcheck`, `ruff`, `pyright`, `gitleaks` over the
+  full history, `semgrep` (through `tools/semgrep-waivers.py`) and `osv-scanner`. None
+  of them is advisory: a finding fails the job.
+- The two toolchain pinning checks: the three release binaries CI installs are fetched
+  by `tools/fetch-analysis-tools.sh` with a pinned SHA-256 each, and a step fails if
+  those versions disagree with `tools/toolchain-versions.txt`.
 - Two structural assertions: the bundle's `LSMinimumSystemVersion` must equal
   `Package.swift`'s `.macOS(.vN)`, and `install.sh` must not hardcode an OS literal.
-- The mac-only gate is `tools/audit-checks.sh`: `swift build --build-tests`,
+- The mac-only gate is `tools/mac-checks.sh`: `swift build --build-tests`,
   `swift test --enable-code-coverage`, `llvm-cov report`, `swiftlint lint`, and
   `swift-format lint` over `Sources`/`Tests` excluding the two generated files.
   swiftlint and swift-format are judged against **recorded waivers** in
-  `AUDIT/plan.md`, not against zero.
+  `tools/analysis-waivers.txt`, not against zero — that file also carries the semgrep
+  findings this project accepts, and is the only place either gate reads them from.
 - No git hooks and no pre-commit config.
 
 ## Traps
 
 - **There is deliberately no Swift job in CI.** No hosted image is macOS 26/arm64
   with MLX, so a Swift job "would be a red build that says nothing about the code".
-  `tools/audit-checks.sh` on a Mac is the real Swift gate — do not add CI that
+  `tools/mac-checks.sh` on a Mac is the real Swift gate — do not add CI that
   pretends otherwise.
 - **Never hand-edit `Sources/ChatBotsCore/WebAssets.swift` or `NameLists.swift`.**
   Edit `web/` or `names/` and run the embed tools; swiftlint and swift-format exclude
   both by name, and `--check` fails CI when they are stale.
 - **The suite is swift-testing, not XCTest.** A successful run still prints
   `Test Suite 'All tests' … Executed 0 tests`. The real result is the
-  `Test run with N tests in M suites` line, which is what `audit-checks.sh`
+  `Test run with N tests in M suites` line, which is what `mac-checks.sh`
   greps — `1052 tests in 196 suites` when this was written, and the line, not the
   number, is the thing to read. Do not read the XCTest zero as "no tests ran".
 - **The website listens on every interface and `/api/*` has no password**, so anyone

@@ -1,6 +1,0 @@
-branch: main
-commit: 73eac3bd9a4a2cdfa9867b3ad786392c3ff9d392
-subject: audit(A132): the acceptance script refused to run on the branch the code now ships from
-committed: 2026-09-13 23:55:04 +0700
-uncommitted paths: 0
-origin/main commits reachable: 315

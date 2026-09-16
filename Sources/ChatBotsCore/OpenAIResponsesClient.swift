@@ -419,8 +419,8 @@ private final class NoRedirects: NSObject, URLSessionTaskDelegate, Sendable {
 /// `URLSession` is not released when the last reference to it goes. It stays alive — with its delegate
 /// and its connection pool — until it is invalidated, which was measured while this finding was fixed:
 /// a session dropped without invalidating is still alive afterwards, and the same session invalidated
-/// first is not (`AUDIT/baseline/swift64/a201-session-lifetime.log`). A struct cannot do anything when
-/// it is deallocated, so the session lives in a class whose `deinit` is the invalidate (A201).
+/// first is not. A struct cannot do anything when it is deallocated, so the session lives in a class
+/// whose `deinit` is the invalidate.
 final class ResponseSession: Sendable {
     let session: URLSession
 

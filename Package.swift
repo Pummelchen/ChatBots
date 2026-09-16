@@ -14,8 +14,7 @@ import PackageDescription
 //   actor-isolated throughout, so this describes the code rather than aspiring to it — and it
 //   is what makes the compiler check that claim.
 // * Warnings are errors. The baseline is zero compiler warnings in both the products and the
-//   test target, so a new warning is a regression and the build should say so. This is the
-//   gate AUDIT task A03 was opened to add: without it a fresh warning is invisible.
+//   test target, so a new warning is a regression and the build should say so.
 //
 // `treatAllWarnings(as: .error)` rather than `.unsafeFlags(["-warnings-as-errors"])`. Both
 // reach swiftc with the same flag, but this is the documented SwiftPM setting, it applies to

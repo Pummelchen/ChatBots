@@ -16,8 +16,8 @@
 // what the snapshot must now be: metadata only, and inside the cap with a maximum-size attachment.
 //
 // Both are written so they compile against the code before the fix as well as after — the size and the
-// presence of the bytes are both observable without the field — which is what makes the before/after in
-// `AUDIT/baseline/swift64/a144-a214-snapshot-payload.log` a measurement rather than an argument.
+// presence of the bytes are both observable without the field — which is what makes the before/after a
+// measurement rather than an argument.
 
 import ChatBotsCore
 import Foundation

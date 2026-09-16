@@ -152,8 +152,8 @@ fi
 # Which one: the build's own. Xcode 27 with the Metal toolchain (a build requirement since A133)
 # compiles the kernels into `mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib`, and that
 # file runs — measured by placing it beside a binary and evaluating a kernel, which is what
-# `Tests/ChatBotsCoreTests/AuditS2MetalLibraryTests.swift` does
-# (`AUDIT/baseline/swift64/a135-metal-lib.log`). This used to download ~190 MB from the network
+# `Tests/ChatBotsCoreTests/AuditS2MetalLibraryTests.swift` does. This used to download ~190 MB from the
+# network
 # instead, for a reason that was never true under Xcode 27 (A135). The pinned, digest-checked
 # download in `tools/fetch-metal.sh` stays as the fallback for a build that produced no metallib.
 BUILT_METALLIB="$BIN/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"

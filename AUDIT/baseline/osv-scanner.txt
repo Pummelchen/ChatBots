@@ -1,6 +1,0 @@
-Scanning dir .
-Starting filesystem walk for root: /
-Scanned /Users/andreborchert/Library/CloudStorage/Dropbox/Coding/ChatBots/Package.resolved file and found 14 packages
-End status: 72 dirs visited, 308 inodes visited, 1 Extract calls, 3.246667ms elapsed, 3.247ms wall time
-
-No issues found

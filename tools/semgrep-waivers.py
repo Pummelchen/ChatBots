@@ -9,10 +9,10 @@ because that hides a finding rather than justifying it (A09) — so a gate has t
 finding this audit has justified" from "a new one", and a count cannot do that: swapping one finding
 for another leaves the total unchanged.
 
-The waivers are therefore an allowlist read from `AUDIT/plan.md`, matched on rule id *and* path
-suffix, and this is the one implementation of that check: the CI job and `AUDIT/phase-e.sh` both
-call it, because the CI job's own `semgrep --error` was wrong in exactly the way it could not be
-noticed — the workflow does not run on the audit branch, so it had never executed (A129).
+The waivers are therefore an allowlist read from `tools/analysis-waivers.txt`, matched on rule id
+*and* path suffix, and this is the one implementation of that check: the CI job calls it, and
+`tools/mac-checks.sh` runs the same scan so the hosted gate and a Mac cannot disagree about what
+has been justified.
 
     python3 tools/semgrep-waivers.py report.json [plan.md]
 
@@ -29,9 +29,9 @@ import sys
 from typing import Any, cast
 
 ROOT: pathlib.Path = pathlib.Path(__file__).resolve().parent.parent
-PLAN: pathlib.Path = ROOT / "AUDIT" / "plan.md"
+WAIVERS: pathlib.Path = ROOT / "tools" / "analysis-waivers.txt"
 
-# `semgrep waiver: <rule id> <path>` — the shape AUDIT/plan.md records them in, and the single
+# `semgrep waiver: <rule id> <path>` — the shape tools/analysis-waivers.txt records them in, and the
 # source both this script and a reader use.
 WAIVER: re.Pattern[str] = re.compile(
     r"^semgrep waiver:\s+(\S+)\s+(\S+)\s*$", re.MULTILINE
@@ -122,10 +122,10 @@ def findings(path: pathlib.Path) -> tuple[list[tuple[str, str]], list[str]]:
 
 def main() -> int:
     if len(sys.argv) < 2:
-        print("usage: semgrep-waivers.py report.json [plan.md]", file=sys.stderr)
+        print("usage: semgrep-waivers.py report.json [waivers.txt]", file=sys.stderr)
         return 2
     report = pathlib.Path(sys.argv[1])
-    plan = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 else PLAN
+    plan = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 else WAIVERS
 
     allowed = waivers(plan)
     found, warnings = findings(report)

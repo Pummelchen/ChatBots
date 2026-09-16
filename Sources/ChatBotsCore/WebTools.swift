@@ -88,8 +88,8 @@ public struct FetchPageTool: ToolProvider {
 
     /// The URL `argument` names, or nil when it is not one this tool can read.
     ///
-    /// Three requirements, each of them measured in `AUDIT/baseline/swift64/a159-probe/url-shapes.swift`
-    /// rather than assumed: an http(s) scheme whatever its case; a non-empty host, because `http:`,
+    /// Three requirements, each of them measured against real URL shapes rather than assumed: an
+    /// http(s) scheme whatever its case; a non-empty host, because `http:`,
     /// `http://` and `http:///path` all parse as URLs and name nothing to fetch; and no whitespace, because
     /// Foundation parses `http://example.com/a b` happily and that space would travel to the extractor
     /// inside the URL it is given.

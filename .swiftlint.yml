@@ -1,8 +1,7 @@
-# .swiftlint.yml — the ChatBots Swift style, stated once (audit A06).
+# .swiftlint.yml — the ChatBots Swift style, stated once.
 #
 # Before this file existed, `swiftlint` ran on its built-in defaults and reported ~400
-# findings against Sources and Tests (401 in the audit baseline, 412 re-measured on the
-# tree at this commit) with nothing to say which were genuine. An unscoped `swiftlint lint`
+# findings against Sources and Tests with nothing to say which were genuine. An unscoped `swiftlint lint`
 # was worse: it also walked `.build/checkouts` and reported ~37,000 findings from
 # dependency code. This file states (a) what is linted, (b) where the house style
 # deliberately differs from SwiftLint's defaults, and (c) what is left as a real finding

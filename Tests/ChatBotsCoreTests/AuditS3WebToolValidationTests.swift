@@ -1,7 +1,7 @@
 // ChatBotsCoreTests — what `fetch_page` will accept as a URL (A159).
 //
-// The guard was `URL(string:)` and `url.scheme?.hasPrefix("http")`, and both halves were wrong in a way the
-// probe in `AUDIT/baseline/swift64/a159-probe/url-shapes.swift` measures:
+// The guard was `URL(string:)` and `url.scheme?.hasPrefix("http")`, and both halves were wrong in ways
+// that real URL shapes show:
 //
 //   * `httpx://example.com` and `httpfoo://example.com` were accepted — schemes this tool does not claim,
 //     handed to the extractor because they began with the right four letters;

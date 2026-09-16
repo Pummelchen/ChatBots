@@ -53,8 +53,7 @@ struct AttachmentIntakeTests {
         // What Foundation does with a FIFO is worth recording, because the finding assumed it blocked and
         // it does not: `Data(contentsOf:)` refuses one immediately, with "you don't have permission to
         // view it" — a permission error for a file the user can read, which is the wrong sentence and the
-        // reason the intake checks the kind itself. Measured in
-        // `AUDIT/baseline/swift64/a149-attachment-intake.log`.
+        // reason the intake checks the kind itself.
         //
         // The read still runs detached and bounded here: a future Foundation that *did* wait for a writer
         // must not be able to wedge the suite on a test of all things.

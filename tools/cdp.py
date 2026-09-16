@@ -132,8 +132,8 @@ class _WebSocket:
         # It is right that they use the unencrypted scheme and not TLS — the peer is Chrome's
         # DevTools endpoint on the loopback interface — and what the rule cannot see is the host
         # check a few lines down, which refuses any endpoint that is not loopback before a
-        # socket is opened. This comment, and AUDIT/ledger.json's A09 entry, record that finding
-        # as deliberate rather than ignored.
+        # socket is opened. This comment records that finding as deliberate rather than ignored; the
+        # written waiver is in `tools/analysis-waivers.txt`.
         if not url.startswith("ws://"):
             raise DevToolsError(f"unsupported websocket url: {url}")
         rest = url[len("ws://") :]
@@ -313,7 +313,7 @@ class Chrome:
                 # the same validation the websocket uses, so no external input can choose the
                 # scheme or host; `r.read` is bounded so the reply cannot be unbounded. The
                 # rule cannot see the pinning, the host check or the read limit, so the finding
-                # is recorded as a deliberate waiver in AUDIT/ledger.json's A09 entry.
+                # is recorded as a deliberate waiver in `tools/analysis-waivers.txt`.
                 with urllib.request.urlopen(
                     devtools_targets_url(self.port), timeout=2
                 ) as r:

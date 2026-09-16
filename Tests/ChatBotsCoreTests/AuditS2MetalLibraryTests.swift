@@ -65,9 +65,8 @@ struct MetalLibraryTests {
         // `make-app.sh` copies `default.metallib` to `Contents/MacOS/mlx.metallib`, because
         // `mlx/backend/metal/device.cpp:136-180` looks beside the running binary first and the app's
         // engine is `Contents/MacOS/chatbots-cli`. The rule is a shell branch, so what is pinned here is
-        // the branch: the file it copies from, the place it copies to, and the fallback it keeps.
-        // `AUDIT/baseline/swift64/a135-metal-lib.log` records the app bundle inspected after a real
-        // `make-app.sh` run.
+        // the branch: the file it copies from, the place it copies to, and the fallback it keeps. It
+        // was written against the app bundle a real `make-app.sh` run produces.
         let script = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()  // ChatBotsCoreTests
             .deletingLastPathComponent()  // Tests

@@ -4,8 +4,9 @@
 # Why this is needed — corrected under Xcode 27 (A135). This used to say that mlx-swift's
 # SwiftPM build does not compile the Metal kernels, and that is false: with the Metal toolchain
 # installed the build compiles every kernel into
-# `mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib`, and that file runs (measured:
-# `AUDIT/baseline/swift64/a135-metal-lib.log`). What is true, and what this script is for, is
+# `mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib`, and that file runs — measured by
+# placing it beside a binary and evaluating a kernel from it. What is true, and what this script is
+# for, is
 # that MLX needs a metallib it can *find*:
 #
 #   `mlx/backend/metal/device.cpp:136-180` tries, in order, `mlx.metallib` beside the binary,
