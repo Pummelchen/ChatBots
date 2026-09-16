@@ -1,0 +1,40 @@
+# A184 — a metallib that was never installed (2026-09-15T15:22:55Z)
+
+## 1. before: two ifs with no else, and exit 0
+$ git show HEAD:tools/fetch-metal.sh | grep -n 'installed:' -B 6 | head -16
+  157-if [[ -z "$BIN" ]]; then
+  158-  BIN="$(swift build --show-bin-path 2>/dev/null || true)"
+  159-fi
+  160-if [[ -n "$BIN" && -d "$BIN" ]]; then
+  161-  cp "$LIB" "$BIN/mlx.metallib"
+  162:  echo "    installed: $BIN/mlx.metallib"
+  --
+  164-
+  165-for target in "${INSTALL_TARGETS[@]:-}"; do
+  166-  [[ -n "$target" ]] || continue
+  167-  if [[ -d "$target/Contents/MacOS" ]]; then
+  168-    cp "$LIB" "$target/Contents/MacOS/mlx.metallib"
+  169:    echo "    installed: $target/Contents/MacOS/mlx.metallib"
+
+$ bash tools/fetch-metal.sh --bin /tmp/no-such-bin
+  exit=0, lines saying anything was installed: 0
+$ bash tools/fetch-metal.sh --into /tmp/no-such-app
+  exit=0, lines saying anything was installed: 1   (the app copy is skipped in silence)
+
+## 2. after
+$ grep -n 'installed=|no such build directory|no app bundle|nothing was installed' tools/fetch-metal.sh
+  164:installed=0
+  174:  echo "error: no such build directory: $BIN" >&2
+  181:  installed=$((installed + 1))
+  187:    echo "error: no app bundle at $target (expected $target/Contents/MacOS)." >&2
+  192:  installed=$((installed + 1))
+  196:  echo "error: nothing was installed; the Metal library would not travel with the app." >&2
+
+  --bin /tmp/no-such-bin         exit=1  error: no such build directory: /tmp/no-such-bin
+  --into /tmp/no-such-app        exit=1  error: no app bundle at /tmp/no-such-app (expected /tmp/no-such-app/Contents/MacOS).
+  --bin (bad) --into (good)      exit=1  error: no such build directory: /tmp/no-such-bin
+  --into (good)                  exit=0  installed: /Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx.metallib
+  the installed library: 3789548 bytes
+
+$ shellcheck tools/fetch-metal.sh
+  clean

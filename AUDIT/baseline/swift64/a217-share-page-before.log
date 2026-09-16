@@ -1,0 +1,11 @@
+# A217 — the new share-page guard against the page as it was (red)
+
+$ swift test --filter AuditShareLinkTests
+  ✘ Test "The page needs no base: no island field, no absolute URL" recorded an issue at AuditShareLinkTests.swift:92:9: Expectation failed: !html.contains("shareBase")
+  ✘ Test "The page needs no base: no island field, no absolute URL" failed after 0.008 seconds with 1 issue.
+  ✘ Test "A client-supplied Host never reaches the page" recorded an issue at AuditShareLinkTests.swift:68:9: Expectation failed: !hostile.contains("evil.example")
+  ✘ Test "A client-supplied Host never reaches the page" recorded an issue at AuditShareLinkTests.swift:69:9: Expectation failed: !hostile.contains("shareBase")
+  ✘ Test "A client-supplied Host never reaches the page" recorded an issue at AuditShareLinkTests.swift:76:9: Expectation failed: !ordinary.contains("chatbots.local:7788")
+  ✘ Test "A client-supplied Host never reaches the page" failed after 0.071 seconds with 3 issues.
+  ✘ Suite "A share page carries no origin from the request (A217)" failed after 0.071 seconds with 4 issues.
+  ✘ Test run with 2 tests in 1 suite failed after 0.071 seconds with 4 issues.

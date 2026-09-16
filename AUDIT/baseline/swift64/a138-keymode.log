@@ -1,0 +1,25 @@
+# A138 — the engine's private key mode (2026-09-15T13:57:37Z)
+
+## 1. before: the committed version
+$ git show HEAD:Sources/ChatBotsCore/CertificateStore.swift | grep -n 'posixPermissions' -B 2
+  175-        // the machine — but there is no reason for it to be world-readable either.
+  176-        try? manager.setAttributes(
+  177:            [.posixPermissions: 0o600], ofItemAtPath: privateKey.path)
+  (one site, its result discarded by try?, and the load path does not look at the mode)
+
+$ swift test --filter CertificateStoreTests   # before
+  ✘ Test "A key that is readable by others is made private again the next time it is loaded" recorded an issue at CertificateStoreTests.swift:96:9: Expe
+  ✘ Test "A key that is readable by others is made private again the next time it is loaded" failed after 0.279 seconds with 1 issue.
+  ✘ Test run with 7 tests in 1 suite failed after 0.371 seconds with 1 issue.
+
+## 2. after
+$ grep -n 'restrictToThisUser|privateKeyPermissions' Sources/ChatBotsCore/CertificateStore.swift
+  69:    case insecurePrivateKey(String)
+  83:        case .insecurePrivateKey(let path):
+  136:        try restrictToThisUser(privateKey)
+  149:    private static let privateKeyPermissions = 0o600
+  159:    private static func restrictToThisUser(_ privateKey: URL) throws {
+  166:            throw CertificateStoreError.insecurePrivateKey(privateKey.path)
+  217:        try restrictToThisUser(privateKey)
+$ swift test --filter CertificateStoreTests   # after
+  ✔ Test run with 7 tests in 1 suite passed after 0.341 seconds.

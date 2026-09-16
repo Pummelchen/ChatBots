@@ -27,9 +27,12 @@
 #   --foreground     stay attached and show logs  (default: same)
 #   --stop           stop whatever is running
 #   --status         report what is running
-#   --open <where>   desktop | mobile | none   (default: none — print the URL)
+#   --open <where>   open the page in the default browser; `none` only prints the URL
 #   --view <mode>    auto | phone | desktop    (default: auto)
 #   --local-only     bind 127.0.0.1 only, not every interface
+#
+# The value of `--open` is not a layout: every value but `none` opens the same URL, and the layout
+# comes from `--view`, or from the browser's own width in `auto`.
 #
 # `--view phone` forces the single-column phone layout even in a desktop browser, which is
 # what `start-web-mobile.sh` uses. The page honours `?view=` on load and remembers nothing, so
@@ -54,17 +57,74 @@ CADDY_LOG="$LOG_DIR/caddy.log"
 ENGINE_PID="$LOG_DIR/engine.pid"
 CADDY_PID="$LOG_DIR/caddy.pid"
 
+# The value an option was given, or a message and an exit.
+#
+# `--port "${2:-}"; shift 2` with the option last shifted nothing — `shift 2` fails when only one
+# argument remains — so the case was re-entered with the same argument and the loop ran for ever
+# without printing anything (A181). A missing value is a usage error, and saying so is what a caller
+# needs; every option that takes one goes through here.
+require_value() {
+  if [ $# -ge 2 ] && [ -n "$2" ]; then
+    return 0
+  fi
+  echo "$1 needs a value" >&2
+  exit 2
+}
+
+# A TCP port number, or a message and an exit.
+#
+# Both port options are interpolated into `sed` programs — one as a replacement, one as a *pattern* —
+# and the result is a Caddyfile that Caddy is then asked to run. A value containing `|` ends the `s`
+# command early, `&` inserts the text that matched, `/` breaks the address pattern, and a pattern like
+# `.*` matches any line at all: the generated config is then mangled, or carries a directive nobody
+# asked for, and it is a file this script wrote and a program this script started (A188). Digits in
+# range is the whole of the validation that interpolation needs, and doing it here means the value is
+# a number by the time any of that runs.
+require_port() {
+  case "${2:-}" in
+    ''|*[!0-9]*)
+      echo "$1 needs a port number, not '${2:-}'" >&2
+      exit 2
+      ;;
+  esac
+  if [ "$2" -lt 1 ] || [ "$2" -gt 65535 ]; then
+    echo "$1 needs a port between 1 and 65535, not '$2'" >&2
+    exit 2
+  fi
+}
+
 while [ $# -gt 0 ]; do
   case "$1" in
-    --port) PORT="${2:-}"; shift 2 ;;
-    --engine) ENGINE_PORT="${2:-}"; shift 2 ;;
+    --port)
+      require_value "$1" "${2:-}"
+      require_port "$1" "${2:-}"
+      PORT="$2"; shift 2 ;;
+    --engine)
+      require_value "$1" "${2:-}"
+      require_port "$1" "${2:-}"
+      ENGINE_PORT="$2"; shift 2 ;;
     --foreground) ACTION=run; shift ;;
-    --open) OPEN_WHERE="${2:-none}"; shift 2 ;;
-    --view) VIEW_MODE="${2:-auto}"; shift 2 ;;
+    --open)
+      # Every value but `none` opens the same URL — the code has no desktop/mobile distinction here,
+      # and the help says so now instead of advertising one. Both wrappers pass `--open desktop`,
+      # including `start-web-mobile.sh`, which reaches the phone layout through `--view phone`; the
+      # old help line read `desktop | mobile | none` and described something that never existed
+      # (A194).
+      require_value "$1" "${2:-}"
+      OPEN_WHERE="${2:-none}"; shift 2 ;;
+    --view)
+      require_value "$1" "${2:-}"
+      VIEW_MODE="${2:-auto}"; shift 2 ;;
     --local-only) LOCAL_ONLY=1; shift ;;
     --stop) ACTION=stop; shift ;;
     --status) ACTION=status; shift ;;
-    -h|--help) sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help)
+      # The header *is* the help: every leading comment line after the shebang is printed, with the
+      # `#` and one space removed, stopping at the first line that is not a comment. It used to be
+      # `sed -n '2,33p'`, a range that had to be updated by hand and was not — lines 34-36, the
+      # `--view phone` explanation, were missing from the help while being in the file (A194).
+      awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
+      exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
 done
@@ -122,13 +182,21 @@ share_base() {
 }
 
 is_our_process() {
-  # Ownership is decided from the whole command line, never from the bare name. A pid file
-  # outlives the process it named and the OS can hand that number to an unrelated program, so
-  # a live pid is not on its own evidence that the process belongs to ChatBots.
+  # Ownership is decided from the **executable**, not from a substring of the command line. A pid file
+  # outlives the process it named and the OS can hand that number to an unrelated program, so a live pid
+  # is not on its own evidence that the process belongs to ChatBots — and neither is a substring match,
+  # which is what this used to be: `vim Caddyfile`, `tail -f .run/caddy.log` and anything else with the
+  # word in an argument matched, and killing one of those is exactly the collateral damage this check
+  # exists to prevent (A189).
+  #
+  # `comm` is the path the executable was launched from, so the basename is the program itself: the
+  # engine is `chatbots-cli` whatever configuration directory it was built into, and Caddy is `caddy`
+  # wherever Homebrew put it. A process that renames itself can still impersonate either name, which is
+  # out of scope here: another process running as this user can already do anything this script can.
   local command
-  command="$(ps -p "$1" -o command= 2>/dev/null)" || true
-  case "$command" in
-    *chatbots*|*caddy*) return 0 ;;
+  command="$(ps -p "$1" -o comm= 2>/dev/null)" || true
+  case "${command##*/}" in
+    chatbots-cli|caddy) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -254,7 +322,9 @@ if ! python3 "$SCRIPT_DIR/embed-web.py" --check >/dev/null 2>&1; then
 fi
 
 BINARY="$ROOT/.build/release/chatbots-cli"
-if [ ! -x "$BINARY" ] || [ "$ROOT/web" -nt "$BINARY" ] || [ "$ROOT/Sources" -nt "$BINARY" ]; then
+# `tools/source-newer.sh` walks the trees: the directory mtimes this compared changed only when a
+# file was added or removed, so an edited `web/app.js` left the stale build in place (A182).
+if "$SCRIPT_DIR/source-newer.sh" "$BINARY" "$ROOT/web" "$ROOT/Sources"; then
   step "Building the engine"
   dim "First build only — this takes a few minutes."
   if ! swift build -c release >"$LOG_DIR/build.log" 2>&1; then

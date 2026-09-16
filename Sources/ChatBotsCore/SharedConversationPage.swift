@@ -21,7 +21,11 @@ import Foundation
 public enum SharedConversationPage {
 
     /// A standalone page for one kept conversation.
-    public static func html(_ record: StoredConversation, shareBase: String? = nil) -> String {
+    ///
+    /// No origin is passed in, because the page needs none: every URL it could use is relative and it
+    /// renders no links of its own. It used to take a `shareBase` from the request's `Host` and write
+    /// it into the island below, where nothing ever read it (A217).
+    public static func html(_ record: StoredConversation) -> String {
         let title = record.topic.isEmpty ? "An untitled conversation" : record.topic
         let exported = ISO8601DateFormatter().string(from: record.updatedAt)
         let seats = record.seats.map { "\($0.name) — \($0.mode)" }.joined(separator: ", ")
@@ -71,7 +75,7 @@ public enum SharedConversationPage {
               <p>Shared from ChatBots. Read-only: nothing here can change the conversation.</p>
             </footer>
 
-            <script id="data" type="application/json">\(dataJSON(record, shareBase: shareBase))</script>
+            <script id="data" type="application/json">\(dataJSON(record))</script>
             <script>
             \(script)
             </script>
@@ -101,10 +105,9 @@ public enum SharedConversationPage {
     /// of that message be parsed as markup — the classic way a JSON island turns into an
     /// injection. Escaping `<` as `\\u003c` is what the HTML parser will not look for, and JSON
     /// decodes it back to `<` on the other side.
-    static func dataJSON(_ record: StoredConversation, shareBase: String?) -> String {
+    static func dataJSON(_ record: StoredConversation) -> String {
         var payload: [String: Any] = [:]
         payload["topic"] = record.topic
-        payload["shareBase"] = shareBase ?? ""
         payload["entries"] = record.turns.map { turn -> [String: Any] in
             [
                 "kind": turn.kind,

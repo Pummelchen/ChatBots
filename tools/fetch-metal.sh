@@ -1,13 +1,26 @@
 #!/usr/bin/env bash
 # Fetches MLX's compiled Metal kernel library (mlx.metallib).
 #
-# Why this is needed: mlx-swift's SwiftPM build compiles the C/C++ core but NOT the
-# Metal kernels — those are produced by the CMake/Xcode build and shipped inside the
-# `Cmlx.xcframework` attached to each mlx-swift release. Without a metallib, MLX throws
-# "Failed to load the default metallib" the moment it touches the GPU.
+# Why this is needed — corrected under Xcode 27 (A135). This used to say that mlx-swift's
+# SwiftPM build does not compile the Metal kernels, and that is false: with the Metal toolchain
+# installed the build compiles every kernel into
+# `mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib`, and that file runs (measured:
+# `AUDIT/baseline/swift64/a135-metal-lib.log`). What is true, and what this script is for, is
+# that MLX needs a metallib it can *find*:
 #
-# MLX looks for the library next to the running binary (it tries `mlx.metallib` first),
-# so we place it in the SwiftPM bin directory and inside the .app bundle.
+#   `mlx/backend/metal/device.cpp:136-180` tries, in order, `mlx.metallib` beside the binary,
+#   `Resources/mlx.metallib`, a SwiftPM resource bundle, `Resources/default.metallib`, and
+#   finally the compile-time METAL_PATH. The SwiftPM bundle is reached through
+#   `Bundle.main.bundleURL` and `Bundle.allBundles()`, which a bare executable one level inside
+#   a .app — the app's engine is `ChatBots.app/Contents/MacOS/chatbots-cli` — does not resolve
+#   to, and `make-app.sh` copies the SwiftPM bundles into `Contents/Resources/`. Without a
+#   colocated metallib MLX throws "Failed to load the default metallib" the moment it touches
+#   the GPU.
+#
+# So the library has to be placed next to the running binary, which is what this does: into the
+# SwiftPM bin directory and into the .app's `Contents/MacOS/`. `make-app.sh` now copies the
+# build's own metallib when there is one and calls this only as the fallback, so a normal app
+# build no longer downloads ~190 MB — see the note there.
 #
 # Usage: tools/fetch-metal.sh [--bin <dir>] [--into <app>]...
 
@@ -94,7 +107,12 @@ if [[ ! -f "$LIB" ]]; then
   if [[ ! -f "$ZIP" ]]; then
     URL="https://github.com/ml-explore/mlx-swift/releases/download/$VERSION/Cmlx.xcframework.zip"
     echo "==> Downloading Metal kernels for mlx-swift $VERSION (≈190 MB, one time)"
-    curl -fL --retry 3 --progress-bar -o "$ZIP.partial" "$URL"
+    # A stalled transfer fails and is retried instead of waiting forever: curl aborts a connection
+    # that has stopped moving (`--speed-limit`/`--speed-time`), `--retry` also covers a handshake
+    # that never completes, and each retry starts the archive again so there is no partial file to
+    # resume from (A193).
+    curl -fL --connect-timeout 20 --speed-limit 1024 --speed-time 30 \
+      --retry 3 --progress-bar -o "$ZIP.partial" "$URL"
     mv "$ZIP.partial" "$ZIP"
   fi
 
@@ -154,18 +172,45 @@ for argument in "$@"; do
   esac
 done
 
+# Every destination is checked and every failure is fatal.
+#
+# This used to be two `if`s with no else: a `--bin` that did not exist and a `--into` target with no
+# `Contents/MacOS` were both skipped in silence, and the script exited 0 having installed nothing —
+# inviting exactly the failure it exists to prevent, MLX throwing "Failed to load the default
+# metallib" the first time a model touches the GPU (A184). A bundle without the library is not a
+# bundle, so a destination that cannot be written is an error, not a note.
+installed=0
+
 if [[ -z "$BIN" ]]; then
   BIN="$(swift build --show-bin-path 2>/dev/null || true)"
+  if [[ -z "$BIN" && "${#INSTALL_TARGETS[@]}" -eq 0 ]]; then
+    echo "error: could not read the build directory, and no --into target was given." >&2
+    echo "       pass --bin <dir> or --into <app> so there is somewhere to install to." >&2
+    exit 1
+  fi
+elif [[ ! -d "$BIN" ]]; then
+  echo "error: no such build directory: $BIN" >&2
+  exit 1
 fi
+
 if [[ -n "$BIN" && -d "$BIN" ]]; then
   cp "$LIB" "$BIN/mlx.metallib"
   echo "    installed: $BIN/mlx.metallib"
+  installed=$((installed + 1))
 fi
 
 for target in "${INSTALL_TARGETS[@]:-}"; do
   [[ -n "$target" ]] || continue
-  if [[ -d "$target/Contents/MacOS" ]]; then
-    cp "$LIB" "$target/Contents/MacOS/mlx.metallib"
-    echo "    installed: $target/Contents/MacOS/mlx.metallib"
+  if [[ ! -d "$target/Contents/MacOS" ]]; then
+    echo "error: no app bundle at $target (expected $target/Contents/MacOS)." >&2
+    exit 1
   fi
+  cp "$LIB" "$target/Contents/MacOS/mlx.metallib"
+  echo "    installed: $target/Contents/MacOS/mlx.metallib"
+  installed=$((installed + 1))
 done
+
+if [[ "$installed" -eq 0 ]]; then
+  echo "error: nothing was installed; the Metal library would not travel with the app." >&2
+  exit 1
+fi

@@ -821,6 +821,23 @@ body[data-device="tablet"] .toggle-text { display: inline; }
 
 .persona-picker:disabled { opacity: 0.6; }
 
+/* The checkpoint select, beside the persona picker and styled to match it. It sizes to its content
+   rather than the row, because a repository id is long and the persona picker is what the eye should
+   land on. */
+.model-picker {
+  font: inherit;
+  font-size: var(--font-small);
+  color: var(--text);
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: calc(2px * var(--scale)) calc(6px * var(--scale));
+  margin-left: calc(6px * var(--scale));
+  max-width: 46%;
+}
+
+.model-picker:disabled { opacity: 0.6; }
+
 /* The list itself. A native-feeling panel rather than a floating dropdown, because it can
    hold the whole cast and works the same with a finger and a mouse. */
 .persona-sheet {

@@ -46,7 +46,7 @@ Language coverage against §1's minimum list:
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Swift | `swift-format` | `swiftlint` | `swiftlint` + `swift build` warnings-as-errors | compiler (Swift 6 mode) | `semgrep` | `osv-scanner` | `gitleaks` | `llvm-cov` |
 | Python (`tools/`, 5 files) | `ruff format` | `ruff check` | `ruff` | `pyright` | `semgrep` | `osv-scanner` | `gitleaks` | n/a — tooling scripts, not production code |
-| Shell (`tools/`, 7 files) | — | `shellcheck` | — | — | `semgrep` | n/a | `gitleaks` | n/a |
+| Shell (`tools/`, 7 files at the baseline) | — | `shellcheck` over every tracked `*.sh` (18: `tools/`, `AUDIT/`, probes — A192) | — | — | `semgrep` | n/a | `gitleaks` | n/a |
 | JavaScript (`web/`) | — | see A-findings | — | — | `semgrep` | `osv-scanner` | `gitleaks` | n/a |
 | C | none in this repository | — | — | — | — | — | — | — |
 
@@ -133,11 +133,183 @@ A99 by measurement rather than by reading — the shipped `Caddyfile` in front o
 an unknown conversation id so that the response body identifies which server answered. `caddy` is not
 required to build or run the project; the packaged app and the installer do not use it.
 
+
+---
+
+# Re-audit — Swift 6.4 / Xcode 27 / macOS 27 (2026-09-15)
+
+The machine this audit runs on was upgraded between sessions: the same Mac now has macOS 27, Xcode 27
+and Swift 6.4, and **the macOS 26 SDK is gone** (27.0 is the only SDK installed). The previous
+acceptance described a toolchain that no longer exists on any host in the fleet, which is why a full
+re-audit was required rather than a spot check.
+
+| | 2026-09-13 audit | 2026-09-15 re-audit |
+| --- | --- | --- |
+| macOS | 26.6.2 (25G83) | **27.0 (26A428)** |
+| Xcode | 26.6 (17F113) | **27.0 (27A266a)** |
+| Swift | 6.3.3 | **6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)** |
+| SDK | macOS 26.5 | **macOS 27.0 — the only one installed** |
+| Development host | `MacBook-AB.local`, 24 GB | **`node1`**, 8 GB |
+| Verification host | `node1` | **`node2`** — a Mac that did not develop the fixes |
+
+## The fleet, measured 2026-09-15
+
+| Host | Class | macOS | Xcode | Swift | Metal toolchain | Role |
+| --- | --- | --- | --- | --- | --- | --- |
+| `node1` (`Node1.local`) | Mac Mini M2, 8 GB | 27.0 | 27.0 | 6.4 | **installed by this audit** | development |
+| `node2` (`Node2.local`) | Mac Mini M2, 8 GB | 27.0 | 27.0 | 6.4 | **installed by this audit** | Phase E |
+| `node3` (`Node3.local`) | Mac Mini M2, 8 GB | 27.0 | 27.0 | 6.4 | **missing** | spare |
+| `node4` (`Node4.local`) | Mac Mini M2, 8 GB | 27.0 | 27.0 | 6.4 | **missing** | spare |
+
+Access is `ssh <node>@<node>.local` — the **machine name is the username**, not the local user. The
+first probe of this session used the default user and was refused on all four; recorded so the next
+session does not repeat it.
+
+§1b's memory rule is why development is one 8 GB Mac with a single heavy job at a time: no Docker
+alongside an Xcode build, and no second build in parallel.
+
+## The Metal toolchain — Xcode 27's new prerequisite (A133)
+
+**Xcode 27 does not ship the Metal compiler.** It is a downloadable component:
+
+```sh
+xcodebuild -downloadComponent MetalToolchain   # 839 MB, resolves as "Metal Toolchain 27A266a"
+xcodebuild -runFirstLaunch
+```
+
+Without it every build of this package fails, because `mlx-swift` compiles generated Metal kernels:
+
+```
+error: cannot execute tool 'metal' due to missing Metal Toolchain
+error: CompileMetalFile .../mlx-swift/.../steel_attention.metal failed with a nonzero exit code
+```
+
+Installed by this audit on `node1`. It resolves through a cryptex mount, so the working invocation is
+`xcrun`, not the Xcode toolchain path:
+
+```
+$ xcrun --find metal
+/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v27.1.266.1.<id>/Metal.xctoolchain/usr/bin/metal
+$ xcrun -sdk macosx metal --version
+Apple metal version 32023.921 (metalfe-32023.921.6)
+```
+
+**`metal` must be *executed* to know it works, not merely resolved.** `xcrun --find metal` returns a
+path on a host where the component is absent, so a check built on `--find` reports success on all four
+nodes while three of them cannot build. Measured by execution when the fleet was recorded: node1 worked
+and node2, node3 and node4 did not, with a stale `com_apple_MobileAsset_MetalToolchain` asset directory
+on node2 that was unusable. **node2's component was installed later the same day**, for Phase E, and
+then verified by compiling a real kernel rather than by reading a version string — see *How the Metal
+component is checked* at the end of this file. node3 and node4 are still without it.
+
+## Toolchain, re-measured
+
+| Tool | 2026-09-13 | 2026-09-15 | Method |
+| --- | --- | --- | --- |
+| Swift | 6.3.3 | **6.4** | Xcode 27.0 |
+| SDK | macOS 26.5 | **macOS 27.0** | Xcode 27.0 |
+| `swift-format` | 603.0.0 (brew) | 603.0.0 (brew), which is the one on `PATH` and the one both gates run; Xcode 27's `xcrun swift-format` (reports `main`) reports the same diagnostics | brew |
+| `swiftlint` | 0.65.1 | 0.65.1 | brew |
+| `llvm-cov` | Homebrew LLVM 23.1.1 | **`xcrun llvm-cov`** (Xcode 27) | Xcode |
+| `gitleaks` / `osv-scanner` / `semgrep` / `ruff` / `pyright` / `shellcheck` | 8.30.1 / 2.5.1 / 1.176.0 / 0.16.7 / 1.1.414 / 0.11.0 | unchanged | brew |
+| Python | 3.14.7 | 3.14.7 | brew |
+| Metal toolchain | *(bundled)* | **component 27A266a, separate download (A133)** | `xcodebuild -downloadComponent` |
+
+Both `swift-format` builds report the same diagnostics on the same tree — **744** when the toolchain
+moved, which is where the recorded waiver comes from, and **739** measured 2026-09-16 — so the move did
+not change the formatter's verdict and the waiver never had to be raised. It is the **brew** build the
+gates run, because they invoke `swift-format` from `PATH`; Xcode's is reachable only through `xcrun` and
+is what the comparison was made with.
+
+## Reproducing this environment (2026-09-15)
+
+```sh
+# Xcode 27.0 (Swift 6.4) — App Store or developer.apple.com, then:
+sudo xcode-select -s /Applications/Xcode.app
+xcodebuild -downloadComponent MetalToolchain     # A133: required, or nothing builds
+xcodebuild -runFirstLaunch
+swift --version                                  # expect 6.4
+
+brew install swiftlint swift-format llvm gitleaks osv-scanner semgrep ruff pyright shellcheck jq
+# `swift-format` is installed from brew on purpose: both gates invoke it from PATH and check it with
+# `command -v`, which `xcrun` does not satisfy. Xcode 27 ships one too, and `xcrun --find` reports a path
+# for it on a host where nothing else is installed — the lesson the Metal component above taught — so the
+# gate must not rest on `xcrun` finding it. The two builds agree on the diagnostics; the recorded waiver
+# is from the brew one.
+```
+
+**The same versions on the CI runner, verified.** GitHub's Linux runner installs shellcheck,
+gitleaks and osv-scanner as release binaries and the rest from PyPI and npm. The three binaries are
+fetched by `tools/fetch-audit-tools.sh`, which pins each asset's SHA-256 and checks it before
+unpacking (A187), and a step in `.github/workflows/checks.yml` fails if the versions in that script
+and the versions in the table above disagree — the record is what the audit ran, so a version bumped
+in only one of the two would make it untrue. The digests themselves are in
+`AUDIT/baseline/swift64/a187-audit-tools.log`, alongside the figures GitHub publishes for the same
+assets. What that pin does **not** cover is semgrep's rule set: `--config auto` fetches its rules
+from the Semgrep registry at scan time, so the version is fixed and the rules are not (A192 — the
+resolved figures are recorded in `plan.md`).
+
+## What this re-audit installed
+
+| Host | Installed | Why | Removal |
+| --- | --- | --- | --- |
+| `node1` | Xcode 27 Metal Toolchain component (27A266a, 839 MB) | A133 — without it this package cannot build | Xcode ▸ Settings ▸ Components |
+| `node2` | Xcode 27 Metal Toolchain component (27A266a, 839 MB) | A133 and Phase E: node2 is the acceptance host and cannot build without it | Xcode ▸ Settings ▸ Components |
+| `node2` | `pyright` 1.1.414 (`npm install --global pyright@1.1.414`) | the first Phase E run reported `pyright is not installed`, so the acceptance host could not run one of the twelve sections; installed at the version recorded in the table above rather than at whatever the registry served that day | `npm uninstall --global pyright` |
+
+## A credential was sitting in plaintext in two wiki clones (A212)
+
+Found on 2026-09-15 while checking the wiki trackers §9 requires after a push. Two of the three wiki
+clones in `~/Downloads/` carried a **fine-grained GitHub personal access token, in plaintext, inside
+the `origin` URL** in `.git/config`:
+
+| Clone | State before | State after |
+| --- | --- | --- |
+| `chatbots-wiki-ro` | `https://Pummelchen:<token>@github.com/Pummelchen/ChatBots.wiki.git` | `https://github.com/Pummelchen/ChatBots.wiki.git` |
+| `mcps-wiki-ro` | same shape, for `MCPSearch.wiki.git` | `https://github.com/Pummelchen/MCPSearch.wiki.git` |
+| `aisessionserver-wiki` | clean (no credential in the URL) | unchanged |
+
+`ChatBots/.git/config` and the two other repository clones were already clean, and nothing in the
+audited repository or its history contains a credential — gitleaks has reported 0 findings over the
+full history since Phase A, and that result stands.
+
+**What was done.** Both URLs were rewritten to the bare HTTPS form. Pushes and fetches still
+authenticate: `~/.gitconfig` already routes `github.com` through `gh auth git-credential`, and `gh` is
+logged in as `Pummelchen`. A fetch against the rewritten clone was run afterwards and succeeded, so
+the rewrite removed the secret without removing access. `~/.config/gh/hosts.yml` (mode 0600) still
+holds the same token, which is where `gh` is designed to keep it.
+
+**What should still happen, by the token's owner.** A token that has been read out of a file into a
+terminal or a session log should be treated as disclosed. It is not in the repository and it was not
+committed, but it was visible on screen, so rotating it is the safe move; nothing in this audit needs
+it, because the credential helper supplies whatever `gh` holds.
+
+**Why it is recorded here rather than as a source fix.** The file it lived in is not in the tree this
+audit has scope over (the brief limits it to `Pummelchen/ChatBots`), so there is no repository change
+that removes it and no commit to point at. Recording it is the alternative to fixing it silently.
+
+### How the Metal component is checked (A133)
+
+`tools/check-metal.sh` runs the compiler and exits non-zero with the install command when it cannot,
+because a machine without the component still answers `xcrun --find metal` with a path:
+
+| Host | `xcrun --find metal` | `tools/check-metal.sh` |
+| --- | --- | --- |
+| `node1` | cryptex path | **passes** — Apple metal version 32023.921 |
+| `node2` (after the install) | cryptex path | **passes** — and a real `.metal` file compiles to a 3 296-byte `.air` |
+| `node3` | `/Applications/Xcode.app/.../metal`, exit 0 | **fails** with `cannot execute tool 'metal' due to missing Metal Toolchain` |
+| `node4` | not re-measured | not re-measured — both spare hosts were missing it when the fleet was recorded |
+
+`tools/install.sh` calls that script before it downloads anything, so a machine that cannot build now
+stops in the first minute instead of failing three minutes into the build. Raw output:
+`AUDIT/baseline/swift64/a133-metal.log`.
+
 ## Toolchain move to Swift 6.4 (2026-09-15)
 
 The package now declares `swift-tools-version: 6.4` and the Mac gates run on Swift 6.4 / Xcode 27.
-Verified locally: `swift build` clean (warnings are errors in the manifest) and the full suite green
-— 824 tests in 139 suites.
+Verified locally when it landed: `swift build` clean (warnings are errors in the manifest) and the
+full suite green — 824 tests in 139 suites, which was this branch's count before the re-audit's own
+work; the re-audit's figures are in the section above.
 
 GitHub's CodeQL *default setup* could not follow: its autobuild image ships Swift 6.3.3 and cannot
 parse a 6.4 manifest (`package 'sources' is using Swift tools version 6.4.0 but the installed version

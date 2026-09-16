@@ -30,12 +30,13 @@ struct CertificateStoreTests {
         #expect(identity.fingerprintDisplay.contains(":"))
     }
 
-    @Test("The same identity comes back on the next load, which is what pinning needs")
+    @Test("The same identity comes back on the next load, which is what a steady report needs")
     func isStableAcrossLoads() throws {
         // The reason this type exists. The library's development identity is regenerated on
-        // every server construction, so its fingerprint changes each restart and a pinned
-        // client would refuse to connect. If this test ever fails, the app will break on
-        // relaunch in a way that looks like a dead engine.
+        // every server construction, so its fingerprint changes each restart. Nothing enforces
+        // the value (A195) — but the fingerprint the engine reports is what a person and the
+        // transport check compare, so a value that changed for no reason would make every
+        // record of it stale on relaunch and look like a dead engine.
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
 
@@ -76,21 +77,61 @@ struct CertificateStoreTests {
         }
     }
 
-    @Test("A partial identity on disk is regenerated rather than half-used")
-    func repairsPartialState() throws {
-        // A crash between writing the two files would otherwise leave an install that can
-        // never start again, with an error about a missing key rather than a fix.
+    @Test("A key that is readable by others is made private again the next time it is loaded")
+    func keyPermissionsAreRepairedOnLoad() throws {
+        // The gap A138 records: generation set the mode and threw the result away, and the load path
+        // never looked. An identity that was already on disk — because an earlier version wrote it
+        // under a permissive umask, or a backup restored it, or someone copied it — stayed readable by
+        // every user on the machine for the life of the install, and nothing said so.
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        _ = try CertificateStore.loadOrCreate(in: directory)
+        let key = directory.appending(path: "webtransport-key.pem")
+
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o644], ofItemAtPath: key.path)
+        #expect(mode(of: key) == 0o644, "the fixture has to actually be open for this to mean anything")
+
+        // The load path is where this is repaired: the files exist, so nothing is regenerated.
+        _ = try CertificateStore.loadOrCreate(in: directory)
+        #expect(mode(of: key) == 0o600, "loading an identity must not leave its key readable by others")
+    }
+
+    /// The mode bits of `url`, or `nil` if they cannot be read.
+    private func mode(of url: URL) -> Int? {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        return (attributes?[.posixPermissions] as? NSNumber)?.intValue
+    }
+
+    @Test("A partial identity on disk is reported with a way out, not silently replaced")
+    func partialStateIsReported() throws {
+        // This test used to assert the opposite — that a missing key was regenerated — and that
+        // expectation was the defect A155 records: a damaged identity was read as "no identity here" and
+        // the store generated a new key, replacing the certificate the engine had been serving without
+        // saying so. The failure is now the store's, with the file named and the way out in the message;
+        // the cost of the way out (a new fingerprint to report) is stated rather than paid in silence.
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let identity = try CertificateStore.loadOrCreate(in: directory)
 
+        let certificate = directory.appending(path: "webtransport-cert.pem")
+        let stored = try Data(contentsOf: certificate)
+
         // Remove the key, as an interrupted first run would.
         try FileManager.default.removeItem(at: directory.appending(path: "webtransport-key.pem"))
 
-        let repaired = try CertificateStore.loadOrCreate(in: directory)
-        #expect(!repaired.privateKeyDER.isEmpty)
-        // A new identity, because the key the old certificate matched is gone.
-        #expect(repaired.fingerprintSHA256 != identity.fingerprintSHA256)
+        do {
+            _ = try CertificateStore.loadOrCreate(in: directory)
+            Issue.record("a partial identity was regenerated in place of the stored one")
+        } catch let error as CertificateStoreError {
+            #expect(error.errorDescription?.contains("webtransport-key.pem") == true)
+            #expect(error.errorDescription?.contains("Delete") == true, "no way out in the message")
+        }
+
+        // The certificate is byte for byte the one that was there: a refused load changed nothing on
+        // disk.
+        #expect(try Data(contentsOf: certificate) == stored, "the refused load rewrote the certificate")
+        #expect(identity.fingerprintSHA256.count == 32)
     }
 
     @Test("The private key is in the encoding the transport accepts")

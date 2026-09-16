@@ -78,9 +78,35 @@ public struct FetchPageTool: ToolProvider {
     public var argumentName: String { "url" }
     public var argumentDescription: String { "Absolute URL of the page to read, e.g. https://example.com/article" }
 
+    /// The schemes `fetch_page` will fetch.
+    ///
+    /// Exactly these two, compared without regard to case. The guard here was
+    /// `url.scheme?.hasPrefix("http")`, which accepted `httpx:` and `httpfoo:` — schemes this tool does not
+    /// claim, handed to the extractor because they began with the right four letters — and it *refused*
+    /// `HTTP://` and `Https://`, which are the same two schemes spelled the way RFC 3986 §3.1 allows (A159).
+    static let readableSchemes: Set<String> = ["http", "https"]
+
+    /// The URL `argument` names, or nil when it is not one this tool can read.
+    ///
+    /// Three requirements, each of them measured in `AUDIT/baseline/swift64/a159-probe/url-shapes.swift`
+    /// rather than assumed: an http(s) scheme whatever its case; a non-empty host, because `http:`,
+    /// `http://` and `http:///path` all parse as URLs and name nothing to fetch; and no whitespace, because
+    /// Foundation parses `http://example.com/a b` happily and that space would travel to the extractor
+    /// inside the URL it is given.
+    static func readableURL(_ argument: String) -> URL? {
+        let raw = argument.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty, !raw.contains(where: \.isWhitespace),
+            let url = URL(string: raw),
+            let scheme = url.scheme?.lowercased(),
+            readableSchemes.contains(scheme),
+            let host = url.host(), !host.isEmpty
+        else { return nil }
+        return url
+    }
+
     public func run(argument: String) async throws -> ToolOutcome {
         let raw = argument.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: raw), url.scheme?.hasPrefix("http") == true else {
+        guard let url = Self.readableURL(raw) else {
             throw ChatBotsError.toolFailed("\"\(raw)\" is not a readable http(s) URL")
         }
 

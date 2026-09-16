@@ -18,16 +18,33 @@ Worth knowing before you report, because several things that look like leaks are
   transcripts and attachments are not sent anywhere unless you point a seat at a cloud
   endpoint yourself.
 * **The engine is bound to loopback.** The HTTP server and the WebTransport listener both bind
-  `127.0.0.1` and are not reachable from the network. The website is reachable from another
-  device only when you start it that way, through Caddy.
-* **A share link is local.** `/s/<id>` is served by the engine that holds the conversation.
-  There is no upload and no hosting.
+  `127.0.0.1` and are not reachable from the network.
+* **The website, once you start it, carries the engine's pages onto the network with it.**
+  `tools/start.sh` runs Caddy from the shipped `Caddyfile`, whose site address carries no host and
+  therefore listens on **every** interface. `/api/*` and `/s/*` are proxied from there to the
+  loopback engine, so anyone who can reach the site can read every kept conversation, drive the run
+  controls and open a share page. That is deliberate — it is what lets a phone on the same Wi-Fi use
+  the interface — and `tools/start.sh --local-only` inserts `bind 127.0.0.1`, which keeps all of it
+  on this Mac.
+* **A share link is not uploaded and not hosted anywhere.** `/s/<id>` is a page the engine renders
+  from the conversation it already holds, and the transcript stays on the machine that made it.
+  What that does *not* mean is that the link is private: it is served through whatever serves the
+  website, so any device that can reach the site and has the URL can read that one conversation —
+  and the API beside it can list them all. Treat a link as being as public as the website is.
 * **Web search goes to Tavily**, and only when a seat has search enabled and a key is
   configured. The query text leaves the machine; nothing else does.
 * **Cloud seats send the conversation to that endpoint.** That is the point of them. The
   built-in DeepSeek key is only ever sent to `api.deepseek.com` — the host is compared exactly
   rather than by substring, so a lookalike domain cannot be handed a real key
   (`BuiltInKeys.allowedHosts`).
+* **One switch writes the conversation somewhere else, and it is off unless you set it.**
+  `CHATBOTS_TRACE_API=1` makes the client print each request to the endpoint on standard error, so
+  that a protocol problem can be seen. It prints the first 2 000 characters of the body with attached
+  images left out — the trace line says how many were omitted — and it does not print the API key.
+  Where that output ends up
+  is wherever standard error goes — a terminal, or a log file you have pointed it at — so treat it as
+  writing the conversation to that place. Any value other than `0`, `false`, `no` or the empty string
+  turns it on.
 
 ## The local trust boundary, stated honestly
 

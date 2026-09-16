@@ -16,6 +16,8 @@ import Foundation
 
 public enum OpenAIResponsesError: LocalizedError, Sendable {
     case badURL(String)
+    /// An endpoint this client will not send to, and the rule that refused it.
+    case refusedEndpoint(String, reason: String)
     case http(status: Int, body: String)
     case streamFailed(String)
     case noOutput
@@ -25,6 +27,8 @@ public enum OpenAIResponsesError: LocalizedError, Sendable {
         switch self {
         case .badURL(let value):
             "Not a usable base URL: \(value)"
+        case .refusedEndpoint(let value, let reason):
+            "The endpoint \(value) is not used: \(reason)."
         case .http(let status, let body):
             "Server returned HTTP \(status): \(UTF8Text.prefix(body, 300))"
         case .streamFailed(let message):
@@ -112,6 +116,20 @@ public enum ModelNames {
         let slug = lowered.split(separator: "/").last.map(String.init) ?? lowered
         if let known = table.first(where: { slug.contains($0.match) }) { return known.name }
         return prettify(slug)
+    }
+
+    /// The compact label a seat shows for an MLX checkpoint.
+    ///
+    /// Derived from the identifier rather than stored beside it: `AgentSpec.seat(index:modelID:)` set
+    /// `modelShortName` to the *default* checkpoint's name whatever it was asked for, so
+    /// `chatbots-cli --model-a <another checkpoint>` told every seat's prompt — "running
+    /// Qwen3.5-4B-4bit on the moderator's Mac" — and every badge that it was running the default
+    /// (A200). The `-MLX` marker comes out because it names the runtime rather than the model, and the
+    /// engine here is always MLX; that leaves the default checkpoint reading exactly as it did.
+    public static func shortName(_ modelID: String) -> String {
+        let slug = modelID.split(separator: "/").last.map(String.init) ?? modelID
+        let trimmed = slug.replacingOccurrences(of: "-MLX", with: "")
+        return trimmed.isEmpty ? slug : trimmed
     }
 
     /// Turn a slug into something readable without pretending to know what it is.
@@ -255,7 +273,7 @@ public struct OpenAIEndpoint: Sendable, Hashable, Codable {
 
     public init(
         baseURL: String = "http://localhost:1234",
-        model: String = "mlx-community/Qwen3.5-4B-MLX-4bit",
+        model: String = AgentSpec.defaultModelID,
         apiKey: String? = nil,
         compatibility: APICompatibility? = nil
     ) {
@@ -271,7 +289,9 @@ public struct OpenAIEndpoint: Sendable, Hashable, Codable {
         self.baseURL = baseURL
         self.model =
             try container.decodeIfPresent(String.self, forKey: .model)
-            ?? "mlx-community/Qwen3.5-4B-MLX-4bit"
+            // The default checkpoint, not a copy of its name (A208). Older saved settings predate the
+            // field, and this is what they meant.
+            ?? AgentSpec.defaultModelID
         self.apiKey = try container.decodeIfPresent(String.self, forKey: .apiKey)
         // Older saved settings predate the field; infer from the URL.
         self.compatibility =
@@ -305,12 +325,43 @@ public struct OpenAIEndpoint: Sendable, Hashable, Codable {
 
     /// The full endpoint, tolerating a base URL given with or without a trailing slash or
     /// with `/v1` already present.
+    ///
+    /// Nil when the endpoint is one this client will not send to, which is `endpointRefusal`'s
+    /// decision rather than a parsing accident.
     public var responsesURL: URL? {
         var trimmed = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         while trimmed.hasSuffix("/") { trimmed.removeLast() }
         guard !trimmed.isEmpty else { return nil }
         let path = trimmed.hasSuffix("/v1") ? "/responses" : "/v1/responses"
-        return URL(string: trimmed + path)
+        guard let url = URL(string: trimmed + path) else { return nil }
+        guard Self.endpointRefusal(url) == nil else { return nil }
+        return url
+    }
+
+    /// Why this client will not send a request to `url`, or nil when it will.
+    ///
+    /// Two rules, both about an address that arrives from configuration a user — or, before A136, any
+    /// web page — could set. It has to be http or https: a `file://` base URL made a model request
+    /// read the local disk. And it must not be link-local, where cloud metadata services live, since
+    /// `http://169.254.169.254/…` is the classic way a request path like this hands out credentials,
+    /// and a non-2xx body is echoed back into the snapshot the front ends display.
+    ///
+    /// Loopback and private addresses stay allowed on purpose — pointing a seat at LM Studio or Ollama
+    /// on this Mac or on the LAN is the thing this app is for, so refusing them would break the
+    /// product to close a hole it does not have. A name that resolves to a link-local address is not
+    /// covered by a string check like this one; the redirect policy on the session is what keeps a
+    /// validated endpoint from being re-pointed behind the check (A141).
+    static func endpointRefusal(_ url: URL) -> String? {
+        guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else {
+            return "only http and https endpoints are used"
+        }
+        guard let host = url.host?.lowercased(), !host.isEmpty else {
+            return "the endpoint has no host"
+        }
+        if host.hasPrefix("169.254.") || host.hasPrefix("fe80:") || host.hasPrefix("[fe80:") {
+            return "it is link-local, which is where cloud metadata services answer"
+        }
+        return nil
     }
 
     /// Derived from the model id so the UI can show something short.
@@ -346,9 +397,51 @@ public struct OpenAIUsage: Sendable, Hashable {
     }
 }
 
+/// A session delegate whose only job is to refuse redirects.
+///
+/// `completionHandler(nil)` means "do not follow": the redirect response is the answer, so a 302 from
+/// an endpoint shows up as a non-2xx rather than as a request to wherever it pointed.
+///
+/// Stateless, and `Sendable` because of it — `URLSession` keeps it for the session's lifetime and the
+/// client is sent between tasks.
+private final class NoRedirects: NSObject, URLSessionTaskDelegate, Sendable {
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        completionHandler(nil)
+    }
+}
+
+/// The client's session, held by the one thing here that can clean up after itself.
+///
+/// `URLSession` is not released when the last reference to it goes. It stays alive — with its delegate
+/// and its connection pool — until it is invalidated, which was measured while this finding was fixed:
+/// a session dropped without invalidating is still alive afterwards, and the same session invalidated
+/// first is not (`AUDIT/baseline/swift64/a201-session-lifetime.log`). A struct cannot do anything when
+/// it is deallocated, so the session lives in a class whose `deinit` is the invalidate (A201).
+final class ResponseSession: Sendable {
+    let session: URLSession
+
+    init(configuration: URLSessionConfiguration, delegate: URLSessionDelegate) {
+        self.session = URLSession(
+            configuration: configuration, delegate: delegate, delegateQueue: nil)
+    }
+
+    deinit {
+        // `finishTasksAndInvalidate` rather than `invalidateAndCancel`: a session released after a turn
+        // has already finished has nothing in flight to cancel, and cancelling is for the caller that is
+        // deliberately giving up on a request it started.
+        session.finishTasksAndInvalidate()
+    }
+}
+
 public struct OpenAIResponsesClient: Sendable {
     private let endpoint: OpenAIEndpoint
-    private let session: URLSession
+    /// The session this client owns. Internal, not private, because the lifetime test holds a weak
+    /// reference to it — the only way to observe that a released client closes it (A201).
+    let responseSession: ResponseSession
 
     public init(endpoint: OpenAIEndpoint) {
         self.endpoint = endpoint
@@ -356,7 +449,11 @@ public struct OpenAIResponsesClient: Sendable {
         configuration.timeoutIntervalForRequest = 600
         configuration.timeoutIntervalForResource = 3_600
         configuration.httpAdditionalHeaders = ["User-Agent": "ChatBots/1.0 (macOS)"]
-        self.session = URLSession(configuration: configuration)
+        // No redirects. The endpoint is validated before the request (`endpointRefusal`), and following
+        // a redirect is how a URL that passed that check reaches a host that never did — a cloud
+        // endpoint answering 302 to a metadata address, with the body echoed into the snapshot (A141).
+        self.responseSession = ResponseSession(
+            configuration: configuration, delegate: NoRedirects())
     }
 
     /// Everything a request can set. Mirrors the app's seat configuration; fields the
@@ -489,13 +586,67 @@ public struct OpenAIResponsesClient: Sendable {
     }
 
 
+    /// The endpoint's URL, or the error that says why there is not one.
+    ///
+    /// Its own function because `run` is at its `function_body_length` budget, and because the two
+    /// reasons a base URL is unusable — it does not parse, or it parses and is refused — are worth
+    /// telling apart in a UI: "not a usable base URL" is what a typo produces (A141).
+    /// How much of a traced request body is printed.
+    ///
+    /// Enough to see the shape of a prompt and where a field went wrong; not enough to spill a whole
+    /// conversation into a log, which is what it did with no cap at all (A140).
+    static let traceLimit = 2_000
+
+    /// Whether `CHATBOTS_TRACE_API` was set to something that means "on".
+    ///
+    /// The test was `!= nil`, so `CHATBOTS_TRACE_API=0` turned the trace *on* — not what anyone
+    /// writing that means, and the switch prints the conversation (A140).
+    static func traceIsOn(_ value: String?) -> Bool {
+        guard let value else { return false }
+        let lowered = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return !(lowered.isEmpty || lowered == "0" || lowered == "false" || lowered == "no")
+    }
+
+    private func endpointURL() throws -> URL {
+        guard let url = endpoint.responsesURL else {
+            if let parsed = URL(string: endpoint.baseURL),
+                let reason = OpenAIEndpoint.endpointRefusal(parsed)
+            {
+                throw OpenAIResponsesError.refusedEndpoint(endpoint.baseURL, reason: reason)
+            }
+            throw OpenAIResponsesError.badURL(endpoint.baseURL)
+        }
+        return url
+    }
+
+    /// Write the request to standard error, when the trace switch is on.
+    ///
+    /// Its own function because `run` is at its `function_body_length` budget, and because this is the
+    /// one place that writes the conversation somewhere other than the chosen endpoint, so it should
+    /// be reviewable on its own (A140).
+    ///
+    /// Bounded, and with the images left out rather than cut off mid-base64: a request body is the
+    /// whole conversation plus every attached image, and standard error is a terminal, a launchd log or
+    /// a container log — `SECURITY.md` says the conversation leaves the machine only to the chosen
+    /// endpoint. What is printed is still the request's own shape, so it remains useful for the
+    /// protocol debugging it exists for.
+    private func traceRequest(_ url: URL, _ request: Request) {
+        let omitted = request.images.isEmpty ? "" : ", \(request.images.count) image payload(s) omitted"
+        let payload = body(for: request, images: [])
+        let encoded =
+            (try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])) ?? Data()
+        let text = String(data: encoded, encoding: .utf8) ?? "?"
+        let preview = UTF8Text.prefix(text, Self.traceLimit)
+        let header = "[trace] POST \(url.absoluteString) (\(encoded.count) bytes\(omitted))\n"
+        FileHandle.standardError.write(Data(header.utf8))
+        FileHandle.standardError.write(Data("[trace] \(preview)\n".utf8))
+    }
+
     private func run(
         _ request: Request,
         into continuation: AsyncThrowingStream<OpenAIStreamEvent, Error>.Continuation
     ) async throws {
-        guard let url = endpoint.responsesURL else {
-            throw OpenAIResponsesError.badURL(endpoint.baseURL)
-        }
+        let url = try endpointURL()
 
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
@@ -504,17 +655,13 @@ public struct OpenAIResponsesClient: Sendable {
         if let key = endpoint.effectiveAPIKey, !key.isEmpty {
             urlRequest.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         }
-        if ProcessInfo.processInfo.environment["CHATBOTS_TRACE_API"] != nil {
-            let preview = String(
-                data: (try? JSONSerialization.data(
-                    withJSONObject: body(for: request), options: [.sortedKeys])) ?? Data(),
-                encoding: .utf8) ?? "?"
-            FileHandle.standardError.write(Data("[trace] POST \(url.absoluteString)\n[trace] \(preview)\n".utf8))
+        if Self.traceIsOn(ProcessInfo.processInfo.environment["CHATBOTS_TRACE_API"]) {
+            traceRequest(url, request)
         }
         urlRequest.httpBody = try JSONSerialization.data(
             withJSONObject: body(for: request), options: [])
 
-        let (bytes, response) = try await session.bytes(for: urlRequest)
+        let (bytes, response) = try await responseSession.session.bytes(for: urlRequest)
         // `flush()` is applied after the loop, below.
 
         guard let http = response as? HTTPURLResponse else {
@@ -636,10 +783,15 @@ public struct OpenAIResponsesClient: Sendable {
         return [["role": "user", "content": content]]
     }
 
-    public func body(for request: Request) -> [String: Any] {
+    /// The JSON body for a request.
+    ///
+    /// `images` is an override for the trace, which prints the body with the image payloads left out
+    /// rather than spilling base64 into a log: the images travel inline in `input` as data URLs
+    /// (A140).
+    public func body(for request: Request, images: [ImageAttachment]? = nil) -> [String: Any] {
         var body: [String: Any] = [
             "model": endpoint.model,
-            "input": Self.encodeInput(request.input, images: request.images),
+            "input": Self.encodeInput(request.input, images: images ?? request.images),
             "stream": true,
         ]
         if let instructions = request.instructions, !instructions.isEmpty {

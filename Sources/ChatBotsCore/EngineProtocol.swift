@@ -89,6 +89,11 @@ public enum EngineRequest: Sendable, Hashable, Codable {
         public var personaID: String?
         public var thinking: ThinkingMode?
         public var backend: AgentSpec.Backend?
+        /// The MLX checkpoint for this seat, as a repository id or one of `ModelCatalog`'s aliases.
+        ///
+        /// Its own field rather than reuse of `apiModel`, which names a model *on a server*: the two
+        /// are different things that happen to share the word, and the seat holds both at once.
+        public var modelID: String?
         public var baseURL: String?
         public var apiModel: String?
         public var apiKey: String?
@@ -99,6 +104,7 @@ public enum EngineRequest: Sendable, Hashable, Codable {
             personaID: String? = nil,
             thinking: ThinkingMode? = nil,
             backend: AgentSpec.Backend? = nil,
+            modelID: String? = nil,
             baseURL: String? = nil,
             apiModel: String? = nil,
             apiKey: String? = nil
@@ -108,6 +114,7 @@ public enum EngineRequest: Sendable, Hashable, Codable {
             self.personaID = personaID
             self.thinking = thinking
             self.backend = backend
+            self.modelID = modelID
             self.baseURL = baseURL
             self.apiModel = apiModel
             self.apiKey = apiKey
@@ -254,8 +261,27 @@ public enum ProtocolLimits {
     /// magnitude, so the message cap is decided by the document rather than by the envelope.
     public static let envelopeOverheadBytes = 64 * 1024
 
+    /// How many events one hop buffers before it starts dropping the oldest.
+    ///
+    /// One number for every hop, deliberately. The engine's own stream, the transport server's per-session
+    /// stream and the client's stream all carry the same event flow, and the cost of a bound that exists on
+    /// one side of a protocol and not the other is what A158 found: the server kept 256 and the client kept
+    /// everything, so a consumer that fell behind — a stalled interface, a paused window — turned the
+    /// client's stream into exactly the unbounded retention the bound was there to prevent.
+    ///
+    /// Newest rather than oldest: a consumer that is behind wants the state as it is now, not the backlog it
+    /// missed. A `turnFinished` is followed by a whole fresh state, so dropping stale fragments cannot leave
+    /// a client unable to draw.
+    public static let eventBufferDepth = 256
+
     /// The largest single message either side will accept: the base64 form of the largest
     /// attachment the engine accepts, plus the envelope around it.
+    ///
+    /// The binding case is the *upload* — `addAttachment` carries the file's whole base64 form — and
+    /// deliberately not the state snapshot, which used to be the other one. A snapshot put a base64
+    /// copy of every attached image into every push, so two maximum-size images needed twice this cap
+    /// and the state update was refused rather than delivered; the snapshot now carries attachment
+    /// metadata only (A144, A214). `AuditS2AttachmentPayloadTests` measures both directions.
     public static let maximumMessageBytes =
         (AttachmentLimits.defaultMaximumFileBytes * base64Numerator + base64Denominator - 1)
         / base64Denominator

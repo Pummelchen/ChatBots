@@ -70,7 +70,7 @@ struct AuditFinalDirectedAssignmentTests {
         // No seats and nothing outstanding: the rotation stands.
         let rotation = ResearchDirector(seats: [], covered: allCovered).direction()
         #expect(rotation.kind == .rotation)
-        #expect(!rotation.isDirected)
+        #expect(rotation.seatID == nil, "a rotation names no seat")
     }
 
     @Test("A reworded assignment still counts from one seat")

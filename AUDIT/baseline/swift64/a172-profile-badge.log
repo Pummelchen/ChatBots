@@ -1,0 +1,37 @@
+# A172 — the debug label that could never show (2026-09-15T15:29:14Z)
+
+## 1. what the stylesheet says it is for
+$ git show HEAD:web/style.css | grep -n 'debug label' -A 2
+  570:/* A debug label, shown only when ?profile is in the URL. */
+  571-.profile-badge {
+  572-  position: fixed;
+$ git show HEAD:web/style.css | grep -n '\[hidden\]'
+  85:[hidden] { display: none !important; }
+$ git show HEAD:web/index.html | grep -n 'profile-badge'
+  169:<div id="profile-badge" class="profile-badge" hidden></div>
+$ git show HEAD:web/app.js | grep -n 'profile-badge' -A 3
+  172:    $("profile-badge").textContent =
+  173-      screenInfo.matched
+  174-        ? `${screenInfo.matched.name} · ${screenInfo.matched.width}×${screenInfo.matched.height}`
+  175-        : `${screenInfo.width}×${screenInfo.height} · unknown device`;
+  (the badge is hidden in markup, the stylesheet makes [hidden] unstoppable, and the page
+   only ever wrote textContent — so the documented ?profile condition had no implementation)
+
+## 2. before: the check on the wiring
+$ node tools/check-web-deltas.js   # with the badge handling removed again
+    ok    every snapshot the page applies goes through the guard
+    FAIL  the debug label reads ?profile
+    FAIL  and the badge is shown only when it is asked for
+  2 deltas check(s) failed
+
+## 3. after
+$ grep -n 'profileRequested' web/app.js
+  180:    badge.hidden = !profileRequested();
+  184:  function profileRequested() {
+$ node tools/check-web-deltas.js
+    ok    the debug label reads ?profile
+    ok    and the badge is shown only when it is asked for
+  all deltas checks passed
+
+  Limit, stated rather than implied: the browser behaviour itself is not exercised — this audit
+  has no headless browser — so what is checked is that the page reads ?profile and applies it.

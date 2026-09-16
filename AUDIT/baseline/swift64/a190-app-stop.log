@@ -1,0 +1,75 @@
+A190 — which processes does --stop take out?
+Host: 27.0 / arm64, bash 3.2.57(1)-release
+
+--- The probe, unmutated ---
+$ bash AUDIT/baseline/swift64/a190-probe/app-stop.sh
+decoys — processes that mention the bundle without being it
+  a shell renamed to a tail of the app's log
+    old pattern kills it: yes, the stop path now kills it: no
+  ok    the stop path does not take out a shell renamed to a tail of the app's log
+  a shell named something else entirely
+    old pattern kills it: no, the stop path now kills it: no
+  ok    the stop path does not take out a shell named something else entirely
+
+the case the stop path is for, and the one it cannot tell apart
+  a process whose name is the bundle path
+    the stop path matches it: yes (that is also the name the real app has, so nothing can tell them apart)
+  ok    a process named as the app is matched
+  a process named exactly ChatBots
+    the stop path matches it: yes
+  ok    the stop path matches a process named ChatBots
+
+the name the script looks for, run against that process
+  ok    the stop path finds a process named ChatBots
+
+and the script says so
+  ok    the stop path uses the exact name
+  ok    the name pattern is gone
+  ok    the header says what --stop does
+
+all A190 probe checks passed
+exit=0
+
+--- The shell checks CI runs ---
+  shellcheck : clean
+  bash -n    : parses
+
+--- M1: the pattern kill comes back (the pre-fix behaviour) ---
+  FAIL  the name pattern is gone — start-app.sh still kills by pattern
+1 A190 probe check(s) failed
+
+--- M2: the name match looks for something nothing is called (over-correction) ---
+  FAIL  the stop path finds a process named ChatBots — it looks for 'ChatBotsNotThisName'
+1 A190 probe check(s) failed
+
+--- M3: the header stops saying what --stop does ---
+  FAIL  the header says what --stop does
+1 A190 probe check(s) failed
+
+--- RESTORED: unmutated again ---
+all A190 probe checks passed
+
+--- What each mutation shows, and what the probe does not do ---
+M1 the pattern kill back: the source check fails. M2 the name match looking for something nothing is called:
+the check that *runs the script's own name* against a process named ChatBots fails — that check exists
+because the decoy section below it measures the two *rules*, not the script's use of one, and a mutation of
+the script cannot be seen by a rule the probe wrote itself. M3 the header stops saying what `--stop` does:
+the header check fails.
+The real app is never started by the probe — launching it opens a window and an engine on this machine — so
+the counterweight is a process renamed to `ChatBots`, which is the same case as far as `pgrep -x` is
+concerned. The probe also prints the case it cannot tell apart: a process whose *name* is the bundle path is
+matched, because that is also the name the real app has; distinguishing those is not possible by name, and a
+same-user process that renames itself is out of scope for a check whose job is to avoid killing unrelated
+programs.
+
+--- FULL GATE at the fix commit (tools/audit-checks.sh) ---
+PASS  build: swift build --build-tests
+PASS  tests: 1033 tests in 192 suites
+PASS  coverage: Sources/ TOTAL 6505 regions 2575 covered 60.42%, 20541 lines 9853 covered 52.03%
+PASS  swiftlint: 253 finding(s), within the recorded waiver of 255
+PASS  swift-format: 739 diagnostic(s), within the recorded waiver of 744
+PASS  web: deltas merge (34 cases)
+PASS  web: the verdict rule (12 cases)
+
+All 6 Mac-only gates passed. (A shell change touches no gate; shellcheck and `bash -n` are in this log, and
+the gate is run at every fix commit regardless.)

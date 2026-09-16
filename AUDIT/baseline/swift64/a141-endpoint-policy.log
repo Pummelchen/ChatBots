@@ -1,0 +1,36 @@
+# A141 — where a configured endpoint may point (2026-09-15T14:18:21Z)
+
+## 1. before: no scheme or host check, and a session that follows redirects
+$ git show HEAD:Sources/ChatBotsCore/OpenAIResponsesClient.swift | grep -n 'return URL(string: trimmed + path)'
+  313:        return URL(string: trimmed + path)
+$ git show HEAD:Sources/ChatBotsCore/OpenAIResponsesClient.swift | grep -n 'URLSession(configuration:'
+  359:        self.session = URLSession(configuration: configuration)
+  (no endpointRefusal, no delegate: the URL goes to URLSession as written)
+
+$ swift test --filter EndpointPolicyTests   # before
+  ✘ Test "A base URL that is not http or https is refused" recorded an issue at AuditS2EndpointPolicyTests.swift:28:9: Expectation failed: OpenAIEndpoin
+  ✘ Test "A base URL that is not http or https is refused" failed after 0.018 seconds with 1 issue.
+  ✘ Test "A refused endpoint fails as itself, and says which rule refused it" recorded an issue at AuditS2EndpointPolicyTests.swift:69:25: Issue recorde
+  ✘ Test "A redirect is not followed" recorded an issue at AuditS2EndpointPolicyTests.swift:94:25: Issue recorded
+  ✘ Test "A redirect is not followed" failed after 75.031 seconds with 1 issue.
+  ✘ Test "A refused endpoint fails as itself, and says which rule refused it" failed after 75.031 seconds with 1 issue.
+  ✘ Test run with 5 tests in 1 suite failed after 75.031 seconds with 3 issues.
+
+## 2. after
+$ grep -n 'endpointRefusal|NoRedirects|refusedEndpoint' Sources/ChatBotsCore/OpenAIResponsesClient.swift
+  20:    case refusedEndpoint(String, reason: String)
+  30:        case .refusedEndpoint(let value, let reason):
+  313:    /// Nil when the endpoint is one this client will not send to, which is `endpointRefusal`'s
+  321:        guard Self.endpointRefusal(url) == nil else { return nil }
+  338:    static func endpointRefusal(_ url: URL) -> String? {
+  391:private final class NoRedirects: NSObject, URLSessionTaskDelegate, Sendable {
+  411:        // No redirects. The endpoint is validated before the request (`endpointRefusal`), and following
+  415:            configuration: configuration, delegate: NoRedirects(), delegateQueue: nil)
+$ swift test --filter EndpointPolicyTests   # after
+  ✔ Test run with 5 tests in 1 suite passed after 0.011 seconds.
+
+## 3. the style the fix had to keep
+  The first version put run() at 81 lines against swiftlint's 80, and one line in the new test
+  file needed breaking. Both were fixed by extracting endpointURL() and breaking the call, not by
+  waiving: swiftlint 255 and authored swift-format 747 before this task and after it. The line
+  numbers in section 2 were taken before that extraction; the names are what it greps for.

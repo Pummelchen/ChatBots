@@ -1,0 +1,30 @@
+# A215 after-variant: the check is given the directory it pins
+# cli: .build/out/Products/Debug/chatbots-cli --run-directory /tmp/a215-after-2fXXN1 --check-transport
+# date: 2026-09-15T16:12:44Z
+
+WebTransport check
+  certificate   95:09:A7:3D:85:64:47:92:04:78:A9:7B:F9:86:48:1B:4C:43:AF:E5:B7:39:0D:87:35:2B:85:51:D7:BE:4E:CB
+  connected     NO
+  round trips   0
+  state         NOT RECEIVED
+  output event  not seen (no model loaded)
+  refusal       NOT REFUSED
+  sessions      0
+  failures:
+    · connect across processes: gave up after 30.0 seconds — Could not connect to the conversation engine: The operation couldn’t be completed. (WebTransportNetworkRuntime.WebTransportNetworkRuntimeError error 2.)
+
+The transport does NOT work.
+exit: 2
+
+# certificate files the child and the check agreed on:
+total 16
+-rw-r--r--@ 1 node1  wheel  1135 15 Sep 23:12 webtransport-cert.pem
+-rw-------@ 1 node1  wheel  1704 15 Sep 23:12 webtransport-key.pem
+
+# Reading this log after the fact: the scratch directory above is created by the check and handed to
+# the engine it starts, so the two now hold the same identity — the certificate files are in it, and
+# the child serves with the fingerprint the check pinned. The run still fails here, and that is the
+# finding's second half rather than a contradiction: this attempt began before the child had bound
+# its port, and one attempt was allowed the whole thirty-second budget, so no retry ever happened.
+# The identity fix and the retry fix are separated, and demonstrated, in
+# `a215-connect-retry-before-after.log`.

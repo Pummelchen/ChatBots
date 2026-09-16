@@ -26,9 +26,16 @@ APP="$ROOT/dist/ChatBots.app"
 LOG_FILE="$ROOT/.install.log"
 BUILD_LOG="$ROOT/.install-build.log"
 
-# The default checkpoint, matching `AgentSpec.defaultModelID`.
-MODEL_ID="mlx-community/Qwen3.5-4B-MLX-4bit"
-MODEL_DIR_NAME="Qwen3.5-4B-MLX-4bit"
+# A connection that stalls *once established* is the failure `--retry` cannot see: curl keeps waiting
+# for the next byte and the install looks hung — the outcome the model-loading step below calls the
+# worst for someone who just wants the app, and guards against with its own timeout (A193).
+# `--max-time` is not the answer: a 3 GB checkpoint on a slow line is slow, not stalled,
+# and a total-time cap would abort a download that is still making progress. `--speed-limit` and
+# `--speed-time` abort only a transfer that has stopped moving — curl's own definition, slower than
+# the limit for that many seconds — which `--retry` then retries and the resume path continues from
+# the bytes already on disk. `--connect-timeout` bounds the handshake, which a stall mid-transfer
+# does not cover.
+CURL_TRANSFER_OPTIONS=(--connect-timeout 20 --speed-limit 1024 --speed-time 30)
 
 # ── Output ──────────────────────────────────────────────────────────────────────────
 if [ -t 1 ]; then
@@ -168,12 +175,45 @@ for tool in iconutil sips plutil textutil; do
   fi
 done
 
+# Xcode 27 ships the Metal compiler as a separate downloadable component, and without it the build
+# stops on the first `.metal` kernel mlx-swift compiles — an error that names the file rather than the
+# cause, three minutes after the download started. The check *runs* the compiler instead of looking for
+# it, because `xcrun --find metal` prints a path on a machine where the component is absent, so a
+# path check reports success on a Mac that cannot build (A133).
+step "Checking for the Metal compiler"
+if metal_version="$(bash "$SCRIPT_DIR/check-metal.sh" --quiet 2>&1)"; then
+  ok "$metal_version"
+else
+  warn "The Metal compiler is not usable on this Mac, so the app cannot be built."
+  printf '%s\n' "$metal_version" | sed 's/^/    /'
+  die "Install the Metal toolchain component and run this script again:
+
+  xcodebuild -downloadComponent MetalToolchain"
+fi
+
 # ── Models ──────────────────────────────────────────────────────────────────────────
+# The checkpoint comes from the source rather than from a copy of it (A208). `AgentSpec.defaultModelID`
+# is what the app looks up when it loads a model, and this installer has to download the same one into
+# the directory the app will look in: `ModelStore.localCheckpoint` tries the tail of the repo id under
+# `models/` (`ModelStore.swift`), so the directory name is derived from the id rather than written down
+# beside it. The macOS minimum used to be duplicated here in exactly this way, and A121 removed the
+# copy rather than adding a check that policed it; this is the same fact in a place where a mismatch
+# costs a 3 GB download the app can never see.
+#
 # Resumable and verified: each file is checked against the size the server reports, so an
 # interrupted download is detected and continued rather than silently accepted. A file whose
 # size cannot be learned is refused rather than recorded as 0 and then waved through — see
 # `file_list_is_complete` and `download_file` below.
 step "Downloading the models"
+MODEL_ID="$(sed -n 's/.*static let defaultModelID = "\([^"]*\)".*/\1/p' \
+  "$ROOT/Sources/ChatBotsCore/ChatModels.swift" | head -1)"
+if [ -z "$MODEL_ID" ]; then
+  die "Could not read the default checkpoint from Sources/ChatBotsCore/ChatModels.swift.
+
+Its \`AgentSpec.defaultModelID\` is the model this installer downloads, so without it there is
+nothing to fetch — the declaration may have been renamed or moved. Nothing was downloaded."
+fi
+MODEL_DIR_NAME="${MODEL_ID##*/}"
 info "Checkpoint: $MODEL_ID"
 mkdir -p "$MODELS_DIR"
 MODEL_DIR="$MODELS_DIR/$MODEL_DIR_NAME"
@@ -257,7 +297,15 @@ info "This checkpoint has $TOTAL_FILES files."
 download_file() {
   local name="$1" expected="$2"
   local url="https://huggingface.co/$MODEL_ID/resolve/main/$name"
-  local target="$MODEL_DIR/$name"
+  # Where it belongs, and the directory it needs. The list comes from the hub, so the name may be a
+  # nested path (`original/config.json`) — which `curl -o` cannot write into a directory that does not
+  # exist — and it may not be trusted to stay inside the model directory (A186).
+  local target
+  if ! target="$(bash "$SCRIPT_DIR/model-target-path.sh" "$MODEL_DIR" "$name" 2>&1)"; then
+    fail "refusing to download $name"
+    dim "$target"
+    return 1
+  fi
 
   # A zero or non-numeric size is not "unknown, so accept anything": it means this file
   # cannot be verified, and an unverifiable model file is not recorded as complete. The size
@@ -279,8 +327,10 @@ download_file() {
     fi
     dim "$name is incomplete ($actual of $expected bytes) — continuing it"
     # `-C -` resumes from where it stopped, which matters for a 3 GB file. `--fail` keeps an
-    # error response out of the file, so a 404 page is never resumed into model bytes.
-    if curl -fsSL -C - --retry 5 --retry-delay 3 --retry-all-errors \
+    # error response out of the file, so a 404 page is never resumed into model bytes. The deadline
+    # options are `CURL_TRANSFER_OPTIONS` above: a stall fails here instead of hanging, and the
+    # retry resumes it.
+    if curl -fsSL -C - "${CURL_TRANSFER_OPTIONS[@]}" --retry 5 --retry-delay 3 --retry-all-errors \
         -o "$target" "$url"; then
       actual="$(stat -f%z "$target" 2>/dev/null || echo 0)"
       if [ "$actual" = "$expected" ]; then
@@ -297,7 +347,7 @@ download_file() {
   local human
   human="$(awk -v b="$expected" 'BEGIN { printf "%.0f MB", b/1048576 }')"
   info "$name ($human)"
-  if ! curl -fL --retry 5 --retry-delay 3 --retry-all-errors --progress-bar \
+  if ! curl -fL "${CURL_TRANSFER_OPTIONS[@]}" --retry 5 --retry-delay 3 --retry-all-errors --progress-bar \
       -o "$target" "$url"; then
     fail "$name did not finish downloading"
     return 1

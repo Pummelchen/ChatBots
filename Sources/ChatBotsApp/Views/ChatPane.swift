@@ -49,7 +49,8 @@ struct ChatPane: View {
             palette: palette,
             onThinkingChange: { controller.setThinking($0, for: pane.id) },
             onPersonaChange: { controller.setPersona($0, for: pane.id) },
-            onBackendChange: { controller.setBackend($0, for: pane.id) }
+            onBackendChange: { controller.setBackend($0, for: pane.id) },
+            onModelChange: { controller.setModel($0, for: pane.id) }
         )
     }
 

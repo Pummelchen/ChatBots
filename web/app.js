@@ -169,10 +169,20 @@
       $(id)?.classList.toggle("on", viewMode === mode);
     }
 
-    $("profile-badge").textContent =
-      screenInfo.matched
-        ? `${screenInfo.matched.name} · ${screenInfo.matched.width}×${screenInfo.matched.height}`
-        : `${screenInfo.width}×${screenInfo.height} · unknown device`;
+    // The stylesheet has said since it was written that this is "a debug label, shown only when
+    // ?profile is in the URL" — and nothing ever unhid it, so the text was written into an element
+    // that `[hidden] { display: none !important; }` keeps invisible (A172). The condition the comment
+    // describes is what is implemented here, rather than deleting a deliberate debug surface.
+    const badge = $("profile-badge");
+    badge.textContent = screenInfo.matched
+      ? `${screenInfo.matched.name} · ${screenInfo.matched.width}×${screenInfo.matched.height}`
+      : `${screenInfo.width}×${screenInfo.height} · unknown device`;
+    badge.hidden = !profileRequested();
+  }
+
+  /// Whether the URL asks for the debug label.
+  function profileRequested() {
+    return new URLSearchParams(location.search).has("profile");
   }
 
   function setViewMode(mode) {
@@ -221,9 +231,9 @@
     for (const el of document.querySelectorAll(".msg[data-id]")) {
       const cast = voteFor(el.dataset.id);
       for (const button of el.querySelectorAll(".vote")) {
-        const isStrong = button.getAttribute("aria-label") === "Moved it forward";
-        const on = cast && ((isStrong && cast === "strong") || (!isStrong && cast === "weak"));
-        if (on) button.dataset.on = "1";
+        // The verdict is read from the button rather than from its label, and the comparison is the
+        // same one the click handler makes (A160).
+        if (window.ChatBotsVotes.isOn(cast, button.dataset.verdict)) button.dataset.on = "1";
         else delete button.dataset.on;
       }
     }
@@ -307,11 +317,17 @@
       button.textContent = verdict === "strong" ? "▲" : "▼";
       button.title = title;
       button.setAttribute("aria-label", title);
-      if (cast === verdict) button.dataset.on = "1";
+      button.dataset.verdict = verdict;
+      if (window.ChatBotsVotes.isOn(cast, verdict)) button.dataset.on = "1";
       button.onclick = () => {
         // Clicking the verdict already cast withdraws it, so a mis-click does not have to be
         // reversed by casting its opposite — which would leave a wrong judgement in the record.
-        const next = cast === verdict ? null : verdict;
+        //
+        // The verdict on record is read *now*, not taken from the `cast` this row was built with: a
+        // turn is drawn once and its marks are redrawn in place, so a captured value is the one from
+        // the moment the row appeared — normally none — and clicking the cast verdict re-cast it
+        // instead of withdrawing it (A160).
+        const next = window.ChatBotsVotes.nextVerdict(voteFor(message.id), verdict);
         run(() => api.post("/api/vote", { id: message.id, verdict: next }));
       };
       row.append(button);
@@ -550,6 +566,10 @@
   // ── State → interface ─────────────────────────────────────────────────────────────
 
   function apply(next) {
+    // One guard for every path a snapshot arrives by. `GET /api/state` at load races the first pushed
+    // snapshot, and before this the older of the two could be applied last and stay on screen until the
+    // next turn — the app-side client has refused stale snapshots since A110 (A171).
+    if (window.ChatBotsDeltas.isStale(next, state.snapshot)) return;
     const first = state.snapshot === null;
     state.snapshot = next;
     // A seat count change replaces the panes, so it is handled before anything draws.
@@ -703,6 +723,35 @@
         }
       }
 
+      const modelPicker = pane.root.querySelector(".model-picker");
+      if (modelPicker) {
+        // The catalogue comes from the engine, so the page offers exactly what the app's own picker
+        // does. An engine too old to send one leaves the select empty rather than showing a list the
+        // page invented.
+        const models = s.availableModels || [];
+        if (modelPicker.dataset.filledModels !== String(models.length)) {
+          modelPicker.textContent = "";
+          for (const model of models) {
+            const option = document.createElement("option");
+            option.value = model.id;
+            option.textContent = model.sizeLabel ? `${model.name} · ${model.sizeLabel}` : model.name;
+            option.title = model.summary;
+            modelPicker.append(option);
+          }
+          modelPicker.dataset.filledModels = String(models.length);
+        }
+        modelPicker.value = seat.model;
+        // Fixed once the conversation has started, for the reason the engine refuses it: the seat's
+        // engine is the one a turn in flight is generating on.
+        modelPicker.disabled = !s.canAttach;
+        modelPicker.title = models.find((m) => m.id === seat.model)?.summary || seat.model;
+        if (modelPicker.dataset.wiredModel !== "1") {
+          modelPicker.dataset.wiredModel = "1";
+          modelPicker.addEventListener("change", () =>
+            run(() => api.post("/api/seat", { seat: seat.id, modelID: modelPicker.value })));
+        }
+      }
+
       const live = s.live.find((l) => l.seatID === seat.id);
       const busy = live && live.isGenerating;
       const stateEl = pane.root.querySelector(".state");
@@ -847,12 +896,19 @@
 
   // ── Commands ──────────────────────────────────────────────────────────────────────
 
+  // Run one command and answer whether the engine took it.
+  //
+  // The answer matters to `send` below and to nothing else: a command that is refused, or an engine
+  // that cannot be reached, arrives here as a thrown error, and the caller that has to decide what a
+  // failure means needs to know it happened (A174).
   async function run(fn) {
     try {
       const next = await fn();
       if (next && next.seats) apply(next);
+      return true;
     } catch (error) {
       toast(error.message);
+      return false;
     }
   }
 
@@ -1251,13 +1307,31 @@
     await run(() => api.post("/api/research/budget", { value: depth }));
   }
 
+  // Whether a send is in flight.
+  //
+  // The box used to be emptied *before* the request, which is also what stopped a second Return from
+  // posting the same text twice. Emptying it afterwards — so a refused send keeps what was typed —
+  // needs that guard to be explicit (A174).
+  let sending = false;
+
   async function send() {
     const box = $("message");
     const text = box.value.trim();
-    if (!text) return;
-    box.value = "";
-    autosize(box);
-    await run(() => api.post("/api/message", { text }));
+    if (!text || sending) return;
+    sending = true;
+    try {
+      // The box is emptied only once the engine has taken the message. Emptying it first meant a
+      // send the engine refused, or one that never left the page because the engine could not be
+      // reached, silently discarded what the moderator had typed (A174).
+      if (!(await run(() => api.post("/api/message", { text })))) return;
+      // Only the text that was sent: anything typed while the request was in flight stays.
+      if (box.value.trim() === text) {
+        box.value = "";
+        autosize(box);
+      }
+    } finally {
+      sending = false;
+    }
   }
 
   function autosize(box) {
@@ -1426,6 +1500,13 @@
     const source = new EventSource("/api/events");
     source.addEventListener("snapshot", (event) => apply(JSON.parse(event.data)));
     source.addEventListener("turn", () => { /* the following snapshot carries it */ });
+    // The engine's own per-token events. Listening only for `snapshot` meant a reply appeared in one
+    // piece when the turn ended, so a long research turn looked frozen while it was working while
+    // the engine was publishing the words as it wrote them (A165). `applyDelta` merges a fragment
+    // into the live entries the renderer already draws from; nothing else about drawing changes.
+    source.addEventListener("delta", (event) => {
+      if (window.ChatBotsDeltas.applyDelta(state.snapshot, JSON.parse(event.data))) drawLive();
+    });
     source.onerror = () => toast("Lost the connection to the server — reconnecting…");
   }
 

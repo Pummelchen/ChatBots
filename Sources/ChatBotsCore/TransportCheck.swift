@@ -107,15 +107,41 @@ public enum TransportCheck {
         return max(1, Int32(milliseconds))
     }
 
+    /// How long one connect attempt may take before the next one is tried.
+    ///
+    /// Two seconds is far longer than a loopback handshake against a listener that is already up —
+    /// the whole check, five round trips included, finishes in about three — and far shorter than
+    /// the budget the run gets, so the six attempts the loop below allows are spread across the time
+    /// the engine needs to come up instead of the first one spending it all (A215).
+    static let connectAttemptBudgetMilliseconds: Int32 = 2_000
+
+    /// The connect deadline one attempt gets.
+    ///
+    /// The attempt budget, unless the caller asked for a run shorter than that — a one-second check
+    /// does not get a two-second attempt, because an attempt that outlives its own run reports a
+    /// connection failure for a run that was already over.
+    static func connectAttemptMilliseconds(_ timeout: Duration) -> Int32 {
+        min(connectAttemptBudgetMilliseconds, clientTimeoutMilliseconds(timeout))
+    }
+
     /// Run the whole channel end to end.
     ///
     /// - Parameter directory: where the certificate lives, so the check uses the same identity
-    ///   a real run would rather than creating another.
+    ///   a real run would rather than creating another. The engine it starts is told the same
+    ///   directory, so the fingerprint this check reports is the one on the other end of the socket
+    ///   (reported, not enforced — see `CertificateStore`).
     /// - Parameter timeout: the whole check's budget — the client's request deadline and the
     ///   connect retries are both taken from it.
+    /// - Parameter executable: the engine to spawn, defaulting to the process's own executable.
+    ///   That default is right for the installer, where this *is* `chatbots-cli`, and wrong for
+    ///   anything driving the check from inside another program: a test runner's
+    ///   `arguments.first` is the test binary, so the child that came up was a second test
+    ///   process and the client timed out against a listener nobody had started (A170). Naming
+    ///   the engine is what makes the check testable without pretending it is the installer.
     @MainActor
     public static func run(
-        in directory: URL, port: UInt16 = 7795, timeout: Duration = .seconds(30)
+        in directory: URL, port: UInt16 = 7795, timeout: Duration = .seconds(30),
+        executable: URL? = nil
     ) async -> TransportCheckReport {
         var report = TransportCheckReport(fingerprint: "not generated")
         // One deadline for the run, so `timeout` bounds the check rather than decorating the
@@ -148,18 +174,29 @@ public enum TransportCheck {
         // it passed — while a real client could not connect to a real engine at all. An
         // in-process pair takes a shortcut that does not exist across a process boundary, so
         // the check was proving nothing. It now spawns the engine the same way the app does.
-        guard let executable = ProcessInfo.processInfo.arguments.first else {
+        let engineURL: URL
+        if let executable {
+            engineURL = executable
+        } else if let first = ProcessInfo.processInfo.arguments.first {
+            engineURL = URL(fileURLWithPath: first)
+        } else {
             report.recordFailure("cannot locate the engine executable to start")
             return report
         }
         let engineProcess = Process()
-        engineProcess.executableURL = URL(fileURLWithPath: executable)
+        engineProcess.executableURL = engineURL
         engineProcess.arguments = [
             "--serve", "--transport", "webtransport",
             "--transport-port", String(port),
             // WebTransport only, so no HTTP listener is opened at all (A120). The unused port is
             // passed anyway, so that this stays harmless if that gating ever changes.
             "--port", String(port - 1),
+            // The identity and the conversations, named outright. Without this the child resolves
+            // its own run directory — the project's `.run`, or Application Support — and the
+            // fingerprint reported above, taken from `directory`, is not the one the child serves
+            // with. The check then fails as "could not connect", which is a verdict about the
+            // caller's directory rather than about the transport (A215).
+            "--run-directory", directory.path,
         ]
         // The child's output goes to the null device rather than into pipes.
         //
@@ -182,6 +219,15 @@ public enum TransportCheck {
         var clientConfiguration = WebTransportEngineClient.Configuration()
         clientConfiguration.port = port
         clientConfiguration.timeoutMilliseconds = Self.clientTimeoutMilliseconds(timeout)
+        // One attempt gets a short connect deadline of its own, so the retries below are real.
+        //
+        // The comment under this loop always claimed the retry was for "not listening yet", and it
+        // was not: a connect that begins before the engine's listener exists does not fail, it
+        // *waits* — so the first attempt was given the whole thirty-second budget and spent it, and
+        // the check reported "the transport does NOT work" about an engine that bound its port two
+        // seconds later. Measured here: with a two-second wait before connecting it passed, which is
+        // what a wait is not allowed to be — a guess about the machine (A215).
+        clientConfiguration.connectTimeoutMilliseconds = Self.connectAttemptMilliseconds(timeout)
         let client = WebTransportEngineClient(configuration: clientConfiguration)
 
         // Retry briefly. Binding a QUIC listener is asynchronous on the library's side, and a

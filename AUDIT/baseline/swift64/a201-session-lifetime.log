@@ -1,0 +1,42 @@
+# A201 — a new client per turn, and a session that outlives it (2026-09-15)
+
+## The measurement the fix rests on
+# `AUDIT/baseline/swift64/a201-probe/session-lifetime.swift`, run on node1:
+$ swift AUDIT/baseline/swift64/a201-probe/session-lifetime.swift
+released without invalidating -> still alive: true
+released after invalidating    -> still alive: false
+
+# So a `URLSession` that is merely released is not released, and the client that built one per turn
+# left one alive per turn, each holding its delegate and its connection pool.
+
+## The tests, against the old behaviour
+# Mutation: the request builds its client inline again (as `generate` did), and `ResponseSession` has
+# no `deinit`.
+$ swift test --filter OpenAIResponsesClientLifetimeTests
+  ✘ Test "Two turns through one engine build one client, so one session and one pool":
+    Expectation failed: built.withLock { $0 } == 1
+  ✘ Test "A client lets go of its session, and the session lets go of itself":
+    Expectation failed: weakSession == nil
+  ✘ Test "The engine's client is made once even when a turn fails":
+    Expectation failed: built.withLock { $0 } == 1
+  ✘ Test run with 3 tests in 1 suite failed after 0.417 seconds with 3 issues.
+
+## With the fix
+$ swift test --filter OpenAIResponsesClientLifetimeTests
+  ✔ Test run with 3 tests in 1 suite passed after 0.388 seconds.
+
+# The weak-reference case is the one worth noting: it fails without the `deinit` and passes with it, on
+# the same machine seconds apart, which is what turns "the session is invalidated" from a reading of the
+# code into something the suite would catch if a later edit dropped it.
+
+## The full gate, with the fix
+$ bash tools/audit-checks.sh
+PASS  build: swift build --build-tests
+PASS  tests: 931 tests in 165 suites
+PASS  coverage: TOTAL 6258 2573 58.88% (regions) · 19749 9690 50.93% (lines)
+PASS  swiftlint: 254 finding(s), within the recorded waiver of 255
+PASS  swift-format: 739 diagnostic(s), within the recorded waiver of 744
+PASS  web: deltas merge (31 cases)
+All 6 Mac-only gates passed.
+
+# 928 tests in 164 suites before this task; the three added are the lifetime tests.

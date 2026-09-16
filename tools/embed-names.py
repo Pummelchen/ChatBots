@@ -44,6 +44,36 @@ FILES: Mapping[str, str] = {
 }
 
 
+def swift_literal(text: str) -> str:
+    r"""`text` as a Swift string literal, escapes and all.
+
+    The lists are data files that people edit, and this used to paste each name straight into a
+    `"…"` literal: a name with a quote, a backslash or a control character in it produced Swift that
+    does not compile, in a file nobody edits by hand and whose breakage surfaces as a build failure
+    (A191). The web embedder escapes its input for the same reason.
+
+    Escaped by character rather than by a chain of `replace` calls so the order cannot matter, and
+    anything below a space — which a Swift literal cannot carry literally — becomes `\u{…}`.
+    """
+    escaped: list[str] = []
+    for character in text:
+        if character == "\\":
+            escaped.append("\\\\")
+        elif character == '"':
+            escaped.append('\\"')
+        elif character == "\n":
+            escaped.append("\\n")
+        elif character == "\r":
+            escaped.append("\\r")
+        elif character == "\t":
+            escaped.append("\\t")
+        elif ord(character) < 0x20 or ord(character) == 0x7F:
+            escaped.append(f"\\u{{{ord(character):x}}}")
+        else:
+            escaped.append(character)
+    return '"' + "".join(escaped) + '"'
+
+
 def parse(path: pathlib.Path) -> dict[str, list[str]]:
     """Read one list file into {"female": [...], "male": [...]}.
 
@@ -106,13 +136,13 @@ public enum NameLanguage: String, Sendable, Codable, CaseIterable, Identifiable 
         switch self {
 """)
     for code, label in LANGUAGES:
-        out.append(f'        case .{code}: "{label}"\n')
+        out.append(f"        case .{code}: {swift_literal(label)}\n")
     out.append("        }\n    }\n\n")
     out.append("    /// The female and male names this language offers.\n")
     out.append("    var names: NameList {\n        switch self {\n")
     for code, _ in LANGUAGES:
-        female = ", ".join(f'"{n}"' for n in lists[code]["female"])
-        male = ", ".join(f'"{n}"' for n in lists[code]["male"])
+        female = ", ".join(swift_literal(n) for n in lists[code]["female"])
+        male = ", ".join(swift_literal(n) for n in lists[code]["male"])
         out.append(
             f"        case .{code}:\n"
             f"            NameList(female: [{female}],\n"

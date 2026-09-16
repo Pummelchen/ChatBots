@@ -1,0 +1,39 @@
+# A192 — what the semgrep gate resolves, and what it used to hide
+
+## semgrep's own summary, with the --quiet the gate used to pass
+semgrep scan --config auto --quiet --json --output semgrep.json Sources tools web
+exit=0  log bytes=0  findings=3
+(nothing above: --quiet suppresses the summary the gate then had no record of)
+
+## the same scan without --quiet, which is what the gate runs now
+exit=0
+ • Findings: 3 (3 blocking)
+ • Rules run: 461
+ • Targets scanned: 101
+   ◦ Files larger than  files 1.0 MB: 1
+ • Scan was limited to files tracked by git
+Ran 461 rules on 101 files: 3 findings.
+findings=3 errors=0
+
+## the waiver check is unchanged by that (it reads the JSON, not the log)
+waived:   javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket  tools/cdp.py
+waived:   javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket  tools/cdp.py
+waived:   python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected  tools/cdp.py
+semgrep: 3 finding(s), all covered by a recorded waiver
+exit=0
+
+## the rule set behind --config auto, as the registry serves it
+bytes=2423491
+rules named=1073  (the policy offers these; semgrep filters to the languages present)
+sha256=d246b00122958b0ca9ce20dd927c7c33396db80ec070b00754f6218718297b4d
+
+## why the resolved policy is not vendored as the pin
+gitleaks over a vendored copy of the policy file:
+  private-key (rule, not value)
+  slack-webhook-url (rule, not value)
+  — the registry's own example credentials inside its rule metadata, so pinning by vendoring
+    would need the secret scan to skip that file, which the audit will not do.
+
+## the two phase-e lines this task changes, run as the script runs them
+shellcheck branch: 0 findings over 18 tracked script(s)  (notes counted from the log: 0)
+semgrep branch:    semgrep: 3 finding(s), all covered by a recorded waiver — Ran 461 rules on 101 files: 3 findings.

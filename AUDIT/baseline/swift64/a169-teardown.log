@@ -1,0 +1,41 @@
+# A169 — teardown awaited before the gate is released (2026-09-15T13:40:47Z)
+
+## 1. the defect: how the transport tests tore their resources down
+$ git show HEAD:Tests/ChatBotsCoreTests/*.swift | grep -c 'defer { Task {'   # per file, before
+  HEAD:Tests/ChatBotsCoreTests/AuditReplyMatchingTests.swift:4
+  HEAD:Tests/ChatBotsCoreTests/AuditTransportLifecycleTests.swift:1
+  HEAD:Tests/ChatBotsCoreTests/AuditTransportServerTests.swift:2
+  HEAD:Tests/ChatBotsCoreTests/AuditWave2IdleTimeoutTests.swift:1
+  HEAD:Tests/ChatBotsCoreTests/WebTransportSessionTests.swift:13
+  total: 21
+$ grep -rc 'TransportTeardown.register' Tests/ChatBotsCoreTests/*.swift | grep -v ':0'   # after
+  Tests/ChatBotsCoreTests/AuditReplyMatchingTests.swift:4
+  Tests/ChatBotsCoreTests/AuditS1TeardownTests.swift:5
+  Tests/ChatBotsCoreTests/AuditTransportLifecycleTests.swift:1
+  Tests/ChatBotsCoreTests/AuditTransportServerTests.swift:2
+  Tests/ChatBotsCoreTests/AuditWave2IdleTimeoutTests.swift:1
+  Tests/ChatBotsCoreTests/WebTransportSessionTests.swift:13
+  total: 26
+
+## 2. after: the suite
+$ swift test --filter AuditS1TeardownTests
+  ✔ Test "A registered teardown is awaited while the gate is still held" passed after 0.051 seconds.
+  ✔ Test "The body's failure path still drains and releases" passed after 0.051 seconds.
+  ✔ Test "Registered work runs in the order it was registered, and is cleared" passed after 0.001 seconds.
+  ✔ Test "A teardown that registers more work does not extend the drain it is in" passed after 0.001 seconds.
+  ✔ Suite "The gate waits for a registered teardown (A169)" passed after 0.103 seconds.
+  ✔ Test run with 4 tests in 1 suite passed after 0.103 seconds.
+  ✔ Test run with 4 tests in 1 suite passed after 0.122 seconds.
+
+## 3. the trait as it was — release without draining the registered work
+$ swift test --filter AuditS1TeardownTests
+  ✘ Test "A registered teardown is awaited while the gate is still held" recorded an issue at AuditS1TeardownTests.swift:39:9: Expectation failed: finis
+  ✘ Test "A registered teardown is awaited while the gate is still held" recorded an issue at AuditS1TeardownTests.swift:40:9: Expectation failed: heldD
+  ✘ Test "A registered teardown is awaited while the gate is still held" failed after 0.001 seconds with 2 issues.
+  ✘ Test "The body's failure path still drains and releases" recorded an issue at AuditS1TeardownTests.swift:61:9: Expectation failed: finished
+  ✘ Test "The body's failure path still drains and releases" failed after 0.001 seconds with 1 issue.
+  ✘ Test run with 4 tests in 1 suite failed after 0.121 seconds with 3 issues.
+
+## 4. restored
+$ swift test --filter AuditS1TeardownTests
+  ✔ Test run with 4 tests in 1 suite passed after 0.115 seconds.

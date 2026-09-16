@@ -306,3 +306,70 @@ struct EngineServiceTests {
         #expect(engine.displayTurns.count <= 1)
     }
 }
+
+// MARK: - Fields the user supplies are bounded (A143)
+
+@MainActor
+@Suite("User-supplied text is bounded")
+struct EngineServiceFieldLimitTests {
+
+    /// A body of text far past the limit, which is what an accidental paste produces.
+    private var overlong: String {
+        String(repeating: "a question about eggs ", count: 200)
+    }
+
+    @Test("A topic past the limit is refused, and the room keeps the topic it had")
+    func topicIsBounded() async {
+        let (service, engine) = makeService()
+        let before = engine.topic
+
+        let reply = await service.handle(.setTopic(overlong))
+        guard let reason = reply.refusal else {
+            Issue.record("expected a refusal, got \(reply)")
+            return
+        }
+        #expect(reason.contains("2000"))
+        #expect(engine.topic == before, "a refused topic must not have been applied")
+    }
+
+    @Test("A topic within the limit is still accepted")
+    func topicWithinTheLimitWorks() async {
+        let (service, engine) = makeService()
+        let reply = await service.handle(.setTopic("Why are eggs not round?"))
+        #expect(reply.snapshot != nil)
+        #expect(engine.topic == "Why are eggs not round?")
+    }
+
+    @Test("A steering message past the limit is refused")
+    func steeringIsBounded() async {
+        let (service, _) = makeService()
+        let reply = await service.handle(.steer(overlong))
+        guard let reason = reply.refusal else {
+            Issue.record("expected a refusal, got \(reply)")
+            return
+        }
+        #expect(reason.contains("2000"))
+    }
+
+    @Test("A steering message within the limit is still accepted")
+    func steeringWithinTheLimitWorks() async {
+        let (service, _) = makeService()
+        let reply = await service.handle(.steer("Could you say more about that?"))
+        #expect(reply.snapshot != nil, "a normal message is not affected by the cap")
+    }
+
+    @Test("A moderator name past the limit is shortened rather than refused")
+    func moderatorNameIsBounded() async {
+        let (service, engine) = makeService()
+        var identity = engine.moderator
+        identity.name = overlong
+
+        let reply = await service.handle(.setModerator(identity))
+        #expect(reply.snapshot != nil, "renaming is not the place to refuse")
+        #expect(engine.moderator.name.count == EngineService.maximumFieldCharacters)
+        // The snapshot's copy is the *display* name, which `PromptBuilder` caps much harder (60) — what
+        // matters here is that nothing unbounded reaches it.
+        let shown = reply.snapshot?.moderatorName.count ?? 0
+        #expect(shown > 0 && shown <= EngineService.maximumFieldCharacters)
+    }
+}

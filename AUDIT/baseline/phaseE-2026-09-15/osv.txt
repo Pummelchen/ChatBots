@@ -1,0 +1,5 @@
+Starting filesystem walk for root: /
+Scanned /Users/node2/chatbots-phase-e/Package.resolved file and found 14 packages
+End status: 0 dirs visited, 1 inodes visited, 1 Extract calls, 2.620166ms elapsed, 2.62ms wall time
+
+No issues found

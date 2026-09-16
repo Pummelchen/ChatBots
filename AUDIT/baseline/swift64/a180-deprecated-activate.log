@@ -1,0 +1,48 @@
+A180 — the activation call the macOS 27 SDK is retiring
+Host: 27.0 / arm64, SDK 27.0
+
+--- The annotation, from the SDK itself ---
+  AppKit.framework/Headers/NSApplication.h:222:- (void)activateIgnoringOtherApps:(BOOL)ignoreOtherApps API_DEPRECATED("This method will be deprecated in a future release. Use NSApp.activate instead.", macos(10.0, API_TO_BE_DEPRECATED));
+  224:/// Makes the receiver the active app, if possible.
+  225-///
+  226-/// You shouldn’t assume the app will be active immediately
+  (Nothing warns today: 'to be deprecated' is not 'deprecated', which is why the build with
+   warnings-as-errors cannot catch this and a source check can.)
+
+--- BEFORE: the call at HEAD ---
+  328:            NSApp.activate(ignoringOtherApps: true)
+
+--- BASELINE: unmutated ---
+✔ Test run with 2 tests in 1 suite passed after 0.034 seconds.
+
+--- M1: the retiring call comes back ---
+✘ Test "The app still asks to be activated when its window opens" recorded an issue at AuditS3DeprecatedAPITests.swift:33:9: Expectation failed: app.contains("NSApp.activate()")
+✘ Test "The app still asks to be activated when its window opens" failed after 0.002 seconds with 1 issue.
+✘ Test "Nothing calls the activation API the SDK has marked to be deprecated" recorded an issue at AuditS3DeprecatedAPITests.swift:22:13: Expectation failed: !text.contains("activate(ignoringOtherApps")
+✘ Test "Nothing calls the activation API the SDK has marked to be deprecated" failed after 0.034 seconds with 1 issue.
+✘ Test run with 2 tests in 1 suite failed after 0.034 seconds with 2 issues.
+
+--- M2: the request is dropped altogether (over-correction) ---
+✘ Test "The app still asks to be activated when its window opens" recorded an issue at AuditS3DeprecatedAPITests.swift:33:9: Expectation failed: app.contains("NSApp.activate()")
+✘ Test "The app still asks to be activated when its window opens" failed after 0.002 seconds with 1 issue.
+✘ Test run with 2 tests in 1 suite failed after 0.033 seconds with 1 issue.
+
+--- RESTORED: unmutated again ---
+✔ Test run with 2 tests in 1 suite passed after 0.033 seconds.
+
+--- What each mutation shows ---
+M1 the retiring call back: both tests fail — the source check sees the spelling the compiler cannot, and the
+counterweight sees the modern call gone with it. M2 the request dropped altogether: the counterweight fails,
+which is the point of having it — a check that only forbids the old spelling would be happy with an app that
+never asks to come forward at all.
+
+--- FULL GATE at the fix commit (tools/audit-checks.sh) ---
+PASS  build: swift build --build-tests
+PASS  tests: 1033 tests in 192 suites
+PASS  coverage: Sources/ TOTAL 6505 regions 2576 covered 60.40%, 20541 lines 9856 covered 52.02%
+PASS  swiftlint: 253 finding(s), within the recorded waiver of 255
+PASS  swift-format: 739 diagnostic(s), within the recorded waiver of 744
+PASS  web: deltas merge (34 cases)
+PASS  web: the verdict rule (12 cases)
+
+All 6 Mac-only gates passed.

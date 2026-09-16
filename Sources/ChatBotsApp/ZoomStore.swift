@@ -20,51 +20,63 @@ final class ZoomStore: ObservableObject {
 
     /// The steps ⌘+ and ⌘− move through.
     ///
-    /// Discrete steps rather than a free multiplier: a text size that lands on 1.07× serves
-    /// nobody, and steps make ⌘0 predictable.
-    static let levels: [Double] = [0.85, 1.0, 1.15, 1.3, 1.5, 1.75, 2.0]
-    static let `default` = 1.0
+    /// The list and every comparison over it live in `ChatBotsCore.TextZoom`, so the suite that
+    /// covers them asserts the code the app runs rather than a copy of it (A167). These are aliases
+    /// kept so the views that read them read the same values.
+    static let levels = TextZoom.levels
+    static let `default` = TextZoom.default
+    static var minimumScale: Double { TextZoom.minimumScale }
+    static var maximumScale: Double { TextZoom.maximumScale }
 
-    /// The smallest and largest steps.
-    ///
-    /// `levels` is an ascending literal, so these are its ends; the fallback to `default` is
-    /// what a caller would see if that ever stopped being true, rather than a trap (audit A28).
-    static var minimumScale: Double { levels.min() ?? `default` }
-    static var maximumScale: Double { levels.max() ?? `default` }
-
-    @AppStorage("textScale") private var storedScale: Double = ZoomStore.default
+    @AppStorage("textScale") private var storedScale: Double = TextZoom.default
 
     var scale: Double {
         get { storedScale }
-        set { storedScale = min(max(newValue, Self.minimumScale), Self.maximumScale) }
+        set { storedScale = TextZoom.clamped(newValue) }
     }
 
-    var percent: Int { Int((scale * 100).rounded()) }
+    var percent: Int { TextZoom.percent(of: scale) }
     /// 100, for comparing against `percent`.
-    var resetPercent: Int { Int((Self.default * 100).rounded()) }
-    var canEnlarge: Bool { scale < Self.maximumScale - 0.001 }
-    var canReduce: Bool { scale > Self.minimumScale + 0.001 }
+    var resetPercent: Int { TextZoom.percent(of: TextZoom.default) }
+    var canEnlarge: Bool { scale < Self.maximumScale - TextZoom.tolerance }
+    var canReduce: Bool { scale > Self.minimumScale + TextZoom.tolerance }
 
     /// Move one step, in the direction of `larger`.
     func step(larger: Bool) {
-        if larger {
-            scale = Self.levels.first { $0 > scale + 0.001 } ?? Self.maximumScale
-        } else {
-            scale = Self.levels.last { $0 < scale - 0.001 } ?? Self.minimumScale
-        }
+        scale = TextZoom.stepped(from: scale, larger: larger)
     }
 
-    func reset() { scale = Self.default }
+    func reset() { scale = TextZoom.default }
 
-    /// The next step's label, so a menu can say what ⌘+ will do.
+    /// The scale ⌘+ would go to, as a percentage, or `nil` at the top of the range.
+    ///
+    /// The menu reads these to say what ⌘+ will do rather than only what it is called; `nil` is also
+    /// when its item is disabled, so the label and the button cannot disagree (A177).
     var nextLargerPercent: Int? {
-        guard let next = Self.levels.first(where: { $0 > scale + 0.001 }) else { return nil }
-        return Int((next * 100).rounded())
+        TextZoom.next(from: scale, larger: true).map(TextZoom.percent(of:))
     }
 
+    /// The scale ⌘− would go to, as a percentage, or `nil` at the bottom of the range.
     var nextSmallerPercent: Int? {
-        guard let next = Self.levels.last(where: { $0 < scale - 0.001 }) else { return nil }
-        return Int((next * 100).rounded())
+        TextZoom.next(from: scale, larger: false).map(TextZoom.percent(of:))
+    }
+
+    /// The smallest the window may be, in points, at this text size.
+    var minimumWindowSize: CGSize { Self.minimumWindowSize(at: scale) }
+
+    /// The window floor at any scale, as a pure function of it.
+    ///
+    /// Below this the two panes stop being usable side by side, and the floor rises with the text
+    /// size: at 200% the same 720 points would clip every label. It is one rule because there were
+    /// three — a declaration in `ChatBotsApp` that nothing read, a hard-coded 720×480 on the window
+    /// and a 700×460 frame minimum in `ContentView` — which disagreed about the base size and about
+    /// whether to scale at all (A177). The window's minimum is what a drag is clamped by; the frame's
+    /// is what the layout asks for where there is no window to clamp it.
+    ///
+    /// A function of the scale rather than only a property, so the rule can be asserted at 100 % and
+    /// at 200 % without a store whose scale lives in the preferences of whatever process runs the test.
+    static func minimumWindowSize(at scale: Double) -> CGSize {
+        CGSize(width: 720 * scale, height: 480 * (1 + (scale - 1) * 0.5))
     }
 }
 
@@ -109,16 +121,5 @@ struct ScaledPadding: ViewModifier {
 
     func body(content: Content) -> some View {
         content.padding(edges, length * zoom.scale)
-    }
-}
-
-/// A dimension that follows the text size — for icon columns and similar fixed widths that
-/// would otherwise clip once the labels beside them grow.
-struct ScaledLength: ViewModifier {
-    @EnvironmentObject private var zoom: ZoomStore
-    let base: Double
-
-    func body(content: Content) -> some View {
-        content.frame(width: base * zoom.scale)
     }
 }

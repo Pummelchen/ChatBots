@@ -89,6 +89,12 @@ public struct APISnapshot: Codable, Sendable {
     public var canAttach: Bool
     public var imagesAllowed: Bool
     public var availablePersonas: [APIPersona]
+    /// The checkpoints this engine offers, so a front end can present the same list the app's own
+    /// picker shows without shipping a second copy of it.
+    ///
+    /// Optional because a snapshot from an engine that predates the field must still decode, the same
+    /// reason `revision` is (A110): a missing list is "nothing to offer here", not a broken state.
+    public var availableModels: [APIModelOption]?
     public var serverTime: Date
 
     /// A counter the engine increments for every snapshot it produces.
@@ -205,8 +211,54 @@ public struct APIAttachment: Codable, Sendable {
     public var summary: String
     public var tokens: Int
     public var wasTruncated: Bool
-    /// Only for images, and only so a front end can show a thumbnail.
-    public var imageBase64: String?
+    // The image's bytes are deliberately absent (A144, A214).
+    //
+    // This carried `imageBase64` — the whole encoded image, re-encoded on every snapshot — so that a
+    // front end *could* show a thumbnail. No front end ever did: the page's chip is a name and a
+    // summary, and the Mac app's chip is an SF Symbol. What it did do was put a base64 copy of every
+    // attached image into every state push, to every connected client, on every turn — up to 24 files
+    // of up to 64 MB each, re-encoded per snapshot. It also let the snapshot exceed the transport's
+    // own message cap, which is derived from one maximum-size attachment: two of them need twice the
+    // cap, so the state push was refused and the client silently kept the previous state. The engine
+    // holds the bytes, which is where the model request reads them from; a front end that ever needs
+    // them should ask for one by id rather than be sent all of them again and again.
+}
+
+/// What `/api/health` answers with.
+///
+/// Its own type rather than a dictionary of strings, because a diagnostics report has numbers and a list
+/// in it (A151).
+public struct APIHealth: Codable, Sendable {
+    /// `"ok"`, or `"unavailable"` when the engine cannot serve a conversation (A152).
+    public var status: String
+    /// The same fact as a boolean, for a client that would rather not read the word.
+    public var ready: Bool
+    /// How many seats the engine has.
+    public var seats: Int
+    /// Why the engine cannot serve a conversation, in a sentence. Nil when it can.
+    public var reason: String?
+    /// The seats whose model could not be loaded, and why, by seat id. A seat here is degradation
+    /// rather than an outage while another seat still works.
+    public var failedSeats: [String: String]
+    /// A number, like every other counter here: this type exists so a report carries numbers rather than
+    /// strings a reader has to parse.
+    public var port: Int
+    /// Connections the listener is holding, streams it is holding open, and connections it has refused.
+    public var connections: Int
+    public var openStreams: Int
+    public var refusedConnections: Int
+    /// Why the listener stopped, when it did.
+    public var listenerError: String?
+    /// The most recent failures, newest first, bounded by `HTTPServer.failureHistoryLimit`.
+    public var recentFailures: [HTTPServer.ConnectionFailure]
+}
+
+public struct APIModelOption: Codable, Sendable {
+    public var id: String
+    public var name: String
+    public var summary: String
+    /// The download size as text ("3.2 GB"), when it is known.
+    public var sizeLabel: String?
 }
 
 public struct APIPersona: Codable, Sendable {
@@ -294,6 +346,8 @@ public struct APICommand: Codable, Sendable {
     public var on: Bool?
     public var name: String?
     public var personaID: String?
+    /// The MLX checkpoint for a seat, as a repository id or a catalogue alias.
+    public var modelID: String?
     public var thinking: String?
     public var backend: String?
     public var showReasoning: Bool?
@@ -321,6 +375,13 @@ public final class APIServer {
     /// command cannot work here and fail over WebTransport.
     private let service: EngineService
     private var server: HTTPServer?
+
+    /// The listener itself, for the tests that inspect what it recorded (A151).
+    ///
+    /// Internal rather than public: nothing outside this module needs the socket, and every counter it
+    /// holds is already answered over `/api/health`.
+    var httpServer: HTTPServer? { server }
+
     private var feedTask: Task<Void, Never>?
     private var tokenObserver: UUID?
     private var streams: [HTTPServer.EventStream] = []
@@ -342,22 +403,46 @@ public final class APIServer {
         self.service.shareBase = shareBase ?? "http://127.0.0.1:\(port)"
     }
 
-    /// A `Host` header that is safe to reflect into a URL, or nil.
+    /// Why a state-changing request must be refused, or nil when it may proceed.
     ///
-    /// Reflecting the header is how a share link comes back to the origin that actually served the
-    /// page, but the value is client-supplied: anything carrying a path, a userinfo `@`, whitespace
-    /// or a character a host or port cannot contain is refused rather than interpolated. A refused
-    /// value falls back to the configured base.
+    /// Two headers do the work, and each closes a different hole (A136).
     ///
-    /// `nonisolated` because it is a pure function of its argument: the server is main-actor
-    /// isolated, and a caller that only wants to know whether a string is a host should not have to
-    /// hop to that actor to find out.
-    nonisolated static func validShareHost(_ host: String?) -> String? {
-        guard let host, !host.isEmpty, host.count <= 255 else { return nil }
-        let allowed = CharacterSet(
-            charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-:[]")
-        guard host.unicodeScalars.allSatisfy({ allowed.contains($0) }) else { return nil }
-        return host
+    /// * **`Content-Type` must be `application/json`.** The engine only ever reads JSON, and a
+    ///   browser cannot send that cross-origin without a preflight — which this server does not
+    ///   answer with an allow-origin (A75), so the preflight fails and the request never arrives.
+    ///   A cross-origin `text/plain` POST is a *simple request* that skips the preflight entirely,
+    ///   which is how a page the user merely visited could drive the engine, and (through
+    ///   `/api/seat`) repoint a cloud seat at a host the attacker controlled.
+    /// * **When `Origin` is present it must be the host the request was addressed to.** Caddy
+    ///   overwrites `Host` with the upstream, so the original is read from `X-Forwarded-Host` when
+    ///   it is there. Ports are ignored on purpose: the engine's port is not Caddy's.
+    ///
+    /// A client that sends neither header — `curl`, the CLI, a script — is unaffected, and a
+    /// *same-origin* browser request carries an `Origin` matching `X-Forwarded-Host`.
+    nonisolated static func crossOriginRefusal(for request: HTTPRequest) -> HTTPResponse? {
+        guard request.method != "GET", request.method != "HEAD" else { return nil }
+
+        // Origin first: a cross-origin request is refused *as* cross-origin whatever its body, so
+        // the answer says what was wrong. A preflight carries no body at all, and answering it 415
+        // would name the wrong reason.
+        if let origin = request.headers["origin"], !origin.isEmpty {
+            let addressed = request.headers["x-forwarded-host"] ?? request.headers["host"] ?? ""
+            let originHost = URL(string: origin)?.host ?? ""
+            let addressedHost = addressed.split(separator: ":").first.map(String.init) ?? addressed
+            guard !originHost.isEmpty, originHost == addressedHost else {
+                return .error("cross-origin request refused", status: 403)
+            }
+        }
+
+        if request.headers["sec-fetch-site"]?.lowercased() == "cross-site" {
+            return .error("cross-origin request refused", status: 403)
+        }
+
+        let contentType = request.headers["content-type"]?.lowercased() ?? ""
+        guard contentType.hasPrefix("application/json") else {
+            return .error("this endpoint accepts application/json only", status: 415)
+        }
+        return nil
     }
 
     /// The shared dispatch, so a caller can treat both transports alike.
@@ -410,6 +495,8 @@ public final class APIServer {
     // MARK: - Routing
 
     func handle(_ request: HTTPRequest) async -> HTTPResponse {
+        // Anything that could change state has to be a same-origin JSON request (A136).
+        if let refusal = Self.crossOriginRefusal(for: request) { return refusal }
         let response = await route(request)
         // Anything that is not an API route may be a static asset, which is how the web
         // interface is served when Caddy is not in front.
@@ -424,15 +511,43 @@ public final class APIServer {
     private func route(_ request: HTTPRequest) async -> HTTPResponse {
         // A conversation somebody can open, with replay controls. Checked before the switch
         // because the path is a prefix rather than a fixed route, and transport-specific rather
-        // than an engine command: it is a page, and the engine does not render pages.
+        // than an engine command: it is a page, and the engine does not render pages. The request's
+        // `Host` is deliberately not read: the page needs no origin, so nothing from the header is
+        // reflected anywhere (A217).
         if request.method == "GET", request.path.hasPrefix("/s/") {
-            return sharedPage(id: String(request.path.dropFirst(3)), host: request.headers["host"])
+            return await sharedPage(id: String(request.path.dropFirst(3)))
         }
 
         // Transport-specific, and none of it is the engine's business.
         switch (request.method, request.path) {
         case ("GET", "/api/health"):
-            return .json(["status": "ok", "port": "\(port)"])
+            // What the listener is doing, not just "ok". The counters existed and were reachable from no
+            // endpoint, and a dropped connection or a refused request left no trace anywhere, so
+            // diagnosing a running engine meant reading source (A151). The strings are operational — a
+            // connection error, the listener's own failure, a request the parser refused — and carry no
+            // conversation data; `/api` is unauthenticated and LAN-reachable, which is why the history is
+            // bounded at the source rather than here.
+            //
+            // And the status code answers the other question: whether the engine behind the listener can
+            // serve a conversation at all. It used to be a hardcoded 200, so a client could not tell the
+            // two apart (A152). 503 is what `tools/start.sh` already treats as "not ready" — it probes
+            // this route with `curl -sf` — and it is the answer an orchestrator needs.
+            let readiness = service.readiness
+            var response = HTTPResponse.json(
+                APIHealth(
+                    status: readiness.isReady ? "ok" : "unavailable",
+                    ready: readiness.isReady,
+                    seats: readiness.seats,
+                    reason: readiness.reason,
+                    failedSeats: readiness.failedSeats,
+                    port: Int(port),
+                    connections: server?.connectionCount ?? 0,
+                    openStreams: server?.openStreamCount ?? 0,
+                    refusedConnections: server?.refusedConnectionCount ?? 0,
+                    listenerError: server?.lastError,
+                    recentFailures: server?.recentFailures ?? []))
+            response.status = readiness.isReady ? 200 : 503
+            return response
 
         case ("GET", "/api/devices"):
             return .json(
@@ -489,7 +604,19 @@ public final class APIServer {
         // Everything else is the engine's, and goes through the same dispatch the
         // WebTransport server uses. A command that works on one channel therefore works on
         // the other, because there is only one implementation of it.
-        guard let command = translate(request) else {
+        let command: EngineRequest?
+        do {
+            command = try translate(request)
+        } catch let unreadable as UnreadableRequest {
+            // 400, and the reason is the server's own: a client that sent something unreadable is told
+            // what was wrong with it rather than that the route does not exist (A142).
+            return .error(unreadable.reason, status: 400)
+        } catch {
+            // `translate` throws only `UnreadableRequest`; anything else here is a defect, and naming
+            // it in a 400 is better than a crash or a blank answer.
+            return .error("the request could not be read: \(error)", status: 400)
+        }
+        guard let command else {
             return .error("no route for \(request.method) \(request.path)", status: 404)
         }
         let reply = await service.handle(command)
@@ -502,40 +629,52 @@ public final class APIServer {
     /// 404 rather than a blank page for an id that names nothing: a shared link that opens an
     /// empty conversation is indistinguishable from one whose transcript was lost, and the
     /// reader has no way to tell which happened.
-    private func sharedPage(id: String, host: String?) -> HTTPResponse {
-        guard let uuid = UUID(uuidString: id), let record = service.store.conversation(id: uuid)
-        else {
-            // A page that says so, rather than a bare 404 body: the reader followed a link
-            // somebody sent them, and "no conversation with that link" is the answer they need.
-            let missing = [
-                "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">",
-                "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
-                "<title>No conversation with that link</title></head>",
-                "<body style=\"font:15px/1.5 -apple-system,system-ui,sans-serif;max-width:640px;"
-                    + "margin:60px auto;padding:0 16px\">",
-                "<h1 style=\"font-size:19px\">No conversation with that link</h1>",
-                "<p>It may have been deleted, or the link may have been copied incompletely.</p>",
-                "</body></html>",
-            ].joined(separator: "\n")
-            return HTTPResponse(
-                status: 404, contentType: "text/html; charset=utf-8",
-                body: Data(missing.utf8),
-                // The default page policy refuses inline style, and this page carries one on
-                // its body. It carries no script, so the replacement grants style only.
-                headers: ["Content-Security-Policy": HTTPResponse.inlineStylePagePolicy])
+    /// The replay page for a shared link.
+    ///
+    /// The lookup reads the whole conversation index, because that is one file (A137), and it happens
+    /// off the main actor: this handler is on the main actor and so is the engine's turn loop, so an
+    /// index read while a conversation was streaming stalled the stream (A147). A malformed id never
+    /// reaches the store at all, which is what it did before as well — the difference is that a
+    /// well-formed id nobody has heard of no longer decodes the history to find that out.
+    ///
+    /// The page is rendered from the record alone. It used to be handed an origin derived from the
+    /// request's `Host` (validated by `validShareHost`), which the page wrote into its JSON island and
+    /// never read; the field, the reflection and the validator are gone (A217). The link a reader
+    /// copies is built by the front ends: the web interface from the origin the browser is reading at,
+    /// with the engine's reported base as its fallback (`web/app.js`), and the desktop app from that
+    /// reported base, which `--share-base` sets (`ChatController.shareLink(for:)`, A99).
+    private func sharedPage(id: String) async -> HTTPResponse {
+        guard let uuid = UUID(uuidString: id) else { return sharedPageNotFound() }
+        guard let record = await service.store.conversationOffMainActor(id: uuid) else {
+            return sharedPageNotFound()
         }
-        // The page's own links go back to the origin that served it, so a phone that reached the
-        // page through Caddy gets Caddy's address rather than the engine's loopback port — which is
-        // the address the phone could not reach in the first place (A99).
-        let base =
-            Self.validShareHost(host).map { "http://\($0)" }
-            ?? service.shareBase ?? "http://127.0.0.1:\(port)"
         return HTTPResponse(
             contentType: "text/html; charset=utf-8",
-            body: Data(SharedConversationPage.html(record, shareBase: base).utf8),
+            body: Data(SharedConversationPage.html(record).utf8),
             // The share page carries its own inline stylesheet and replay script, so it says so
             // rather than inheriting the interface's policy, which has no inline grant.
             headers: ["Content-Security-Policy": HTTPResponse.inlinePagePolicy])
+    }
+
+    /// A page that says the link does not work, rather than a bare 404 body: the reader followed a
+    /// link somebody sent them, and "no conversation with that link" is the answer they need.
+    private func sharedPageNotFound() -> HTTPResponse {
+        let missing = [
+            "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">",
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+            "<title>No conversation with that link</title></head>",
+            "<body style=\"font:15px/1.5 -apple-system,system-ui,sans-serif;max-width:640px;"
+                + "margin:60px auto;padding:0 16px\">",
+            "<h1 style=\"font-size:19px\">No conversation with that link</h1>",
+            "<p>It may have been deleted, or the link may have been copied incompletely.</p>",
+            "</body></html>",
+        ].joined(separator: "\n")
+        return HTTPResponse(
+            status: 404, contentType: "text/html; charset=utf-8",
+            body: Data(missing.utf8),
+            // The default page policy refuses inline style, and this page carries one on its body.
+            // It carries no script, so the replacement grants style only.
+            headers: ["Content-Security-Policy": HTTPResponse.inlineStylePagePolicy])
     }
 
     /// The mode a query asks about, defaulting to entertainment.
@@ -550,7 +689,54 @@ public final class APIServer {
         return mode
     }
 
-    private func translate(_ request: HTTPRequest) -> EngineRequest? {
+    /// A request that cannot be turned into an engine request, and why.
+    ///
+    /// Separate from "no route" because the answer differs: an unknown route is a 404, a body the
+    /// server cannot read is a 400 that says what was wrong (A142).
+    private struct UnreadableRequest: Error {
+        var reason: String
+    }
+
+    /// The command body, telling three states apart that `try?` used to collapse into one.
+    ///
+    /// No body at all means the field was not sent, which some routes treat as "clear this" and is
+    /// the caller's decision. A body that decodes is the command. A body that was **sent and cannot
+    /// be read** is a client error — and it used to be read as the defaults, so a typo in `mode`
+    /// switched the room to entertainment, an unknown research depth reset it to standard, and a
+    /// malformed topic cleared it. Silent, and in the direction of changing state (A142).
+    private func command(from request: HTTPRequest) throws -> APICommand? {
+        guard !request.body.isEmpty else { return nil }
+        guard let decoded = request.json(APICommand.self) else {
+            throw UnreadableRequest(
+                reason: "the request body is not a JSON object with the fields this route takes")
+        }
+        return decoded
+    }
+
+    /// The 400 for a value that is present but not one this server knows.
+    ///
+    /// The two routes that map a string to a case used to answer with a default instead — an unknown
+    /// mode switched the room to entertainment, an unknown research depth reset it to standard — so a
+    /// misspelling changed state. It is a bad request, and the answer says what was expected (A142).
+    private func unknownValue(_ field: String, _ raw: String, _ allowed: [String]) -> UnreadableRequest {
+        UnreadableRequest(
+            reason: "unknown \(field) \"\(raw)\" — expected one of: \(allowed.joined(separator: ", "))")
+    }
+
+    /// The change a seat update describes.
+    ///
+    /// Pulled out of `translate` because the case that used to build it inline put that function over
+    /// its `function_body_length` budget, and a named value reads better than a nested `.init` anyway.
+    private func seatChange(from body: APICommand, seatID: String) -> EngineRequest.SeatChange {
+        EngineRequest.SeatChange(
+            seatID: seatID, name: body.name, personaID: body.personaID,
+            thinking: body.thinking.flatMap(ThinkingMode.init(rawValue:)),
+            backend: body.backend.flatMap(AgentSpec.Backend.init(rawValue:)),
+            modelID: body.modelID,
+            baseURL: body.baseURL, apiModel: body.apiModel, apiKey: body.apiKey)
+    }
+
+    private func translate(_ request: HTTPRequest) throws -> EngineRequest? {
         switch (request.method, request.path) {
         case ("GET", "/api/state"): return .fetchState
         case ("POST", "/api/start"): return .start
@@ -564,47 +750,48 @@ public final class APIServer {
         case ("POST", "/api/conversations/new"): return .newConversation
 
         case ("POST", "/api/conversations/load"):
-            guard let id = request.json(APICommand.self)?.value else { return nil }
+            guard let id = try command(from: request)?.value else { return nil }
             return .loadSavedConversation(id: id)
 
         case ("POST", "/api/conversations/delete"):
-            guard let id = request.json(APICommand.self)?.value else { return nil }
+            guard let id = try command(from: request)?.value else { return nil }
             return .deleteSavedConversation(id: id)
 
         case ("POST", "/api/topic"):
-            guard let body = request.json(APICommand.self), let topic = body.topic,
+            guard let body = try command(from: request), let topic = body.topic,
                 !topic.isEmpty
             else { return .setTopic("") }   // an empty topic is refused by the engine
             return .setTopic(topic)
 
         case ("POST", "/api/message"):
-            guard let body = request.json(APICommand.self), let text = body.text else {
+            guard let body = try command(from: request), let text = body.text else {
                 return .steer("")
             }
             return .steer(text)
 
         case ("POST", "/api/settings"):
-            let body = request.json(APICommand.self)
+            let body = try command(from: request)
             return .setShowReasoning(body?.showReasoning ?? service.showReasoning)
 
         case ("POST", "/api/mode"):
-            guard let raw = request.json(APICommand.self)?.value,
-                let mode = DiscussionMode(rawValue: raw)
-            else { return .setMode(.entertainment) }
+            guard let raw = try command(from: request)?.value else { return nil }
+            guard let mode = DiscussionMode(rawValue: raw) else {
+                throw unknownValue("mode", raw, DiscussionMode.allCases.map(\.rawValue))
+            }
             return .setMode(mode)
 
         case ("POST", "/api/roster"):
-            guard let body = request.json(APICommand.self), let id = body.id else { return nil }
+            guard let body = try command(from: request), let id = body.id else { return nil }
             // A seed the caller supplies reproduces a draw; one it does not supply is made
             // here and reported, so every draw is repeatable whether or not it was planned.
             return .applyRoster(id: id, seed: body.seed ?? RosterLibrary.freshSeed())
 
         case ("POST", "/api/scenario"):
-            guard let id = request.json(APICommand.self)?.id else { return nil }
+            guard let id = try command(from: request)?.id else { return nil }
             return .applyScenario(id: id)
 
         case ("POST", "/api/vote"):
-            guard let body = request.json(APICommand.self), let turnID = body.id else { return nil }
+            guard let body = try command(from: request), let turnID = body.id else { return nil }
             // No verdict withdraws the vote, so a mis-click does not have to be reversed by
             // clicking the opposite button — which would leave a wrong judgement in the record.
             return .castVote(
@@ -615,37 +802,34 @@ public final class APIServer {
             return .clearVotes
 
         case ("POST", "/api/moderator"):
-            guard let body = request.json(APICommand.self) else { return nil }
+            guard let body = try command(from: request) else { return nil }
             return .setModerator(
                 ModeratorIdentity(
                     name: body.name ?? ModeratorIdentity.defaultName,
                     personaID: body.personaID ?? PersonaLibrary.neutral.id))
 
         case ("POST", "/api/research/budget"):
-            guard let raw = request.json(APICommand.self)?.value,
-                let depth = ResearchBudget.Depth(rawValue: raw)
-            else { return .setResearchBudget(.standard) }
+            guard let raw = try command(from: request)?.value else { return nil }
+            guard let depth = ResearchBudget.Depth(rawValue: raw) else {
+                throw unknownValue(
+                    "research depth", raw, ResearchBudget.Depth.allCases.map(\.rawValue))
+            }
             return .setResearchBudget(depth)
 
         case ("POST", "/api/seat"):
-            guard let body = request.json(APICommand.self), let seatID = body.seat else {
+            guard let body = try command(from: request), let seatID = body.seat else {
                 return nil
             }
-            return .updateSeat(
-                .init(
-                    seatID: seatID, name: body.name, personaID: body.personaID,
-                    thinking: body.thinking.flatMap(ThinkingMode.init(rawValue:)),
-                    backend: body.backend.flatMap(AgentSpec.Backend.init(rawValue:)),
-                    baseURL: body.baseURL, apiModel: body.apiModel, apiKey: body.apiKey))
+            return .updateSeat(seatChange(from: body, seatID: seatID))
 
         case ("POST", "/api/attachments"):
-            guard let body = request.json(APICommand.self), let filename = body.filename,
+            guard let body = try command(from: request), let filename = body.filename,
                 let content = body.content, let data = Data(base64Encoded: content)
             else { return nil }
             return .addAttachment(filename: filename, contents: data)
 
         case ("POST", "/api/attachments/remove"):
-            guard let id = request.json(APICommand.self)?.value else { return nil }
+            guard let id = try command(from: request)?.value else { return nil }
             return .removeAttachment(id: id)
 
         default:

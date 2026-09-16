@@ -1,0 +1,55 @@
+A151 — controlled before/after for the server-diagnostics tests
+Host: 27.0 / arm64, swift-driver version: 1.168.6 Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)
+
+--- BASELINE: unmutated ---
+◇ Test run started.
+✔ Test "The failure ring keeps the newest entries and no more than its limit" passed after 0.011 seconds.
+✔ Test "The health endpoint reports the counters and the recent failures" passed after 0.042 seconds.
+✔ Test "A malformed request is answered and recorded" passed after 0.053 seconds.
+✔ Test run with 3 tests in 1 suite passed after 0.054 seconds.
+
+--- M1: drop the request recording (the pre-fix '_ = error' behaviour at the HTTPError catch) ---
+◇ Test run started.
+✔ Test "The failure ring keeps the newest entries and no more than its limit" passed after 0.007 seconds.
+✔ Test "The health endpoint reports the counters and the recent failures" passed after 0.042 seconds.
+✘ Test "A malformed request is answered and recorded" recorded an issue at AuditS3ServerDiagnosticsTests.swift:113:9: Expectation failed: !failures.isEmpty
+✘ Test "A malformed request is answered and recorded" recorded an issue at AuditS3ServerDiagnosticsTests.swift:114:9: Expectation failed: failures.first?.reason.hasPrefix("request:") == true
+✘ Test "A malformed request is answered and recorded" failed after 0.053 seconds with 2 issues.
+✘ Suite "A running engine can say what is going wrong (A151)" failed after 0.054 seconds with 2 issues.
+✘ Test run with 3 tests in 1 suite failed after 0.054 seconds with 2 issues.
+
+--- M2: drop the ring bound ---
+◇ Test run started.
+✘ Test "The failure ring keeps the newest entries and no more than its limit" recorded an issue at AuditS3ServerDiagnosticsTests.swift:89:9: Expectation failed: failures.count == HTTPServer.failureHistoryLimit
+✘ Test "The failure ring keeps the newest entries and no more than its limit" recorded an issue at AuditS3ServerDiagnosticsTests.swift:91:9: Expectation failed: failures.last?.reason == "failure \(HTTPServer.failureHistoryLimit + 1)"
+✘ Test "The failure ring keeps the newest entries and no more than its limit" failed after 0.014 seconds with 2 issues.
+✔ Test "The health endpoint reports the counters and the recent failures" passed after 0.041 seconds.
+✔ Test "A malformed request is answered and recorded" passed after 0.048 seconds.
+✘ Suite "A running engine can say what is going wrong (A151)" failed after 0.048 seconds with 2 issues.
+✘ Test run with 3 tests in 1 suite failed after 0.048 seconds with 2 issues.
+
+--- M3: health reports no failures ---
+◇ Test run started.
+✔ Test "The failure ring keeps the newest entries and no more than its limit" passed after 0.007 seconds.
+✘ Test "The health endpoint reports the counters and the recent failures" recorded an issue at AuditS3ServerDiagnosticsTests.swift:139:9: Expectation failed: health.recentFailures.first?.reason == "connection: a client went away"
+✘ Test "The health endpoint reports the counters and the recent failures" failed after 0.042 seconds with 1 issue.
+✔ Test "A malformed request is answered and recorded" passed after 0.053 seconds.
+✘ Suite "A running engine can say what is going wrong (A151)" failed after 0.053 seconds with 1 issue.
+✘ Test run with 3 tests in 1 suite failed after 0.053 seconds with 1 issue.
+
+--- RESTORED: unmutated again ---
+◇ Test run started.
+✔ Test "The failure ring keeps the newest entries and no more than its limit" passed after 0.011 seconds.
+✔ Test "The health endpoint reports the counters and the recent failures" passed after 0.042 seconds.
+✔ Test "A malformed request is answered and recorded" passed after 0.052 seconds.
+✔ Test run with 3 tests in 1 suite passed after 0.052 seconds.
+
+--- FULL GATE at the fix commit (tools/audit-checks.sh) ---
+PASS  build: swift build --build-tests
+PASS  tests: 971 tests in 174 suites
+PASS  coverage: Sources/ TOTAL 6364 regions 2595 covered 59.22%, 20147 lines 9838 covered 51.17%
+PASS  swiftlint: 254 finding(s), within the recorded waiver of 255
+PASS  swift-format: 739 diagnostic(s), within the recorded waiver of 744
+PASS  web: deltas merge (34 cases)
+
+All 6 Mac-only gates passed.

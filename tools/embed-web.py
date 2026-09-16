@@ -26,6 +26,7 @@ TARGET: pathlib.Path = ROOT / "Sources" / "ChatBotsCore" / "WebAssets.swift"
 FILES: Sequence[tuple[str, str, str, *tuple[str, ...]]] = [
     ("indexHTML", "index.html", "text/html; charset=utf-8", "/", "/index.html"),
     ("styleCSS", "style.css", "text/css; charset=utf-8", "/style.css"),
+    ("deltasJS", "deltas.js", "application/javascript; charset=utf-8", "/deltas.js"),
     ("appJS", "app.js", "application/javascript; charset=utf-8", "/app.js"),
 ]
 

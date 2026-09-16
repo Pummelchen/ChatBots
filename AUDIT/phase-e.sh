@@ -73,10 +73,16 @@ fi
 # out. There are two: the audit branch while the audit is in progress, and `main` once the audit has
 # been landed on. A gate that refuses to run on the branch the code actually ships from is a gate
 # that stops being run — which is how the acceptance script came to fail on its own `main` (A132).
+#
+# The audit branch is matched as `audit/*` rather than by the date it was cut, because the date is
+# not a property of the gate: A132 added `main` here after the landing, and the next audit opened
+# `audit/2026-09-15`, which this case then failed on for a whole audit-hop (A210). What the check
+# actually asserts is "an audit branch or main", and that is what it now says. The branch is named
+# in the result so the evidence still records which one it was.
 case "$branch" in
-    audit/2026-09-13) pass "on the audit branch, where the audit was developed" ;;
+    audit/*) pass "on the audit branch '$branch', where the audit was developed" ;;
     main) pass "on main, which the audit was landed on" ;;
-    *) fail "on branch '$branch', which is neither the audit branch nor main" ;;
+    *) fail "on branch '$branch', which is neither an audit branch nor main" ;;
 esac
 # §0, recorded rather than asserted, because the number means different things either side of the
 # landing: before it, `origin/main` is the base commit and this counts the branch's distance from it;
@@ -138,7 +144,11 @@ fi
 # ---------------------------------------------------------------- tests
 section "4/12  full suite"
 if swift test > "$out/test.log" 2>&1; then
-    summary="$(grep -E 'Test run with' "$out/test.log" | tail -1)"
+    # Summed across test bundles: one process per test target, one "Test run with" line each, so the
+    # last line alone is a single target's count (A166).
+    summary="$(grep -E 'Test run with' "$out/test.log" \
+        | sed -E 's/.*with ([0-9]+) tests? in ([0-9]+) suites.*/\1 \2/' \
+        | awk '{t += $1; s += $2} END {printf "%d tests in %d suites", t, s}')"
     pass "tests: ${summary:-swift test exited 0}"
 else
     fail "test suite failed; see $out/test.log"
@@ -167,9 +177,15 @@ section "6/12  coverage over Sources/"
 if swift test --enable-code-coverage > "$out/coverage-test.log" 2>&1; then
     bin="$(swift build --show-bin-path 2>/dev/null)"
     profile="$bin/codecov/default.profdata"
-    binary="$bin/ChatBotsPackageTests.xctest/Contents/MacOS/ChatBotsPackageTests"
-    if [ -f "$profile" ] && [ -f "$binary" ] \
-        && xcrun llvm-cov report "$binary" -instr-profile "$profile" --sources Sources \
+    # One test bundle per test target, named after the target; discovered rather than written down
+    # because the name changed with Xcode 27 and a second target was added (A134, A146).
+    test_bundles=()
+    for bundle in "$bin"/*.xctest; do
+        bundle_executable="$bundle/Contents/MacOS/$(basename "$bundle" .xctest)"
+        [ -x "$bundle_executable" ] && test_bundles+=("$bundle_executable")
+    done
+    if [ -f "$profile" ] && [ "${#test_bundles[@]}" -gt 0 ] \
+        && xcrun llvm-cov report "${test_bundles[@]}" -instr-profile "$profile" --sources Sources \
             > "$out/coverage.log" 2>&1
     then
         total="$(grep -E '^TOTAL' "$out/coverage.log" | tail -1)"
@@ -233,31 +249,46 @@ if command -v semgrep >/dev/null 2>&1; then
     # The waivers, why they exist, and the matching rule are in `tools/semgrep-waivers.py`, which
     # is also what CI runs: one implementation, so the Mac gate and the hosted one cannot disagree
     # about which findings have been justified (A129).
-    semgrep scan --config auto --quiet --json --output "$out/semgrep.json" \
+    # No `--quiet`: the rule set comes from the registry at scan time, so the scan is run without it
+    # and the figures semgrep resolves are carried into the line this check reports. On this tree
+    # `--config auto` resolved a 1074-rule policy of which 461 ran for the languages present, over
+    # 101 targets; the one target it skipped is the 1.5 MB app icon, which is a PNG (A192).
+    semgrep scan --config auto --json --output "$out/semgrep.json" \
         Sources tools web > "$out/semgrep.log" 2>&1
+    resolved="$(grep -E '^Ran [0-9]+ rules? on [0-9]+ files?:' "$out/semgrep.log" | tail -1 || true)"
     if python3 tools/semgrep-waivers.py "$out/semgrep.json" > "$out/semgrep-waivers.txt" 2>&1; then
-        pass "$(tail -1 "$out/semgrep-waivers.txt")"
+        pass "$(tail -1 "$out/semgrep-waivers.txt")${resolved:+ — $resolved}"
     else
-        fail "semgrep: $(tail -1 "$out/semgrep-waivers.txt") — see $out/semgrep.json"
+        fail "semgrep: $(tail -1 "$out/semgrep-waivers.txt")${resolved:+ — $resolved} — see $out/semgrep.json"
     fi
 else
     fail "semgrep is not installed"
 fi
 
 if command -v shellcheck >/dev/null 2>&1; then
-    shellcheck -S style tools/*.sh > "$out/shellcheck.txt" 2>&1
-    # Counted from the `SCnnnn (severity):` form, which is one per finding. Two earlier counts
-    # of this same output were wrong in two different ways: 24 was the file's line count, and 7
-    # was `grep -oE 'SC[0-9]{4}'`, which also matches the three `shellcheck.net/wiki/SCnnnn`
-    # help URLs printed under the findings. The real number is 4. Anchoring on the severity
-    # suffix is what makes this one a count of findings rather than of codes that appear.
-    notes="$(grep -cE 'SC[0-9]{4} \((style|info|warning|error)\):' "$out/shellcheck.txt" || true)"
-    if [ "$notes" = "0" ]; then
-        pass "shellcheck -S style: 0 findings"
+    # Every tracked shell script, not just `tools/*.sh`: the audit's own scripts and the probes under
+    # `AUDIT/baseline/` were outside that glob and so were never linted, and a script added in a new
+    # directory would have escaped it the same way (A192). Taking the list from git fixes the class,
+    # not the instance; `-z`/`-0` keeps a path with a space in it one argument, and an empty list is
+    # failed rather than passed to shellcheck, which would read stdin and report nothing.
+    shell_count="$(git ls-files '*.sh' | wc -l | tr -d ' ')"
+    if [ "$shell_count" = "0" ]; then
+        fail "shellcheck: git lists no shell script to lint"
     else
-        # Recorded and reported, not hidden: A10 owns these, and a non-zero count must be
-        # visible in the acceptance run rather than rounded away.
-        pass "shellcheck -S style: $notes finding(s) — see $out/shellcheck.txt (A10's scope)"
+        git ls-files -z '*.sh' | xargs -0 shellcheck -S style > "$out/shellcheck.txt" 2>&1 || true
+        # Counted from the `SCnnnn (severity):` form, which is one per finding. Two earlier counts
+        # of this same output were wrong in two different ways: 24 was the file's line count, and 7
+        # was `grep -oE 'SC[0-9]{4}'`, which also matches the three `shellcheck.net/wiki/SCnnnn`
+        # help URLs printed under the findings. The real number is 4. Anchoring on the severity
+        # suffix is what makes this one a count of findings rather than of codes that appear.
+        notes="$(grep -cE 'SC[0-9]{4} \((style|info|warning|error)\):' "$out/shellcheck.txt" || true)"
+        if [ "$notes" = "0" ]; then
+            pass "shellcheck -S style: 0 findings over $shell_count tracked script(s)"
+        else
+            # Recorded and reported, not hidden: A10 owns these, and a non-zero count must be
+            # visible in the acceptance run rather than rounded away.
+            pass "shellcheck -S style: $notes finding(s) — see $out/shellcheck.txt (A10's scope)"
+        fi
     fi
 else
     fail "shellcheck is not installed"

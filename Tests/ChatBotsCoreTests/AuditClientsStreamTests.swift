@@ -26,6 +26,13 @@ struct AuditClientsStreamTests {
         "[DONE]",
     ])
 
+    /// A server that says it finished and produced nothing: the answer is empty, which is a failed
+    /// turn rather than a finished one (A202).
+    private static let completedWithoutText = sse([
+        sseCompleted(inputTokens: 7, outputTokens: 0),
+        "[DONE]",
+    ])
+
     /// The finding: the same delta, and then the body simply ends.
     private static let truncatedStream = sse([sseTextDelta("Hello")])
 
@@ -119,6 +126,37 @@ struct AuditClientsStreamTests {
         #expect(failures == ["the model crashed"])
     }
 
+    /// An empty answer must fail the turn rather than finish it.
+    ///
+    /// The engine emitted `turnFailed` and then `turnFinished` unconditionally, and the orchestrator
+    /// records what the events say — so an empty turn was recorded as completed with no text, and
+    /// `record(.turnFinished)` cleared the failure it had just been handed (A202).
+    @Test("An empty answer fails the turn instead of finishing it")
+    func emptyAnswerFailsTheTurn() async throws {
+        let server = try await ScriptedOpenAIServer(responsesBody: Self.completedWithoutText)
+        defer { server.stop() }
+        let engine = OpenAIResponsesEngine(spec: scriptedSpec(port: server.port))
+
+        // An actor, because `onEvent` is `@Sendable` and a captured `var` cannot be mutated from it.
+        let recorder = TerminalEventRecorder()
+        var thrown: (any Error)?
+        do {
+            _ = try await engine.generate(
+                messages: [PromptMessage(role: .user, content: "Say hello.")],
+                tools: [],
+                onToolCall: { _, _ in },
+                onEvent: { event in await recorder.record(event) })
+        } catch {
+            thrown = error
+        }
+
+        let events = await recorder.events
+        #expect(thrown != nil, "a turn that produced no text must not return success")
+        #expect(events == ["failed"], "and it must not also be announced as finished, was \(events)")
+        let stats = await engine.lastStats
+        #expect(stats == nil, "a failed turn records no statistics")
+    }
+
     /// The consequence the finding names: the engine used to record the fragment as a normal
     /// turn. The assertion is on `lastStats` — pre-fix it is a `stop` with zero usage, post-fix
     /// the turn throws before any statistics are recorded.
@@ -142,5 +180,18 @@ struct AuditClientsStreamTests {
         #expect(thrown != nil, "a truncated stream must fail the turn")
         let stats = await engine.lastStats
         #expect(stats == nil, "a truncated turn must not be reported as a stop with zero usage")
+    }
+}
+
+/// Collects a turn's terminal events. An actor because the engine's callback is `@Sendable`.
+private actor TerminalEventRecorder {
+    private(set) var events: [String] = []
+
+    func record(_ event: TurnEvent) {
+        switch event {
+        case .turnFailed: events.append("failed")
+        case .turnFinished: events.append("finished")
+        default: break
+        }
     }
 }

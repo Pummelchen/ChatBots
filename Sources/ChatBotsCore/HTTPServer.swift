@@ -114,6 +114,8 @@ public struct HTTPResponse: Sendable {
         case 409: "Conflict"
         case 413: "Payload Too Large"
         case 500: "Internal Server Error"
+        case 501: "Not Implemented"
+        case 505: "HTTP Version Not Supported"
         case 503: "Service Unavailable"
         default: "OK"
         }
@@ -121,9 +123,26 @@ public struct HTTPResponse: Sendable {
 
     /// The bytes to put on the wire, headers included.
     public func serialised(keepAlive: Bool) -> Data {
+        var data = head(keepAlive: keepAlive, contentLength: body.count)
+        data.append(body)
+        return data
+    }
+
+    /// The head for a response whose body is not known when the head is written.
+    ///
+    /// Server-sent events are the one response this server leaves open, so it has no `Content-Length` and
+    /// nothing is appended to the head. It is built by the same code as every other head, which is the
+    /// point: assembling it by hand is how the stream path came to carry none of the security headers
+    /// every other response carries, for a whole class of response (A150).
+    public func streamingHead(keepAlive: Bool = true) -> Data {
+        head(keepAlive: keepAlive, contentLength: nil)
+    }
+
+    /// The head, with a length only when the whole body is in hand.
+    private func head(keepAlive: Bool, contentLength: Int?) -> Data {
         var head = "HTTP/1.1 \(status) \(reason)\r\n"
         head += "Content-Type: \(contentType)\r\n"
-        head += "Content-Length: \(body.count)\r\n"
+        if let contentLength { head += "Content-Length: \(contentLength)\r\n" }
         head += "Cache-Control: no-store\r\n"
         head += "Connection: \(keepAlive ? "keep-alive" : "close")\r\n"
         // The security headers first, then anything the response set itself, so a page that
@@ -134,9 +153,19 @@ public struct HTTPResponse: Sendable {
             head += "\(name): \(value)\r\n"
         }
         head += "\r\n"
-        var data = Data(head.utf8)
-        data.append(body)
-        return data
+        return Data(head.utf8)
+    }
+
+    /// The response that opens a server-sent event stream.
+    ///
+    /// No body and no length: the head is written on its own and the socket stays open, which is what
+    /// makes server-sent events work. It is an `HTTPResponse` so that the stream path is not a second,
+    /// hand-written header assembler — that is the whole of A150 — and `X-Accel-Buffering` is set here
+    /// rather than in the head so that it takes the same route as every other response's own headers.
+    public static func eventStream() -> HTTPResponse {
+        HTTPResponse(
+            contentType: "text/event-stream; charset=utf-8",
+            headers: ["X-Accel-Buffering": "no"])
     }
 
     /// The headers every response carries, with the policy chosen from its content type.
@@ -215,44 +244,131 @@ public enum HTTPParser {
     /// drift apart again.
     public static let maximumBodyBytes = ProtocolLimits.maximumMessageBytes
 
+    /// How large a request head may be before it is refused.
+    ///
+    /// A head is a request line and a handful of fields — a few hundred bytes for everything this
+    /// server does, and no browser sends kilobytes. It had no bound of its own: a client could stream
+    /// the full 85 MB body allowance as "headers", kept in memory per connection and rescanned from
+    /// the start on every 64 KB read, so thirty-two connections pinned gigabytes and the scan was
+    /// quadratic in the head (A145). 16 KB is generous for a head and small enough that the worst case
+    /// per connection is not worth attacking.
+    public static let maximumHeadBytes = 16 * 1_024
+
     public struct Incomplete: Error {}
+
+    /// The versions this server speaks, checked against the request line.
+    ///
+    /// Only HTTP/1.1: every response declares 1.1 framing, the clients are the page, the CLI, the app
+    /// and Caddy's upstream, and a version this server does not speak is the case 505 exists for. The
+    /// version used to go unread entirely, so `GET / HTTP/9.9` parsed as if it had said 1.1 (A154).
+    static let supportedVersions: Set<String> = ["HTTP/1.1"]
+
+    /// Whether every character of `text` is a token character (RFC 9110 §5.6.2), which is what a method
+    /// and a field name must be.
+    ///
+    /// ASCII on purpose: `CharacterSet.alphanumerics` is the whole of Unicode, so it would accept a
+    /// field name with a letter in it that no parser on the other side of a proxy would agree with.
+    static func isToken(_ text: Substring) -> Bool {
+        !text.isEmpty && text.unicodeScalars.allSatisfy { tokenCharacters.contains($0) }
+    }
+
+    private static let tokenCharacters: CharacterSet = {
+        var set = CharacterSet(charactersIn: "!#$%&'*+-.^_`|~")
+        set.insert(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+        return set
+    }()
+
+    /// The method and target from a request line, which must have exactly three parts.
+    ///
+    /// `split(omittingEmptySubsequences: true)` and a `count >= 2` guard accepted a line with no version
+    /// — it went unread — and a line with four parts, and collapsed runs of spaces with them, so a
+    /// request line no parser upstream would agree with was read as if it were ordinary (A154). The
+    /// method keeps the upper-casing the router compares against, which is pinned by `HTTPTests`; what
+    /// is new is that it has to be a token at all.
+    static func requestParts(_ line: String) throws -> (method: String, target: String) {
+        let parts = line.split(separator: " ", omittingEmptySubsequences: false)
+        guard parts.count == 3 else {
+            throw HTTPError.malformed("the request line must be a method, a target and a version")
+        }
+        guard isToken(parts[0]) else {
+            throw HTTPError.malformed("the method was not a token")
+        }
+        guard supportedVersions.contains(String(parts[2])) else {
+            throw HTTPError.unsupportedVersion(String(parts[2]))
+        }
+        return (String(parts[0]).uppercased(), String(parts[1]))
+    }
+
+    /// The header fields, refusing the two shapes RFC 9112 requires a server to reject.
+    ///
+    /// A field name was trimmed before the colon, so `Host : x` — the whitespace §5.1 says a server MUST
+    /// reject — was read as `Host`; and a line with no colon was skipped, which is exactly how an
+    /// obs-fold continuation line arrives, so a folded field was dropped rather than rejected (§5.2).
+    /// The value keeps the optional whitespace the standard allows around it.
+    static func headerFields(_ lines: [String]) throws -> [String: String] {
+        var headers: [String: String] = [:]
+        for line in lines {
+            guard line.first != " ", line.first != "\t" else {
+                throw HTTPError.malformed("a header line was a continuation of the previous one")
+            }
+            guard let colon = line.firstIndex(of: ":") else {
+                throw HTTPError.malformed("a header line had no field name")
+            }
+            let name = line[line.startIndex..<colon]
+            guard isToken(name) else {
+                throw HTTPError.malformed("a header field name was not a token: \"\(name)\"")
+            }
+            let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            let key = name.lowercased()
+            // Repeated headers are joined, which is harmless for the ones we read.
+            headers[key] = headers[key].map { "\($0), \(value)" } ?? value
+        }
+        return headers
+    }
+
+    /// Where the request head ends, or why there is not one yet.
+    ///
+    /// Only the first `maximumHeadBytes` are searched, so the work per read is bounded by the cap
+    /// rather than by how much has arrived — the whole buffer used to be rescanned on every 64 KB, so
+    /// the scan was quadratic in the head — and a request whose head cannot fit is refused here rather
+    /// than accumulated, which is what kept thirty-two connections from pinning gigabytes (A145).
+    ///
+    /// Its own function as well as its own rule: `parse` is at its cyclomatic-complexity budget, and
+    /// the two ways this can end without a head are worth reading together.
+    private static func headEnd(in data: Data) throws -> Data.Index {
+        let searchable = data.prefix(maximumHeadBytes + 4)
+        guard let end = searchable.range(of: Data("\r\n\r\n".utf8))?.lowerBound else {
+            if data.count > maximumHeadBytes { throw HTTPError.headTooLarge }
+            throw Incomplete()
+        }
+        return end
+    }
 
     /// Parse a complete request head plus whatever body has arrived.
     ///
     /// Throws `Incomplete` when more bytes are needed, which is the normal case for a
     /// request arriving in pieces.
     public static func parse(_ data: Data) throws -> HTTPRequest {
-        guard let headerEnd = data.range(of: Data("\r\n\r\n".utf8)) else {
-            throw Incomplete()
-        }
-        let headData = data[data.startIndex..<headerEnd.lowerBound]
+        let headerEnd = try headEnd(in: data)
+        let headData = data[data.startIndex..<headerEnd]
         guard let head = String(data: headData, encoding: .utf8) else {
             throw HTTPError.malformed("the request head was not valid UTF-8")
         }
 
         var lines = head.components(separatedBy: "\r\n")
-        guard !lines.isEmpty else { throw HTTPError.malformed("empty request") }
-        let requestLine = lines.removeFirst().split(separator: " ", omittingEmptySubsequences: true)
-        guard requestLine.count >= 2 else {
-            throw HTTPError.malformed("could not read the request line")
-        }
-        let method = String(requestLine[0]).uppercased()
-        let target = String(requestLine[1])
+        guard let requestLine = lines.first else { throw HTTPError.malformed("empty request") }
+        lines.removeFirst()
+        let (method, target) = try requestParts(requestLine)
+        let headers = try headerFields(lines)
 
-        var headers: [String: String] = [:]
-        for line in lines where !line.isEmpty {
-            guard let colon = line.firstIndex(of: ":") else { continue }
-            let name = line[line.startIndex..<colon].trimmingCharacters(in: .whitespaces)
-            let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
-            // Repeated headers are joined, which is harmless for the ones we read.
-            headers[name.lowercased()] = headers[name.lowercased()].map { "\($0), \(value)" } ?? value
-        }
+        try refuseUnframedBody(headers)
 
         let declaredLength = try declaredBodyLength(headers["content-length"])
         guard declaredLength <= maximumBodyBytes else {
             throw HTTPError.tooLarge
         }
-        let bodyStart = headerEnd.upperBound
+        // Past the blank line that ends the head: the terminator is four bytes.
+        let bodyStart = headerEnd + 4
         let available = data.count - data.distance(from: data.startIndex, to: bodyStart)
         guard available >= declaredLength else { throw Incomplete() }
         let body = Data(data[bodyStart..<data.index(bodyStart, offsetBy: declaredLength)])
@@ -260,18 +376,42 @@ public enum HTTPParser {
         // Split the path from the query, and decode percent escapes so a topic with
         // spaces or non-ASCII can travel in a URL.
         let parts = target.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
-        let path = percentDecoded(String(parts.first ?? ""))
+        let path = pathDecoded(String(parts.first ?? ""))
         var query: [String: String] = [:]
         if parts.count > 1 {
             for pair in parts[1].split(separator: "&") {
                 let kv = pair.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
-                query[percentDecoded(String(kv.first ?? ""))] =
-                    kv.count > 1 ? percentDecoded(String(kv[1])) : ""
+                query[formDecoded(String(kv.first ?? ""))] =
+                    kv.count > 1 ? formDecoded(String(kv[1])) : ""
             }
         }
 
         return HTTPRequest(
             method: method, path: path, query: query, headers: headers, body: body)
+    }
+
+    /// Refuse a body whose framing this server cannot read, rather than reading it as empty.
+    ///
+    /// `Transfer-Encoding` appeared nowhere in this file (A153), so a chunked request — what a proxy
+    /// forwards when the client did not know the length, and what `curl --data-binary @-` sends from a
+    /// pipe — arrived with no `Content-Length`, which `declaredBodyLength` reads as zero. The request
+    /// then parsed successfully with an empty body and its route ran on it. Every route here reads an
+    /// empty body as "the field was not sent" (A142) and `/api/topic` answers that by clearing the
+    /// topic, so the failure was silent and in the direction of changing state.
+    ///
+    /// Both framings at once is the one shape here that is a request-smuggling signal rather than a
+    /// client mistake, so it is a 400 (RFC 9112 §6.1); a coding this server does not implement — it
+    /// implements none — is the 501 that same section asks for. Nothing downstream sees either: the
+    /// read loop answers and closes before a route is reached.
+    private static func refuseUnframedBody(_ headers: [String: String]) throws {
+        guard let declared = headers["transfer-encoding"] else { return }
+        guard headers["content-length"] == nil else {
+            throw HTTPError.malformed("both Transfer-Encoding and Content-Length were declared")
+        }
+        guard !declared.isEmpty else {
+            throw HTTPError.malformed("Transfer-Encoding declared no coding")
+        }
+        throw HTTPError.unsupportedTransferEncoding(declared)
     }
 
     /// The body length a `Content-Length` header declares, or zero when it is absent.
@@ -297,22 +437,59 @@ public enum HTTPParser {
         return value
     }
 
-    /// Percent-decoding that leaves a malformed escape alone rather than dropping it.
-    static func percentDecoded(_ value: String) -> String {
-        value.replacingOccurrences(of: "+", with: " ").removingPercentEncoding ?? value
+    /// Percent-decoding for a path, where `+` is a plus.
+    ///
+    /// A URL path is not a form: RFC 3986 gives `+` no special meaning there, and this used to decode a
+    /// path with the query's rule, so `/s/a+b` became `/s/a b` — a different resource from the one the
+    /// client asked for, and a kept conversation whose id contained a plus could not be opened at all
+    /// (A154). A malformed escape is left alone rather than dropped.
+    static func pathDecoded(_ value: String) -> String {
+        value.removingPercentEncoding ?? value
+    }
+
+    /// Percent-decoding for a query, where `+` is a space.
+    ///
+    /// `application/x-www-form-urlencoded` is what a browser form and `URLSearchParams` send, and this
+    /// is the one place that convention applies. The replacement comes before the percent-decoding so
+    /// that an encoded plus (`%2B`) survives as a plus while a literal one becomes a space.
+    static func formDecoded(_ value: String) -> String {
+        pathDecoded(value.replacingOccurrences(of: "+", with: " "))
     }
 }
 
 public enum HTTPError: LocalizedError {
     case malformed(String)
     case tooLarge
+    case headTooLarge
     case portInUse(UInt16)
+    /// A body the server cannot frame because it does not implement the coding asked for (A153).
+    case unsupportedTransferEncoding(String)
+    /// An HTTP version this server does not speak (A154).
+    case unsupportedVersion(String)
 
     public var errorDescription: String? {
         switch self {
         case .malformed(let reason): "Malformed request: \(reason)"
         case .tooLarge: "Request body is too large"
+        case .headTooLarge: "Request headers are too large"
         case .portInUse(let port): "Port \(port) is already in use"
+        case .unsupportedTransferEncoding(let coding):
+            "Transfer-Encoding is not supported: \(coding). Send a Content-Length instead."
+        case .unsupportedVersion(let version):
+            "HTTP version is not supported: \(version). This server speaks HTTP/1.1."
+        }
+    }
+
+    /// The status a client is answered with. 431 for a head that cannot fit is the code that exists
+    /// for it; 413 is the body's; 501 is what RFC 9112 §6.1 asks for when the recipient does not
+    /// implement the transfer coding it was sent.
+    public var statusCode: Int {
+        switch self {
+        case .headTooLarge: 431
+        case .tooLarge: 413
+        case .unsupportedTransferEncoding: 501
+        case .unsupportedVersion: 505
+        case .malformed, .portInUse: 400
         }
     }
 }
@@ -445,6 +622,48 @@ public final class HTTPServer: @unchecked Sendable {
     /// the connection it was armed for.
     private var idleDeadlines: [ObjectIdentifier: UUID] = [:]
 
+    /// One thing that went wrong on this listener, kept so a live engine can be diagnosed.
+    public struct ConnectionFailure: Sendable, Equatable, Codable {
+        /// What happened, in a sentence: a connection error, a request the parser refused, a connection
+        /// refused for being over the limit.
+        public var reason: String
+        public var at: Date
+    }
+
+    /// How many failures are kept.
+    ///
+    /// Bounded, because anyone who can reach the port can produce one: an unbounded log of a server that
+    /// listens on every interface is a memory leak wearing a diagnostics label (A151).
+    public static let failureHistoryLimit = 20
+
+    /// The most recent failures, newest first.
+    ///
+    /// This is the other half of A151: the counters below existed and were reachable from no endpoint, and
+    /// a client that walked away mid-request was `_ = error`'d out of existence, so diagnosing a running
+    /// engine meant reading source. `APIServer` serves this on `/api/health`.
+    public var recentFailures: [ConnectionFailure] {
+        failureLock.lock()
+        defer { failureLock.unlock() }
+        return failures
+    }
+    /// Its own lock rather than `stateLock`, so that recording a failure is safe on every path —
+    /// including the ones that already hold `stateLock` — without nesting one lock inside another.
+    private let failureLock = NSLock()
+    private var failures: [ConnectionFailure] = []
+
+    /// Record one failure, keeping the newest `failureHistoryLimit`.
+    ///
+    /// Internal rather than private so the tests can drive the ring without a socket, and because the
+    /// network queue and the main actor both call it: the lock is the whole of the synchronisation.
+    func note(_ reason: String) {
+        failureLock.lock()
+        defer { failureLock.unlock() }
+        failures.insert(ConnectionFailure(reason: reason, at: .now), at: 0)
+        if failures.count > Self.failureHistoryLimit {
+            failures.removeLast(failures.count - Self.failureHistoryLimit)
+        }
+    }
+
     /// How many connections have been refused for being over `maximumConnections`.
     ///
     /// Counted and answerable because the finding's other half was that nothing reported this
@@ -508,9 +727,9 @@ public final class HTTPServer: @unchecked Sendable {
 
     /// Take ownership of an open event stream.
     ///
-    /// Every read and write of `streams` goes through `stateLock` — here, in `stop()`, in
-    /// `closeStreams()` and in `finish()` — because the last of those runs on the network queue
-    /// while the first three can run on the main actor.
+    /// Every read and write of `streams` goes through `stateLock` — here, in `stop()` and in
+    /// `finish()` — because the last of those runs on the network queue while the other can run on
+    /// the main actor.
     private func addStream(_ stream: EventStream) {
         stateLock.lock()
         streams.append(stream)
@@ -641,16 +860,6 @@ public final class HTTPServer: @unchecked Sendable {
         markStopped()
     }
 
-    /// Close every open event stream. Used when the conversation is reset, so a connected
-    /// page re-reads the state rather than waiting on events that will never come.
-    public func closeStreams() {
-        stateLock.lock()
-        let open = streams
-        streams.removeAll()
-        stateLock.unlock()
-        for stream in open { stream.close() }
-    }
-
     /// How many event streams the server is still holding open.
     ///
     /// An accessor rather than a comment because there was no way to observe the leak this
@@ -682,6 +891,7 @@ public final class HTTPServer: @unchecked Sendable {
 
         connection.start(queue: queue)
         guard !atCapacity else {
+            note("refused: \(maximumConnections) connections already open")
             // Refused rather than queued, and refused with an answer rather than silence: a
             // peer over the cap is told, and the connection is not entered in the table.
             write(
@@ -727,6 +937,7 @@ public final class HTTPServer: @unchecked Sendable {
 
         // Stale token, or the connection has already been answered or reaped: nothing to do.
         guard isCurrent, isLive else { return }
+        note("request: not completed in time")
         write(
             .error("the request was not completed in time", status: 408), to: connection,
             thenClose: true)
@@ -761,8 +972,14 @@ public final class HTTPServer: @unchecked Sendable {
             } catch is HTTPParser.Incomplete {
                 if isComplete {
                     // The peer closed mid-request; nothing useful to send.
+                    self.note("request: the peer closed before the request was complete")
                     self.finish(connection, error: nil)
-                } else if accumulated.count > HTTPParser.maximumBodyBytes {
+                } else if accumulated.count > HTTPParser.maximumHeadBytes
+                    + HTTPParser.maximumBodyBytes
+                {
+                    // Head plus body, because a head that has not terminated is counted here too and the
+                    // head has its own cap inside `parse` (A145).
+                    self.note("request: larger than the head and body limits")
                     self.write(
                         .error("Request body is too large", status: 413), to: connection,
                         thenClose: true)
@@ -772,9 +989,16 @@ public final class HTTPServer: @unchecked Sendable {
                     self.receive(on: connection, buffer: accumulated)
                 }
             } catch let error as HTTPError {
+                // The parser refused it: a malformed head, a head or body past its cap, a request line it
+                // cannot read. Answered with its own status and, now, remembered (A151).
+                self.note("request: \(error.localizedDescription)")
                 self.write(
-                    .error(error.localizedDescription, status: 400), to: connection, thenClose: true)
+                    .error(error.localizedDescription, status: error.statusCode), to: connection,
+                    thenClose: true)
             } catch {
+                // Anything else, which the caller sees as a 400. Recorded too: the failures worth reading are
+                // the ones nobody wrote a status code for.
+                self.note("request: \(error.localizedDescription)")
                 self.write(
                     .error(error.localizedDescription, status: 400), to: connection, thenClose: true)
             }
@@ -798,21 +1022,18 @@ public final class HTTPServer: @unchecked Sendable {
                     // Appended under `stateLock`, like every other access to `streams`.
                     //
                     // This said "no lock: `streams` is only ever touched on the main actor", and
-                    // that was never true: `stop()`, `closeStreams()` and `finish()` all mutate
-                    // the same array under the lock, and `finish()` runs on the network queue.
-                    // Appending here without it is a concurrent mutation of a Swift array — the
-                    // kind that corrupts or crashes rather than merely reporting a stale value.
+                    // that was never true: `stop()` and `finish()` mutate the same array under the
+                    // lock, and `finish()` runs on the network queue. Appending here without it is a
+                    // concurrent mutation of a Swift array — the kind that corrupts or crashes
+                    // rather than merely reporting a stale value.
                     self.addStream(stream)
                     // Head first, then the opening events, then the socket is left open —
-                    // which is what makes server-sent events work.
-                    let head =
-                        "HTTP/1.1 200 OK\r\n"
-                        + "Content-Type: text/event-stream; charset=utf-8\r\n"
-                        + "Cache-Control: no-store\r\n"
-                        + "X-Accel-Buffering: no\r\n"
-                        + "Connection: keep-alive\r\n"
-                        + "\r\n"
-                    connection.send(content: Data(head.utf8), completion: .contentProcessed { _ in })
+                    // which is what makes server-sent events work. The head comes from the same
+                    // response type every other route answers with, so it carries the same security
+                    // headers; it used to be assembled here by hand, without any of them (A150).
+                    connection.send(
+                        content: HTTPResponse.eventStream().streamingHead(),
+                        completion: .contentProcessed { _ in })
                     for payload in initial { stream.send(payload, event: "snapshot") }
                     // The connection stays open, so it still has to be watched: this is the
                     // only place that learns the client has gone, and `finish` is the only code
@@ -863,7 +1084,10 @@ public final class HTTPServer: @unchecked Sendable {
 
     private func finish(_ connection: NWConnection, error: NWError?) {
         if let error {
-            _ = error  // A client that walks away mid-request is not worth reporting.
+            // Not worth *showing* anyone — a client that walks away mid-request is routine — but worth
+            // recording once, because "the connection keeps dropping" is not diagnosable otherwise. The
+            // ring is bounded, so routine noise cannot grow (A151).
+            note("connection: \(error)")
         }
         stateLock.lock()
         connections[ObjectIdentifier(connection)] = nil

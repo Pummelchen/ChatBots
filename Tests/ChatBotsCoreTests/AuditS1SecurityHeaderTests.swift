@@ -134,6 +134,48 @@ struct AuditS1SecurityHeaderTests {
         #expect(!written.contains("script-src 'self';"))
     }
 
+    @Test("The event stream's head carries the same security headers as every other response")
+    func theStreamHeadAgreesWithTheOthers() {
+        // A150: the stream head was assembled by hand, so it carried none of these. Comparing the two
+        // heads line by line is what stops that happening again — a header added to one is now on both
+        // by construction, and this fails if someone assembles a head separately again.
+        let stream =
+            String(bytes: HTTPResponse.eventStream().streamingHead(), encoding: .utf8) ?? ""
+        let complete = responseHead(.json(["status": "ok"]))
+
+        for header in complete.split(separator: "\r\n") where header.contains(": ") {
+            let name = header.split(separator: ":")[0]
+            // The two differ in exactly two things, both by design: a stream declares no length, and its
+            // content type is its own. Everything else — the security headers this is about — must match.
+            if name.hasPrefix("Content-Length") || name.hasPrefix("Content-Type") { continue }
+            #expect(stream.contains(header), "\(header) is missing from the stream head")
+        }
+        #expect(stream.contains("Content-Type: text/event-stream; charset=utf-8"))
+        #expect(stream.contains("X-Accel-Buffering: no"), "the proxy-buffering hint still travels")
+        #expect(!stream.contains("Content-Length"), "a stream has no length to declare")
+    }
+
+    @Test("The live event stream answers with those headers")
+    func theLiveStreamCarriesThem() async throws {
+        let (server, _, session, base) = try await headerServer()
+        defer { server.stop() }
+
+        // A stream never finishes, so `data(for:)` waits for a body that will not end — the first
+        // version of this test sat there for the session's 60-second timeout. `bytes(for:)` hands back the
+        // head as soon as it arrives, which is where the headers are.
+        let (bytes, response) = try await session.bytes(
+            for: URLRequest(url: URL(string: "\(base)/api/events")!))
+        defer { bytes.task.cancel() }
+        let http = try #require(response as? HTTPURLResponse)
+        #expect(http.statusCode == 200)
+        #expect(http.value(forHTTPHeaderField: "Content-Type")?.contains("text/event-stream") == true)
+        #expect(http.value(forHTTPHeaderField: "X-Content-Type-Options") == "nosniff")
+        #expect(http.value(forHTTPHeaderField: "Referrer-Policy") == "no-referrer")
+        #expect(http.value(forHTTPHeaderField: "X-Frame-Options") == "DENY")
+        let policy = http.value(forHTTPHeaderField: "Content-Security-Policy") ?? ""
+        #expect(policy.contains("default-src 'none'"), "got \(policy)")
+    }
+
     // MARK: Over a real server
 
     @Test("The interface is served with the strict policy")

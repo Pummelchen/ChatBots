@@ -1,0 +1,44 @@
+# A175 — the reason a connection failed is not covered by its symptoms (2026-09-15)
+
+## The tests, against the old behaviour
+# Mutation: `noteConnectionFailed` stores a client regardless (the old order of the two assignments)
+# and `reportNoClient` overwrites the message unconditionally. Both were how the controller behaved.
+
+$ swift test --filter ConnectionReasonTests
+  ✘ Test "A connection that failed leaves no client behind" recorded an issue:
+    Expectation failed: controller.client == nil
+  ✘ Test "Any other control pressed while disconnected does not cover it either" recorded an issue:
+    Expectation failed: controller.engineConnection == "Could not reach the engine: timed out"
+  ✘ Test "The seat endpoints pushed after a failed start do not cover the reason" recorded an issue:
+    Expectation failed: controller.engineConnection == "Could not reach the engine: connection refused"
+  ✘ Test run with 5 tests in 1 suite failed after 0.014 seconds with 3 issues.
+
+# The third of those is the finding's own sequence: connect fails, the window's task calls
+# `applyAPIEndpoints`, one command per seat goes into the disconnected client, and the last transport
+# failure is what the banner shows instead of the reason.
+#
+# The two tests that pass under the mutation are the ones about the fallback sentence, which the old
+# code also produced — that is the point of keeping them: they say what must *not* change.
+
+## With the fix
+$ swift test --filter ConnectionReasonTests
+  ✔ Test run with 5 tests in 1 suite passed after 0.011 seconds.
+
+## What is not exercised here, stated rather than implied
+# The positive half — a connect that succeeds stores the client and clears the message — is not driven
+# from this target: it needs a live QUIC server, and `ChatBotsAppTests` has no transport harness (the
+# Core target's suites start a real `WebTransportEngineServer` in-process; this one would need the same
+# and its own port gate). The failure half is where the finding was, and it is pinned deterministically
+# because `noteConnectionFailed` is the failure branch of `connect` rather than a copy of it.
+
+## The full gate, with the fix
+$ bash tools/audit-checks.sh
+PASS  build: swift build --build-tests
+PASS  tests: 928 tests in 164 suites
+PASS  coverage: TOTAL 6252 2577 58.78% (regions) · 19730 9694 50.87% (lines)
+PASS  swiftlint: 254 finding(s), within the recorded waiver of 255
+PASS  swift-format: 739 diagnostic(s), within the recorded waiver of 744
+PASS  web: deltas merge (31 cases)
+All 6 Mac-only gates passed.
+
+# 923 tests in 163 suites before this task; the five added are `ConnectionReasonTests`.

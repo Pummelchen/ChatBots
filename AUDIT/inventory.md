@@ -1,6 +1,8 @@
 # AUDIT — scope inventory (§2)
 
-Produced before any audit pass, as §2 requires. Branch `audit/2026-09-13` from `main` @ `a6d6999`.
+Produced before any audit pass, as §2 requires, for the 2026-09-13 audit: branch `audit/2026-09-13`
+from `main` @ `a6d6999`. The 2026-09-15 re-audit re-derived the scope against Swift 6.4 and Xcode 27
+in the section at the end of this file; its branch is `audit/2026-09-15` from `main` @ `02ddd4e`.
 
 > **Scope note, stated before anything else.** The brief describes "a monorepo with 20+
 > increasingly interdependent projects". The working tree is **not** a monorepo: it is a
@@ -115,3 +117,52 @@ Initial L4 checks already performed, so they are recorded as verified rather tha
 | tools/ scripts | humans, CI | a broken installer ships a broken app (this has already happened once) |
 
 Anything with more than one consumer is audited at higher severity, per §2.4.
+
+---
+
+# Re-audit 2026-09-15 — scope, re-measured
+
+The previous inventory stands; this section records what changed under Swift 6.4 / Xcode 27 and
+corrects one premise of the brief.
+
+## §2 — the workspace is not a monorepo, re-verified
+
+The brief describes "a monorepo with 20+ increasingly interdependent projects". Enumerated on
+2026-09-15, `/Users/node1/Downloads` holds **three projects and three wiki checkouts**:
+
+| Path | Kind | Notes |
+| --- | --- | --- |
+| `ChatBots` | **the project this audit covers** | SwiftPM package + `web/` + `tools/` |
+| `MCPSearch` | sibling project | separate repository; read-only for this audit |
+| `AISessionServer` | sibling project | separate repository; currently on its own `audit/2026-09-15` branch, i.e. another session |
+| `chatbots-wiki-ro`, `mcps-wiki-ro`, `aisessionserver-wiki` | wiki checkouts | documentation, not code |
+
+There is no shared build, no shared schema and no cross-project dependency beyond the one already
+recorded (`Pummelchen/WebTransport`, which is both a sibling and a pinned dependency). §0 forbids
+narrowing a task's scope and equally forbids widening it silently, so **this re-audit covers
+`ChatBots` only**, and the 20+ project premise is recorded as not matching the workspace.
+
+## §2.1 — units, re-measured
+
+| Unit | Count | Host class |
+| --- | --- | --- |
+| Swift sources | 173 files, **46 258 LOC** | Mac (macOS 27, Xcode 27) |
+| Swift tests | 102 files, **824 `@Test` in 139 `@Suite`** | Mac |
+| Shell (`tools/` 7 + `AUDIT/` 4) | 11 | Mac |
+| Python (`tools/`) | 7 | Mac or Linux |
+| Web (`web/`) | `index.html`, `app.js`, `style.css` | any browser |
+| `names/`, `Caddyfile`, `Package.resolved` | data/config | — |
+
+**No C, C++, Objective-C or C# exists in this repository**, re-verified: `git ls-files` matches none of
+`.c .h .cpp .cc .cs .m .mm`. §1's C sanitizer/memory-checker and .NET requirements therefore have no
+target here; §1's toolchain requirement that *does* bite is Swift 6.4 with strict concurrency and
+warnings-as-errors, which the package sets via `.swiftLanguageMode(.v6)` +
+`.treatAllWarnings(as: .error)`.
+
+## §2.3 — trust boundaries, re-checked
+
+Unchanged, with one addition now that share pages are proxied: **T1 (Caddy on the LAN) now carries
+`/s/<id>` as well as `/api/*`** — the A99 fix that made share links work in the shipped configuration
+also made kept conversations reachable from the network through the documented deployment. That is
+consistent with the documented "website is reachable from the LAN" position and with `SECURITY.md`;
+it is recorded here because a boundary changed shape.

@@ -3,12 +3,22 @@
 Companion files: [`environment.md`](environment.md) (fleet/toolchain), [`inventory.md`](inventory.md)
 (scope, §2), [`ledger.md`](ledger.md) + `ledger.json` (tasks), [`baseline/`](baseline) (raw evidence).
 
-Branch `audit/2026-09-13` from `main` @ `a6d6999`. `main` was untouched for the whole audit, and the
-branch was landed on it as a fast-forward once Phase E was green. Nothing is force-pushed.
+Branch `audit/2026-09-15`, cut from `main` @ `02ddd4e`, for the Swift 6.4 / Xcode 27 / macOS 27
+re-audit. `main` is deliberately untouched until Phase E is green; the branch then goes back by pull
+request. The previous `audit/2026-09-13` audit was landed on `main` as a fast-forward and is history;
+`main` has moved on since (`349fefe`), so the two are not the same commit. Nothing is force-pushed.
 
 > **Scope.** This project only, for the reason recorded at the top of `inventory.md`: the
 > workspace is a set of sibling repositories, not a monorepo, and `Converter` (Phase A) and
 > `MCPSearch` (Phase B, session still active) are owned by other audit sessions.
+
+> **Reading the phase sections below.** They are the 2026-09-13 audit's own plan and status, kept as
+> the record of how that audit ran. The 2026-09-15 re-audit re-ran Phase A and Phase B against the
+> Swift 6.4 toolchain and those results are appended to [`environment.md`](environment.md) and
+> [`inventory.md`](inventory.md); **its Phase C is complete** — 218 tasks, all DONE, in
+> [`ledger.json`](ledger.json) — and **its Phase E has been run**, on `node2` from a fresh clone of the
+> branch head; the acceptance is at the end of the Phase E section below. Where the two disagree about
+> counts, `ledger.json` decides and nothing hand-written here does.
 
 ## Phase A — inventory, baseline, environment ✅ complete
 
@@ -41,12 +51,13 @@ error is conservative.
 | `swift-format lint` | **not reproducible as recorded** (was 29 900); **3 003** after A06's config | 29 904 was the line count of the captured file (A28). Now counted from `warning:`/`error:` lines | `baseline/swift-format-lint.txt` |
 | `ruff check` / `ruff format --check` | **11 errors / 5 files would be reformatted** | `ruff check`'s own summary line; `ruff format --check`'s file list | `baseline/ruff-*.txt` — reproduces exactly |
 | `pyright` | **2 errors** | `pyright`'s own `N errors, M warnings` line | `baseline/pyright.json` — reproduces exactly |
-| `shellcheck -S style` | **4 findings**: 2 × SC2001 (`make-app.sh`), SC2034 (`start-app.sh`), SC2015 (`start.sh`) | `grep -cE 'SC[0-9]{4} \((style\|info\|warning\|error\)):'` — one per finding. This number was wrong **twice**: 24 was the captured file's **line count**, and 7 was `grep -oE 'SC[0-9]{4}'`, which also matches the three `shellcheck.net/wiki/SCnnnn` help URLs printed under the findings | `baseline/shellcheck.txt` is 24 lines containing 4 findings |
+| `shellcheck -S style` | **4 findings** at the baseline: 2 × SC2001 (`make-app.sh`), SC2034 (`start-app.sh`), SC2015 (`start.sh`) — **0 now**, over every tracked script | `grep -cE 'SC[0-9]{4} \((style\|info\|warning\|error\)):'` — one per finding. This number was wrong **twice**: 24 was the captured file's **line count**, and 7 was `grep -oE 'SC[0-9]{4}'`, which also matches the three `shellcheck.net/wiki/SCnnnn` help URLs printed under the findings | `baseline/shellcheck.txt` is 24 lines containing 4 findings; A10 fixed the four, A192 widened the glob from `tools/*.sh` to `git ls-files '*.sh'` (18 scripts) |
 | Force unwraps in `Sources/` | **12 `!` sites** (a review recorded "two … not a task") | `grep -nE '[A-Za-z0-9_)\]]!\s*($\|[^=])' Sources/`; 10 force unwraps + 3 implicitly-unwrapped declarations, minus overlap. None can currently trap; fixed by A28 | see A28 in `ledger.md` |
 | `try?` sites in `Sources/` | **72 across 23 files** | `grep -rno 'try?' Sources` — reproduces exactly | `baseline/` |
 | Secret scan, **full history** (`gitleaks --log-opts=--all`) | **0 findings** | `gitleaks` JSON report, read as a count only; values never echoed | `baseline/gitleaks.json` |
 | Dependency CVE (`osv-scanner`) | **no issues found** | the tool's own summary | `baseline/osv-scanner.txt` |
 | SAST (`semgrep --config auto`) | **3 findings**, all in `tools/cdp.py` | `jq '.results \| length'` | `baseline/semgrep.json` — reproduces exactly |
+| SAST, what `auto` resolved | a **1074-rule policy**, of which **461 ran** for this tree's languages, over 101 targets | semgrep's own scan summary, which the gate no longer suppresses with `--quiet` | `baseline/swift64/a192-semgrep-rules.log` — A192: the rule set is fetched from the registry at scan time, so no pin covers it; the gate now records what it resolved |
 | §5 placeholder sweep | **0 markers** (TODO/FIXME/HACK/XXX/WIP/STUB) | `git grep -cE` over tracked source; re-run in Phase C, still 0 | `inventory.md` §2.3 note |
 | Forbidden constructs (§0) | **0** — no `try!`, no `as!`, no `-Wno-` in `Sources/` or `Tests/` | `git grep -nE 'try!\|as!\|-Wno-'` | re-run in Phase C |
 | AddressSanitizer, full suite | **clean** — exit 0, no sanitizer report | `swift test --sanitize=address` | `baseline/swift-test-asan.log` |
@@ -103,8 +114,26 @@ is pinned to `http` and built only from validated values, and the reply is read 
 findings stay visible — there is no `nosemgrep` — and each site carries a comment saying what the
 rule cannot know.
 
-`shellcheck -S style` (4 findings, A10), `ruff check`, `ruff format --check` and `pyright` are
-**not** waived: those are clean targets or owned by a named task.
+`shellcheck -S style` (4 findings at the baseline, all fixed by A10), `ruff check`,
+`ruff format --check` and `pyright` are **not** waived: those are clean targets or owned by a named
+task. A192 widened the shell lint from `tools/*.sh` to every tracked `*.sh`, which brings the
+audit's own scripts and the probe scripts under `AUDIT/` into the gate; the run is 0 findings over
+18 scripts (`baseline/swift64/a192-shellcheck-scope.log`). The Python gates (parse, `ruff`,
+`pyright`) stay scoped to `tools/*.py`, which is all the Python this repository ships: the two probe
+scripts under `AUDIT/baseline/` are research artifacts, they are **not** clean under those gates,
+and that is stated here rather than left to be inferred from the glob.
+
+**One gate input is not pinned, and is not claimed to be.** `semgrep --config auto` fetches its
+rule set from the Semgrep registry when it runs, so the version pin on the *binary* (1.176.0) says
+nothing about the rules: on 2026-09-15 the registry served a 1074-rule policy
+(`sha256 d246b001…`, 2 423 491 bytes) of which semgrep ran 461 for this tree's languages. A192
+therefore removed `--quiet` from both semgrep invocations — the scan's own summary (rules run,
+targets scanned, and the one skipped target, the 1.5 MB app PNG) is now in the job log and in
+`phase-e.sh`'s line — and recorded the figures here. Pinning the policy was considered and
+rejected: the registry serves no versioned reference to `auto`, and vendoring the resolved file
+would freeze the rule set *and* require a gitleaks exclusion, because that file embeds the
+registry's own example credentials (two findings, values never echoed,
+`baseline/swift64/a192-semgrep-rules.log`).
 
 ## Phase B — audit passes (in progress)
 
@@ -140,8 +169,11 @@ and marked L1, L2, L4 and L6 "in progress". The table was the stale artifact, no
 
 ## Phase C — fix → test → audit
 
-**Complete: 127 of 127 tasks DONE, 0 open, 0 blocked.** Work order: S0, then S1, then S2, then S3. One task = one commit,
-`audit(<id>): <title>`, on `audit/2026-09-13`.
+The 2026-09-13 audit ran this phase to completion: 127 of 127 tasks DONE, 0 open, 0 blocked. The
+2026-09-15 re-audit is **in** this phase — for its live counts read the generated table in
+[`ledger.md`](ledger.md), which is rendered from `ledger.json`, not any number written here. Work
+order: S0, then S1, then S2, then S3. One task = one commit,
+`audit(<id>): <title>`, on `audit/2026-09-15`.
 
 A DONE status is a claim about the tree, so it is checked against the tree and not against the
 ledger: **`AUDIT/verify-done-commits.sh` must exit 0** before a fix task is called DONE. It takes
@@ -200,10 +232,11 @@ history; `osv-scanner` no issues; `semgrep` 3 findings, all covered by a written
 recorded waivers; `verify-done-commits.sh` backed 116 · skipped 14 · unbacked 0; the ledger at 130
 tasks with none open; and the generated files — the web interface, the name lists and the ledger's own
 status tables — all in step.
-inction is the whole reason it
-exists: every number in this audit that was wrong was wrong because it was derived by hand from
-formatted output — A19 recorded a task DONE whose commit contained no source change, and A28 found
-three counts that were the line counts of captured files rather than finding counts. Each check
+
+The script reads every figure it reports from the tool that produced it, and that distinction is the
+whole reason it exists: every number in this audit that was wrong was wrong because it was derived by
+hand from formatted output — A19 recorded a task DONE whose commit contained no source change, and A28
+found three counts that were the line counts of captured files rather than finding counts. Each check
 here reads its figure from the tool's own report, and the ones that can only *report* a number
 rather than enforce a floor say so.
 
@@ -215,6 +248,37 @@ what macOS ships and what the verification host will use.
 It exits non-zero if any gate fails, so a green exit is the acceptance statement. The gate that
 matters most for this audit's own integrity is `verify-done-commits.sh`: it is what stops a task
 being marked DONE without a commit that backs it.
+
+### The 2026-09-15 re-audit's acceptance
+
+Run on the branch named above, not on `main`: `main` is deliberately untouched until this passes, and
+the branch then goes back by pull request. `main` had moved nine commits while the audit ran, so it
+was merged into the branch first (`686bf70`) — a pull request against a diverged `main` would have
+conflicted, and merging afterwards would have meant running the acceptance against one commit and
+merging another. That merge's own run was green (`runs/2-merge-commit-686bf70/`), as was the run after
+A218 (`runs/3-commit-e5ce7851/`); the acceptance below is the run after the ledger gained its *last*
+task, A219 — the two instruction documents `main` had added mid-audit, whose figures the re-audit's own
+measurements contradicted.
+
+| | |
+| --- | --- |
+| Commit tested | `7ed87f55d20f233ae7861b92b95e6c4aae469eab` (`audit/2026-09-15`) |
+| Host | `node2` (`Node2.local`), a Mac that did not develop these fixes, from a fresh clone of the pushed branch |
+| Result | **23 passed, 0 failed** — `AUDIT/baseline/phaseE-2026-09-15/summary.txt` |
+| Evidence | `AUDIT/baseline/phaseE-2026-09-15/` — the run's own logs, the identity of what was tested, and the summary. The instrumented build trees are `.gitignore`d; the logs are committed. Three earlier runs are under `runs/`: the first stopped on `pyright is not installed` on the host, the second was green on the merge commit, the third was green at 218 tasks and was superseded when A219 changed the ledger. |
+
+The figures it produced: 1052 tests in 196 suites; 0 compiler errors and 0 compiler warnings; ASan and
+TSan clean; coverage `Sources/` 60.42 % of regions; `gitleaks` 0 findings over the full history;
+`osv-scanner` no issues; `semgrep` 3 findings, all covered by a written waiver (461 rules run over 101
+files); `shellcheck` 0 findings over every tracked script, `ruff` and `pyright` clean; `swiftlint` 253
+and `swift-format` 739, both inside their recorded waivers; `verify-done-commits.sh` backed 202 ·
+skipped 17 · unbacked 0; the ledger at **219 tasks with none open and none blocked**; and the generated
+files — the web interface, the name lists and the ledger's own status tables — all in step.
+
+One thing this paragraph cannot claim: it was written after the run, so the head is the tested commit
+plus this documentation commit. The alternative — writing the acceptance before the run that fills it
+in — would be worse; what the run itself checked is that the tree was clean at `7ed87f55` and that
+`ledger.json`, not prose, decided every count.
 
 ## Git operations performed, with rollback (§0)
 

@@ -29,9 +29,10 @@ fi
 # JSON parser per task.
 #
 # `file_line` is free prose, so it is scanned for plausible repository paths rather than parsed:
-# anything that looks like a file or directory under Sources/, Tests/ or tools/. A task that
-# names no such path — a CI YAML, a document, a decision — is out of scope here and is reported
-# as skipped rather than passed silently.
+# anything ending in one of the source extensions below — Swift, Python, shell, and the web and CI
+# files a task can also be fixed in. A task that names no such path — a document, a decision, a
+# sanitizer baseline — is out of scope here and is reported as skipped rather than passed silently.
+# That list is load-bearing rather than cosmetic: see the note on it where it is used (A213).
 # The separator has now been wrong twice, in the same direction both times: the guard read its
 # own fields wrongly, therefore *skipped* the claims it exists to check, and still exited 0.
 #
@@ -79,8 +80,16 @@ while IFS="$separator" read -r id commit file_line unit; do
     read_rows=$((read_rows + 1))
 
     # The paths this task's own record points at.
+    #
+    # The extension list is what decides whether a task's claim can be checked at all, so an
+    # omission here does not report "unchecked" — it reports the task as *unbacked*, because the
+    # record names a path the check refuses to see. `js` was missing until A213, which made a fix
+    # entirely inside `web/` unverifiable: A165's own commit contains the change and the guard said
+    # it touched none of the task's files. `html`, `css` and `yml` were missing for the same reason —
+    # the web interface, its stylesheet and the CI workflows are all places a task can be fixed, and
+    # the ledger names them.
     paths=$(printf '%s %s\n' "$file_line" "$unit" \
-        | grep -oE '[A-Za-z0-9_./-]*\.(swift|py|sh)[^ ,;:)]*' \
+        | grep -oE '[A-Za-z0-9_./-]*\.(swift|py|sh|js|html|css|yml)[^ ,;:)]*' \
         | sed 's/[.,;:)]*$//' \
         | sort -u)
 

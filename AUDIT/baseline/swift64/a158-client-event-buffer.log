@@ -1,0 +1,89 @@
+A158 — controlled before/after for the client event buffer
+Host: 27.0 / arm64, swift-driver version: 1.168.6 Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)
+
+--- BASELINE: unmutated ---
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test "A consumer that stops draining cannot make the client retain every event" passed after 2.018 seconds.
+✔ Test "The request channel lets one holder in at a time, and hands over to the waiter" passed after 0.109 seconds.
+✔ Test "A frame this build cannot read is recorded rather than swallowed" passed after 0.001 seconds.
+✔ Test run with 3 tests in 1 suite passed after 2.130 seconds.
+
+--- M1: the client's event stream is unbounded again (the pre-fix behaviour) ---
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✘ Test "A consumer that stops draining cannot make the client retain every event" recorded an issue at AuditS3ClientEventBufferTests.swift:53:9: Expectation failed: received <= ProtocolLimits.eventBufferDepth
+↳ the client retained 299 events; the bound is 256
+↳ received <= ProtocolLimits.eventBufferDepth → false
+↳   received → 299
+↳   ProtocolLimits.eventBufferDepth → 256
+✘ Test "A consumer that stops draining cannot make the client retain every event" failed after 1.997 seconds with 1 issue.
+✔ Test "The request channel lets one holder in at a time, and hands over to the waiter" passed after 0.108 seconds.
+✔ Test "A frame this build cannot read is recorded rather than swallowed" passed after 0.001 seconds.
+✘ Suite "The client's event stream is bounded where the server's is (A158)" failed after 2.107 seconds with 1 issue.
+✘ Test run with 3 tests in 1 suite failed after 2.107 seconds with 1 issue.
+
+--- M2: a frame this build cannot read is swallowed again (the pre-fix try?) ---
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test "A consumer that stops draining cannot make the client retain every event" passed after 2.162 seconds.
+✔ Test "The request channel lets one holder in at a time, and hands over to the waiter" passed after 0.107 seconds.
+✘ Test "A frame this build cannot read is recorded rather than swallowed" recorded an issue at AuditS3ClientEventBufferTests.swift:86:9: Expectation failed: client.unreadableFrames == 1
+↳ client.unreadableFrames == 1 → false
+↳   client.unreadableFrames → 0
+✘ Test "A frame this build cannot read is recorded rather than swallowed" recorded an issue at AuditS3ClientEventBufferTests.swift:87:9: Expectation failed: client.lastUnreadableFrame?.contains("Could not decode") == true
+↳ the reason should be the codec's: nothing
+↳ client.lastUnreadableFrame?.contains("Could not decode") == true → false
+↳   client.lastUnreadableFrame?.contains("Could not decode") → nil
+↳     some → true
+✘ Test "A frame this build cannot read is recorded rather than swallowed" recorded an issue at AuditS3ClientEventBufferTests.swift:94:9: Expectation failed: client.unreadableFrames == 1
+↳ a readable frame was counted as unreadable
+↳ client.unreadableFrames == 1 → false
+
+--- M3: the burst never happens (the counterweight's own counterweight) ---
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test "A consumer that stops draining cannot make the client retain every event" passed after 1.253 seconds.
+✔ Test "The request channel lets one holder in at a time, and hands over to the waiter" passed after 0.102 seconds.
+✔ Test "A frame this build cannot read is recorded rather than swallowed" passed after 0.003 seconds.
+✔ Test run with 3 tests in 1 suite passed after 1.362 seconds.
+
+--- M4: a readable frame is counted as unreadable (over-correction) ---
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test "A consumer that stops draining cannot make the client retain every event" passed after 2.122 seconds.
+✔ Test "The request channel lets one holder in at a time, and hands over to the waiter" passed after 0.106 seconds.
+✘ Test "A frame this build cannot read is recorded rather than swallowed" recorded an issue at AuditS3ClientEventBufferTests.swift:86:9: Expectation failed: client.unreadableFrames == 1
+↳ client.unreadableFrames == 1 → false
+↳   client.unreadableFrames → 2
+✘ Test "A frame this build cannot read is recorded rather than swallowed" recorded an issue at AuditS3ClientEventBufferTests.swift:94:9: Expectation failed: client.unreadableFrames == 1
+↳ a readable frame was counted as unreadable
+↳ client.unreadableFrames == 1 → false
+↳   client.unreadableFrames → 3
+✘ Test "A frame this build cannot read is recorded rather than swallowed" failed after 0.006 seconds with 2 issues.
+✘ Suite "The client's event stream is bounded where the server's is (A158)" failed after 2.236 seconds with 2 issues.
+✘ Test run with 3 tests in 1 suite failed after 2.239 seconds with 2 issues.
+
+--- RESTORED: unmutated again ---
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test "A consumer that stops draining cannot make the client retain every event" passed after 2.126 seconds.
+✔ Test "The request channel lets one holder in at a time, and hands over to the waiter" passed after 0.106 seconds.
+✔ Test "A frame this build cannot read is recorded rather than swallowed" passed after 0.005 seconds.
+✔ Test run with 3 tests in 1 suite passed after 2.242 seconds.
+
+--- FULL GATE at the fix commit (tools/audit-checks.sh) ---
+PASS  build: swift build --build-tests
+PASS  tests: 1015 tests in 187 suites
+PASS  coverage: Sources/ TOTAL 6501 regions 2590 covered 60.16%, 20475 lines 9830 covered 51.99%
+PASS  swiftlint: 253 finding(s), within the recorded waiver of 255
+PASS  swift-format: 739 diagnostic(s), within the recorded waiver of 744
+PASS  web: deltas merge (34 cases)
+
+All 6 Mac-only gates passed.

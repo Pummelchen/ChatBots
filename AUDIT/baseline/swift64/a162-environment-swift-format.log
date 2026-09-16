@@ -1,0 +1,60 @@
+A162 — how swift-format is obtained, and what the gates actually need
+Host: 27.0 / arm64
+
+--- The hole, demonstrated: every tool but swift-format on PATH ---
+$ env PATH=<tmp with swift, swiftlint, xcrun, jq, node> bash tools/audit-checks.sh
+missing required tool: swift-format (see AUDIT/environment.md)
+exit=2
+
+$ env PATH=<same> xcrun --find swift-format
+/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-format
+exit=0
+
+A reader who believed the old record — "swift-format comes from Xcode 27 (xcrun swift-format); it is not
+installed from brew for this audit" — would have Xcode's, believe the environment was complete, and get
+exit 2 with `missing required tool: swift-format` from the gate.
+
+--- What is actually installed and what the gates run ---
+  command -v swift-format : /opt/homebrew/bin/swift-format
+  resolves to             : ../Cellar/swift-format/603.0.0/bin/swift-format
+  swift-format --version  : 603.0.0 (the one on PATH, so the one both gates run)
+  xcrun swift-format -v   : main
+  xcrun --find swift-format: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-format
+  brew list --versions    : swift-format 603.0.0
+
+--- Both builds, on the same tree, today ---
+  brew 603.0.0 : 739 diagnostics
+  xcrun main   : 739 diagnostics
+
+--- What the gates require ---
+  tools/audit-checks.sh:42  the required-tool loop: for tool in swift swiftlint swift-format xcrun jq node
+  tools/audit-checks.sh:43  command -v "\$tool"
+  AUDIT/phase-e.sh:332  if command -v swift-format
+
+--- AFTER: the three edited places in AUDIT/environment.md ---
+$ grep -n 'swift-format' AUDIT/environment.md | sed -n '1,8p'
+30:| `swift-format` | 603.0.0 | brew | formatter + `lint` |
+47:| Swift | `swift-format` | `swiftlint` | `swiftlint` + `swift build` warnings-as-errors | compiler (Swift 6 mode) | `semgrep` | `osv-scanner` | `gitleaks` | `llvm-cov` |
+64:brew install swift-format swiftlint llvm gitleaks osv-scanner semgrep ruff pyright shellcheck jq
+211:| `swift-format` | 603.0.0 (brew) | 603.0.0 (brew), which is the one on `PATH` and the one both gates run; Xcode 27's `xcrun swift-format` (reports `main`) reports the same diagnostics | brew |
+218:Both `swift-format` builds report the same diagnostics on the same tree — **744** when the toolchain
+221:gates run, because they invoke `swift-format` from `PATH`; Xcode's is reachable only through `xcrun` and
+233:brew install swiftlint swift-format llvm gitleaks osv-scanner semgrep ruff pyright shellcheck jq
+234:# `swift-format` is installed from brew on purpose: both gates invoke it from PATH and check it with
+
+--- The CI version check still agrees about the three pinned tools ---
+  shellcheck   script 0.11.0   environment.md 0.11.0
+  gitleaks     script 8.30.1   environment.md 8.30.1
+  osv-scanner  script 2.5.1    environment.md 2.5.1
+
+--- FULL GATE at the fix commit (tools/audit-checks.sh) ---
+PASS  build: swift build --build-tests
+PASS  tests: 1020 tests in 188 suites
+PASS  coverage: Sources/ TOTAL 6505 regions 2589 covered 60.20%, 20486 lines 9826 covered 52.04%
+PASS  swiftlint: 253 finding(s), within the recorded waiver of 255
+PASS  swift-format: 739 diagnostic(s), within the recorded waiver of 744
+PASS  web: deltas merge (34 cases)
+PASS  web: the verdict rule (12 cases)
+
+All 6 Mac-only gates passed. (A record change touches no gate; the gate is run at every fix commit
+regardless, and this is the run at this one.)

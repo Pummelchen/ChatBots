@@ -1,0 +1,16 @@
+# A213 — the DONE-commit guard's path list, before and after (2026-09-15T13:33:03Z)
+
+## 1. before: the guard knows .swift, .py and .sh only
+$ grep -n 'swift|py|sh' AUDIT/verify-done-commits.sh   # (in the committed version)
+  83:        | grep -oE '[A-Za-z0-9_./-]*\.(swift|py|sh)[^ ,;:)]*' \
+$ AUDIT/verify-done-commits.sh | grep A165
+  FAIL   A165  commit 3445aee touches none of: Sources/ChatBotsCore/APIServer.swift 
+  backed 127 · skipped 17 · unbacked 1
+
+## 2. after: .js, .html, .css and .yml are seen
+$ grep -n 'grep -oE' AUDIT/verify-done-commits.sh
+  92:        | grep -oE '[A-Za-z0-9_./-]*\.(swift|py|sh|js|html|css|yml)[^ ,;:)]*' \
+$ AUDIT/verify-done-commits.sh | grep -E 'A165|A01|backed'
+  ok     A01  c91a310 touches tools/start-web-mobile.sh
+  ok     A165  3445aee touches web/app.js
+  backed 132 · skipped 13 · unbacked 0

@@ -41,6 +41,7 @@ struct PaneHeader: View {
     let onThinkingChange: (ThinkingMode) -> Void
     let onPersonaChange: (String) -> Void
     let onBackendChange: (AgentSpec.Backend) -> Void
+    let onModelChange: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -71,6 +72,12 @@ struct PaneHeader: View {
                     spec: spec,
                     isEnabled: canChangeBackend,
                     onSelect: onBackendChange
+                )
+
+                ModelControl(
+                    spec: spec,
+                    isEnabled: !isGenerating,
+                    onSelect: onModelChange
                 )
 
                 PersonaControl(
@@ -276,7 +283,7 @@ struct BackendControl: View {
             !isEnabled
                 ? "Backend is fixed once the conversation has started"
                 : spec.backend == .mlx
-                    ? "Running Qwen in-process on the GPU with MLX"
+                    ? "Running \(spec.modelShortName) in the engine process, on this Mac's GPU with MLX"
                     : "Talking to \(spec.openAI.baseURL) over the OpenAI Responses API. Web tools are MLX-only, so this seat has none."
         )
     }
@@ -286,40 +293,71 @@ struct BackendControl: View {
     }
 }
 
-/// Shows where an API-backed seat is pointed, and warns that its tools are gone.
-struct EndpointBar: View {
+/// Per-seat checkpoint picker.
+///
+/// The list is `ModelCatalog`, so what is offered is what has been run through this app's engine
+/// rather than whatever a hub search happens to return. The current checkpoint is always shown even
+/// when it is not in the catalogue — a seat can be pointed at any repository id from the command line,
+/// and a picker that could not display the model in use would be lying about it.
+///
+/// Same isolation as the other controls: plain values and a callback, never an observation of the
+/// streaming pane, because a `Menu` rebuilt on every token sends the hosting view into a transaction
+/// loop.
+struct ModelControl: View {
     let spec: AgentSpec
-    let palette: AppPalette
-    let onEdit: () -> Void
-
-    @EnvironmentObject private var theme: ThemeStore
-    @State private var draft = ""
-    @State private var showingEditor = false
+    let isEnabled: Bool
+    let onSelect: (String) -> Void
 
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "network")
-                .scaledFont(size: 9)
-                .foregroundStyle(palette.textTertiary)
-
-            Text("\(spec.openAI.baseURL) · \(spec.openAI.model)")
-                .scaledFont(size: 9.5, design: .monospaced)
-                .foregroundStyle(palette.textTertiary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-
-            if spec.webSearchEnabled {
-                Label("web tools unavailable on this backend", systemImage: "exclamationmark.triangle")
-                    .scaledFont(size: 9.5, design: .rounded)
-                    .foregroundStyle(AgentTheme.warning)
+        Menu {
+            Picker("Model", selection: binding) {
+                ForEach(choices) { choice in
+                    Text(choice.name).tag(choice.id)
+                }
             }
-
-            Spacer(minLength: 0)
+            .pickerStyle(.inline)
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "brain")
+                    .scaledFont(size: 9)
+                Text(spec.modelShortName)
+                    .scaledFont(size: 10, weight: .medium, design: .rounded)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
         }
-        .help("This seat uses the OpenAI Responses API at \(spec.openAI.baseURL)")
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .disabled(!isEnabled)
+        .help(helpText)
+    }
+
+    /// The catalogue, plus whatever this seat is running if the catalogue does not have it.
+    private var choices: [ModelChoice] {
+        let known = ModelCatalog.choices
+        guard !known.contains(where: { $0.id == spec.modelID }) else { return known }
+        // Built separately rather than inline in the array: a call whose last argument is an empty
+        // literal is where swiftlint and swift-format disagree about a trailing comma, and a named
+        // local reads better than either of them.
+        let current = ModelChoice(
+            id: spec.modelID,
+            name: spec.modelShortName,
+            summary: "Set outside this app; its size is not known here.",
+            aliases: []
+        )
+        return known + [current]
+    }
+
+    private var helpText: String {
+        guard isEnabled else { return "The model is fixed while this seat is generating" }
+        let current = ModelCatalog.choice(for: spec.modelID)?.summary
+        return current ?? "MLX checkpoint for this seat: \(spec.modelID)"
+    }
+
+    private var binding: Binding<String> {
+        Binding(get: { spec.modelID }, set: { onSelect($0) })
     }
 }
-
 
 /// A seat's name, renamed by double-clicking it.
 ///

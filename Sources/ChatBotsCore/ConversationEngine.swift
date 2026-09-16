@@ -108,6 +108,12 @@ public final class ConversationEngine {
         public var compactKeepRecentTurns: Int = 8
         /// Token allowance for the digest itself.
         public var compactSummaryTokens: Int = 900
+        /// How an MLX engine is built for a seat.
+        ///
+        /// Injected because a seat's checkpoint can be changed while the engine is alive, and the
+        /// wiring around an engine is the caller's: the command line routes load progress to stdout,
+        /// the app reports it into a pane, and a test wants to see the swap without loading weights.
+        public var makeMLXEngine: @Sendable (AgentSpec) -> any LLMEngine = { MLXEngine(spec: $0) }
 
         public init() {}
     }
@@ -120,9 +126,12 @@ public final class ConversationEngine {
         public var spec: AgentSpec
         /// The MLX engine. Every seat has one — both initialisers install an engine here — so
         /// the fallback in `engine` below cannot be empty (audit A28).
-        public let mlx: any LLMEngine
+        ///
+        /// Replaceable, because the checkpoint a seat runs is a user choice: `setModel` builds a new
+        /// engine for the new weights and releases the old one.
+        public var mlx: any LLMEngine
         /// The API engine, present only when the seat was built for both backends.
-        public let openAI: (any LLMEngine)?
+        public var openAI: (any LLMEngine)?
 
         public init(spec: AgentSpec, engine: any LLMEngine) {
             self.spec = spec
@@ -155,6 +164,17 @@ public final class ConversationEngine {
     /// Non-fatal notices, newest last. The UI drains these into a running commentary.
     public private(set) var notices: [String] = []
     private var noticeContinuation: AsyncStream<[String]>.Continuation?
+
+    /// Why a seat's model could not be loaded, by seat id, from the last attempt to load it.
+    ///
+    /// A failed load was a notice in the room and nothing else, so a listener could answer
+    /// `/api/health` with "ok" while every seat was unusable — the checkpoint deleted, the Metal
+    /// library missing. This is what the health check reads (A152). Written from the load group, which
+    /// is why it lives on the main actor with the rest of the observable state.
+    ///
+    /// Cleared by the next successful load and by pointing a seat at a different checkpoint, so a
+    /// failure that has been dealt with is not reported for the rest of the session.
+    public private(set) var modelLoadFailures: [String: String] = [:]
 
     /// Notices as they happen.
     public private(set) lazy var noticeUpdates: AsyncStream<[String]> = {
@@ -201,7 +221,8 @@ public final class ConversationEngine {
     /// the whole prompt, so an unobserved run accumulated a full event-by-event copy of the
     /// conversation including one copy of a multi-thousand-token prompt per turn. A consumer
     /// that falls behind now loses the oldest events instead of the process retaining them
-    /// forever — the same policy and bound the WebTransport server gives each client. The CLI
+    /// forever — the same policy and bound the WebTransport server and the client give each hop, from the
+    /// one constant they share. The CLI
     /// only reads the coarse tool and turn events, so dropping stale fragments cannot starve it.
     public private(set) var events: AsyncStream<TurnEvent>
 
@@ -268,7 +289,7 @@ public final class ConversationEngine {
         // The event buffer is bounded: with no iterative reader, an unbounded stream retained
         // every token and every full prompt for the life of the process. See `events`.
         let (eventStream, eventSink) = AsyncStream.makeStream(
-            of: TurnEvent.self, bufferingPolicy: .bufferingNewest(256))
+            of: TurnEvent.self, bufferingPolicy: .bufferingNewest(ProtocolLimits.eventBufferDepth))
         let (statusStream, statusSink) = AsyncStream.makeStream(
             of: RunStatus.self, bufferingPolicy: .bufferingNewest(1))
         let (transcriptStream, transcriptSink) = AsyncStream.makeStream(
@@ -398,7 +419,11 @@ public final class ConversationEngine {
     /// seat's next turn rather than only being recorded.
     public func updateSeat(_ spec: AgentSpec) {
         guard let index = seats.firstIndex(where: { $0.spec.id == spec.id }) else { return }
+        let changedModel = seats[index].spec.modelID != spec.modelID
         seats[index].spec = spec
+        if changedModel {
+            rebuildMLXEngine(at: index)
+        }
         if let engine = seatEngine(for: spec.id) {
             Task {
                 await engine.setDisplayName(spec.displayName)
@@ -406,6 +431,56 @@ public final class ConversationEngine {
                 await engine.setThinking(spec.thinking)
             }
         }
+    }
+
+    /// Whether a turn is in flight — generating, preparing, or parked by a pause.
+    ///
+    /// Not the same question as `isRunning`, which a paused room answers "no": the checkpoint cannot
+    /// be changed while a parked turn is waiting to resume on the engine it started with.
+    public var hasTurnInFlight: Bool { generationTask != nil }
+
+    /// Point one seat at a different checkpoint, and answer whether that changed anything.
+    ///
+    /// Refused while a turn is in flight: the engine being replaced is the one that turn is generating
+    /// on — or will resume on — and releasing its weights underneath it would fail the turn for a
+    /// reason the user did not ask for. A caller that wants to switch says so while the room is
+    /// stopped.
+    @discardableResult
+    public func setModel(_ modelID: String, for agentID: String) -> Bool {
+        let resolved = ModelCatalog.resolve(modelID)
+        guard !resolved.isEmpty, seats.contains(where: { $0.spec.id == agentID }) else { return false }
+        guard !hasTurnInFlight else { return false }
+        var spec = seats.first(where: { $0.spec.id == agentID })!.spec
+        guard spec.modelID != resolved else { return false }
+        spec.modelID = resolved
+        // From the identifier, as a seat built from scratch does: the label is what a front end shows
+        // for the seat, and leaving the old one would name the model that is no longer running (A200).
+        spec.modelShortName = ModelNames.shortName(resolved)
+        updateSeat(spec)
+        return true
+    }
+
+    /// Give a seat a new MLX engine for its new checkpoint, and let the old one go.
+    ///
+    /// The old engine is unloaded rather than merely replaced: it holds the whole checkpoint in
+    /// memory, and two of these — 3 GB each, or 6 GB for the larger one — do not fit on the machines
+    /// this app targets. `unload` is what releases the weights; the engine object itself is
+    /// unreachable from here afterwards, so nothing else can hold it alive.
+    private func rebuildMLXEngine(at index: Int) {
+        let old = seats[index].mlx
+        seats[index].mlx = configuration.makeMLXEngine(seats[index].spec)
+        // The new checkpoint has not been tried yet, so the old model's failure is not this one's
+        // (A152). What it does get is a clean slate: the next load either clears it or sets its own.
+        modelLoadFailures[seats[index].spec.id] = nil
+        Task { await old.unload() }
+    }
+
+    /// Record whether a seat's model loaded, for the health check (A152).
+    ///
+    /// Called from the load group next to the notice, so the room and the endpoint cannot disagree
+    /// about what happened.
+    private func recordModelLoad(of seatID: String, failure: String?) {
+        modelLoadFailures[seatID] = failure
     }
 
     /// Every seat, in speaking order.
@@ -499,9 +574,11 @@ public final class ConversationEngine {
                     group.addTask {
                         do {
                             try await seat.engine.load()
+                            await self?.recordModelLoad(of: seat.spec.id, failure: nil)
                         } catch {
-                            await self?.note(
-                                "\(seat.spec.id) failed to load: \(error.localizedDescription)")
+                            let reason = error.localizedDescription
+                            await self?.note("\(seat.spec.id) failed to load: \(reason)")
+                            await self?.recordModelLoad(of: seat.spec.id, failure: reason)
                         }
                     }
                 }
@@ -997,6 +1074,9 @@ public final class ConversationEngine {
                         in: clean,
                         from: id,
                         others: everyone,
+                        // Names to match the text against, ids to key the state by: the models write the
+                        // name, and the social state is keyed by the id (A199).
+                        names: Self.nameIndex(seats.map(\.spec)),
                         // Aimed at whoever spoke last, which is who the message is answering.
                         addressing: conversation.turns.dropLast().last { $0.kind == .chat }?.speakerID
                     )
@@ -1342,6 +1422,20 @@ public final class ConversationEngine {
         note(
             "Condensed \(older.count) entries into \(digest.count / 4) tokens; context is now about \(contextUsage.tokens) tokens.")
         return true
+    }
+
+    /// A lowercased display name to seat id map, for the social reader.
+    ///
+    /// A name shorter than three characters is dropped, because `ConflictReader` ignores those — a
+    /// one-letter name would match by accident — and a duplicated name keeps the first seat, since two
+    /// participants with one name cannot be told apart by text anyway.
+    static func nameIndex(_ specs: [AgentSpec]) -> [String: String] {
+        var index: [String: String] = [:]
+        for spec in specs where spec.displayName.count >= 3 {
+            let key = spec.displayName.lowercased()
+            if index[key] == nil { index[key] = spec.id }
+        }
+        return index
     }
 
     private func publishTranscript() {

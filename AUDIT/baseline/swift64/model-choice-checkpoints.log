@@ -1,0 +1,55 @@
+# The two abliterated checkpoints, measured on node1 (2026-09-16)
+
+# What they are, from the repositories' own file listings:
+#   Huihui-Qwen3.5-4B-abliterated-oQ4e   model.safetensors            3 161 408 513 bytes
+#   Huihui-Qwen3.5-9B-abliterated-oQ4e   two shards, 5 005 041 864 + 1 034 616 787 = 6 039 658 651
+#   mlx-community/Qwen3.5-4B-MLX-4bit    model.safetensors            3 034 300 695 (the default)
+#
+# Both are MLX safetensors, `model_type: qwen3_5`, and the same VLM-wrapped layout as this app's own
+# default checkpoint — `language_model.*` (924 tensors) plus `vision_tower.*` (297) — so nothing about
+# the architecture is new to the loader. The difference is the quantization: the default is uniform
+# 4-bit, while oQ stores a per-module `quantization` map with 5-bit and 6-bit overrides, which
+# `mlx-swift-lm` supports through `BaseConfiguration.PerLayerQuantization`
+# (`Libraries/MLXLMCommon/Base.Load.swift` applies it per weight path).
+
+## Loading, through this app's own engine
+$ chatbots-cli --check --model-a huihui4b
+  model loaded — context window 262144 tokens
+  generated 0 characters in 5.1s
+check failed: the model produced no output
+
+$ chatbots-cli --check --model-a huihui9b
+  model loaded — context window 262144 tokens
+  (no answer within the time this host was given; 8 GB against a 6 GB checkpoint)
+
+$ chatbots-cli --check --model-a huihui4b          # the control, minutes later
+  generated 5 characters in 12.6s
+Check passed — the app is ready to run
+
+# So the two behave differently on this machine, and the difference is memory, not the loader: the 4B
+# passes the check and answers a real topic; the 9B loads, and then swaps hard enough that a turn does
+# not finish in the minutes this host was given. After killing a 9B run mid-flight, the next start spent
+# nine minutes in the hub client before loading anything (RSS stayed at ~10 MB), which is the download
+# cache being re-verified rather than the model being loaded; the blobs themselves were complete
+# (5 005 041 864 + 1 034 616 787 bytes, matching the repository). A 9B wants a 16 GB Mac.
+
+# The `--check` prompt is "You are terse." / "Reply with the single word: ready" — the 4B answers the
+# default checkpoint's version of it with "ready" in 13.6 s, and this one with nothing, because it
+# spends the turn in its reasoning channel and the app strips that before it counts characters. That is
+# a property of the prompt, not of the load: a real topic produced a full answer from the same weights
+# in the run below.
+
+## A real turn, on the 4B
+$ CHATBOTS_SEATS=1 chatbots-cli --model-a TheWirelessPhoenix/Huihui-Qwen3.5-4B-abliterated-oQ4e \
+      --turns 1 --topic "Why are eggs not round?"
+  CAROLINA
+  Let's get one thing straight: eggs are not round because they're actually a little elliptical, and
+  that's the secret of the egg. … (≈450 words, addressed the topic, hallucinated a 1934 paper)
+
+# It generated a long, on-topic, coherent answer. That is the claim the catalogue makes about it.
+
+## Memory, which is the real constraint
+# A 4-bit checkpoint costs roughly its file size while loaded, per seat. The 9B is ~6 GB on its own, so
+# a 9B beside a 4B does not fit in 8 GB: an early attempt at the 9B turn ran two such processes at once
+# on this host and made no progress in nine minutes. Alone, the 9B loaded in under a minute and began
+# generating. `Choosing-models` on the wiki states this rather than leaving it to be discovered.

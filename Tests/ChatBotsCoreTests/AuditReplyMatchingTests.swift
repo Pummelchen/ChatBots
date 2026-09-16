@@ -44,7 +44,9 @@ private struct BlockingExtractor: DocumentExtracting {
     let entered: DispatchSemaphore
     let release: DispatchSemaphore
 
-    func extract(url: URL, kind: DocumentKind, limits: AttachmentLimits) throws -> AttachedDocument {
+    func extract(data: Data, from url: URL, kind: DocumentKind, limits: AttachmentLimits) throws
+        -> AttachedDocument
+    {
         _ = entered.signal()
         // Bounded, so a test that fails before it signals cannot wedge the suite.
         _ = release.wait(timeout: .now() + 20)
@@ -133,11 +135,11 @@ struct AuditReplyMatchingTests {
             .plainText: BlockingExtractor(entered: entered, release: release)
         ])
         let running = try await startEngine(ingestor: ingestor)
-        defer { Task { await running.stop() } }
+        defer { TransportTeardown.register { await running.stop() } }
 
         let client = makeClient(port: running.port)
         try await client.connect()
-        defer { Task { await client.disconnect() } }
+        defer { TransportTeardown.register { await client.disconnect() } }
 
         let attachment = Task {
             try await client.send(
@@ -172,11 +174,11 @@ struct AuditReplyMatchingTests {
     func overlappingRequestsEachGetTheirOwnReply() async throws {
         // The real extractors are fine here: this test sends no attachment, only reads.
         let running = try await startEngine(ingestor: SystemDocumentExtractor.ingestor)
-        defer { Task { await running.stop() } }
+        defer { TransportTeardown.register { await running.stop() } }
 
         let client = makeClient(port: running.port)
         try await client.connect()
-        defer { Task { await client.disconnect() } }
+        defer { TransportTeardown.register { await client.disconnect() } }
 
         // Tasks rather than a task group: `addTask` with a `@MainActor` closure trips the
         // region-based isolation checker, and the overlap this test wants does not need the

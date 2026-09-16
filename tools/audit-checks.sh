@@ -39,7 +39,7 @@ set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 2
 
-for tool in swift swiftlint swift-format xcrun jq; do
+for tool in swift swiftlint swift-format xcrun jq node; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         printf 'missing required tool: %s (see AUDIT/environment.md)\n' "$tool" >&2
         exit 2
@@ -64,7 +64,7 @@ fail() {
     failures=$((failures + 1))
 }
 
-printf '\n=== 1/5  build: products and tests, warnings are errors ===\n'
+printf '\n=== 1/6  build: products and tests, warnings are errors ===\n'
 if swift build --build-tests > "$logs/build.log" 2>&1; then
     pass "build: swift build --build-tests"
 else
@@ -73,9 +73,13 @@ else
     fail "build: swift build --build-tests"
 fi
 
-printf '\n=== 2/5  tests: the full suite ===\n'
+printf '\n=== 2/6  tests: the full suite ===\n'
 if swift test --enable-code-coverage > "$logs/test.log" 2>&1; then
-    test_summary="$(grep -E 'Test run with' "$logs/test.log" | tail -1)"
+    # Summed across test bundles: `swift test` runs one process per test target and each prints its
+    # own "Test run with" line, so taking the last one reported a single target's count (A166).
+    test_summary="$(grep -E 'Test run with' "$logs/test.log" \
+        | sed -E 's/.*with ([0-9]+) tests? in ([0-9]+) suites.*/\1 \2/' \
+        | awk '{t += $1; s += $2} END {printf "%d tests in %d suites", t, s}')"
     printf '      %s\n' "${test_summary:-swift test passed}"
     pass "tests: ${test_summary:-swift test passed}"
 else
@@ -84,12 +88,20 @@ else
     fail "tests: swift test --enable-code-coverage"
 fi
 
-printf '\n=== 3/5  coverage: Sources/ ===\n'
+printf '\n=== 3/6  coverage: Sources/ ===\n'
 bin_path="$(swift build --show-bin-path 2>/dev/null)"
 profile="$bin_path/codecov/default.profdata"
-test_binary="$bin_path/ChatBotsPackageTests.xctest/Contents/MacOS/ChatBotsPackageTests"
-if [ -f "$profile" ] && [ -f "$test_binary" ] \
-    && xcrun llvm-cov report "$test_binary" \
+    # One test bundle per test target, named after the target. The single bundle this used to name was
+    # `ChatBotsPackageTests.xctest`, which Xcode 27 renamed to `ChatBotsCoreTests.xctest`, and A166 added a
+    # second target — so the name is discovered rather than written down, and the next rename or target is
+    # not a silent failure (A134, A146, both fixed by this).
+    test_bundles=()
+    for bundle in "$bin_path"/*.xctest; do
+        bundle_executable="$bundle/Contents/MacOS/$(basename "$bundle" .xctest)"
+        [ -x "$bundle_executable" ] && test_bundles+=("$bundle_executable")
+    done
+if [ -f "$profile" ] && [ "${#test_bundles[@]}" -gt 0 ] \
+    && xcrun llvm-cov report "${test_bundles[@]}" \
         -instr-profile "$profile" \
         --sources Sources > "$logs/coverage.log" 2>&1
 then
@@ -101,12 +113,12 @@ else
         printf '      last 20 lines of %s:\n' "$logs/coverage.log"
         tail -n 20 "$logs/coverage.log" | sed 's/^/      /'
     else
-        printf '      no coverage profile at %s (did the test gate produce one?)\n' "$profile"
+        printf '      no coverage profile at %s, or no test bundle under %s (did the test gate run?)\n' "$profile" "$bin_path"
     fi
     fail "coverage: llvm-cov report over Sources/"
 fi
 
-printf '\n=== 4/5  swiftlint: Sources, Tests ===\n'
+printf '\n=== 4/6  swiftlint: Sources, Tests ===\n'
 # A06 added the configs and recorded what their residual is, so this gate is "no worse than the
 # number this audit recorded" rather than "zero" — which is the only form of it that can pass
 # without hiding findings. The waivers live in AUDIT/plan.md so that raising one is a deliberate,
@@ -136,7 +148,7 @@ case "${findings:-}" in
         ;;
 esac
 
-printf '\n=== 5/5  swift-format lint: Sources, Tests ===\n'
+printf '\n=== 5/6  swift-format lint: Sources, Tests ===\n'
 # Authored Swift only: the generated `WebAssets.swift` and `NameLists.swift` carry thousands
 # of diagnostics of their own, which makes the count a function of `web/` and `names/` rather than
 # of this repository's code (A125). swiftlint excludes the same two in `.swiftlint.yml`.
@@ -155,11 +167,35 @@ else
     fail "swift-format: $diagnostics diagnostic(s) exceeds the recorded waiver of $allowed"
 fi
 
+printf '\n=== 6/6  web: the rules the page runs ===\n'
+# The page's streaming reply is drawn from `state.snapshot.live`, and the merge that fills it from the
+# engine's `delta` events is pure JavaScript in `web/deltas.js`. It used to live inline in `app.js` and
+# there was no way to run it, which is how the page came to listen for nothing but whole-turn
+# snapshots (A165). This runs it in Node, with no browser and no network.
+if node tools/check-web-deltas.js > "$logs/web-deltas.log" 2>&1; then
+    pass "web: deltas merge ($(grep -c '  ok ' "$logs/web-deltas.log") cases)"
+else
+    printf '      last 20 lines of %s:\n' "$logs/web-deltas.log"
+    tail -n 20 "$logs/web-deltas.log" | sed 's/^/      /'
+    fail "web: deltas merge"
+fi
+
+# The audience's verdict rule, for the same reason and in the same shape (A160): a turn is drawn once and
+# its buttons are re-marked in place, so the click handler used to work from the verdict captured when the
+# row was built. `web/votes.js` holds the rule; this runs it in Node and checks the page's use of it.
+if node tools/check-web-votes.js > "$logs/web-votes.log" 2>&1; then
+    pass "web: the verdict rule ($(grep -c '  ok ' "$logs/web-votes.log") cases)"
+else
+    printf '      last 20 lines of %s:\n' "$logs/web-votes.log"
+    tail -n 20 "$logs/web-votes.log" | sed 's/^/      /'
+    fail "web: the verdict rule"
+fi
+
 printf '\n=== summary ===\n'
 cat "$summary"
 if [ "$failures" -eq 0 ]; then
-    printf '\nAll 5 Mac-only gates passed.\n'
+    printf '\nAll 6 Mac-only gates passed.\n'
     exit 0
 fi
-printf '\n%d of 5 Mac-only gates failed. Full output in %s/.\n' "$failures" "$logs"
+printf '\n%d of 6 Mac-only gates failed. Full output in %s/.\n' "$failures" "$logs"
 exit 1

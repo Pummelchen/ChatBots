@@ -1,0 +1,29 @@
+start.sh — the help against the code
+  ok    the help includes the --view phone explanation the old range stopped before
+  ok    the help describes --open as opening the page
+  ok    the help no longer advertises a desktop/mobile --open value
+  ok    and the code really has no such distinction
+
+capture-devices.py — the header and the display copy
+  ok    a card with a display copy shows it and links the capture
+  ok    the index does not embed the full-size capture it has a copy of
+  ok    a card with no display copy falls back to the capture and says so
+  ok    every image the index names exists beside it
+  ok    the header describes the DevTools call the tool makes, not Chrome's --screenshot
+  ok    the display copy is written and smaller than the capture
+
+hf-file-list.py — what is downloaded and what it is called
+  ok    the repository prose and metadata are not downloaded
+  ok    a redundant SentencePiece vocabulary is skipped
+  ok    nothing else is filtered out, nested path and shard names included
+  ok    the default checkpoint lists every file it offers but the prose
+  ok    the skip list gives tokenizer.model its own reason instead of calling it documentation
+  ok    and the module docstring no longer says the same thing
+
+mutations — each one has to be caught
+  ok    M0 a line added to a copy's header appears in its help
+  ok    M1 the header is longer than the range the old help printed
+  ok    M2 the index check sees an index that ignores the display copy
+  ok    M3 the file-list check sees a tool that downloads the prose
+
+all A194 probe checks passed

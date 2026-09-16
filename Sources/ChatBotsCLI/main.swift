@@ -65,8 +65,13 @@ struct Options {
     var backendA: AgentSpec.Backend = .mlx
     var backendB: AgentSpec.Backend = .mlx
     var baseURL = "http://localhost:1234"
-    var apiModel = "mlx-community/Qwen3.5-4B-MLX-4bit"
+    /// The model an OpenAI-compatible server is assumed to be serving, which is the checkpoint this
+    /// project ships and the installer downloads — named here rather than copied (A208).
+    var apiModel = AgentSpec.defaultModelID
     var apiKey: String?
+    /// Where the certificate and the conversations live, when it is not the default. Nil means
+    /// `RunDirectory.current`: the project's `.run` in a checkout, Application Support otherwise.
+    var runDirectory: URL?
 
     static func parse(_ arguments: [String]) -> Options {
         var options = Options()
@@ -107,8 +112,12 @@ struct Options {
                 }
                 options.turns = value
                 options.turnsSpecified = true
-            case "--model-a": options.modelA = next() ?? options.modelA
-            case "--model-b": options.modelB = next() ?? options.modelB
+            // A catalogue alias or a repository id. Resolution happens here so everything downstream
+            // — the spec, the log, the seat — sees the id that will actually be loaded, and a
+            // mistyped alias is passed through as the id it looks like rather than being refused,
+            // because any repository id is a legitimate value (ModelCatalog).
+            case "--model-a": options.modelA = ModelCatalog.resolve(next() ?? options.modelA)
+            case "--model-b": options.modelB = ModelCatalog.resolve(next() ?? options.modelB)
             case "--key": options.tavilyKey = next()
             case "--max-tokens":
                 // The same silent-default class: a nil from `Int(...)` left the seat's own budget in
@@ -125,6 +134,15 @@ struct Options {
             case "--api-key": options.apiKey = next()
             case "--persona-a": options.personaA = next()
             case "--persona-b": options.personaB = next()
+            case "--list-models":
+                for choice in ModelCatalog.choices {
+                    let size = choice.sizeLabel.map { "  (\($0))" } ?? ""
+                    print("\(choice.name)\(size)")
+                    print("  \(choice.id)")
+                    print("  \(choice.summary)")
+                    print("  aliases: \(choice.aliases.joined(separator: ", "))")
+                }
+                exit(0)
             case "--list-personas":
                 for category in Persona.Category.allCases {
                     print("\(category.rawValue):")
@@ -238,6 +256,18 @@ struct Options {
                     reject("invalid compact keep", keepRaw, expected: "0 or more turns")
                 }
                 options.keepRecent = value
+            case "--run-directory":
+                // Where this run's certificate and conversations live. The default is right for
+                // one engine on one machine; a second engine — a test one, or the one
+                // `TransportCheck` starts — needs its own, and the child it spawns has to be told
+                // the same path or the two disagree about the identity (A215). A relative path is
+                // resolved against the working directory here, so the answer does not depend on
+                // where the child ends up running.
+                let runRaw = next() ?? ""
+                guard !runRaw.isEmpty else {
+                    reject("invalid run directory", runRaw, expected: "a path")
+                }
+                options.runDirectory = URL(fileURLWithPath: runRaw)
             case "--solo": options.solo = true
             case "--help", "-h":
                 print(Self.usage)
@@ -271,6 +301,8 @@ struct Options {
           -n, --turns <count>      Number of LLM turns to run (default: 4)
               --model-a <id>       MLX checkpoint for seat A (default: \(AgentSpec.defaultModelID))
               --model-b <id>       MLX checkpoint for seat B
+              --list-models        Print the checkpoints this app offers and exit
+                                   (--model-a also takes any Hugging Face repository id)
               --key <key>          Tavily API key (else env TAVILY_API_KEY or .secrets.env)
               --max-tokens <n>     Cap answer tokens per turn
               --thinking <mode>    off | minimal | low | medium | high | unlimited
@@ -285,6 +317,8 @@ struct Options {
               --benchmark          Measure seat throughput instead of chatting
               --solo               With --benchmark: measure seat A only, then exit
               --memory-probe       Report MLX GPU memory across loading and turns
+              --run-directory <path>   Where the certificate and conversations live
+                                       (default: .run in a checkout)
 
         Seat A and seat B are separate model instances with independent sampling
         parameters, so a headless run exercises exactly the same path as the GUI.
@@ -350,6 +384,15 @@ func header(_ title: String) {
 let modelsRoot = ModelStore.prepare()
 let options = Options.parse(Array(CommandLine.arguments.dropFirst()))
 
+// The one answer to "where does this run keep its state", decided once.
+//
+// Every mode below — preparing the identity, checking the transport, serving it — has to agree,
+// and so does the engine process the serve path starts, which asks the same question again on its
+// own. `--run-directory` is how that answer is given; without it the answer is the same one
+// `RunDirectory` has always produced for this process (A215).
+let runDirectory = RunDirectory.resolve(
+    override: options.runDirectory, projectRoot: ModelStore.projectRoot())
+
 // A flag that would otherwise be accepted and then ignored: `--seed` fills the server's
 // engine with a sample conversation, and outside `--serve` there is no server engine to
 // fill, so the run used to proceed silently as a real model conversation instead (A66).
@@ -370,7 +413,7 @@ if options.seed, !options.serve {
 // during setup, where a pause is expected, rather than in the app where it looks like a hang,
 // and the fingerprint is printed where someone installing can see it.
 if options.prepareIdentity {
-    let directory = RunDirectory.current
+    let directory = runDirectory
     do {
         let identity = try CertificateStore.loadOrCreate(in: directory)
         print("engine certificate: \(identity.fingerprintDisplay)")
@@ -390,7 +433,7 @@ if options.prepareIdentity {
 // An in-process check can pass while a real client cannot connect at all — which is exactly
 // what happened here, and is the reason this exists.
 if options.checkClient {
-    let directory = RunDirectory.current
+    let directory = runDirectory
     _ = try? CertificateStore.loadOrCreate(in: directory)
     var configuration = WebTransportEngineClient.Configuration()
     configuration.port = options.transportPort
@@ -421,7 +464,7 @@ if options.checkClient {
 }
 
 if options.checkTransport {
-    let directory = RunDirectory.current
+    let directory = runDirectory
     let report = await TransportCheck.run(in: directory)
     print("WebTransport check")
     print(report.describe())
@@ -787,6 +830,18 @@ if options.serve {
     // accepted and ignored (A66). `--turns` is applied only when it was actually given,
     // so `--serve` on its own keeps the engine's own default rather than the CLI's 4.
     var engineConfiguration = ConversationEngine.Configuration()
+    // A front end can point a seat at another checkpoint while this engine is serving, which builds a
+    // new MLX engine for it. That engine has to carry the same wiring as the seats built below —
+    // the tool registry, and the progress line this run's stdout is for — or a switched seat would
+    // silently lose both.
+    engineConfiguration.makeMLXEngine = { spec in
+        MLXEngine(spec: spec, toolRegistry: registry) { state in
+            if case .loading(let progress) = state, progress > 0, progress < 1 {
+                let percent = Int(progress * 100)
+                if percent % 25 == 0 { log("  \(spec.id): downloading \(percent)%") }
+            }
+        }
+    }
     if options.turnsSpecified { engineConfiguration.maxTurns = max(1, options.turns) }
     if let threshold = options.compactThreshold { engineConfiguration.compactThreshold = threshold }
     if let keep = options.keepRecent { engineConfiguration.compactKeepRecentTurns = keep }
@@ -819,14 +874,16 @@ if !options.attachments.isEmpty {
     // A sample conversation, for laying out the interface without waiting for a model.
     if options.seed { engine.seed(SampleConversation.turns(topic: engine.topic)) }
 
-    // Documents are read by the app's extractors, which live in the app target; the CLI
-    // links the same code, so the server can accept uploads too.
+    // Documents are read by `SystemDocumentExtractor`, from `ChatBotsCore`: the core keeps extraction
+    // behind an installed provider, and this process is what installs one, so the server it starts can
+    // accept uploads. (A207: this said the extractors were the app's and lived in the app target; the
+    // CLI does not link the app target, and no extractor is defined there.)
     DocumentIngestorProvider.install(SystemDocumentExtractor.ingestor)
 
-    // Runtime state — the certificate, and the conversations this engine keeps. Resolved by
-    // `RunDirectory` rather than from the working directory, so an engine started from inside
-    // `ChatBots.app` does not write its state into its own bundle.
-    let runDirectory = RunDirectory.current
+    // Runtime state — the certificate, and the conversations this engine keeps — is the one
+    // directory this run resolved at startup: `--run-directory` when it was given, otherwise what
+    // `RunDirectory` answers for this process. Never the working directory, so an engine started
+    // from inside `ChatBots.app` does not write its state into its own bundle.
     // The `APIServer` owns the one `EngineService` that both transports dispatch through, so it is
     // always built. Only its HTTP listener is optional.
     let server = APIServer(
@@ -870,7 +927,6 @@ if !options.attachments.isEmpty {
     // browsers speak that, and it is what Caddy is for.
     var transportServer: WebTransportEngineServer?
     if options.transport == "webtransport" || options.transport == "both" {
-        let runDirectory = RunDirectory.current
         do {
             let identity = try CertificateStore.loadOrCreate(in: runDirectory)
             var configuration = WebTransportEngineServer.Configuration()

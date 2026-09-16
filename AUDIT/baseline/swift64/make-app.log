@@ -1,0 +1,295 @@
+==> Building (release)
+Building for production...
+[Computing dependencies]
+[Pre-planning 1 / 1187]
+[Planning deferred tasks]
+[231 / 647]
+[241 / 655] Crypto
+[244 / 663]
+[246 / 674]
+[250 / 674] RealModule
+[252 / 699] ArgumentParserToolInfo
+[253 / 699]
+[258 / 799]
+[268 / 799]
+[280 / 799]
+[290 / 799]
+[305 / 799]
+[314 / 799]
+[323 / 799]
+[337 / 799] ArgumentParserToolInfo
+[342 / 800] ComplexModule
+[345 / 801] InternalCollectionsUtilities
+[351 / 801]
+[359 / 803]
+[365 / 803]
+[377 / 803]
+[386 / 805] Numerics
+[403 / 806] Numerics
+[411 / 806]
+[415 / 806]
+[421 / 806]
+[423 / 807]
+[427 / 807]
+[432 / 807]
+[433 / 807]
+[437 / 807] WebTransportSecurityShim
+[439 / 807]
+[444 / 807]
+[445 / 807] Crypto
+[451 / 807] WebTransportUDPApple
+[457 / 807] EventSource
+[464 / 808] HuggingFace
+[470 / 836]
+[483 / 836]
+[486 / 836] OrderedCollections-product
+[489 / 837]
+[491 / 837]
+[493 / 837]
+[497 / 838] Jinja
+[499 / 838]
+[500 / 838]
+[500 / 838] yyjson
+[501 / 838]
+[502 / 838]
+[503 / 838] WebTransportQUICCore
+[512 / 841] WebTransportCryptoApple
+[519 / 845] WebTransportCryptoApple
+[525 / 845] WebTransportTLSCore
+[531 / 845] ArgumentParser
+[538 / 846] encuda-product
+[540 / 847] WebTransportHTTP3Core
+[547 / 848] WebTransportNetworkRuntime
+[551 / 852]
+[554 / 852] encuda-product
+[555 / 852] encuda-product
+[563 / 852] mlx-swift_Cmlx
+[566 / 852] mlx-swift_Cmlx
+[568 / 853] Cmlx
+[569 / 853] Cmlx
+[571 / 853] Cmlx
+[572 / 856]
+In file included from /Users/node1/Downloads/ChatBots/.build/checkouts/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/steel_attention.metal:6:
+In file included from /Users/node1/Downloads/ChatBots/.build/checkouts/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/../../../steel/attn/kernels/steel_attention.h:3:
+In file included from /Users/node1/Downloads/ChatBots/.build/checkouts/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/../../../steel/attn/attn.h:6:
+In file included from /Users/node1/Downloads/ChatBots/.build/checkouts/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/../../../steel/attn/../../steel/attn/mma.h:11:
+/Users/node1/Downloads/ChatBots/.build/checkouts/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/../../../steel/attn/../../steel/utils/integral_constant.h:108:6: warning: constexpr if is a C++17 extension [-Wc++17-extensions]
+  if constexpr (start < stop) {
+     ^
+In file included from /Users/node1/Downloads/ChatBots/.build/checkouts/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/steel_attention.metal:6:
+/Users/node1/Downloads/ChatBots/.build/checkouts/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/../../../steel/attn/kernels/steel_attention.h:356:16: warning: constexpr if is a C++17 extension [-Wc++17-extensions]
+            if constexpr (is_bool) {
+               ^
+/Users/node1/Downloads/ChatBots/.build/checkouts/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/../../../steel/attn/kernels/steel_attention.h:426:14: warning: constexpr if is a C++17 extension [-Wc++17-extensions]
+          if constexpr (BD == 128) {
+             ^
+/Users/node1/Downloads/ChatBots/.build/checkouts/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/../../../steel/attn/kernels/steel_attention.h:436:14: warning: constexpr if is a C++17 extension [-Wc++17-extensions]
+          if constexpr (BD == 128) {
+             ^
+4 warnings generated.
+[574 / 856] Cmlx
+[576 / 856] Cmlx
+[578 / 856] Cmlx
+[580 / 856] Cmlx
+[581 / 856] Cmlx
+[583 / 856] Cmlx
+[584 / 856] mlx-swift_Cmlx
+[586 / 856] Cmlx
+[590 / 856] HuggingFace
+[595 / 856] Jinja
+[596 / 856] Cmlx
+[598 / 856] WebTransportNetworkRuntime
+[611 / 856] Cmlx
+[617 / 856] Cmlx
+[623 / 856] Cmlx
+[624 / 856] Cmlx
+[625 / 856] Cmlx
+[626 / 856] Cmlx
+[627 / 856] Cmlx
+[628 / 856] Cmlx
+[629 / 856] Cmlx
+[631 / 856] Cmlx
+[635 / 856] Cmlx
+[637 / 856] Cmlx
+[638 / 856] Cmlx
+[641 / 856] Cmlx
+[642 / 856] Cmlx
+[645 / 856] Cmlx
+[646 / 856] Cmlx
+[647 / 856] Cmlx
+[651 / 856] Cmlx
+[653 / 856] Cmlx
+[654 / 856] Cmlx
+[655 / 856] Cmlx
+[657 / 856] Cmlx
+[658 / 856] Cmlx
+[659 / 856] Cmlx
+[661 / 856] Cmlx
+[662 / 856] MLX
+[664 / 856] MLX
+[669 / 856] Cmlx
+[670 / 856] Cmlx
+[671 / 856] Cmlx
+[673 / 856] Cmlx
+[674 / 856] Cmlx
+[677 / 856] Cmlx
+[678 / 856] Cmlx
+[680 / 856] Cmlx
+[681 / 856] Cmlx
+[682 / 856] Cmlx
+[683 / 856] Cmlx
+[685 / 856] Cmlx
+[686 / 856] Cmlx
+[687 / 856] Cmlx
+[689 / 856] Cmlx
+[691 / 856] Cmlx
+[693 / 856] Cmlx
+[694 / 856] Cmlx
+[695 / 856] Cmlx
+[697 / 856] Cmlx
+[699 / 856] Cmlx
+[700 / 856] Cmlx
+[701 / 856] Cmlx
+[704 / 856] Cmlx
+[708 / 856] Cmlx
+[709 / 856] Cmlx
+[714 / 856] Cmlx
+[715 / 856] Cmlx
+[717 / 856] Cmlx
+[718 / 856] Cmlx
+[720 / 856] Cmlx
+[721 / 856] Cmlx
+[722 / 856] Cmlx
+[723 / 856] Cmlx
+[725 / 856] Cmlx
+[726 / 856] Cmlx
+[727 / 856] Cmlx
+[729 / 856] Cmlx
+[733 / 856] Cmlx
+[735 / 856] Cmlx
+[737 / 856] Cmlx
+[739 / 856] Cmlx
+[741 / 856] Cmlx
+[742 / 856] Cmlx
+[744 / 856] Cmlx
+[745 / 856] Cmlx
+[747 / 856] Cmlx
+[749 / 856] Cmlx
+[750 / 856] Cmlx
+[751 / 856] Cmlx
+[752 / 856] Cmlx
+[753 / 856] Cmlx
+[755 / 856] Cmlx
+[756 / 856] Cmlx
+[757 / 856] Cmlx
+[758 / 856] Cmlx
+[763 / 856] Cmlx
+[764 / 856] Cmlx
+[765 / 856] Cmlx
+[767 / 856] Cmlx
+[768 / 856] Cmlx
+[769 / 856] Cmlx
+[771 / 856] WebTransport
+[772 / 856] Cmlx
+[776 / 889] MLXNN
+[779 / 889]
+[783 / 889]
+[788 / 890] WebTransportNetworkRuntime
+[791 / 890]
+[795 / 891] WebTransport
+[797 / 892] MLXNN
+[800 / 892]
+[803 / 938]
+[806 / 958]
+[811 / 958]
+[816 / 958]
+[821 / 958]
+[824 / 958]
+[829 / 958]
+[834 / 958]
+[837 / 958]
+[839 / 958]
+[841 / 958]
+[845 / 958]
+[852 / 958]
+[853 / 958]
+[855 / 958]
+[856 / 958]
+[859 / 958]
+[864 / 958]
+[866 / 958]
+[869 / 958]
+[870 / 958]
+[875 / 958]
+[877 / 958]
+[881 / 958]
+[883 / 958]
+[884 / 958]
+[886 / 958]
+[888 / 958]
+[889 / 958]
+[890 / 958] Cmlx
+[890 / 958] MLXNN
+[896 / 959] MLXOptimizers
+[898 / 960] Cmlx
+[898 / 960] MLXOptimizers
+[904 / 961] MLXLMCommon
+[909 / 972]
+[917 / 973]
+[919 / 973] Hub
+[921 / 973]
+[922 / 973] Tokenizers
+[924 / 974]
+[925 / 974] Tokenizers
+[931 / 974] MLXLMCommon
+[939 / 977] MLXVLM
+[945 / 980] MLXHuggingFace
+[950 / 980] Cmlx
+[951 / 980] Cmlx
+[954 / 980] MLXOptimizers
+[956 / 980] MLXVLM
+[962 / 980] MLXLLM
+[969 / 981] ChatBotsCore
+[976 / 988]
+[977 / 988] ChatBotsCore
+[984 / 989] ChatBotsCore
+[984 / 989] ChatBots-product
+[987 / 991] ChatBots-product
+[989 / 991] ChatBots-product
+[990 / 991] ChatBots-product
+Build complete! (196,84 secs)
+Building for production...
+[Computing dependencies]
+[Pre-planning 1 / 1158]
+[Planning deferred tasks]
+[7 / 94]
+[9 / 14] chatbots-cli-product
+[11 / 15] chatbots-cli-product
+[13 / 15] chatbots-cli-product
+[14 / 15] chatbots-cli-product
+Build complete! (16,50 secs)
+Building for production...
+[Computing dependencies]
+[Constructing description]
+[Pre-planning 1 / 1158]
+[Planning deferred tasks]
+[7 / 94]
+[9 / 14] chatbots-probe-product
+[11 / 15] chatbots-probe-product
+[13 / 15] chatbots-probe-product
+[14 / 15] chatbots-probe-product
+Build complete! (11,34 secs)
+==> Assembling /Users/node1/Downloads/ChatBots/dist/ChatBots.app
+==> Third-party notices in the bundle
+==> Building AppIcon.icns from the master artwork
+==> Downloading Metal kernels for mlx-swift 0.31.6 (≈190 MB, one time)
+#=#=#                                                                                                                                                     0.0%#                                                                          2.2%##                                                                         4.1%###                                                                        5.2%#####                                                                      7.4%######                                                                     9.3%#######                                                                   10.4%#########                                                                 12.6%#########                                                                 13.1%###########                                                               15.4%###########                                                               15.5%############                                                              17.8%##############                                                            19.7%##############                                                            20.7%###############                                                           20.9%###############                                                           21.0%###############                                                           21.1%###############                                                           21.3%###############                                                           21.6%###############                                                           21.9%###############                                                           22.2%################                                                          22.7%################                                                          23.4%#################                                                         24.3%##################                                                        25.5%##################                                                        25.9%###################                                                       27.6%####################                                                      28.6%#####################                                                     29.5%######################                                                    31.1%######################                                                    31.8%#######################                                                   32.4%#######################                                                   32.4%#######################                                                   32.8%########################                                                  34.2%########################                                                  34.4%#########################                                                 35.9%##########################                                                36.3%###########################                                               37.6%###########################                                               37.9%############################                                              39.2%############################                                              39.8%#############################                                             41.2%#############################                                             41.5%###############################                                           43.7%################################                                          45.6%#################################                                         46.6%###################################                                       48.9%####################################                                      50.7%#####################################                                     51.8%#####################################                                     52.4%######################################                                    53.9%########################################                                  56.0%#########################################                                 57.0%##########################################                                59.2%###########################################                               61.1%############################################                              62.1%############################################                              62.2%############################################                              62.4%#############################################                             63.7%##############################################                            65.3%################################################                          66.8%################################################                          67.3%#################################################                         68.5%#################################################                         68.9%##################################################                        70.0%##################################################                        70.3%###################################################                       71.5%###################################################                       71.8%####################################################                      72.5%#####################################################                     74.8%#######################################################                   76.6%#######################################################                   77.7%#########################################################                 80.0%##########################################################                81.8%###########################################################               82.9%#############################################################             85.1%##############################################################            87.0%###############################################################           88.1%#################################################################         90.3%##################################################################        92.2%###################################################################       93.2%###################################################################       94.1%####################################################################      94.7%####################################################################      95.6%####################################################################      95.8%#####################################################################     96.6%######################################################################    97.3%######################################################################    98.2%######################################################################    98.5%######################################################################## 100.0%
+    sha256 a202bf1dcfe1e64404adabfeb5eb363332e3a6221d18e4289ca0663fa3ab86c9
+==> Extracting default.metallib
+==> Metal library: /Users/node1/Downloads/ChatBots/.build/mlx-metal/default.metallib (3.6M)
+    installed: /Users/node1/Downloads/ChatBots/.build/out/Products/Release/mlx.metallib
+    installed: /Users/node1/Downloads/ChatBots/dist/ChatBots.app/Contents/MacOS/mlx.metallib
+==> Ad-hoc signing
+
+Built: /Users/node1/Downloads/ChatBots/dist/ChatBots.app
+Run:   open '/Users/node1/Downloads/ChatBots/dist/ChatBots.app'

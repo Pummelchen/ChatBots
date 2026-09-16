@@ -64,4 +64,39 @@ struct RunDirectoryTests {
         // the engine's certificate end up in different places.
         #expect(RunDirectory.resolve(projectRoot: nil) == RunDirectory.resolve(projectRoot: nil))
     }
+
+    @Test("An explicit directory is the answer for everyone who asks")
+    func anOverrideWins() throws {
+        // `--run-directory` is how a caller says where its state lives, and the engine it starts as
+        // a separate process is told the same thing. Without this, `TransportCheck` pinned one
+        // identity and the engine it started served another (A215).
+        let root = try scratch()
+        let chosen = try scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        defer { try? FileManager.default.removeItem(at: chosen) }
+        try "// swift-tools-version: 6.3".write(
+            to: root.appending(path: "Package.swift"), atomically: true, encoding: .utf8)
+
+        #expect(
+            RunDirectory.resolve(override: chosen, projectRoot: root) == chosen)
+        #expect(
+            RunDirectory.resolve(override: chosen, projectRoot: root)
+                != root.appending(path: ".run"))
+        // No override keeps the answer that was there before the flag existed.
+        #expect(RunDirectory.resolve(override: nil, projectRoot: root) == root.appending(path: ".run"))
+    }
+
+    @Test("A chosen directory is standardised, so parent and child agree on the path")
+    func anOverrideIsStandardised() throws {
+        // The path is passed to a child process as a string. `…/a/../b` and `…/b` are the same
+        // directory but not the same string, and a comparison that used the string would say the
+        // two processes disagreed when they had not.
+        let base = try scratch()
+        defer { try? FileManager.default.removeItem(at: base) }
+        try FileManager.default.createDirectory(
+            at: base.appending(path: "inner"), withIntermediateDirectories: true)
+        let roundabout = base.appending(path: "inner").appending(path: "..").appending(path: "inner")
+
+        #expect(RunDirectory.resolve(override: roundabout, projectRoot: nil) == base.appending(path: "inner"))
+    }
 }
