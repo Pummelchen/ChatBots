@@ -30,16 +30,15 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 217 |
-| DONE | 211 |
-| START | 6 |
+| DONE | 212 |
+| START | 5 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 6
+### Open — 5
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
-| A195 | S3 | START | — | docs / TLS trust | The client never enforces the pinned fingerprint while another comment claims pinning is meaningful |
 | A205 | S3 | START | — | dead code / wrong label | The .richText case is unreachable and an RTF file is labelled 'Word' |
 | A206 | S3 | START | — | dead code | Six declarations are written or named but never used, one with a documented rule the code does not implement |
 | A207 | S3 | START | — | docs / correctness | Three comments say the document extractors live in the app target and that the core cannot read a PDF or Word file; all three are false |
@@ -164,7 +163,7 @@ been run.
 | A192 | S3 | DONE | ab64af5 | CI / coverage of the gates | The shell lint covers only tools/*.sh so the audit scripts are never linted, and semgrep fetches a mutable live rule set despite the pinning claim |
 | A193 | S3 | DONE | 971c610 | tools / network robustness | Model and Metal downloads have no transfer deadline, so a stalled connection hangs the installer indefinitely |
 | A194 | S3 | DONE | cac00df | docs / drift | Several tool comments and help texts describe behaviour that changed or never existed |
-| A195 | S3 | START | — | docs / TLS trust | The client never enforces the pinned fingerprint while another comment claims pinning is meaningful |
+| A195 | S3 | DONE | 6cdd6ef | docs / TLS trust | The client never enforces the pinned fingerprint while another comment claims pinning is meaningful |
 | A196 | S1 | DONE | e4a8e16 | inference / arithmetic | The reasoning ceiling under-counts tokens, so the thinking level the UI promises is not the one enforced |
 | A197 | S1 | DONE | a2d5b80 | untrusted input / resource | Child output is unbounded and the conversion timeout cannot fire while output flows |
 | A198 | S1 | DONE | 2918d0b | concurrency / lifecycle | A session accepted during stop() is orphaned and keeps serving |
