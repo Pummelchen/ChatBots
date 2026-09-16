@@ -19,7 +19,8 @@ app or a browser. Four products share one package — `ChatBots` (the SwiftUI ap
 `ChatBotsCore` (the library). Two front ends share one conversation engine: the
 desktop app reaches it over WebTransport/QUIC, the website over HTTP through Caddy.
 Models run locally via MLX; OpenAI-compatible backends and Tavily tools are
-supported. No releases and no tags — deployment is `tools/install.sh` on a Mac.
+supported. Release `1.0.0` is the first: `tools/make-release.sh` builds and publishes it, and
+`bash tools/install.sh` in a checkout remains the way to get a working install with its models.
 Swift 6.4 / SwiftPM, package floor macOS 26, Apple Silicon only.
 
 ## Layout
@@ -63,6 +64,8 @@ bash tools/install.sh            # end-user setup: toolchain, ~3 GB of models, a
 
 bash tools/start-app.sh          # app plus API server
 bash tools/start-web-desktop.sh  # also start-web-mobile.sh, start.sh
+
+bash tools/make-release.sh       # package a release (dry run; --publish to tag and upload)
 ```
 
 Every start script takes `--help` and `--local-only` (which binds `127.0.0.1`).
