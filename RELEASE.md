@@ -168,8 +168,9 @@ Leave previous releases' notes and performance tables alone.
   account works with Codex, Claude Code, DeepSeek Harness, OpenCode, Qwen Code,
   Qoder and Zed. Six read `AGENTS.md` directly; **Claude Code does not** — its
   documentation is explicit that it reads `CLAUDE.md`, not `AGENTS.md` — so this
-  repository also carries a committed `CLAUDE.md` whose entire content is the
-  `@AGENTS.md` import. Commit it: a symlink made on one machine is invisible to a
+  repository also carries a committed `CLAUDE.md` whose content is the `@AGENTS.md`
+  import and a comment saying why it is committed rather than a symlink. Commit it: a
+  symlink made on one machine is invisible to a
   fresh clone, to CI and to every other checkout, and on Windows it needs
   Administrator rights. Qwen Code reads `AGENTS.md` alongside its own `QWEN.md`, so
   there is nothing to duplicate for it.
@@ -199,5 +200,6 @@ Leave previous releases' notes and performance tables alone.
   autobuilds with a Swift 6.3.3 image that cannot parse this package's 6.4 manifest.
 - **Before the first release** this needs a runnable artifact: a version literal that
   cannot drift, one script that builds and packages native `arm64` only, a dry run,
-  and a Release carrying the archive plus its digest. Nothing here produces a binary
+  and a Release carrying the archive plus its digest. `tools/make-app.sh` builds the
+  app for this Mac, but no release artifact — an archive and its digest — is produced
   yet, so the release gate below cannot be exercised.
