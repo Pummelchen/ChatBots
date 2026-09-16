@@ -30,16 +30,15 @@ been run.
 | Metric | Count |
 | --- | --- |
 | Tasks enumerated | 217 |
-| DONE | 215 |
-| START | 2 |
+| DONE | 216 |
+| START | 1 |
 | PROGRESS | 0 |
 | BLOCKED | 0 |
 
-### Open — 2
+### Open — 1
 
 | id | sev | status | commit | unit | title |
 | --- | --- | --- | --- | --- | --- |
-| A205 | S3 | START | — | dead code / wrong label | The .richText case is unreachable and an RTF file is labelled 'Word' |
 | A217 | S3 | START | — | dead code / share page | The share page's `shareBase` island field, the `Host` reflection that fills it and the validator that guards the reflection have no consumer |
 
 ### Every task — 217
@@ -171,7 +170,7 @@ been run.
 | A202 | S2 | DONE | 0c885fd | terminal event | An empty server answer emits turnFailed and then turnFinished, so a failed turn is recorded as a successful empty one |
 | A203 | S2 | DONE | 2ac0bf1 | research / direction | The author of an unsupported claim can be directed to substantiate their own claim |
 | A204 | S2 | DONE | a562360 | prompt injection (A69 recurrence) | Raw display names are interpolated into the moderator instruction, bypassing the sanitiser A69 added |
-| A205 | S3 | START | — | dead code / wrong label | The .richText case is unreachable and an RTF file is labelled 'Word' |
+| A205 | S3 | DONE | c722b95 | dead code / wrong label | The .richText case is unreachable and an RTF file is labelled 'Word' |
 | A206 | S3 | DONE | d19edd7 | dead code | Six declarations are written or named but never used, one with a documented rule the code does not implement |
 | A207 | S3 | DONE | cc5afef | docs / correctness | Three comments say the document extractors live in the app target and that the core cannot read a PDF or Word file; all three are false |
 | A208 | S3 | DONE | b7a8700 | installer / dependencies | The checkpoint the installer downloads is a hand-copied duplicate of AgentSpec.defaultModelID and nothing keeps the two in step |
