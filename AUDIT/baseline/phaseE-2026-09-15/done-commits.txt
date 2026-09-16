@@ -215,5 +215,6 @@ ok     A214  b052a34 touches Sources/ChatBotsCore/EngineProtocol.swift
 ok     A215  e9b7f44 touches Sources/ChatBotsCLI/main.swift
 ok     A216  d3a4316 touches Sources/ChatBotsCore/ErrorText.swift
 ok     A217  b20a177 touches Sources/ChatBotsCore/APIServer.swift
+skip   A218  names no source path
 
-backed 202 · skipped 15 · unbacked 0
+backed 202 · skipped 16 · unbacked 0
