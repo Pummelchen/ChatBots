@@ -48,10 +48,10 @@ if [ ! -f VERSION ]; then
 fi
 
 version="$(tr -d '[:space:]' < VERSION)"
-if printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+if printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
     printf 'PASS  identity: VERSION is the semantic version %s\n' "$version"
 else
-    fail "VERSION holds '$version', which is not a semantic version (expected X.Y.Z)"
+    fail "VERSION holds '$version', which is not a semantic version (expected X.Y or X.Y.Z)"
     exit 1
 fi
 

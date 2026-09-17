@@ -1,4 +1,4 @@
-# ChatBots 1.0.0 — release notes
+# ChatBots 1.0 — release notes
 
 ChatBots runs two or more local MLX models against each other on a Mac, watched from a SwiftUI
 app or a browser. This is the first release; every claim below names the check that would fail
@@ -6,7 +6,7 @@ if it stopped being true, and the checks that did not run are named last.
 
 ## The archive
 
-`ChatBots-1.0.0-macos-arm64.tar.gz` and its `.sha256` sit on the release page. Inside,
+`ChatBots-1.0-macos-arm64.tar.gz` and its `.sha256` sit on the release page. Inside,
 `ChatBots.app` carries the engine `chatbots-cli`, the probe `chatbots-probe` and MLX's Metal
 kernels in `Contents/MacOS/`; `bin/` holds the executables and kernels again, with `LICENSE`,
 `THIRD-PARTY-NOTICES.md`, `SECURITY.md` and `README-binaries.txt`. No model weights.
@@ -25,7 +25,7 @@ equals `Package.swift`'s `.macOS(.v26)`.
 
 ## The version it reports
 
-`VERSION` at the repository root holds `1.0.0`, and the bundle's `CFBundleShortVersionString`
+`VERSION` at the repository root holds `1.0`, and the bundle's `CFBundleShortVersionString`
 and `CFBundleVersion` are both written from it, so a person can say what they are running from
 the artefact alone. Backed by `tools/check-identity.sh` (CI, and gate 8 of
 `tools/mac-checks.sh`), which fails on a malformed `VERSION`, a copy in `tools/make-app.sh`, or
@@ -145,6 +145,6 @@ files, file sizes, third-party notices, `bash -n` and `shellcheck`, `py_compile`
 The digest and archive size are substituted at publish time, from the archive that was built:
 
 ```
-SHA256_PENDING  ChatBots-1.0.0-macos-arm64.tar.gz
+SHA256_PENDING  ChatBots-1.0-macos-arm64.tar.gz
 ARCHIVE_BYTES_PENDING  bytes
 ```

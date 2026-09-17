@@ -224,7 +224,7 @@ fi
 
 # ---------------------------------------------------------------- artifact checks
 
-step "4/7  the artifact says what it is, and is arm64 only (RELEASE.md §1.2.2, §1.3)"
+step "4/7  the bundle says what it is (RELEASE.md §1.3)"
 PLIST="$APP/Contents/Info.plist"
 [ -f "$PLIST" ] || die "the assembled bundle has no Info.plist"
 PLIST_VERSION="$(/usr/libexec/PlistBuddy -c Print:CFBundleShortVersionString "$PLIST")"
@@ -233,24 +233,9 @@ PLIST_BUILD="$(/usr/libexec/PlistBuddy -c Print:CFBundleVersion "$PLIST")"
 [ "$PLIST_BUILD" = "$VERSION" ] || die "the bundle's build number is $PLIST_BUILD, not $VERSION"
 record "  bundle identity: CFBundleShortVersionString and CFBundleVersion are both $VERSION"
 
-ARCH_FAILURES=0
-MACHO_COUNT=0
-while IFS= read -r file; do
-    file -b "$file" | grep -q 'Mach-O' || continue
-    MACHO_COUNT=$((MACHO_COUNT + 1))
-    ARCHS="$(lipo -archs "$file" 2>&1)"
-    if [ "$ARCHS" != "arm64" ]; then
-        printf 'FAIL  %s reports %s\n' "$file" "$ARCHS" >&2
-        ARCH_FAILURES=$((ARCH_FAILURES + 1))
-    fi
-done < <(find "$STAGING" -type f -perm -u+x 2>/dev/null)
-[ "$MACHO_COUNT" -ge 3 ] || die "only $MACHO_COUNT Mach-O files found; the bundle is incomplete"
-[ "$ARCH_FAILURES" -eq 0 ] || die "$ARCH_FAILURES Mach-O file(s) are not exactly arm64"
-record "  lipo -archs: all $MACHO_COUNT Mach-O files report exactly arm64"
-
 # ---------------------------------------------------------------- assemble the archive
 
-step "5/7  the archive (RELEASE.md §1.6)"
+step "5/7  the archive, and arm64 only (RELEASE.md §1.2.2, §1.6)"
 mkdir -p "$STAGING/bin"
 for product in chatbots-cli chatbots-probe mlx.metallib; do
     [ -f "$APP/Contents/MacOS/$product" ] || die "the bundle has no $product, so the archive would be incomplete"
@@ -294,6 +279,24 @@ This build is arm64 only, and it says so: \`lipo -archs ChatBots.app/Contents/Ma
 prints \`arm64\`. The app reports its own version as $VERSION
 (CFBundleShortVersionString in ChatBots.app/Contents/Info.plist).
 TXT
+
+# The arch assertion runs here, over the finished staging tree, so it covers everything the
+# archive will contain — the app's own Mach-O files and the stand-alone copies in `bin/` — rather
+# than the bundle alone. §1.2.2 asks about the artifact, and the artifact is what gets tarred.
+ARCH_FAILURES=0
+MACHO_COUNT=0
+while IFS= read -r file; do
+    file -b "$file" | grep -q 'Mach-O' || continue
+    MACHO_COUNT=$((MACHO_COUNT + 1))
+    ARCHS="$(lipo -archs "$file" 2>&1)"
+    if [ "$ARCHS" != "arm64" ]; then
+        printf 'FAIL  %s reports %s\n' "$file" "$ARCHS" >&2
+        ARCH_FAILURES=$((ARCH_FAILURES + 1))
+    fi
+done < <(find "$STAGING" -type f -perm -u+x 2>/dev/null)
+[ "$MACHO_COUNT" -ge 3 ] || die "only $MACHO_COUNT Mach-O files found; the archive is incomplete"
+[ "$ARCH_FAILURES" -eq 0 ] || die "$ARCH_FAILURES Mach-O file(s) are not exactly arm64"
+record "  lipo -archs: all $MACHO_COUNT Mach-O files in the archive report exactly arm64"
 
 ( cd "$STAGE" && COPYFILE_DISABLE=1 tar -czf "$NAME.tar.gz" "$NAME" )
 ( cd "$STAGE" && shasum -a 256 "$NAME.tar.gz" > "$NAME.tar.gz.sha256" )
