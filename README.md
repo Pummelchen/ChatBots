@@ -80,6 +80,11 @@ The installer is written for a Mac with nothing set up on it. It installs a Swif
 you have none, downloads about 3 GB of models, builds the app, and finishes by loading a model
 and generating a few tokens — so you find out *then* whether it works, not later.
 
+It always installs the checkpoint the app ships with. Three are in the catalogue: on a terminal
+the installer lists the other two and asks whether to fetch them as well, and in a script the
+choice is a flag — `bash tools/install.sh --model huihui9b` for one more, `--models all` for every
+checkpoint (~12 GB).
+
 Then pick one, or run all three — they share one conversation engine, so a conversation
 started in the app appears in the browser:
 

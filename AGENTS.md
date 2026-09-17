@@ -61,6 +61,8 @@ Swift 6.4 / SwiftPM, package floor macOS 26, Apple Silicon only.
 swift build
 swift test
 bash tools/install.sh            # end-user setup: toolchain, ~3 GB of models, app
+bash tools/install.sh --model huihui9b --yes   # also fetch another catalogue checkpoint
+                                 # (--models all takes the whole catalogue, ~12 GB)
 
 bash tools/start-app.sh          # app plus API server
 bash tools/start-web-desktop.sh  # also start-web-mobile.sh, start.sh

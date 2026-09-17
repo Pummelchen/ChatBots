@@ -11,6 +11,10 @@
 # you can double-click. Every step is safe to repeat: running it again repairs rather than
 # duplicating, so it is always reasonable to just run it again if something went wrong.
 #
+# The checkpoint the app ships with is always installed; the other entries in the catalogue are
+# opt-in, through `--model <alias>` / `--models all` or through the menu this prints when it runs
+# on a terminal and was told nothing. `bash tools/install.sh --help` lists the options.
+#
 # Deliberately plain: `set -u` but not `set -e`, because several steps are allowed to fail
 # and are handled explicitly, and a non-developer should see *which* step failed rather than
 # a script that stopped silently. No dependencies beyond what macOS already has.
@@ -48,6 +52,76 @@ die() {
   printf "A full log is at: %s\n\n" "$LOG_FILE" >&2
   exit 1
 }
+
+# ── Options ─────────────────────────────────────────────────────────────────────────
+# Read before the log is opened, so `--help` and a usage error print nothing else. The shipped
+# checkpoint is always installed — the app's first run uses it and the verification step below
+# loads it — so these options only add to it.
+MODEL_REQUEST=""
+MODELS_ALL=0
+INSTALL_ASSUME_YES=0
+
+usage() {
+  cat <<'USAGE'
+ChatBots installer — checks the machine, downloads the models, builds the app, and leaves a
+launcher you can double-click.
+
+usage: bash tools/install.sh [options]
+
+  --model <alias|id>   also download this checkpoint. Repeatable, and a comma-separated list
+                       works too. Aliases are listed by `chatbots-cli --list-models`; any
+                       Hugging Face repository id (owner/name) is accepted as well.
+  --models all         also download every checkpoint in the catalogue (~12 GB in total).
+  --yes                do not ask anything; install the shipped checkpoint and whatever the
+                       flags named.
+  -h, --help           this text.
+
+The checkpoint the app ships with is always installed: the app's first run uses it, and this
+installer loads it to prove the install works. Run without options on a terminal and it lists
+the catalogue and asks which further ones to fetch; run it from a script or a pipe and it
+installs the shipped checkpoint alone.
+USAGE
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --model)
+      if [ $# -lt 2 ]; then
+        printf 'error: --model needs an alias or a repository id\n\n' >&2
+        usage >&2
+        exit 2
+      fi
+      MODEL_REQUEST="$MODEL_REQUEST ${2//,/ }"
+      shift 2
+      ;;
+    --models)
+      if [ "${2:-}" != "all" ]; then
+        printf "error: --models only takes 'all'\n\n" >&2
+        usage >&2
+        exit 2
+      fi
+      MODELS_ALL=1
+      shift 2
+      ;;
+    --yes)
+      INSTALL_ASSUME_YES=1
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      printf 'unknown option: %s\n\n' "$1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+# Read by `tools/lib/install-models.sh`, which is sourced below; exported so the interface between
+# the two files is explicit rather than an accident of sourcing order.
+export MODELS_ALL INSTALL_ASSUME_YES
 
 # Everything is logged, so a failure can be diagnosed after the fact.
 : > "$LOG_FILE"
@@ -145,6 +219,8 @@ ${BOLD}If something goes wrong${OFF}
   · The log from this run:        $LOG_FILE
   · The build log:                $BUILD_LOG
   · Where the models live:        $MODELS_DIR
+  · Add another checkpoint later: bash tools/install.sh --model huihui9b --yes
+    (the catalogue and its aliases:  chatbots-cli --list-models)
 
 ${BOLD}Optional: cloud models instead of local ones${OFF}
 
