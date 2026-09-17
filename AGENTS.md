@@ -19,7 +19,7 @@ app or a browser. Four products share one package — `ChatBots` (the SwiftUI ap
 `ChatBotsCore` (the library). Two front ends share one conversation engine: the
 desktop app reaches it over WebTransport/QUIC, the website over HTTP through Caddy.
 Models run locally via MLX; OpenAI-compatible backends and Tavily tools are
-supported. Release `1.0.0` is the first: `tools/make-release.sh` builds and publishes it, and
+supported. Release `1.0` is the first: `tools/make-release.sh` builds and publishes it, and
 `bash tools/install.sh` in a checkout remains the way to get a working install with its models.
 Swift 6.4 / SwiftPM, package floor macOS 26, Apple Silicon only.
 
@@ -77,13 +77,13 @@ Warnings-as-errors is **not** a flag here: `Package.swift` sets
 ## Identity
 
 `VERSION` at the repository root is the one authoritative value, a semantic version
-(`1.0.0`); the tag is `v` plus it. Nothing else declares it: `tools/make-app.sh` reads
+(`1.0`); the tag is `v` plus it. Nothing else declares it: `tools/make-app.sh` reads
 the file and writes both `CFBundleShortVersionString` and `CFBundleVersion` from it, so
 the bundle cannot misreport what it is. `tools/check-identity.sh` fails when the file is
 malformed, when the bundle builder has grown a copy of its own, or when the release notes
 for that version are missing; it runs in CI and as the eighth gate of
 `tools/mac-checks.sh`, and `tools/make-release.sh` checks the built bundle's copy.
-`tools/set-version.sh <X.Y.Z>` is the one command a bump needs. The shipped checkpoint is
+`tools/set-version.sh <X.Y[.Z]>` is the one command a bump needs. The shipped checkpoint is
 a *decision* rather than a number a release propagates, so it keeps one declaration and a
 test that pins it (`Tests/ChatBotsCoreTests/DefaultCheckpointTests.swift`).
 

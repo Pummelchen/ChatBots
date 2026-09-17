@@ -51,9 +51,10 @@ hope.
 - **One authoritative value.** A file at the repository root — `VERSION` for a
   semantic version, `BUILD_NUMBER` for a build number. Anywhere else it appears
   is a **mirror**, and the build or CI must fail when a mirror disagrees.
-- **Pick one scheme and state it.** Semantic versions (`vX.Y.Z`) or build numbers
-  (`b1`, `b2`). Do not mix them, and do not "helpfully" introduce versions into a
-  project that uses build numbers.
+- **Pick one scheme and state it.** Semantic versions (`vX.Y.Z`, or `vX.Y` where a
+  release has no patch axis yet and the third number would always be zero) or build
+  numbers (`b1`, `b2`). Do not mix them, and do not "helpfully" introduce versions into
+  a project that uses build numbers.
 - **The build refuses a malformed or inconsistent identity.** Fail at configure
   or compile time, not at release time.
 - **Identity is observable.** A user must be able to say what they are running
@@ -193,7 +194,7 @@ Leave previous releases' notes and performance tables alone.
 
 # Part 2 — This repository
 
-## ChatBots — Swift, first release `1.0.0`
+## ChatBots — Swift, first release `1.0`
 
 - **Identity** semantic version, established and single-sourced: `VERSION` at the repository
   root is the authority and the tag is `v` plus it. Nothing else declares the value —
@@ -201,21 +202,9 @@ Leave previous releases' notes and performance tables alone.
   from the file — and `tools/check-identity.sh` fails when the file is malformed, when the
   bundle builder has grown a copy of its own, or when the notes for that version are missing.
   It runs in CI, as the eighth gate of `tools/mac-checks.sh`, and (against the built bundle)
-  inside `tools/make-release.sh`. `tools/set-version.sh <X.Y.Z>` is the one command a bump
+  inside `tools/make-release.sh`. `tools/set-version.sh <X.Y[.Z]>` is the one command a bump
   needs: it writes the file and then runs the check. The shipped checkpoint is a decision
   rather than a propagated number, so it keeps its own declaration and test.
-- **The first release**, `1.0.0`, was published on 2026-09-16 from `61a761f` (tag `v1.0.0`,
-  https://github.com/Pummelchen/ChatBots/releases/tag/v1.0.0):
-  `ChatBots-1.0.0-macos-arm64.tar.gz`, 62,819,107 bytes, sha256
-  `407f697e1553c2c0b4851f4bfd8f7e35e3e7c8b78538c140d06b1e4b8cc82a10`, with its `.sha256`
-  beside it. §1.9 was checked by downloading both assets again and verifying the digest, and the
-  published notes quote it. The bundle reports `1.0.0` from both plist keys, every Mach-O in it
-  reports `arm64`, and `bin/chatbots-cli` and `bin/chatbots-probe` run from the extracted
-  archive. Named in the notes as not checked: inference with the shipped checkpoint (this
-  checkout has no weights), notarisation (ad-hoc signing only), a Swift job in CI (deliberate),
-  and semgrep's rule set (fetched at scan time). The staging record — preconditions, gate
-  output, the clean-build log and the notes as published — is the release run's report, not a
-  file in the repository.
 - **Code scanning** runs CodeQL **default setup** — there is no `codeql.yml` here —
   and AI Scan for pull requests is disabled. The Autofind job asks
   `api.individual.githubcopilot.com` for a model an individual Copilot plan does not

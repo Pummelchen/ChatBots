@@ -43,7 +43,7 @@ if [ ! -f "$VERSION_FILE" ]; then
   exit 1
 fi
 APP_VERSION="$(tr -d '[:space:]' < "$VERSION_FILE")"
-if ! printf '%s' "$APP_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+if ! printf '%s' "$APP_VERSION" | grep -Eq '^[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
   printf 'error: VERSION holds "%s", which is not a semantic version\n' "$APP_VERSION" >&2
   exit 1
 fi
