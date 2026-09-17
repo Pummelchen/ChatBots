@@ -67,7 +67,11 @@ die() {
 
 [ -f VERSION ] || die "no VERSION at the repository root; run tools/set-version.sh <X.Y.Z>"
 VERSION="$(tr -d '[:space:]' < VERSION)"
-printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' \
+# Enough to name the tag and the archive; the full identity rule — the file's shape, the bundle
+# builder carrying no copy, the notes existing, the tag matching — is `tools/check-identity.sh`,
+# which runs in the gates below. This is deliberately the same shape it accepts: `X.Y`, or `X.Y.Z`
+# once there is a patch axis.
+printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+(\.[0-9]+)?$' \
     || die "VERSION holds '$VERSION', which is not a semantic version"
 TAG="v$VERSION"
 NAME="ChatBots-$VERSION-macos-arm64"
