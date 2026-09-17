@@ -205,6 +205,19 @@ Leave previous releases' notes and performance tables alone.
   inside `tools/make-release.sh`. `tools/set-version.sh <X.Y[.Z]>` is the one command a bump
   needs: it writes the file and then runs the check. The shipped checkpoint is a decision
   rather than a propagated number, so it keeps its own declaration and test.
+- **The first release**, `1.0`, was published on 2026-09-17 from `9806228` (tag `v1.0`,
+  https://github.com/Pummelchen/ChatBots/releases/tag/v1.0):
+  `ChatBots-1.0-macos-arm64.tar.gz`, 62,818,504 bytes, sha256
+  `4fa02c79d52e334363189ebf33173a8e4491e7e62fe79b838622c5c822d1bbc6`, with its `.sha256` beside
+  it. §1.9 was checked by downloading both assets again and verifying the digest, and the
+  published notes quote it. The bundle reports `1.0` from both plist keys, all five Mach-O files
+  in the archive report `arm64`, and `bin/chatbots-cli` and `bin/chatbots-probe` run from the
+  extracted archive. Named in the notes as not checked: inference with the shipped checkpoint
+  (this checkout has no weights), notarisation (ad-hoc signing only), a Swift job in CI
+  (deliberate), and semgrep's rule set (fetched at scan time). The run's staging directory held
+  the preconditions, the gate output, the clean-build log and the notes as published; like every
+  build artefact it is not committed. An earlier `1.0.0` release of the same commit was
+  withdrawn unpublished-in-practice and re-cut as `1.0` at the owner's request; its tag is gone.
 - **Code scanning** runs CodeQL **default setup** — there is no `codeql.yml` here —
   and AI Scan for pull requests is disabled. The Autofind job asks
   `api.individual.githubcopilot.com` for a model an individual Copilot plan does not
