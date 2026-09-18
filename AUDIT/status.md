@@ -14,12 +14,12 @@ only the orientation a resumed run needs, so it does not repeat either.
 
 ## Ledger state at the last commit
 
-`done: 92, open: 1, blocked: 4` — S0 0, S1 0, S2 1, S3 0.
+`done: 94, open: 2, blocked: 4` — S0 0, S1 0, S2 1, S3 1.
 
 The closure invariant holds: the non-terminal count fell at every milestone report, from 96 at
-the start to 1 now.
+the start to 2 now.
 
-## The one open task: AUDIT-0029
+## The open tasks
 
 Replace the recorded waivers in `tools/analysis-waivers.txt` with `--strict`. It was split on the
 record — not narrowed — into:
