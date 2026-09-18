@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Render AUDIT/ledger.md from AUDIT/ledger.json — the ledger is the single source of truth.
+"""Render AUDIT/ledger.md — the open-work tracker — from AUDIT/ledger.json.
+
+`AUDIT/ledger.json` is the single source of truth and keeps every task, closed ones included, as
+the audit record. The rendered tracker is the opposite: it lists only what still needs doing, in
+tables with a task number, so the file a person opens is the work rather than the history.
 
 Usage: python3 AUDIT/render-ledger.py
 Writes AUDIT/ledger.md and prints the counts line.
@@ -9,6 +13,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 import sys
 from collections import Counter
 
@@ -34,7 +39,10 @@ FIELDS = [
     "blocked_reason",
 ]
 
-TERMINAL = {"DONE", "BLOCKED"}
+# A task in one of these states needs nobody: it is either finished or waiting on a decision that
+# is not the audit's to make (BLOCKED, which the tracker shows separately because it is an issue a
+# person has to answer).
+CLOSED = {"DONE", "BLOCKED"}
 SEVERITY_ORDER = {"S0": 0, "S1": 1, "S2": 2, "S3": 3}
 STATUS_ORDER = {
     "OPEN": 0,
@@ -42,9 +50,10 @@ STATUS_ORDER = {
     "SWEPT": 2,
     "TEST": 3,
     "AUDIT": 4,
-    "DONE": 5,
-    "BLOCKED": 6,
 }
+
+BLOCKED_OWNER = re.compile(r"OWNER:\s*(.+?)\.\s*REASON:", re.S)
+BLOCKED_OPTIONS = "OPTIONS FOR A HUMAN:"
 
 
 def load() -> list[dict]:
@@ -55,7 +64,19 @@ def load() -> list[dict]:
 
 def esc(value: object) -> str:
     text = "" if value is None else str(value)
-    return text.replace("|", "\\|").replace("\n", " ")
+    return text.replace("|", "\\|").replace("\n", " ").strip()
+
+
+def blocked_parts(reason: str) -> tuple[str, str, str]:
+    """The owner, the situation and the options a `blocked_reason` records."""
+    owner = ""
+    match = BLOCKED_OWNER.search(reason)
+    if match:
+        owner = match.group(1).strip()
+    body = reason[match.end() :] if match else reason
+    situation, _, options = body.partition(BLOCKED_OPTIONS)
+    situation = re.sub(r"^(REASON|TRIED):\s*", "", situation.strip())
+    return owner, situation.strip(), options.strip()
 
 
 def main() -> int:
@@ -66,66 +87,76 @@ def main() -> int:
             task.setdefault(field, "")
 
     counts = Counter(task["status"] for task in tasks)
-    open_count = sum(1 for t in tasks if t["status"] not in TERMINAL)
-    blocked = counts.get("BLOCKED", 0)
     done = counts.get("DONE", 0)
-    sev_open = Counter(t["severity"] for t in tasks if t["status"] not in TERMINAL)
-    sev_all = Counter(t["severity"] for t in tasks)
-    tier_all = Counter(t["tier"] for t in tasks)
+    blocked_tasks = [t for t in tasks if t["status"] == "BLOCKED"]
+    open_tasks = [t for t in tasks if t["status"] not in CLOSED]
+    open_count = len(open_tasks)
+    sev_open = Counter(t["severity"] for t in open_tasks)
+
+    def order(task: dict) -> tuple:
+        return (
+            SEVERITY_ORDER.get(task["severity"], 9),
+            STATUS_ORDER.get(task["status"], 9),
+            task["id"],
+        )
+
+    open_tasks.sort(key=order)
+    blocked_tasks.sort(key=order)
 
     lines: list[str] = []
     add = lines.append
-    add("# Audit ledger")
-    add("")
-    add("Generated from `AUDIT/ledger.json` by `AUDIT/render-ledger.py`. Do not edit by hand.")
-    add("")
-    add(f"- total: {len(tasks)}")
-    add(f"- done: {done}")
-    add(f"- open: {open_count}")
-    add(f"- blocked: {blocked}")
-    add("")
-    add("## Open by severity")
-    add("")
-    add("| severity | open | total |")
-    add("| --- | --- | --- |")
-    for severity in ("S0", "S1", "S2", "S3"):
-        add(f"| {severity} | {sev_open.get(severity, 0)} | {sev_all.get(severity, 0)} |")
-    add("")
-    add("## By tier")
-    add("")
-    add("| tier | total |")
-    add("| --- | --- |")
-    for tier in sorted(tier_all):
-        add(f"| {tier} | {tier_all[tier]} |")
-    add("")
-
-    ordered = sorted(
-        tasks,
-        key=lambda t: (
-            SEVERITY_ORDER.get(t["severity"], 9),
-            t["status"] in TERMINAL,
-            t["id"],
-        ),
-    )
-    add("## Tasks")
+    add("# ChatBots audit — open work")
     add("")
     add(
-        "| id | sev | tier | project | file:line | title | category | status | "
-        "host | discovered-by | evidence-before | fix-summary | evidence-after | commit | blocked-reason |"
+        "Generated from `AUDIT/ledger.json` by `AUDIT/render-ledger.py`; edit the JSON, not this "
+        "file."
     )
-    add("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
-    for task in ordered:
+    add(
+        f"**{len(tasks)} recorded · {done} closed · {open_count} open · "
+        f"{len(blocked_tasks)} awaiting a decision**"
+    )
+    add("")
+    add("Closed tasks stay in the JSON as the audit record and are not repeated here.")
+    add("")
+
+    add("## Open")
+    add("")
+    if open_tasks:
         add(
-            "| "
-            + " | ".join(esc(task[field]) for field in FIELDS)
-            + " |"
+            "| # | task | sev | tier | project | title | where | status | what remains |"
         )
+        add("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+        for number, task in enumerate(open_tasks, start=1):
+            remains = task.get("note") or task["evidence_before"]
+            add(
+                f"| {number} | {esc(task['id'])} | {esc(task['severity'])} | {esc(task['tier'])} "
+                f"| {esc(task['project'])} | {esc(task['title'])} | {esc(task['file_line'])} "
+                f"| {esc(task['status'])} | {esc(remains)} |"
+            )
+    else:
+        add("None.")
+    add("")
+
+    add("## Awaiting a decision")
+    add("")
+    if blocked_tasks:
+        add("| # | task | sev | title | owner | situation | options |")
+        add("| --- | --- | --- | --- | --- | --- | --- |")
+        for number, task in enumerate(blocked_tasks, start=len(open_tasks) + 1):
+            owner, situation, options = blocked_parts(task["blocked_reason"])
+            add(
+                f"| {number} | {esc(task['id'])} | {esc(task['severity'])} "
+                f"| {esc(task['title'])} | {esc(owner)} | {esc(situation)} | {esc(options)} |"
+            )
+    else:
+        add("None.")
     add("")
 
     LEDGER_MD.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(
-        f"total:{len(tasks)} done:{done} open:{open_count} blocked:{blocked} "
-        f"open_by_sev:" + ",".join(f"{s}={sev_open.get(s, 0)}" for s in ("S0", "S1", "S2", "S3"))
+        f"total:{len(tasks)} done:{done} open:{open_count} blocked:{len(blocked_tasks)} "
+        f"open_by_sev:"
+        + ",".join(f"{s}={sev_open.get(s, 0)}" for s in ("S0", "S1", "S2", "S3"))
     )
     return 0
 
