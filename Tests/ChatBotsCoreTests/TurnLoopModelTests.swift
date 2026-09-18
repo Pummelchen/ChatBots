@@ -5,6 +5,7 @@
 // first half of `TurnLoopModelTests.swift`.
 
 import Foundation
+import MLXLMCommon
 import Testing
 
 @testable import ChatBotsCore
@@ -237,12 +238,11 @@ struct TurnLoopModelTests {
     @Test("Fabricated tool syntax is stripped and the speaker tag removed")
     func fabricatedSyntaxAndSpeakerTag() async throws {
         let engine = MLXEngine(spec: TurnLoopHarness.spec(displayName: "Mira"))
-        let rounds = TurnLoopHarness.ScriptedRounds([
-            [
-                .chunk("[web_search]\nquery: capital cost\nMira: The capital cost is 12%."),
-                .info(TurnLoopHarness.info()),
-            ]
-        ])
+        let round: [Generation] = [
+            .chunk("[web_search]\nquery: capital cost\nMira: The capital cost is 12%."),
+            .info(TurnLoopHarness.info()),
+        ]
+        let rounds = TurnLoopHarness.ScriptedRounds([round])
         let events = TurnLoopHarness.EventRecorder()
 
         let text = try await TurnLoopHarness.performTurn(
