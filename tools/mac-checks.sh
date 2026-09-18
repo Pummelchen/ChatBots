@@ -16,8 +16,8 @@
 #   2. build      swift build --build-tests          products and tests, warnings are errors
 #   3. tests      swift test --enable-code-coverage  the full suite
 #   4. coverage   llvm-cov over Sources/             the profile that run produced
-#   5. swiftlint  swiftlint lint Sources Tests
-#   6. format     swift-format lint --recursive --strict Sources Tests
+#   5. swiftlint  swiftlint lint --strict Sources Tests   zero findings
+#   6. format     swift-format lint --strict Sources Tests zero diagnostics
 #   7. web        the two Node checks for web/deltas.js and web/votes.js
 #   8. jstools    eslint and prettier over web/ and the web check scripts (`npm ci` first)
 #   9. identity   VERSION, and every mirror of it that can be checked without building
@@ -28,8 +28,11 @@
 #
 # Every gate runs even when an earlier one fails, and the summary at the end names each one;
 # the exit status is non-zero if any gate failed. Nothing here is suppressed, downgraded or
-# made advisory — a finding is a finding. Gates 5 and 6 report the pre-configuration
-# recorded waivers in `tools/analysis-waivers.txt` rather than against zero.
+# made advisory — a finding is a finding. Gates 5 and 6 run `--strict`, so a warning fails the
+# gate the way an error does, and both are judged against zero: the audit drove the residual the
+# waivers used to cover to nothing, and a cap that is no longer needed is a cap that would let the
+# debt come back unnoticed. `tools/analysis-waivers.txt` still carries the semgrep findings the
+# project accepts; it no longer carries a count for either style gate.
 # Gate 4 reports a number rather than enforcing a floor: no coverage floor is set anywhere.
 # Gate 1 runs first because it is the cheapest and the one a large file can be caught by
 # before a build has to happen.
@@ -138,65 +141,54 @@ else
     fail "coverage: llvm-cov report over Sources/"
 fi
 
-printf '\n=== 5/9  swiftlint: Sources, Tests ===\n'
-# The configs were added with their residual recorded, so this gate is "no worse than the
-# recorded number" rather than "zero" — which is the only form of it that can pass
-# without hiding findings. The waivers live in tools/analysis-waivers.txt so that raising one is a deliberate,
-# reviewable edit. Both numbers below are read from the tool's own report.
-waiver_for() {
-    # No `\b`: BSD sed, which is what macOS ships, does not support word boundaries, and with
-    # one in the pattern this silently matched nothing and the gate reported "no waiver
-    # recorded" for a waiver that was there.
-    sed -n "s/.*$1 waiver: \([0-9][0-9]*\).*/\1/p" tools/analysis-waivers.txt | head -1
-}
-
-swiftlint lint --quiet --reporter json Sources Tests > "$logs/swiftlint.json" 2>"$logs/swiftlint.err"
+printf '\n=== 5/9  swiftlint: Sources, Tests (strict) ===\n'
+# Zero findings, not "no worse than a recorded number": the configs' residual was paid down, so a
+# finding here is new debt. `--strict` is what makes a warning fail, and the exit status is checked
+# alongside the count so a run that reports nothing because it linted nothing cannot pass as clean.
+swiftlint lint --strict --quiet --reporter json Sources Tests > "$logs/swiftlint.json" 2>"$logs/swiftlint.err"
+lint_status=$?
 findings="$(jq 'length' "$logs/swiftlint.json" 2>/dev/null)"
-allowed="$(waiver_for swiftlint)"
 case "${findings:-}" in
     ''|*[!0-9]*)
         fail "swiftlint: could not read a count from the JSON reporter"
         ;;
-    *)
-        if [ -z "$allowed" ]; then
-            fail "swiftlint: $findings finding(s) and no waiver recorded in tools/analysis-waivers.txt"
-        elif [ "$findings" -le "$allowed" ]; then
-            pass "swiftlint: $findings finding(s), within the recorded waiver of $allowed"
+    0)
+        if [ "$lint_status" -ne 0 ]; then
+            tail -n 20 "$logs/swiftlint.err" | sed 's/^/      /'
+            fail "swiftlint: --strict exited $lint_status with an empty report, so it did not lint"
         else
-            fail "swiftlint: $findings finding(s) exceeds the recorded waiver of $allowed"
+            pass "swiftlint: no findings under --strict"
         fi
+        ;;
+    *)
+        fail "swiftlint: $findings finding(s) under --strict"
         ;;
 esac
 
-printf '\n=== 6/9  swift-format lint: Sources, Tests ===\n'
+printf '\n=== 6/9  swift-format lint: Sources, Tests (strict) ===\n'
 # Authored Swift only: the generated `WebAssets.swift` and `NameLists.swift` carry thousands
 # of diagnostics of their own, which makes the count a function of `web/` and `names/` rather than
 # of this repository's code. swiftlint excludes the same two in `.swiftlint.yml`.
 #
-# The exit status is checked as well as the count. `swift-format lint` exits non-zero when it
-# reports a diagnostic, so the status alone cannot say "the tool failed" — but a non-zero status
-# with *no* diagnostic lines means it never linted anything, and that used to pass this gate as
-# "0 diagnostic(s)".
+# The diagnostic count comes from the diagnostic lines, NOT `wc -l` on the output: a 3,003-diagnostic
+# run produces about 30,000 lines, so that would print the size of the file rather than the size of
+# the problem. The exit status is checked too — `--strict` makes any diagnostic a failure, so a
+# non-zero status with no diagnostic line means the tool never linted anything.
 swift_files="$(find Sources Tests -name '*.swift' ! -name 'WebAssets.swift' ! -name 'NameLists.swift')"
 find Sources Tests -name '*.swift' ! -name 'WebAssets.swift' ! -name 'NameLists.swift' -print0 \
-    | xargs -0 swift-format lint > "$logs/swift-format.txt" 2>&1
+    | xargs -0 swift-format lint --strict > "$logs/swift-format.txt" 2>&1
 format_status=$?
-# Counted from the diagnostic lines, NOT with `wc -l` on the output. This gate reported `wc -l`
-# first, which is exactly the mistake this gate once made: a 3,003-diagnostic run produces about 30,000
-# lines, so the number it printed was the size of the file rather than the size of the problem.
 diagnostics="$(grep -cE 'warning:|error:' "$logs/swift-format.txt" || true)"
-allowed="$(waiver_for swift-format)"
 if [ -z "$swift_files" ]; then
     fail "swift-format: no Swift file was found to lint"
-elif [ "$format_status" -ne 0 ] && [ "$diagnostics" -eq 0 ]; then
+elif [ "$diagnostics" -ne 0 ]; then
+    tail -n 20 "$logs/swift-format.txt" | sed 's/^/      /'
+    fail "swift-format: $diagnostics diagnostic(s) under --strict"
+elif [ "$format_status" -ne 0 ]; then
     tail -n 20 "$logs/swift-format.txt" | sed 's/^/      /'
     fail "swift-format: exited $format_status without reporting a diagnostic, so it did not lint"
-elif [ -z "$allowed" ]; then
-    fail "swift-format: $diagnostics diagnostic(s) and no waiver recorded in tools/analysis-waivers.txt"
-elif [ "$diagnostics" -le "$allowed" ]; then
-    pass "swift-format: $diagnostics diagnostic(s), within the recorded waiver of $allowed"
 else
-    fail "swift-format: $diagnostics diagnostic(s) exceeds the recorded waiver of $allowed"
+    pass "swift-format: no diagnostics under --strict"
 fi
 
 printf '\n=== 7/9  web: the rules the page runs ===\n'

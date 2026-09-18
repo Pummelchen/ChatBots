@@ -34,9 +34,13 @@ Provenance is `brew list --versions …` unless stated.
 | Python | 3.14 | runs `tools/*.py` |
 | `jq` | 1.8 | parsing scanner output |
 
-`swiftlint` and `swift-format` have a recorded residual rather than a zero target, explained by rule in
-`.swiftlint.yml` and `.swift-format` and capped in `tools/analysis-waivers.txt` — the file both gates
-read. The semgrep findings this project accepts are in the same file.
+`swiftlint` and `swift-format` run with `--strict` and are judged against zero: gates 5 and 6 of
+`tools/mac-checks.sh` fail on a single finding, and the exit status is checked alongside the count so a
+run that reports nothing because it linted nothing cannot pass as clean. Both were driven to zero during
+the audit — swiftlint from 206 findings, swift-format from 306 diagnostics — so the caps they used to
+carry are gone rather than sitting unused. `.swiftlint.yml` and `.swift-format` remain the rule
+configuration. The semgrep findings this project accepts are the only entries left in
+`tools/analysis-waivers.txt`.
 
 The JavaScript toolchain is installed with `npm ci` from the committed `package-lock.json`; the
 lockfile is the pin. `tools/mac-checks.sh` and CI both fail when it has not been installed rather than

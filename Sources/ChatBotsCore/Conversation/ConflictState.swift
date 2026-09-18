@@ -239,144 +239,184 @@ public struct ConflictState: Sendable, Hashable, Codable {
             // A signal aimed at someone applies to that person; otherwise it applies to the
             // room, and the strongest reaction goes to whoever spoke most recently.
             let targets = signal.target.map { [$0] } ?? others
-            switch signal.kind {
-            case .jab:
-                for target in targets where target != speaker {
-                    var feeling = feelingBetween(speaker, target)
-                    // Sized so that one unmistakable jab crosses the grudge threshold: the
-                    // brief wants a slight to be remembered, and a first jab that faded
-                    // before it registered would mean grudges never form at all.
-                    feeling.annoyance += 0.6 * signal.confidence
-                    feeling.respect -= 0.10 * signal.confidence
-                    // A jab is what a grudge is made of, and the reason is kept so the prompt
-                    // can refer to it rather than to a number.
-                    if feeling.annoyance >= 0.5 {
-                        feeling.grudge = Relationship.Grudge(
-                            reason: summary ?? "a remark earlier",
-                            sinceSequence: sequence,
-                            intensity: min(1, feeling.annoyance))
-                    }
-                    // Being jabbed at tends to end an alliance.
-                    feeling.alliance = nil
-                    set(feeling, speaker, target)
-
-                    // And it invites retaliation: the target's own hostility rises.
-                    var back = feelingBetween(target, speaker)
-                    back.competition += 0.3 * signal.confidence
-                    // Trust is bipolar, so an attack takes it below zero rather than merely
-                    // failing to raise it: being jabbed at produces active distrust, which is
-                    // what the seat's next message should reflect.
-                    back.trust -= 0.25 * signal.confidence
-                    set(back, target, speaker)
-                }
-                record("\(speaker) \(signal.kind.phrase)\(targetSuffix(signal.target))")
-
-            case .concession:
-                for target in targets where target != speaker {
-                    var feeling = feelingBetween(speaker, target)
-                    feeling.respect += 0.4 * signal.confidence
-                    feeling.annoyance -= 0.25 * signal.confidence
-                    feeling.grudge = nil
-                    set(feeling, speaker, target)
-
-                    var back = feelingBetween(target, speaker)
-                    back.trust += 0.2 * signal.confidence
-                    set(back, target, speaker)
-                }
-                beatsWon[speaker, default: 0] += 1
-                record("\(speaker) \(signal.kind.phrase)")
-
-            case .contradiction, .challenge:
-                for target in targets where target != speaker {
-                    var feeling = feelingBetween(speaker, target)
-                    // Going after someone successfully *is* a display of strength, so
-                    // competition rises while respect holds rather than falling.
-                    feeling.competition += 0.25 * signal.confidence
-                    set(feeling, speaker, target)
-
-                    var back = feelingBetween(target, speaker)
-                    back.respect += 0.15 * signal.confidence
-                    back.annoyance += 0.2 * signal.confidence
-                    set(back, target, speaker)
-                }
-                beatsWon[speaker, default: 0] += 1
-                record("\(speaker) \(signal.kind.phrase)\(targetSuffix(signal.target))")
-
-            case .agreement:
-                for target in targets where target != speaker {
-                    var feeling = feelingBetween(speaker, target)
-                    feeling.trust += 0.35 * signal.confidence
-                    feeling.annoyance -= 0.2 * signal.confidence
-                    set(feeling, speaker, target)
-
-                    var back = feelingBetween(target, speaker)
-                    back.trust += 0.3 * signal.confidence
-                    set(back, target, speaker)
-
-                    // An alliance needs goodwill on *both* sides. One seat agreeing is a
-                    // gesture; it becomes an alliance when the other agrees back, or when
-                    // they have already warmed to each other. Checking only one direction
-                    // would let a single compliment ally two characters, which is not what
-                    // the brief describes.
-                    let mine = feelingBetween(speaker, target)
-                    let theirs = feelingBetween(target, speaker)
-                    if mine.trust >= 0.45, theirs.trust >= 0.4 {
-                        var updated = mine
-                        if updated.alliance == nil {
-                            updated.alliance = Relationship.Alliance(
-                                sinceSequence: sequence, strength: 0.3)
-                            set(updated, speaker, target)
-                        }
-                        var reciprocal = theirs
-                        if reciprocal.alliance == nil {
-                            reciprocal.alliance = Relationship.Alliance(
-                                sinceSequence: sequence, strength: 0.3)
-                            set(reciprocal, target, speaker)
-                        }
-                    }
-                }
-                record("\(speaker) \(signal.kind.phrase)\(targetSuffix(signal.target))")
-
-            case .reconciliation:
-                for target in targets where target != speaker {
-                    var feeling = feelingBetween(speaker, target)
-                    feeling.annoyance = max(0, feeling.annoyance - 0.5 * signal.confidence)
-                    feeling.grudge = nil
-                    feeling.trust += 0.15 * signal.confidence
-                    set(feeling, speaker, target)
-
-                    var back = feelingBetween(target, speaker)
-                    back.annoyance = max(0, back.annoyance - 0.35 * signal.confidence)
-                    set(back, target, speaker)
-                }
-                record("\(speaker) \(signal.kind.phrase)")
-
-            case .newEvidence:
-                for target in targets where target != speaker {
-                    var feeling = feelingBetween(speaker, target)
-                    feeling.respect += 0.25 * signal.confidence
-                    set(feeling, speaker, target)
-                }
-                beatsWon[speaker, default: 0] += 1
-                record("\(speaker) \(signal.kind.phrase)")
-
-            case .unsupportedClaim:
-                // A weak argument invites mockery, which is what the brief asks for: it
-                // raises the others' willingness to go after this seat next.
-                for target in others where target != speaker {
-                    var feeling = feelingBetween(target, speaker)
-                    feeling.respect -= 0.2 * signal.confidence
-                    feeling.competition += 0.15 * signal.confidence
-                    set(feeling, target, speaker)
-                }
-                record("\(speaker) \(signal.kind.phrase)")
-
-            case .positionChange:
-                record("\(speaker) \(signal.kind.phrase)")
-            }
+            apply(
+                signal,
+                in: SignalContext(
+                    speaker: speaker, targets: targets, others: others, sequence: sequence,
+                    summary: summary))
         }
 
         for key in feelings.keys { feelings[key]?.clamp() }
+    }
+
+    /// One signal together with the room it lands in, so each rule takes a signal and a context
+    /// rather than re-threading five arguments.
+    private struct SignalContext {
+        var speaker: String
+        var targets: [String]
+        var others: [String]
+        var sequence: Int
+        var summary: String?
+    }
+
+    /// Route one signal to the rule that owns it.
+    private mutating func apply(_ signal: TurnSignal, in context: SignalContext) {
+        switch signal.kind {
+        case .jab:
+            applyJab(signal, in: context)
+        case .concession:
+            applyConcession(signal, in: context)
+        case .contradiction, .challenge:
+            applyContradiction(signal, in: context)
+        case .agreement:
+            applyAgreement(signal, in: context)
+        case .reconciliation:
+            applyReconciliation(signal, in: context)
+        case .newEvidence:
+            applyNewEvidence(signal, in: context)
+        case .unsupportedClaim:
+            applyUnsupportedClaim(signal, in: context)
+        case .positionChange:
+            record("\(context.speaker) \(signal.kind.phrase)")
+        }
+    }
+
+    private mutating func applyJab(_ signal: TurnSignal, in context: SignalContext) {
+        for target in context.targets where target != context.speaker {
+            var feeling = feelingBetween(context.speaker, target)
+            // Sized so that one unmistakable jab crosses the grudge threshold: the
+            // brief wants a slight to be remembered, and a first jab that faded
+            // before it registered would mean grudges never form at all.
+            feeling.annoyance += 0.6 * signal.confidence
+            feeling.respect -= 0.10 * signal.confidence
+            // A jab is what a grudge is made of, and the reason is kept so the prompt
+            // can refer to it rather than to a number.
+            if feeling.annoyance >= 0.5 {
+                feeling.grudge = Relationship.Grudge(
+                    reason: context.summary ?? "a remark earlier",
+                    sinceSequence: context.sequence,
+                    intensity: min(1, feeling.annoyance))
+            }
+            // Being jabbed at tends to end an alliance.
+            feeling.alliance = nil
+            set(feeling, context.speaker, target)
+
+            // And it invites retaliation: the target's own hostility rises.
+            var back = feelingBetween(target, context.speaker)
+            back.competition += 0.3 * signal.confidence
+            // Trust is bipolar, so an attack takes it below zero rather than merely
+            // failing to raise it: being jabbed at produces active distrust, which is
+            // what the seat's next message should reflect.
+            back.trust -= 0.25 * signal.confidence
+            set(back, target, context.speaker)
+        }
+        record("\(context.speaker) \(signal.kind.phrase)\(targetSuffix(signal.target))")
+    }
+
+    private mutating func applyConcession(_ signal: TurnSignal, in context: SignalContext) {
+        for target in context.targets where target != context.speaker {
+            var feeling = feelingBetween(context.speaker, target)
+            feeling.respect += 0.4 * signal.confidence
+            feeling.annoyance -= 0.25 * signal.confidence
+            feeling.grudge = nil
+            set(feeling, context.speaker, target)
+
+            var back = feelingBetween(target, context.speaker)
+            back.trust += 0.2 * signal.confidence
+            set(back, target, context.speaker)
+        }
+        beatsWon[context.speaker, default: 0] += 1
+        record("\(context.speaker) \(signal.kind.phrase)")
+    }
+
+    private mutating func applyContradiction(_ signal: TurnSignal, in context: SignalContext) {
+        for target in context.targets where target != context.speaker {
+            var feeling = feelingBetween(context.speaker, target)
+            // Going after someone successfully *is* a display of strength, so
+            // competition rises while respect holds rather than falling.
+            feeling.competition += 0.25 * signal.confidence
+            set(feeling, context.speaker, target)
+
+            var back = feelingBetween(target, context.speaker)
+            back.respect += 0.15 * signal.confidence
+            back.annoyance += 0.2 * signal.confidence
+            set(back, target, context.speaker)
+        }
+        beatsWon[context.speaker, default: 0] += 1
+        record("\(context.speaker) \(signal.kind.phrase)\(targetSuffix(signal.target))")
+    }
+
+    private mutating func applyAgreement(_ signal: TurnSignal, in context: SignalContext) {
+        for target in context.targets where target != context.speaker {
+            var feeling = feelingBetween(context.speaker, target)
+            feeling.trust += 0.35 * signal.confidence
+            feeling.annoyance -= 0.2 * signal.confidence
+            set(feeling, context.speaker, target)
+
+            var back = feelingBetween(target, context.speaker)
+            back.trust += 0.3 * signal.confidence
+            set(back, target, context.speaker)
+
+            // An alliance needs goodwill on *both* sides. One seat agreeing is a
+            // gesture; it becomes an alliance when the other agrees back, or when
+            // they have already warmed to each other. Checking only one direction
+            // would let a single compliment ally two characters, which is not what
+            // the brief describes.
+            let mine = feelingBetween(context.speaker, target)
+            let theirs = feelingBetween(target, context.speaker)
+            if mine.trust >= 0.45, theirs.trust >= 0.4 {
+                var updated = mine
+                if updated.alliance == nil {
+                    updated.alliance = Relationship.Alliance(
+                        sinceSequence: context.sequence, strength: 0.3)
+                    set(updated, context.speaker, target)
+                }
+                var reciprocal = theirs
+                if reciprocal.alliance == nil {
+                    reciprocal.alliance = Relationship.Alliance(
+                        sinceSequence: context.sequence, strength: 0.3)
+                    set(reciprocal, target, context.speaker)
+                }
+            }
+        }
+        record("\(context.speaker) \(signal.kind.phrase)\(targetSuffix(signal.target))")
+    }
+
+    private mutating func applyReconciliation(_ signal: TurnSignal, in context: SignalContext) {
+        for target in context.targets where target != context.speaker {
+            var feeling = feelingBetween(context.speaker, target)
+            feeling.annoyance = max(0, feeling.annoyance - 0.5 * signal.confidence)
+            feeling.grudge = nil
+            feeling.trust += 0.15 * signal.confidence
+            set(feeling, context.speaker, target)
+
+            var back = feelingBetween(target, context.speaker)
+            back.annoyance = max(0, back.annoyance - 0.35 * signal.confidence)
+            set(back, target, context.speaker)
+        }
+        record("\(context.speaker) \(signal.kind.phrase)")
+    }
+
+    private mutating func applyNewEvidence(_ signal: TurnSignal, in context: SignalContext) {
+        for target in context.targets where target != context.speaker {
+            var feeling = feelingBetween(context.speaker, target)
+            feeling.respect += 0.25 * signal.confidence
+            set(feeling, context.speaker, target)
+        }
+        beatsWon[context.speaker, default: 0] += 1
+        record("\(context.speaker) \(signal.kind.phrase)")
+    }
+
+    private mutating func applyUnsupportedClaim(_ signal: TurnSignal, in context: SignalContext) {
+        // A weak argument invites mockery, which is what the brief asks for: it
+        // raises the others' willingness to go after this seat next.
+        for target in context.others where target != context.speaker {
+            var feeling = feelingBetween(target, context.speaker)
+            feeling.respect -= 0.2 * signal.confidence
+            feeling.competition += 0.15 * signal.confidence
+            set(feeling, target, context.speaker)
+        }
+        record("\(context.speaker) \(signal.kind.phrase)")
     }
 
     /// What to tell a seat about the room.

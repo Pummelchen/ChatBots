@@ -1,29 +1,19 @@
 # Static-analysis waivers — the residual the gates accept, and why.
 #
-# Two style gates cannot reach zero without either reformatting the whole tree or hiding findings, so
-# their residual is waived at a stated number rather than quietly tolerated; three semgrep findings in
-# `tools/cdp.py` and `tools/cdp_protocol.py` are justified in writing. Both gates read this file —
-# `tools/mac-checks.sh` for the two counts, `tools/semgrep-waivers.py` for the semgrep lines — so
-# raising a number or adding a line is a deliberate edit with a reason attached, not a silent drift.
+# One file, because this is the only place a gate reads an accepted finding from. It used to carry a
+# count for each style gate as well; the audit drove both to zero (`swiftlint` from 206 findings and
+# `swift-format` from 306), and gates 5 and 6 of `tools/mac-checks.sh` now run `--strict` against zero
+# rather than against a recorded number. What is left here is the semgrep findings below, which
+# are justified in writing because the scanner cannot see the control that answers them.
 #
-# What the residual *is*, rule by rule, lives in `.swiftlint.yml` and `.swift-format`, which are the
-# configuration for those two tools. This file only says how much of it the gates accept. The caps sit
-# a couple of findings above the measured residual (13 and 0 against 15 and 2 after the audit enabled
-# `force_unwrapping`, ran `swift-format format` over the tree, and removed the sites the rules found) because
-# the two formatters arrive through Homebrew and a patch release can word a diagnostic differently; the
-# slack is there for that drift, not for new code. A change that pushes either count past its cap fails
-# the gate and has to justify the new number here.
+# The style residual *was*, rule by rule, described in `.swiftlint.yml` and `.swift-format`. Those two
+# files are still the configuration for their tools; the caps are gone because the debt is.
 #
-#   swiftlint waiver: <count>       the gate fails when the run reports more than this many findings
-#   swift-format waiver: <count>    the same, over authored Swift only
 #   semgrep waiver: <rule id> <path suffix>
 #                                   a finding that stays visible — there is no `nosemgrep` — matched on
 #                                   rule id *and* path, because a count cannot tell a justified finding
 #                                   from a new one: fixing one and introducing another would leave the
 #                                   total unchanged.
-swiftlint waiver: 15
-swift-format waiver: 2
-
 # `tools/cdp.py` and `tools/cdp_protocol.py` drive a headless Chrome on loopback and nothing else.
 # `require_loopback_host` refuses any endpoint that is not 127.0.0.1, localhost or ::1 before a socket
 # is opened, the URL scheme is pinned to `http` and built only from validated values, the target list is

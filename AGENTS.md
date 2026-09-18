@@ -108,13 +108,13 @@ test that pins it (`Tests/ChatBotsCoreTests/DefaultCheckpointTests.swift`).
   `Package.swift`'s `.macOS(.vN)`, and `install.sh` must not hardcode an OS literal.
 - The mac-only gate is `tools/mac-checks.sh`, nine gates in one command: the file-size
   check, `swift build --build-tests`, `swift test --enable-code-coverage`,
-  `llvm-cov report`, `swiftlint lint`, `swift-format lint` over `Sources`/`Tests`
+  `llvm-cov report`, `swiftlint lint --strict`, `swift-format lint --strict` over `Sources`/`Tests`
   excluding the two generated files, the two Node web-rule checks, `eslint` and
   `prettier` over the JavaScript, and the identity
   check. swiftlint and
-  swift-format are judged against **recorded waivers** in
-  `tools/analysis-waivers.txt`, not against zero — that file also carries the semgrep
-  findings this project accepts, and is the only place either gate reads them from.
+  swift-format run with **`--strict` against zero** — a warning fails the gate the way
+  an error does. `tools/analysis-waivers.txt` carries only the semgrep findings this
+  project accepts, each matched on rule id and path.
   The JavaScript toolchain comes from `npm ci` against the committed
   `package-lock.json`, and a missing install fails the gate rather than skipping it.
   The size limit is one number in one script (`tools/check-file-sizes.sh`), called by

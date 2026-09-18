@@ -32,20 +32,7 @@ extension WebTransportEngineServer {
         // arriving, because a client that does neither has never asked for anything and is holding a slot
         // the engine could be using. `spokenSessions` is what the watchdog reads, and both it and
         // this loop are on the main actor, so there is no lock between them.
-        let startupTimeout = Duration.seconds(configuration.sessionStartupTimeout)
-        let watchdog = Task { [weak self] in
-            try? await Task.sleep(for: startupTimeout)
-            guard !Task.isCancelled, let self, !self.spokenSessions.contains(id) else { return }
-            let seconds = Int(self.configuration.sessionStartupTimeout)
-            let reason = "the session did not finish a frame within \(seconds) seconds"
-            self.note(reason)
-            // The session is taken out of `sessions` before it is closed, exactly as the `defer`
-            // below does: the `defer` closes only what it still owns, and the library's `close()`
-            // must not be called twice.
-            if self.sessions.removeValue(forKey: id) != nil {
-                try? await session.close(reason: reason)
-            }
-        }
+        let watchdog = startWatchdog(session, id: id)
         defer { watchdog.cancel() }
 
         // One stream, and that is not a simplification for its own sake: the transport
@@ -77,13 +64,7 @@ extension WebTransportEngineServer {
         let (events, continuation) = AsyncStream<EngineEvent>.makeStream(
             bufferingPolicy: .bufferingNewest(ProtocolLimits.eventBufferDepth))
         subscribers[id] = continuation
-        let writer = Task { [weak self] in
-            guard let self else { return }
-            for await event in events {
-                if Task.isCancelled { return }
-                await self.send(.event(event), on: stream, through: writes)
-            }
-        }
+        let writer = startWriter(events, on: stream, through: writes)
         defer {
             writer.cancel()
             continuation.finish()
@@ -93,6 +74,7 @@ extension WebTransportEngineServer {
         // without waiting for a change.
         await send(.event(.state(service.snapshot())), on: stream, through: writes)
 
+        let channel = SessionChannel(stream: stream, session: session, id: id, writes: writes)
         var buffer = Data()
         // What this session holds from the server's buffered-frame budget. It is given back as the
         // buffer is consumed and on every exit, so the budget is a bound on live buffers rather
@@ -117,29 +99,85 @@ extension WebTransportEngineServer {
 
             // Several frames can arrive together and one can be split across reads; the
             // framing holds partial messages until they are complete.
-            while true {
-                let result: LengthFraming.ReadResult
-                do {
-                    result = try LengthFraming.read(from: buffer)
-                } catch {
-                    // A frame the framing refuses cannot be skipped, so this ends the session; the reasons
-                    // are unwound in `refuseFraming` because this function is at its complexity budget.
-                    await refuseFraming(error, on: stream, session: session, id: id, through: writes)
-                    return
-                }
-                guard case .message(let payload, let remainder) = result else { break }
-                let consumed = buffer.count - remainder.count
-                releaseFrameBytes(consumed)
-                reserved -= consumed
-                buffer = remainder
-                // A whole frame, so the session is a conversation rather than a client that sent a byte and
-                // stopped: the startup deadline no longer applies to it. It is *bytes* that make the server
-                // serve a session — measured, one byte is enough to hold an admission slot and receive the
-                // state pushes — so the deadline has to cover the frame being finished, not the first byte
-                // arriving.
-                spokenSessions.insert(id)
-                await answer(payload, on: stream, through: writes)
+            guard await readFrames(from: &buffer, reserved: &reserved, channel: channel) else {
+                return
             }
+        }
+    }
+
+    /// The channel one accepted session reads frames from, bundled so the frame reader takes one
+    /// argument rather than four.
+    private struct SessionChannel {
+        let stream: WebTransportBidirectionalStream
+        let session: WebTransportSession
+        let id: UUID
+        let writes: SendQueue
+    }
+
+    /// Start the deadline that ends a session which never finishes a frame.
+    ///
+    /// The deadline covers the stream being opened *and* the first frame arriving, because a
+    /// client that does neither has never asked for anything and is holding a slot the engine
+    /// could be using.
+    private func startWatchdog(_ session: WebTransportSession, id: UUID) -> Task<Void, Never> {
+        let timeout = Duration.seconds(configuration.sessionStartupTimeout)
+        return Task { [weak self] in
+            try? await Task.sleep(for: timeout)
+            guard !Task.isCancelled, let self, !self.spokenSessions.contains(id) else { return }
+            let seconds = Int(self.configuration.sessionStartupTimeout)
+            let reason = "the session did not finish a frame within \(seconds) seconds"
+            self.note(reason)
+            // The session is taken out of `sessions` before it is closed, exactly as the `defer`
+            // in `serve` does: the `defer` closes only what it still owns, and the library's
+            // `close()` must not be called twice.
+            if self.sessions.removeValue(forKey: id) != nil {
+                try? await session.close(reason: reason)
+            }
+        }
+    }
+
+    /// Start the task that drains this session's event stream onto its frame writer.
+    private func startWriter(
+        _ events: AsyncStream<EngineEvent>, on stream: WebTransportBidirectionalStream,
+        through writes: SendQueue
+    ) -> Task<Void, Never> {
+        Task { [weak self] in
+            guard let self else { return }
+            for await event in events {
+                if Task.isCancelled { return }
+                await self.send(.event(event), on: stream, through: writes)
+            }
+        }
+    }
+
+    /// Drain every whole frame currently buffered. `false` means the session must end.
+    private func readFrames(
+        from buffer: inout Data, reserved: inout Int, channel: SessionChannel
+    ) async -> Bool {
+        while true {
+            let result: LengthFraming.ReadResult
+            do {
+                result = try LengthFraming.read(from: buffer)
+            } catch {
+                // A frame the framing refuses cannot be skipped, so this ends the session; the reasons
+                // are unwound in `refuseFraming`.
+                await refuseFraming(
+                    error, on: channel.stream, session: channel.session, id: channel.id,
+                    through: channel.writes)
+                return false
+            }
+            guard case .message(let payload, let remainder) = result else { return true }
+            let consumed = buffer.count - remainder.count
+            releaseFrameBytes(consumed)
+            reserved -= consumed
+            buffer = remainder
+            // A whole frame, so the session is a conversation rather than a client that sent a byte and
+            // stopped: the startup deadline no longer applies to it. It is *bytes* that make the server
+            // serve a session — measured, one byte is enough to hold an admission slot and receive the
+            // state pushes — so the deadline has to cover the frame being finished, not the first byte
+            // arriving.
+            spokenSessions.insert(channel.id)
+            await answer(payload, on: channel.stream, through: channel.writes)
         }
     }
 

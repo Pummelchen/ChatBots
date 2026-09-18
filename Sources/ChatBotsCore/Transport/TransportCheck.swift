@@ -176,18 +176,88 @@ public enum TransportCheck {
         // it passed — while a real client could not connect to a real engine at all. An
         // in-process pair takes a shortcut that does not exist across a process boundary, so
         // the check was proving nothing. It now spawns the engine the same way the app does.
-        let engineURL: URL
-        if let executable {
-            engineURL = executable
-        } else if let first = ProcessInfo.processInfo.arguments.first {
-            engineURL = URL(fileURLWithPath: first)
-        } else {
+        guard let engineURL = engineExecutable(executable) else {
             report.recordFailure("cannot locate the engine executable to start")
             return report
         }
-        let engineProcess = Process()
-        engineProcess.executableURL = engineURL
-        engineProcess.arguments = [
+        let engineProcess: Process
+        do {
+            engineProcess = try startEngine(at: engineURL, port: port, in: directory)
+        } catch {
+            report.recordFailure("could not start the engine: \(error.localizedDescription)")
+            return report
+        }
+        defer {
+            if engineProcess.isRunning { engineProcess.terminate() }
+        }
+        _ = engine
+
+        let client = makeClient(port: port, timeout: timeout)
+
+        switch await connect(client, deadline: deadline, timeout: timeout) {
+        case .connected:
+            report.connected = true
+        case .gaveUp(let message), .failed(let message):
+            report.recordFailure(message)
+            return report
+        }
+
+        // Collect events for the length of the check, so an output fragment is seen if one is
+        // produced. Nothing is generated here, so its absence is not a failure.
+        let collector = EventCollector()
+
+        let collectTask = Task {
+            guard let events = client.events else { return }
+            for await event in events {
+                await collector.record(event)
+            }
+        }
+
+        await checkStateRead(client, &report)
+        await checkTopicChange(client, &report)
+        await checkModeRefusal(client, &report)
+        await checkUnknownSeatRefusal(client, &report)
+        await checkAfterRefusals(client, &report)
+
+        let seen = await waitForEventStream(collector)
+        report.recordEventStream(state: seen.state, event: seen.event)
+
+        // What this check can observe about sessions is its own: it opened one connection and has
+        // not closed it yet. The engine's tally lives in another process and was never read — the
+        // field was a literal 1, so it read the same after a failed connect.
+        report.sessionCount = report.connected ? 1 : 0
+
+        collectTask.cancel()
+        await client.disconnect()
+        if engineProcess.isRunning { engineProcess.terminate() }
+        return report
+    }
+
+    /// The engine to spawn: the caller's choice, or this process's own executable.
+    ///
+    /// The default is right for the installer, where this *is* `chatbots-cli`, and wrong for
+    /// anything driving the check from inside another program: a test runner's
+    /// `arguments.first` is the test binary, so the child that came up was a second test
+    /// process and the client timed out against a listener nobody had started. Naming
+    /// the engine is what makes the check testable without pretending it is the installer.
+    private static func engineExecutable(_ executable: URL?) -> URL? {
+        if let executable { return executable }
+        guard let first = ProcessInfo.processInfo.arguments.first else { return nil }
+        return URL(fileURLWithPath: first)
+    }
+
+    /// Start the engine as a separate process.
+    ///
+    /// The first version of this check ran the server and the client in one process, and it
+    /// passed — while a real client could not connect to a real engine at all. An in-process pair
+    /// takes a shortcut that does not exist across a process boundary, so the check was proving
+    /// nothing. It now spawns the engine the same way the app does.
+    private static func startEngine(at executable: URL, port: UInt16, in directory: URL) throws
+        -> Process
+    {
+        let process = Process()
+        process.executableURL = executable
+        process.arguments = [
             "--serve", "--transport", "webtransport",
             "--transport-port", String(port),
             // WebTransport only, so no HTTP listener is opened at all. The unused port is
@@ -205,81 +275,85 @@ public enum TransportCheck {
         // Pipes with no reader are not "output that is ignored": the child blocks on write as soon
         // as one fills, and it is then waited on forever. Nothing here reads them and nothing needs
         // to — the report carries every failure the check observes for itself.
-        engineProcess.standardOutput = FileHandle.nullDevice
-        engineProcess.standardError = FileHandle.nullDevice
-        do {
-            try engineProcess.run()
-        } catch {
-            report.recordFailure("could not start the engine: \(error.localizedDescription)")
-            return report
-        }
-        defer {
-            if engineProcess.isRunning { engineProcess.terminate() }
-        }
-        _ = engine
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        return process
+    }
 
-        var clientConfiguration = WebTransportEngineClient.Configuration()
-        clientConfiguration.port = port
-        clientConfiguration.timeoutMilliseconds = Self.clientTimeoutMilliseconds(timeout)
-        // One attempt gets a short connect deadline of its own, so the retries below are real.
-        //
-        // The comment under this loop always claimed the retry was for "not listening yet", and it
-        // was not: a connect that begins before the engine's listener exists does not fail, it
-        // *waits* — so the first attempt was given the whole thirty-second budget and spent it, and
-        // the check reported "the transport does NOT work" about an engine that bound its port two
-        // seconds later. Measured here: with a two-second wait before connecting it passed, which is
-        // what a wait is not allowed to be — a guess about the machine.
-        clientConfiguration.connectTimeoutMilliseconds = Self.connectAttemptMilliseconds(timeout)
-        let client = WebTransportEngineClient(configuration: clientConfiguration)
+    /// The client for this run.
+    ///
+    /// One attempt gets a short connect deadline of its own, so the retries in `connect` are real.
+    /// The comment under the old loop always claimed the retry was for "not listening yet", and it
+    /// was not: a connect that begins before the engine's listener exists does not fail, it
+    /// *waits* — so the first attempt was given the whole thirty-second budget and spent it, and
+    /// the check reported "the transport does NOT work" about an engine that bound its port two
+    /// seconds later. Measured here: with a two-second wait before connecting it passed, which is
+    /// what a wait is not allowed to be — a guess about the machine.
+    @MainActor
+    private static func makeClient(port: UInt16, timeout: Duration) -> WebTransportEngineClient {
+        var configuration = WebTransportEngineClient.Configuration()
+        configuration.port = port
+        configuration.timeoutMilliseconds = Self.clientTimeoutMilliseconds(timeout)
+        configuration.connectTimeoutMilliseconds = Self.connectAttemptMilliseconds(timeout)
+        return WebTransportEngineClient(configuration: configuration)
+    }
 
-        // Retry briefly. Binding a QUIC listener is asynchronous on the library's side, and a
-        // check that gave up on the first attempt reported "cannot connect" for what was
-        // really "not listening yet".
-        //
-        // Bounded by the same deadline as the rest of the run, so six attempts cannot outlive the
-        // budget the caller set.
+    /// What one run's connect retries settled on.
+    private enum ConnectOutcome {
+        case connected
+        /// The run's deadline passed before a connect succeeded; carries the failure to record.
+        case gaveUp(String)
+        /// Every attempt failed before the deadline; carries the failure to record.
+        case failed(String)
+    }
+
+    /// Connect, retrying briefly.
+    ///
+    /// Binding a QUIC listener is asynchronous on the library's side, and a check that gave up on
+    /// the first attempt reported "cannot connect" for what was really "not listening yet".
+    /// Bounded by the same deadline as the rest of the run, so six attempts cannot outlive the
+    /// budget the caller set.
+    @MainActor
+    private static func connect(
+        _ client: WebTransportEngineClient, deadline: ContinuousClock.Instant, timeout: Duration
+    ) async -> ConnectOutcome {
         var lastError: String?
         for attempt in 0..<6 {
             do {
                 try await client.connect()
-                report.connected = true
-                lastError = nil
-                break
+                return .connected
             } catch {
                 lastError = error.localizedDescription
                 if ContinuousClock.now >= deadline {
-                    report.recordFailure(
-                        "connect across processes: gave up after \(timeout) — \(lastError ?? "unknown")")
-                    return report
+                    let message =
+                        "connect across processes: gave up after \(timeout) — \(lastError ?? "unknown")"
+                    return .gaveUp(message)
                 }
                 try? await Task.sleep(for: .milliseconds(400 * (attempt + 1)))
             }
         }
-        if !report.connected {
-            report.recordFailure("connect across processes: \(lastError ?? "unknown")")
-            return report
-        }
+        return .failed("connect across processes: \(lastError ?? "unknown")")
+    }
 
-        // Collect events for the length of the check, so an output fragment is seen if one is
-        // produced. Nothing is generated here, so its absence is not a failure.
-        let collector = EventCollector()
-
-        let collectTask = Task {
-            guard let events = client.events else { return }
-            for await event in events {
-                await collector.record(event)
-            }
-        }
-
-        // 1. A state read.
+    /// 1. A state read.
+    @MainActor
+    private static func checkStateRead(
+        _ client: WebTransportEngineClient, _ report: inout TransportCheckReport
+    ) async {
         do {
             let snapshot = try await client.state()
             report.recordStateRead(received: snapshot != nil)
         } catch {
             report.recordFailure("fetchState: \(error.localizedDescription)")
         }
+    }
 
-        // 2. A command that changes something.
+    /// 2. A command that changes something.
+    @MainActor
+    private static func checkTopicChange(
+        _ client: WebTransportEngineClient, _ report: inout TransportCheckReport
+    ) async {
         do {
             let reply = try await client.send(.setTopic("Transport check, second topic"))
             report.recordCommand(
@@ -288,16 +362,26 @@ public enum TransportCheck {
         } catch {
             report.recordFailure("setTopic: \(error.localizedDescription)")
         }
+    }
 
-        // 3. A refusal, which must arrive as an answer rather than closing the stream.
+    /// 3. A refusal, which must arrive as an answer rather than closing the stream.
+    @MainActor
+    private static func checkModeRefusal(
+        _ client: WebTransportEngineClient, _ report: inout TransportCheckReport
+    ) async {
         do {
             let reply = try await client.send(.setMode(.research))
             report.recordRefusal(wasRefused: reply.refusal != nil, failureWhenNotRefused: nil)
         } catch {
             report.recordFailure("setMode: \(error.localizedDescription)")
         }
+    }
 
-        // 4. An invalid seat, to prove a refusal does not kill the session.
+    /// 4. An invalid seat, to prove a refusal does not kill the session.
+    @MainActor
+    private static func checkUnknownSeatRefusal(
+        _ client: WebTransportEngineClient, _ report: inout TransportCheckReport
+    ) async {
         do {
             let reply = try await client.send(.updateSeat(.init(seatID: "Agent 99", name: "Nobody")))
             report.recordRefusal(
@@ -306,35 +390,36 @@ public enum TransportCheck {
         } catch {
             report.recordFailure("updateSeat: \(error.localizedDescription)")
         }
+    }
 
-        // 5. The session must still work after two refusals.
+    /// 5. The session must still work after two refusals.
+    @MainActor
+    private static func checkAfterRefusals(
+        _ client: WebTransportEngineClient, _ report: inout TransportCheckReport
+    ) async {
         do {
             let snapshot = try await client.state()
             report.recordStateAfterRefusals(received: snapshot != nil)
         } catch {
             report.recordFailure("state after refusals: \(error.localizedDescription)")
         }
+    }
 
-        // Wait for the collector to see the state the engine pushes to a new session, against a
-        // deadline rather than a fixed sleep. The 400 ms pause was a guess — too short on a busy
-        // machine and pure waiting on an idle one — and nothing recorded which had happened.
+    /// Wait for the collector to see the state the engine pushes to a new session, against a
+    /// deadline rather than a fixed sleep.
+    ///
+    /// The 400 ms pause was a guess — too short on a busy machine and pure waiting on an idle one
+    /// — and nothing recorded which had happened.
+    private static func waitForEventStream(
+        _ collector: EventCollector
+    ) async -> (state: Bool, event: Bool) {
         let streamDeadline = ContinuousClock.now.advanced(by: .seconds(5))
         var seen = await collector.snapshot()
         while !seen.state, ContinuousClock.now < streamDeadline {
             try? await Task.sleep(for: .milliseconds(50))
             seen = await collector.snapshot()
         }
-        report.recordEventStream(state: seen.state, event: seen.event)
-
-        // What this check can observe about sessions is its own: it opened one connection and has
-        // not closed it yet. The engine's tally lives in another process and was never read — the
-        // field was a literal 1, so it read the same after a failed connect.
-        report.sessionCount = report.connected ? 1 : 0
-
-        collectTask.cancel()
-        await client.disconnect()
-        if engineProcess.isRunning { engineProcess.terminate() }
-        return report
+        return seen
     }
 
     /// Accumulates what arrived on the event stream.

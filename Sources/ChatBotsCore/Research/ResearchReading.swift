@@ -34,8 +34,39 @@ public enum ResearchReading {
     /// again every turn until the budget ran out, which is the opposite of directing.
     @MainActor
     public static func read(seats: [AgentSpec], turns: [Turn]) -> ResearchDirector {
-        // Analysts only. A read of the room that counted the moderator's own directions as
-        // contributions would conclude the moderator was the most productive analyst.
+        let analysts = analysts(in: seats)
+        let analystIDs = Set(analysts.map(\.id))
+        let names = seats.map(\.displayName)
+        let said = passOne(turns: turns, analystIDs: analystIDs, names: names)
+        let covered = coverage(of: said.named, directedCovered: said.directedCovered)
+        let unsupported = unsupportedGaps(said.gaps, turns: turns, analystIDs: analystIDs)
+        let conflicts = unresolvedConflicts(
+            said.marks, turns: turns, analystIDs: analystIDs, names: names)
+
+        // A question where the room agreed and nobody has since objected. Agreement on a claim
+        // that was then challenged is not agreement.
+        let settled = said.agreed.subtracting(said.disputedLater)
+        // Who spoke most recently, so the moderator does not ask someone to answer themselves.
+        let lastSpeaker = turns.last { $0.kind == .chat }?.speakerID
+        return ResearchDirector(
+            seats: seats,
+            contributions: said.contributions,
+            covered: covered,
+            conflicts: conflicts,
+            unsupported: unsupported,
+            settled: settled,
+            lastSpeakerID: lastSpeaker,
+            analystIDs: analystIDs)
+    }
+
+    // MARK: - The room's analysts
+
+    /// The seats whose contributions count as analyst work.
+    ///
+    /// Analysts only. A read of the room that counted the moderator's own directions as
+    /// contributions would conclude the moderator was the most productive analyst.
+    @MainActor
+    private static func analysts(in seats: [AgentSpec]) -> [AgentSpec] {
         let declared = seats.filter { spec in
             spec.mode == .research
                 && AnalystLibrary.role(id: spec.personaID).id == spec.personaID
@@ -44,13 +75,15 @@ public enum ResearchReading {
         // A research line-up where nobody has been given an analyst role still gets directed;
         // it just gets directed without the benefit of knowing who is equipped for what. The
         // alternative — silently doing nothing — is the failure this whole file exists to fix.
-        let analysts =
-            declared.isEmpty
-            ? seats.filter { $0.mode == .research && $0.personaID != AnalystLibrary.moderatorID }
-            : declared
-        let analystIDs = Set(analysts.map(\.id))
-        let names = seats.map(\.displayName)
+        guard declared.isEmpty else { return declared }
+        return seats.filter { $0.mode == .research && $0.personaID != AnalystLibrary.moderatorID }
+    }
 
+    // MARK: - Pass one: what was said
+
+    /// Everything pass one collected, so the reading can be split across helpers.
+    private struct Said {
+        /// Contributions per seat id.
         var contributions: [String: Int] = [:]
         /// Basis-bearing mentions, before the room-engagement rule below is applied.
         var named: [ResearchSubQuestion: Set<String>] = [:]
@@ -68,157 +101,224 @@ public enum ResearchReading {
         var lastClaimant: [ResearchSubQuestion: String] = [:]
         var agreed: Set<ResearchSubQuestion> = []
         var disputedLater: Set<ResearchSubQuestion> = []
+    }
 
-        // ── Pass one: what was said. ──────────────────────────────────────────────────
-        // Read in log order: pairing a challenge with the claim it answers only works
-        // left-to-right, and a settled question is one that was agreed *and not* reopened.
+    /// Read the turns in log order.
+    ///
+    /// Pairing a challenge with the claim it answers only works left-to-right, and a settled
+    /// question is one that was agreed *and not* reopened.
+    @MainActor
+    private static func passOne(turns: [Turn], analystIDs: Set<String>, names: [String]) -> Said {
+        var said = Said()
         for turn in turns {
-            // A direction the app itself wrote, asking the room at a subject nobody has
-            // addressed. Recorded so the answer to it counts as engagement below. Which
-            // assignment it was is carried on the turn as `unaddressedSubject`, so editing
-            // the instruction's wording cannot change what the reading sees; a
-            // turn written before that field existed is still read from its wording, once,
-            // by `legacyUnaddressedSubject`.
-            if turn.kind == .direction {
-                if let marker = turn.unaddressedSubject,
-                    let question = ResearchSubQuestion(rawValue: marker)
-                {
-                    directed.insert(question)
-                } else if let legacy = ResearchDirector.legacyUnaddressedSubject(in: turn.content) {
-                    directed.insert(legacy)
-                }
-                continue
-            }
-            guard turn.kind == .chat,
-                let seatID = turn.speakerID, analystIDs.contains(seatID)
-            else { continue }
-            contributions[seatID, default: 0] += 1
-
-            let questions = ResearchDirector.subQuestions(in: turn.content)
-            // A subject is *named* only by a contribution that also says what it is relying on.
-            //
-            // A keyword in an unsourced paragraph is a mention, not an answer, and treating a
-            // mention as coverage is what let a couple of paragraphs read as the whole question
-            // addressed. The relationship and conflict reads below still use every subject the
-            // text names, because pairing a challenge with what it answered is about what was
-            // said rather than about what was evidenced.
-            if ResearchDirector.hasBasis(turn.content) {
-                for question in questions {
-                    named[question, default: []].insert(seatID)
-                    if directed.contains(question) { directedCovered.insert(question) }
-                }
-            }
-
-            let signals = ConflictReader.signals(
-                in: turn.content,
-                from: seatID,
-                others: names,
-                addressing: nil)
-
-            // Both reads must agree. The reader's signal is the precise one — it needs a
-            // certainty phrase and no evidence — and `hasBasis` is the broader marker list, so
-            // requiring it to be false as well is what keeps a short methodological remark from
-            // being chased as though it were a claim. Flagging on either alone made almost
-            // every contribution a gap, and a director that finds a gap everywhere directs
-            // nowhere: it asks the same question until the budget runs out.
-            if signals.contains(where: { $0.kind == .unsupportedClaim }),
-                !ResearchDirector.hasBasis(turn.content)
-            {
-                // Named by its own opening, so the direction can quote what it is about
-                // rather than describing it.
-                let claim =
-                    ConflictReader.summary(of: turn.content)
-                    ?? turn.content.trimmingCharacters(in: .whitespacesAndNewlines)
-                gaps.append((seatID: seatID, claim: claim, sequence: turn.sequence))
-            }
-
-            let isDisagreement = signals.contains { $0.kind == .contradiction || $0.kind == .challenge }
-            for question in questions {
-                if isDisagreement, let other = lastClaimant[question], other != seatID {
-                    var parties = marks[question]?.parties ?? []
-                    if !parties.contains(other) { parties.append(other) }
-                    if !parties.contains(seatID) { parties.append(seatID) }
-                    marks[question] = (parties, turn.sequence)
-                    disputedLater.insert(question)
-                }
-                if signals.contains(where: { $0.kind == .agreement }) {
-                    agreed.insert(question)
-                }
-                lastClaimant[question] = seatID
-            }
+            read(turn, into: &said, analystIDs: analystIDs, names: names)
         }
+        return said
+    }
 
-        // Coverage is the room's engagement, not one seat's mention. A subject that
-        // one contribution named with a basis is a mention, however well sourced: text matching
-        // cannot tell "the room worked through the cost question" from "someone wrote a sentence
-        // containing the word cost", and a single sentence naming all ten subjects used to close
-        // a session as fully answered. A subject therefore counts as covered when more than one
-        // seat has named it with a basis — the room took it up — or when it is the subject the
-        // moderator asked about and a seat answered that assignment. Coverage is not made
-        // unreachable by this: the director keeps pointing at the gap until the room responds.
+    /// Read one turn into the record.
+    @MainActor
+    private static func read(
+        _ turn: Turn, into said: inout Said, analystIDs: Set<String>, names: [String]
+    ) {
+        // A direction the app itself wrote, asking the room at a subject nobody has
+        // addressed. Recorded so the answer to it counts as engagement below. Which
+        // assignment it was is carried on the turn as `unaddressedSubject`, so editing
+        // the instruction's wording cannot change what the reading sees; a
+        // turn written before that field existed is still read from its wording, once,
+        // by `legacyUnaddressedSubject`.
+        if turn.kind == .direction {
+            recordDirection(turn, directed: &said.directed)
+            return
+        }
+        guard turn.kind == .chat,
+            let seatID = turn.speakerID, analystIDs.contains(seatID)
+        else { return }
+        said.contributions[seatID, default: 0] += 1
+
+        let questions = ResearchDirector.subQuestions(in: turn.content)
+        recordNaming(questions, seatID: seatID, turn: turn, said: &said)
+
+        let signals = ConflictReader.signals(
+            in: turn.content,
+            from: seatID,
+            others: names,
+            addressing: nil)
+
+        recordGap(turn, seatID: seatID, signals: signals, into: &said)
+        recordMarks(
+            questions, seatID: seatID, signals: signals, sequence: turn.sequence, into: &said)
+    }
+
+    /// Record the subject a direction pointed the room at.
+    @MainActor
+    private static func recordDirection(_ turn: Turn, directed: inout Set<ResearchSubQuestion>) {
+        if let marker = turn.unaddressedSubject,
+            let question = ResearchSubQuestion(rawValue: marker)
+        {
+            directed.insert(question)
+        } else if let legacy = ResearchDirector.legacyUnaddressedSubject(in: turn.content) {
+            directed.insert(legacy)
+        }
+    }
+
+    /// Record the subjects a contribution named, but only where it also said what it relies on.
+    ///
+    /// A keyword in an unsourced paragraph is a mention, not an answer, and treating a
+    /// mention as coverage is what let a couple of paragraphs read as the whole question
+    /// addressed. The relationship and conflict reads below still use every subject the
+    /// text names, because pairing a challenge with what it answered is about what was
+    /// said rather than about what was evidenced.
+    @MainActor
+    private static func recordNaming(
+        _ questions: [ResearchSubQuestion], seatID: String, turn: Turn, said: inout Said
+    ) {
+        guard ResearchDirector.hasBasis(turn.content) else { return }
+        for question in questions {
+            said.named[question, default: []].insert(seatID)
+            if said.directed.contains(question) { said.directedCovered.insert(question) }
+        }
+    }
+
+    /// Record a claim offered with nothing behind it.
+    ///
+    /// Both reads must agree. The reader's signal is the precise one — it needs a
+    /// certainty phrase and no evidence — and `hasBasis` is the broader marker list, so
+    /// requiring it to be false as well is what keeps a short methodological remark from
+    /// being chased as though it were a claim. Flagging on either alone made almost
+    /// every contribution a gap, and a director that finds a gap everywhere directs
+    /// nowhere: it asks the same question until the budget runs out.
+    @MainActor
+    private static func recordGap(
+        _ turn: Turn, seatID: String, signals: [TurnSignal], into said: inout Said
+    ) {
+        guard signals.contains(where: { $0.kind == .unsupportedClaim }),
+            !ResearchDirector.hasBasis(turn.content)
+        else { return }
+        // Named by its own opening, so the direction can quote what it is about
+        // rather than describing it.
+        let claim =
+            ConflictReader.summary(of: turn.content)
+            ?? turn.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        said.gaps.append((seatID: seatID, claim: claim, sequence: turn.sequence))
+    }
+
+    /// Record disagreement, agreement, and who last claimed each subject.
+    @MainActor
+    private static func recordMarks(
+        _ questions: [ResearchSubQuestion], seatID: String, signals: [TurnSignal], sequence: Int,
+        into said: inout Said
+    ) {
+        let isDisagreement = signals.contains { $0.kind == .contradiction || $0.kind == .challenge }
+        for question in questions {
+            if isDisagreement, let other = said.lastClaimant[question], other != seatID {
+                var parties = said.marks[question]?.parties ?? []
+                if !parties.contains(other) { parties.append(other) }
+                if !parties.contains(seatID) { parties.append(seatID) }
+                said.marks[question] = (parties, sequence)
+                said.disputedLater.insert(question)
+            }
+            if signals.contains(where: { $0.kind == .agreement }) {
+                said.agreed.insert(question)
+            }
+            said.lastClaimant[question] = seatID
+        }
+    }
+
+    // MARK: - Pass two: what the room did about it
+
+    /// Which subjects the room took up, rather than which one seat mentioned.
+    ///
+    /// Coverage is the room's engagement, not one seat's mention. A subject that
+    /// one contribution named with a basis is a mention, however well sourced: text matching
+    /// cannot tell "the room worked through the cost question" from "someone wrote a sentence
+    /// containing the word cost", and a single sentence naming all ten subjects used to close
+    /// a session as fully answered. A subject therefore counts as covered when more than one
+    /// seat has named it with a basis — the room took it up — or when it is the subject the
+    /// moderator asked about and a seat answered that assignment. Coverage is not made
+    /// unreachable by this: the director keeps pointing at the gap until the room responds.
+    @MainActor
+    private static func coverage(
+        of named: [ResearchSubQuestion: Set<String>], directedCovered: Set<ResearchSubQuestion>
+    ) -> [ResearchSubQuestion: Set<String>] {
         var covered: [ResearchSubQuestion: Set<String>] = [:]
         for (question, seatIDs) in named
         where seatIDs.count >= 2 || directedCovered.contains(question) {
             covered[question] = seatIDs
         }
+        return covered
+    }
 
-        // ── Pass two: what the room did about it. ────────────────────────────────────
-        // "Addressed" is not "resolved". The director cannot see whether a claim was actually
-        // checked, and does not pretend to; it stops asking once the room has taken the
-        // question up. Reading the response is what separates directing from repeating.
-
-        /// Whether someone else has since worked on this sub-question at all. The standard is
-        /// deliberately loose — a contribution that merely touches methodology counts — because
-        /// the alternative is a director that keeps demanding the same check until the budget
-        /// runs out, which is the failure mode this pass exists to prevent.
-        func takenUp(_ question: ResearchSubQuestion, after sequence: Int, by seatID: String?) -> Bool {
-            turns.contains { turn in
-                turn.kind == .chat
-                    && turn.sequence > sequence
-                    && turn.speakerID.map { analystIDs.contains($0) && $0 != seatID } == true
-                    && ResearchDirector.subQuestions(in: turn.content).contains(question)
+    /// The unsupported claims nobody has taken up, which are what the director asks about.
+    @MainActor
+    private static func unsupportedGaps(
+        _ gaps: [(seatID: String, claim: String, sequence: Int)], turns: [Turn],
+        analystIDs: Set<String>
+    ) -> [(seatID: String, claim: String)] {
+        gaps
+            .filter {
+                !takenUp(
+                    .methodology, after: $0.sequence, by: $0.seatID, turns: turns,
+                    analystIDs: analystIDs)
             }
-        }
-
-        /// Whether someone has since brought material, conceded, or contested the point again.
-        /// Any of the three means the disagreement is being worked on rather than ignored, so
-        /// it does not need the moderator to assign it a second time.
-        func advanced(_ question: ResearchSubQuestion, after sequence: Int) -> Bool {
-            turns.contains { turn in
-                guard turn.kind == .chat, turn.sequence > sequence,
-                    let speaker = turn.speakerID, analystIDs.contains(speaker),
-                    ResearchDirector.subQuestions(in: turn.content).contains(question)
-                else { return false }
-                return ConflictReader.signals(
-                    in: turn.content, from: speaker, others: names, addressing: nil
-                ).contains { $0.kind == .newEvidence || $0.kind == .concession || $0.kind == .contradiction }
-            }
-        }
-
-        let unsupported =
-            gaps
-            .filter { !takenUp(.methodology, after: $0.sequence, by: $0.seatID) }
             .map { (seatID: $0.seatID, claim: $0.claim) }
+    }
 
+    /// The disagreements nobody has since worked on.
+    @MainActor
+    private static func unresolvedConflicts(
+        _ marks: [ResearchSubQuestion: (parties: [String], sequence: Int)], turns: [Turn],
+        analystIDs: Set<String>, names: [String]
+    ) -> [ResearchSubQuestion: [String]] {
         var conflicts: [ResearchSubQuestion: [String]] = [:]
         for (question, mark) in marks.sorted(by: { $0.value.sequence < $1.value.sequence }) {
-            guard !advanced(question, after: mark.sequence) else { continue }
+            guard
+                !advanced(
+                    question, after: mark.sequence, turns: turns, analystIDs: analystIDs,
+                    names: names)
+            else { continue }
             conflicts[question] = mark.parties
         }
+        return conflicts
+    }
 
-        // A question where the room agreed and nobody has since objected. Agreement on a claim
-        // that was then challenged is not agreement.
-        let settled = agreed.subtracting(disputedLater)
-        // Who spoke most recently, so the moderator does not ask someone to answer themselves.
-        let lastSpeaker = turns.last { $0.kind == .chat }?.speakerID
-        return ResearchDirector(
-            seats: seats,
-            contributions: contributions,
-            covered: covered,
-            conflicts: conflicts,
-            unsupported: unsupported,
-            settled: settled,
-            lastSpeakerID: lastSpeaker,
-            analystIDs: analystIDs)
+    /// Whether someone else has since worked on this sub-question at all.
+    ///
+    /// The standard is deliberately loose — a contribution that merely touches methodology
+    /// counts — because the alternative is a director that keeps demanding the same check until
+    /// the budget runs out, which is the failure mode this pass exists to prevent.
+    @MainActor
+    private static func takenUp(
+        _ question: ResearchSubQuestion, after sequence: Int, by seatID: String?, turns: [Turn],
+        analystIDs: Set<String>
+    ) -> Bool {
+        turns.contains { turn in
+            turn.kind == .chat
+                && turn.sequence > sequence
+                && turn.speakerID.map { analystIDs.contains($0) && $0 != seatID } == true
+                && ResearchDirector.subQuestions(in: turn.content).contains(question)
+        }
+    }
+
+    /// Whether someone has since brought material, conceded, or contested the point again.
+    ///
+    /// Any of the three means the disagreement is being worked on rather than ignored, so
+    /// it does not need the moderator to assign it a second time.
+    @MainActor
+    private static func advanced(
+        _ question: ResearchSubQuestion, after sequence: Int, turns: [Turn],
+        analystIDs: Set<String>, names: [String]
+    ) -> Bool {
+        turns.contains { turn in
+            guard turn.kind == .chat, turn.sequence > sequence,
+                let speaker = turn.speakerID, analystIDs.contains(speaker),
+                ResearchDirector.subQuestions(in: turn.content).contains(question)
+            else { return false }
+            return ConflictReader.signals(
+                in: turn.content, from: speaker, others: names, addressing: nil
+            ).contains {
+                $0.kind == .newEvidence || $0.kind == .concession || $0.kind == .contradiction
+            }
+        }
     }
 }

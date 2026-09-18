@@ -50,14 +50,7 @@ public enum ConflictReader {
         // ── Concession ────────────────────────────────────────────────────────────────
         // The strongest signal available, and the one that most changes a relationship, so it
         // is matched narrowly: an admission, not a polite "I see your point".
-        let concessionPhrases = [
-            "you're right", "you are right", "you were right", "i was wrong", "i was mistaken",
-            "i stand corrected", "fair enough", "i concede", "i'll concede", "that's a fair point",
-            "that is a fair point", "i hadn't considered", "i had not considered",
-            "i take that back", "i'll give you that", "i will give you that",
-            "i have to admit you", "i admit you", "point taken",
-        ]
-        if let phrase = firstMatch(concessionPhrases, in: lowered) {
+        if let phrase = firstMatch(Self.concessionPhrases, in: lowered) {
             signals.append(TurnSignal(kind: .concession, confidence: 0.9, target: target))
             _ = phrase
         }
@@ -74,51 +67,22 @@ public enum ConflictReader {
         // concession ("I was wrong") is the clearest instance and is included, because
         // conceding *is* a position moving. A false positive here costs a turn of budget, not
         // a false claim, so the list deliberately errs towards noticing a revision.
-        let positionChangePhrases = [
-            "you're right", "you are right", "i was wrong", "i was mistaken",
-            "i stand corrected", "i take that back", "i concede", "i'll concede",
-            "i hadn't considered", "i had not considered", "i've changed my mind",
-            "i have changed my mind", "i changed my mind", "my position has changed",
-            "i changed my position", "i now think", "i now believe", "on reflection",
-            "having thought about", "having re-read", "having reread", "i revise",
-            "i'll revise", "i will revise", "i no longer", "i've come round",
-            "i have come round", "i was too quick", "in hindsight", "i withdraw",
-            "i retract",
-        ]
-        if firstMatch(positionChangePhrases, in: lowered) != nil {
+        if firstMatch(Self.positionChangePhrases, in: lowered) != nil {
             signals.append(TurnSignal(kind: .positionChange, confidence: 0.7, target: target))
         }
 
         // ── Reconciliation ────────────────────────────────────────────────────────────
-        let reconciliationPhrases = [
-            "i'm sorry", "i am sorry", "i apologise", "i apologize", "that was uncalled for",
-            "no offence meant", "no offense meant", "let's not", "i didn't mean to",
-            "i did not mean to", "we're on the same side",
-        ]
-        if firstMatch(reconciliationPhrases, in: lowered) != nil {
+        if firstMatch(Self.reconciliationPhrases, in: lowered) != nil {
             signals.append(TurnSignal(kind: .reconciliation, confidence: 0.8, target: target))
         }
 
         // ── Agreement ─────────────────────────────────────────────────────────────────
-        let agreementPhrases = [
-            "i agree", "i agree with", "you're onto something", "you are onto something",
-            "that's exactly what i", "that is exactly what i", "i'd back that", "i would back that",
-            "you make a good point", "i think you're right about", "same conclusion",
-            "i came to the same", "that matches what i",
-        ]
-        if firstMatch(agreementPhrases, in: lowered) != nil {
+        if firstMatch(Self.agreementPhrases, in: lowered) != nil {
             signals.append(TurnSignal(kind: .agreement, confidence: 0.75, target: target))
         }
 
         // ── Contradiction ─────────────────────────────────────────────────────────────
-        let contradictionPhrases = [
-            "you contradicted yourself", "that contradicts what you", "you said earlier",
-            "you just said", "you're contradicting", "you are contradicting",
-            "that's the opposite of what you", "that is the opposite of what you",
-            "earlier you claimed", "you can't have it both ways", "you cannot have it both ways",
-            "first you said", "which is it",
-        ]
-        if firstMatch(contradictionPhrases, in: lowered) != nil {
+        if firstMatch(Self.contradictionPhrases, in: lowered) != nil {
             signals.append(TurnSignal(kind: .contradiction, confidence: 0.8, target: target))
         }
 
@@ -126,57 +90,24 @@ public enum ConflictReader {
         // Aimed at a person, not at a claim. "That argument is weak" is a challenge; "you are
         // an idiot" is a jab; "that's ridiculous" is a jab at the claim and counts as a
         // challenge, not a personal attack — the distinction the brief draws.
-        let jabPhrases = [
-            "you're an idiot", "you are an idiot", "you're pathetic", "you are pathetic",
-            "you're useless", "you are useless", "you're clueless", "you are clueless",
-            "you're embarrassing", "you are embarrassing", "shut up", "nobody asked you",
-            "you're a joke", "you are a joke", "you're deluded", "you are deluded",
-            "you're hopeless", "you have no idea what you're talking about",
-            "you have no idea what you are talking about", "trust me, bro",
-        ]
-        if firstMatch(jabPhrases, in: lowered) != nil {
+        if firstMatch(Self.jabPhrases, in: lowered) != nil {
             signals.append(TurnSignal(kind: .jab, confidence: 0.85, target: target))
         }
 
         // ── Challenge ─────────────────────────────────────────────────────────────────
-        let challengePhrases = [
-            "that doesn't follow", "that does not follow", "that's nonsense", "that is nonsense",
-            "that's ridiculous", "that is ridiculous", "that's absurd", "that is absurd",
-            "where's your evidence", "where is your evidence", "you haven't shown",
-            "you have not shown", "that's not an argument", "that is not an argument",
-            "you're begging the question", "that proves nothing", "unfounded",
-            "on what basis", "you're assuming", "you are assuming", "that's a stretch",
-            "that is a stretch", "you've just asserted", "you have just asserted",
-            "circular", "hand-waving", "hand waving", "you're dodging", "you are dodging",
-        ]
-        if firstMatch(challengePhrases, in: lowered) != nil {
+        if firstMatch(Self.challengePhrases, in: lowered) != nil {
             signals.append(TurnSignal(kind: .challenge, confidence: 0.7, target: target))
         }
 
         // ── Unsupported claim ─────────────────────────────────────────────────────────
         // A confident assertion with nothing behind it. Only counted when the message also
         // carries no evidence marker at all, so a sourced claim is never read as unsupported.
-        let evidencePhrases = [
-            "according to", "the data shows", "the study", "research shows", "reported that",
-            "published", "survey", "statistics", "for example", "for instance", "in 20",
-            "measured", "the figure", "per cent", "percent",
-        ]
-        let hedges = [
-            "i don't know", "i do not know", "i'm not sure", "i am not sure", "i could be wrong",
-            "i may be wrong", "i don't have a source", "i do not have a source",
-            "unverified", "i can't verify", "i cannot verify", "i think", "probably",
-            "my guess", "it seems",
-        ]
-        let hasEvidence = firstMatch(evidencePhrases, in: lowered) != nil
-        let hasHedge = firstMatch(hedges, in: lowered) != nil
+        let hasEvidence = firstMatch(Self.evidencePhrases, in: lowered) != nil
+        let hasHedge = firstMatch(Self.hedgePhrases, in: lowered) != nil
         if hasEvidence {
             signals.append(TurnSignal(kind: .newEvidence, confidence: 0.6))
         }
-        let certaintyPhrases = [
-            "obviously", "clearly", "everyone knows", "it's a fact", "it is a fact",
-            "without doubt", "undeniable", "no question that", "the truth is",
-        ]
-        if !hasEvidence, !hasHedge, firstMatch(certaintyPhrases, in: lowered) != nil {
+        if !hasEvidence, !hasHedge, firstMatch(Self.certaintyPhrases, in: lowered) != nil {
             signals.append(TurnSignal(kind: .unsupportedClaim, confidence: 0.6))
         }
 
@@ -257,4 +188,92 @@ extension ConflictReader {
         guard trimmed.count >= 12 else { return nil }
         return String(trimmed.prefix(120))
     }
+}
+
+// The phrase lists `signals` matches against. Held here rather than as locals inside the reader,
+// which needs the room for the rules that decide what a match means; the lists are data, not
+// logic, and reading them beside the function that uses them added nothing to either.
+extension ConflictReader {
+    /// An admission, not a polite "I see your point".
+    fileprivate static let concessionPhrases = [
+        "you're right", "you are right", "you were right", "i was wrong", "i was mistaken",
+        "i stand corrected", "fair enough", "i concede", "i'll concede", "that's a fair point",
+        "that is a fair point", "i hadn't considered", "i had not considered",
+        "i take that back", "i'll give you that", "i will give you that",
+        "i have to admit you", "i admit you", "point taken",
+    ]
+
+    /// Self-revision rather than disagreement with someone else.
+    fileprivate static let positionChangePhrases = [
+        "you're right", "you are right", "i was wrong", "i was mistaken",
+        "i stand corrected", "i take that back", "i concede", "i'll concede",
+        "i hadn't considered", "i had not considered", "i've changed my mind",
+        "i have changed my mind", "i changed my mind", "my position has changed",
+        "i changed my position", "i now think", "i now believe", "on reflection",
+        "having thought about", "having re-read", "having reread", "i revise",
+        "i'll revise", "i will revise", "i no longer", "i've come round",
+        "i have come round", "i was too quick", "in hindsight", "i withdraw",
+        "i retract",
+    ]
+
+    fileprivate static let reconciliationPhrases = [
+        "i'm sorry", "i am sorry", "i apologise", "i apologize", "that was uncalled for",
+        "no offence meant", "no offense meant", "let's not", "i didn't mean to",
+        "i did not mean to", "we're on the same side",
+    ]
+
+    fileprivate static let agreementPhrases = [
+        "i agree", "i agree with", "you're onto something", "you are onto something",
+        "that's exactly what i", "that is exactly what i", "i'd back that", "i would back that",
+        "you make a good point", "i think you're right about", "same conclusion",
+        "i came to the same", "that matches what i",
+    ]
+
+    fileprivate static let contradictionPhrases = [
+        "you contradicted yourself", "that contradicts what you", "you said earlier",
+        "you just said", "you're contradicting", "you are contradicting",
+        "that's the opposite of what you", "that is the opposite of what you",
+        "earlier you claimed", "you can't have it both ways", "you cannot have it both ways",
+        "first you said", "which is it",
+    ]
+
+    /// Aimed at a person, not at a claim. "That argument is weak" is a challenge; "you are an
+    /// idiot" is a jab; "that's ridiculous" is a jab at the claim and counts as a challenge.
+    fileprivate static let jabPhrases = [
+        "you're an idiot", "you are an idiot", "you're pathetic", "you are pathetic",
+        "you're useless", "you are useless", "you're clueless", "you are clueless",
+        "you're embarrassing", "you are embarrassing", "shut up", "nobody asked you",
+        "you're a joke", "you are a joke", "you're deluded", "you are deluded",
+        "you're hopeless", "you have no idea what you're talking about",
+        "you have no idea what you are talking about", "trust me, bro",
+    ]
+
+    fileprivate static let challengePhrases = [
+        "that doesn't follow", "that does not follow", "that's nonsense", "that is nonsense",
+        "that's ridiculous", "that is ridiculous", "that's absurd", "that is absurd",
+        "where's your evidence", "where is your evidence", "you haven't shown",
+        "you have not shown", "that's not an argument", "that is not an argument",
+        "you're begging the question", "that proves nothing", "unfounded",
+        "on what basis", "you're assuming", "you are assuming", "that's a stretch",
+        "that is a stretch", "you've just asserted", "you have just asserted",
+        "circular", "hand-waving", "hand waving", "you're dodging", "you are dodging",
+    ]
+
+    fileprivate static let evidencePhrases = [
+        "according to", "the data shows", "the study", "research shows", "reported that",
+        "published", "survey", "statistics", "for example", "for instance", "in 20",
+        "measured", "the figure", "per cent", "percent",
+    ]
+
+    fileprivate static let hedgePhrases = [
+        "i don't know", "i do not know", "i'm not sure", "i am not sure", "i could be wrong",
+        "i may be wrong", "i don't have a source", "i do not have a source",
+        "unverified", "i can't verify", "i cannot verify", "i think", "probably",
+        "my guess", "it seems",
+    ]
+
+    fileprivate static let certaintyPhrases = [
+        "obviously", "clearly", "everyone knows", "it's a fact", "it is a fact",
+        "without doubt", "undeniable", "no question that", "the truth is",
+    ]
 }

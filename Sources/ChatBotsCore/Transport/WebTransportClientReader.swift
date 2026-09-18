@@ -47,60 +47,77 @@ extension WebTransportEngineClient {
                 return
             }
             buffer.append(chunk)
-
-            while true {
-                guard generation == readerGeneration else { return }
-                let result: LengthFraming.ReadResult
-                do {
-                    result = try LengthFraming.read(from: buffer)
-                } catch let error as ProtocolError {
-                    // The length prefix is the only thing that says where the next frame
-                    // begins, so a refused frame cannot be skipped and every later frame is
-                    // unreachable. Stop the reader with the reason rather than looping on a
-                    // buffer that will never advance — which is what the discarded `try?` did,
-                    // leaving a client that was connected, silent and useless.
-                    failReader(error.errorDescription ?? "a frame was refused")
-                    return
-                } catch {
-                    failReader(error.localizedDescription)
-                    return
-                }
-                guard case .message(let payload, let remainder) = result else { break }
-                buffer = remainder
-                guard let frame = decodedFrame(payload) else { continue }
-                switch frame {
-                case .reply(let reply):
-                    // Matched to the request, not to the position. The slot held by the sender
-                    // means the head of the queue is the request the engine is answering.
-                    guard let pending = pendingReplies.first else {
-                        // No request can be waiting for this. A protocol the client cannot
-                        // misalign — one request, one reply, in order — so the only honest
-                        // reading is that the frame order is no longer trustworthy.
-                        failReader("a reply arrived when no request was outstanding")
-                        return
-                    }
-                    pendingReplies.removeFirst()
-                    if pending.abandoned {
-                        // The sender gave up waiting, so its reply is still owed and is being
-                        // consumed here. That is what keeps the next request's reply next.
-                        continue
-                    }
-                    guard Self.reply(reply, answers: pending.request) else {
-                        failReader(
-                            "the engine answered \(Self.name(of: pending.request)) with "
-                                + Self.name(of: reply))
-                        return
-                    }
-                    pending.continuation.yield(reply)
-                case .event(let event):
-                    eventContinuation?.yield(event)
-                case .request:
-                    // Only the engine answers requests; a client receiving one is a
-                    // misdirected frame.
-                    continue
-                }
-            }
+            guard readBufferedFrames(from: &buffer, generation: generation) else { return }
         }
+    }
+
+    /// Read every whole frame currently buffered, routing each to its destination. `false`
+    /// means the reader has stopped and the caller must return.
+    private func readBufferedFrames(from buffer: inout Data, generation: Int) -> Bool {
+        while true {
+            guard generation == readerGeneration else { return false }
+            let result: LengthFraming.ReadResult
+            do {
+                result = try LengthFraming.read(from: buffer)
+            } catch let error as ProtocolError {
+                // The length prefix is the only thing that says where the next frame
+                // begins, so a refused frame cannot be skipped and every later frame is
+                // unreachable. Stop the reader with the reason rather than looping on a
+                // buffer that will never advance — which is what the discarded `try?` did,
+                // leaving a client that was connected, silent and useless.
+                failReader(error.errorDescription ?? "a frame was refused")
+                return false
+            } catch {
+                failReader(error.localizedDescription)
+                return false
+            }
+            guard case .message(let payload, let remainder) = result else { return true }
+            buffer = remainder
+            guard let frame = decodedFrame(payload) else { continue }
+            guard deliver(frame) else { return false }
+        }
+    }
+
+    /// Route one decoded frame. `false` means the reader has stopped.
+    private func deliver(_ frame: EngineFrame) -> Bool {
+        switch frame {
+        case .reply(let reply):
+            return deliver(reply)
+        case .event(let event):
+            eventContinuation?.yield(event)
+            return true
+        case .request:
+            // Only the engine answers requests; a client receiving one is a
+            // misdirected frame.
+            return true
+        }
+    }
+
+    /// Hand one reply to the request it answers. `false` means the reader has stopped.
+    private func deliver(_ reply: EngineReply) -> Bool {
+        // Matched to the request, not to the position. The slot held by the sender
+        // means the head of the queue is the request the engine is answering.
+        guard let pending = pendingReplies.first else {
+            // No request can be waiting for this. A protocol the client cannot
+            // misalign — one request, one reply, in order — so the only honest
+            // reading is that the frame order is no longer trustworthy.
+            failReader("a reply arrived when no request was outstanding")
+            return false
+        }
+        pendingReplies.removeFirst()
+        if pending.abandoned {
+            // The sender gave up waiting, so its reply is still owed and is being
+            // consumed here. That is what keeps the next request's reply next.
+            return true
+        }
+        guard Self.reply(reply, answers: pending.request) else {
+            failReader(
+                "the engine answered \(Self.name(of: pending.request)) with "
+                    + Self.name(of: reply))
+            return false
+        }
+        pending.continuation.yield(reply)
+        return true
     }
 
     /// Whether `reply` can be the answer to `request`.
@@ -116,29 +133,51 @@ extension WebTransportEngineClient {
         case .refused, .failed:
             return true
         case .state:
-            switch request {
-            case .fetchReport, .listSavedConversations, .deleteSavedConversation, .listRosters,
-                .listScenarios:
-                return false
-            default:
-                return true
-            }
+            return stateAnswers(request)
         case .report:
-            if case .fetchReport = request { return true }
-            return false
+            return isReportRequest(request)
         case .savedConversations:
             // Both of the saved-conversation commands answer with the list.
-            switch request {
-            case .listSavedConversations, .deleteSavedConversation: return true
-            default: return false
-            }
+            return isSavedConversationRequest(request)
         case .rosters:
-            if case .listRosters = request { return true }
-            return false
+            return isRosterRequest(request)
         case .scenarios:
-            if case .listScenarios = request { return true }
-            return false
+            return isScenarioRequest(request)
         }
+    }
+
+    /// `.state` is the generic answer to most commands; the reads that have their own reply
+    /// case are never answered by a state snapshot.
+    private static func stateAnswers(_ request: EngineRequest) -> Bool {
+        switch request {
+        case .fetchReport, .listSavedConversations, .deleteSavedConversation, .listRosters,
+            .listScenarios:
+            return false
+        default:
+            return true
+        }
+    }
+
+    private static func isReportRequest(_ request: EngineRequest) -> Bool {
+        if case .fetchReport = request { return true }
+        return false
+    }
+
+    private static func isSavedConversationRequest(_ request: EngineRequest) -> Bool {
+        switch request {
+        case .listSavedConversations, .deleteSavedConversation: return true
+        default: return false
+        }
+    }
+
+    private static func isRosterRequest(_ request: EngineRequest) -> Bool {
+        if case .listRosters = request { return true }
+        return false
+    }
+
+    private static func isScenarioRequest(_ request: EngineRequest) -> Bool {
+        if case .listScenarios = request { return true }
+        return false
     }
 
     /// How a frame is named in a mismatch, so the failure says what crossed with what.

@@ -227,21 +227,27 @@ public struct SocialCharacter: Identifiable, Sendable, Hashable, Codable {
         debateStyle: String? = nil
     ) -> SocialCharacter {
         var copy = self
-        if let dominance { copy.dominance = dominance }
-        if let ego { copy.ego = ego }
-        if let aggression { copy.aggression = aggression }
-        if let sarcasm { copy.sarcasm = sarcasm }
-        if let humor { copy.humor = humor }
-        if let empathy { copy.empathy = empathy }
-        if let competitiveness { copy.competitiveness = competitiveness }
-        if let skepticism { copy.skepticism = skepticism }
-        if let openness { copy.openness = openness }
-        if let insultIntensity { copy.insultIntensity = insultIntensity }
-        if let challengeRate { copy.challengeRate = challengeRate }
-        if let concessionThreshold { copy.concessionThreshold = concessionThreshold }
-        if let speechStyle { copy.speechStyle = speechStyle }
-        if let debateStyle { copy.debateStyle = debateStyle }
+        copy.override(dominance, \.dominance)
+        copy.override(ego, \.ego)
+        copy.override(aggression, \.aggression)
+        copy.override(sarcasm, \.sarcasm)
+        copy.override(humor, \.humor)
+        copy.override(empathy, \.empathy)
+        copy.override(competitiveness, \.competitiveness)
+        copy.override(skepticism, \.skepticism)
+        copy.override(openness, \.openness)
+        copy.override(insultIntensity, \.insultIntensity)
+        copy.override(challengeRate, \.challengeRate)
+        copy.override(concessionThreshold, \.concessionThreshold)
+        copy.override(speechStyle, \.speechStyle)
+        copy.override(debateStyle, \.debateStyle)
         return copy
+    }
+
+    /// Replace one trait with the override, when one was given. Each override in `adjusted`
+    /// is one call rather than one branch, so the combinatorial copy stays readable.
+    private mutating func override<T>(_ value: T?, _ keyPath: WritableKeyPath<SocialCharacter, T>) {
+        if let value { self[keyPath: keyPath] = value }
     }
 
     /// The directive handed to the model, built from the traits.
