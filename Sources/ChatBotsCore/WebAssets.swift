@@ -2316,6 +2316,11 @@ export function wirePaneControls() {
 }
 
 function startRename(button) {
+  // Already renaming, so this is a re-entry rather than a start. The pane's own Enter handler and
+  // the one `finish` installs are both keydown listeners on this button, and the pane's runs
+  // first; Enter therefore called this again and added another blur/keydown pair, so a later
+  // Enter posted /api/seat once more for a name that had already been committed.
+  if (button.isContentEditable) return;
   if (state.snapshot && !state.snapshot.canAttach) {
     toast("Names are fixed once the conversation has started.");
     return;

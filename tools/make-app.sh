@@ -12,6 +12,10 @@ ROOT="$PWD"
 CONFIG="${CONFIG:-release}"
 APP="$ROOT/dist/ChatBots.app"
 SCRATCH=""
+# A locally built app runs where it was built even when its signature is bad, which is why this
+# used to warn and carry on. The bundle a release ships does not: Gatekeeper refuses an unsigned
+# or unverifiable copy, so a failed signature fails the build unless a caller says otherwise.
+ALLOW_UNSIGNED=0
 
 # `--scratch` builds into a directory of its own, which is what a release does so that the
 # package comes from a clean build rather than an incremental one; `--out` puts the bundle
@@ -19,13 +23,14 @@ SCRATCH=""
 # every script here answers it.
 usage() {
   sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'
-  printf '\nusage: tools/make-app.sh [--scratch <build-dir>] [--out <app-path>]\n'
+  printf '\nusage: tools/make-app.sh [--scratch <build-dir>] [--out <app-path>] [--allow-unsigned]\n'
 }
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --scratch) SCRATCH="${2:?--scratch needs a directory}"; shift 2 ;;
     --out) APP="${2:?--out needs an app path}"; shift 2 ;;
+    --allow-unsigned) ALLOW_UNSIGNED=1; shift ;;
     -h | --help) usage; exit 0 ;;
     *) printf 'unknown argument: %s\n' "$1" >&2; exit 2 ;;
   esac
@@ -258,15 +263,27 @@ for nested in mlx.metallib chatbots-cli chatbots-probe ChatBots; do
   codesign --force --sign - "$component" >/dev/null 2>&1 || true
 done
 
-# Reported rather than swallowed. A failure does not stop the app running where it was built,
-# but a downloaded copy would be refused by Gatekeeper, and silently skipping it is how the
-# problem above stayed hidden.
+# Reported rather than swallowed, and now fatal unless the caller opted out. A failure does not
+# stop the app running where it was built, but a downloaded copy would be refused by Gatekeeper,
+# and silently skipping it is how the problem above stayed hidden — while `install.sh` and
+# `make-release.sh` read the zero exit status as success.
+signing_problem=""
 if ! sign_output="$(codesign --force --sign - "$APP" 2>&1)"; then
-  echo "    ! the app could not be signed; a downloaded copy would be refused" >&2
+  signing_problem="the app could not be signed; a downloaded copy would be refused"
+  echo "    ! $signing_problem" >&2
   indent_output <<< "$sign_output" >&2
 elif ! verify_output="$(codesign --verify --strict "$APP" 2>&1)"; then
-  echo "    ! the app is signed but does not verify:" >&2
+  signing_problem="the app is signed but does not verify"
+  echo "    ! $signing_problem:" >&2
   indent_output <<< "$verify_output" >&2
+fi
+if [ -n "$signing_problem" ]; then
+  if [ "$ALLOW_UNSIGNED" -eq 1 ]; then
+    echo "    ! continuing because --allow-unsigned was given" >&2
+  else
+    printf 'error: %s; pass --allow-unsigned to build anyway\n' "$signing_problem" >&2
+    exit 1
+  fi
 fi
 
 echo

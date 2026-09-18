@@ -208,6 +208,17 @@ if ! bash tools/make-app.sh --scratch "$SCRATCH" --out "$APP" > "$STAGE/clean-bu
     die "the clean build failed; the log is $STAGE/clean-build.log"
 fi
 
+# The bundle's signature is checked here, independently of `make-app.sh`. A signature is what
+# makes the app runnable on a machine that did not build it, and Gatekeeper refuses an unsigned
+# or unverifiable copy — so a release that shipped one would be a bundle nobody could open. This
+# check did not exist: the release path relied on `make-app.sh`'s exit status, which used to be
+# zero even when it had printed that the signature failed.
+if ! codesign --verify --strict "$APP" > "$STAGE/signature.log" 2>&1; then
+    tail -n 5 "$STAGE/signature.log" >&2
+    die "the built bundle does not verify; see $STAGE/signature.log"
+fi
+record "  bundle signature: codesign --verify --strict (recorded in signature.log)"
+
 # The pattern wants a diagnostic that *is* an error: `path:line:col: error: …`, or SwiftPM's
 # own `error: …` at the start of a line. A warning whose prose happens to contain "an error:"
 # — the SwiftPM cache says exactly that — is not one, which is why the first version of this
