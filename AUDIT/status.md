@@ -13,21 +13,23 @@ orientation note so a resumed run does not restart discovery.
 
 ## Ledger state at the last commit
 
-`done: 44, open: 48, blocked: 4` — S0 0, S1 0, S2 1, S3 47.
+`done: 53, open: 40, blocked: 4` — S0 0, S1 0, S2 1, S3 39.
 
 The closure invariant holds: non-terminal count has gone 96 → 90 → 83 → 76 → 71 → 66 →
-62 → 59 → 58 → 56 → 54 → 51 → 50 → 49 → 48 across the milestone reports.
+62 → 59 → 58 → 56 → 54 → 51 → 50 → 49 → 48 → 43 → 40 across the milestone reports.
 
 ## The one remaining S2
 
 **AUDIT-0029 — SwiftLint/swift-format `--strict`, and `force_unwrapping`.** The gates are
-enforced against recorded waiver counts in `tools/analysis-waivers.txt` (215/444), and
+enforced against recorded waiver counts in `tools/analysis-waivers.txt` (211/413, tightened from 217/444), and
 `.swiftlint.yml` has no `opt_in_rules`, so `force_unwrapping` never fires. Closing it needs:
 
-1. Enable `force_unwrapping` and fix the 32 sites it then reports.
-2. Then drive SwiftLint to zero so `--strict` can be turned on: 112 `line_length`
-   (mostly prose string literals), 22 `cyclomatic_complexity`, 10 `function_body_length`,
-   15 `closure_parameter_position`, 14 `optional_data_string_conversion`, and the rest.
+1. ~~Enable `force_unwrapping` and fix the 32 sites~~ — DONE as AUDIT-0097, which also
+tightened the waivers from 217/444 to 211/413 (measured 209/411).
+2. Then drive SwiftLint to zero so `--strict` can be turned on. Measured now: 113
+   `line_length` (mostly prose string literals), 22 `cyclomatic_complexity`, 15
+   `closure_parameter_position`, 14 `optional_data_string_conversion`, 11 `trailing_comma`,
+   11 `identifier_name`, 9 `function_body_length`, and a tail of small classes.
    Reconfiguring a threshold to pass would be a §0 violation, so these are real edits or
    real refactors.
 3. The same for swift-format's 439 diagnostics (`--strict` is what the brief names).
@@ -35,7 +37,7 @@ enforced against recorded waiver counts in `tools/analysis-waivers.txt` (215/444
 Because this is much larger than one task, split it into sub-tasks the moment work starts,
 each with its own id, and note on AUDIT-0029 that its scope was split rather than narrowed.
 
-## The S3 sweep (47)
+## The S3 sweep (39)
 
 All are style/formatting/test-quality. They are resolved as rule-class sweeps through the
 formatter/linter, one commit per class, with no test and no cold re-read (§8). The
@@ -63,7 +65,9 @@ primary host only, recorded in the ledger.
 ## Conventions in force
 
 - Branch `audit/2026-09-18` only; no force-push, no history rewrite.
-- One commit per S0/S1 task; S2/S3 batch by class or coherent group.
+- One commit per S0/S1 task; S2/S3 batch by class or coherent group (batches 10-15 done:
+  endpoint rebuild, reader generation, SSE line cap, JS toolchain, force_unwrapping, HTTP
+  reasons and header CR/LF, shell traps, CLI exit codes).
 - Every fix carries before/after evidence in `AUDIT/evidence-*.log`.
 - `bash tools/mac-checks.sh` is the gate after every batch — now **9 gates**, including
   eslint and prettier (`npm ci` first). Metrics must not regress: SwiftLint ≤ 217
