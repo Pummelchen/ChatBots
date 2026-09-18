@@ -43,16 +43,16 @@ private actor PromptLogStub: LLMEngine {
 @Suite("The audience's scorecard")
 struct AudienceScorecardTests {
 
-    private let a = UUID()
-    private let b = UUID()
-    private let c = UUID()
+    private let firstTurn = UUID()
+    private let secondTurn = UUID()
+    private let thirdTurn = UUID()
 
     @Test("A vote is recorded against the seat that spoke")
     func castAndRead() {
         var card = AudienceScorecard()
-        card.cast(.strong, for: a, seatID: "eco")
-        #expect(card.vote(for: a)?.verdict == .strong)
-        #expect(card.vote(for: a)?.seatID == "eco")
+        card.cast(.strong, for: firstTurn, seatID: "eco")
+        #expect(card.vote(for: firstTurn)?.verdict == .strong)
+        #expect(card.vote(for: firstTurn)?.seatID == "eco")
     }
 
     @Test("Voting twice changes the vote rather than counting twice")
@@ -60,10 +60,10 @@ struct AudienceScorecardTests {
         // Otherwise a reader could inflate a score by clicking, and the scorecard would be
         // measuring persistence rather than judgement.
         var card = AudienceScorecard()
-        card.cast(.strong, for: a, seatID: "eco")
-        card.cast(.weak, for: a, seatID: "eco")
+        card.cast(.strong, for: firstTurn, seatID: "eco")
+        card.cast(.weak, for: firstTurn, seatID: "eco")
         #expect(card.votes.count == 1)
-        #expect(card.vote(for: a)?.verdict == .weak)
+        #expect(card.vote(for: firstTurn)?.verdict == .weak)
         #expect(card.scores.first?.weak == 1)
         #expect(card.scores.first?.strong == 0)
     }
@@ -71,8 +71,8 @@ struct AudienceScorecardTests {
     @Test("A vote can be withdrawn, so a mis-click is not reversed by its opposite")
     func withdraw() {
         var card = AudienceScorecard()
-        card.cast(.strong, for: a, seatID: "eco")
-        card.withdraw(turnID: a)
+        card.cast(.strong, for: firstTurn, seatID: "eco")
+        card.withdraw(turnID: firstTurn)
         #expect(card.votes.isEmpty)
         #expect(card.scores.isEmpty)
     }
@@ -80,9 +80,9 @@ struct AudienceScorecardTests {
     @Test("The scorecard is sorted by score and then by seat, so two readers see one order")
     func ordering() {
         var card = AudienceScorecard()
-        card.cast(.weak, for: a, seatID: "eco")
-        card.cast(.strong, for: b, seatID: "eco")
-        card.cast(.strong, for: c, seatID: "sta")
+        card.cast(.weak, for: firstTurn, seatID: "eco")
+        card.cast(.strong, for: secondTurn, seatID: "eco")
+        card.cast(.strong, for: thirdTurn, seatID: "sta")
         // eco: +1 -1 = 0. sta: +1. sta leads.
         #expect(card.scores.map(\.seatID) == ["sta", "eco"])
         #expect(card.leader?.seatID == "sta")
@@ -91,22 +91,22 @@ struct AudienceScorecardTests {
     @Test("A tie has no leader rather than an arbitrary winner")
     func tieHasNoLeader() {
         var card = AudienceScorecard()
-        card.cast(.strong, for: a, seatID: "eco")
-        card.cast(.strong, for: b, seatID: "sta")
+        card.cast(.strong, for: firstTurn, seatID: "eco")
+        card.cast(.strong, for: secondTurn, seatID: "sta")
         #expect(card.leader == nil, "picking one would be inventing a winner")
 
         // And a level but negative scorecard has no leader either: nobody was ahead.
         var negative = AudienceScorecard()
-        negative.cast(.weak, for: a, seatID: "eco")
+        negative.cast(.weak, for: firstTurn, seatID: "eco")
         #expect(negative.leader == nil)
     }
 
     @Test("A seat with a positive score leads even when another has more votes")
     func leaderByScoreNotVolume() {
         var card = AudienceScorecard()
-        card.cast(.weak, for: a, seatID: "eco")
-        card.cast(.weak, for: b, seatID: "eco")
-        card.cast(.strong, for: c, seatID: "sta")
+        card.cast(.weak, for: firstTurn, seatID: "eco")
+        card.cast(.weak, for: secondTurn, seatID: "eco")
+        card.cast(.strong, for: thirdTurn, seatID: "sta")
         #expect(card.leader?.seatID == "sta")
     }
 }

@@ -70,7 +70,7 @@ struct LengthFramingTests {
             Issue.record("expected a message once complete")
             return
         }
-        #expect(String(decoding: message, as: UTF8.self) == "hello world")
+        #expect(String(bytes: message, encoding: .utf8) == "hello world")
     }
 
     @Test("Two frames in one buffer yield the first and the remainder")
@@ -83,13 +83,13 @@ struct LengthFramingTests {
             Issue.record("expected a message")
             return
         }
-        #expect(String(decoding: first, as: UTF8.self) == "first")
+        #expect(String(bytes: first, encoding: .utf8) == "first")
 
         guard case .message(let second, let rest) = try LengthFraming.read(from: remainder) else {
             Issue.record("expected the second message")
             return
         }
-        #expect(String(decoding: second, as: UTF8.self) == "second")
+        #expect(String(bytes: second, encoding: .utf8) == "second")
         #expect(rest.isEmpty)
     }
 

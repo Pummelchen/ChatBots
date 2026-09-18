@@ -71,34 +71,22 @@ opening_brace:
 
 identifier_name:
   # The codebase uses two-character prepositional names (`at`, `to`, `on`) and short local
-  # names (`ok`, `kv`, `js`, `as`) deliberately: 15 findings. `min_length` is therefore 2.
-  # One-character names (`a`, `b`, `c`, `z`; 10 findings) stay flagged as genuine terseness.
+  # names (`ok`, `kv`, `js`, `as`) deliberately, so `min_length` is 2. One-character names
+  # (`a`, `b`, `c`, `z`) stay flagged as genuine terseness. `id` is excluded explicitly:
+  # SwiftLint's `excluded:` REPLACES its own default list (which is `[id]`) rather than
+  # extending it, so without the line a later `min_length` change would surface 109 `id`
+  # findings out of a config that claims to state the house style.
   min_length:
     warning: 2
     error: 1
   excluded:
-    # `id` is excluded explicitly, and it has to be, because SwiftLint's `excluded:` REPLACES
-    # its own default list rather than extending it — the default is `[id]`. Today that makes
-    # no difference: `min_length.warning: 2` already masks every `id`, so the measured count is
-    # the same either way. It matters the moment anyone raises `min_length`: without this line
-    # 109 `id` findings would appear out of a config that claims to state the house style.
-    # Written down because it is invisible until it is not.
     - id
-    # Field names mirrored verbatim from the Tavily HTTP API's JSON in the request and
-    # response DTOs in TavilyClient.swift (`search_depth`, `max_results`, ...). Renaming
-    # them would need hand-written CodingKeys and gain nothing; 8 findings.
-    - search_depth
-    - max_results
-    - include_answer
-    - include_raw_content
-    - raw_content
-    - extract_depth
-    - failed_results
 
 nesting:
-  # Request and response DTOs nest one type (`Response.Item`) inside their function: 4
-  # findings. Deeper type nesting and all statement nesting are still reported.
-  type_level: 2
+  # SwiftLint's default. It was `2` to accept `Response.Item` nested inside a function; the two
+  # Tavily DTO pairs now live at file scope, and `DeviceList.Entry`'s hand-written `CodingKeys` —
+  # which restated the synthesised key for `class` — is gone, so the default holds.
+  type_level: 1
 
 file_length:
   # Nothing reaches this threshold, and that is the point: the project's own limit is 500 lines,

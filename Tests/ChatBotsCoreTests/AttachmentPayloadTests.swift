@@ -4,8 +4,8 @@
 // `imageBase64: document.imageData?.base64EncodedString()`. That is the payload of every state push —
 // the SSE `snapshot` event and the WebTransport state message — so:
 //
-//   · every client was sent a base64 copy of every attached image on every turn, re-encoded each time
-//, up to 24 files of up to 64 MB each; and
+//   · every client was sent a base64 copy of every attached image on every turn, re-encoded each
+//     time, up to 24 files of up to 64 MB each; and
 //   · the snapshot could exceed the transport's own message cap, which is derived as the base64 form
 //     of *one* maximum-size attachment plus its envelope. Two maximum-size images need twice that, and
 //     an over-cap message is not a slow push: the transmitter refuses to frame it, so the state update

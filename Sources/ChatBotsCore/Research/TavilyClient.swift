@@ -117,42 +117,23 @@ public struct TavilyClient: Sendable {
         depth: Depth = .basic,
         includeAnswer: Bool = false
     ) async throws -> (hits: [SearchHit], billedUnits: Int) {
-        struct Request: Encodable {
-            let query: String
-            let search_depth: String
-            let max_results: Int
-            let include_answer: Bool
-            let include_raw_content: Bool
-        }
-        struct Response: Decodable {
-            struct Item: Decodable {
-                let title: String?
-                let url: String?
-                let content: String?
-                let raw_content: String?
-                let score: Double?
-            }
-            let results: [Item]?
-            let answer: String?
-        }
-
         let response = try await post(
             path: "/search",
-            body: Request(
+            body: TavilySearchRequest(
                 query: query,
-                search_depth: depth.rawValue,
-                max_results: max(1, min(maxResults, 10)),
-                include_answer: includeAnswer,
-                include_raw_content: false
+                searchDepth: depth.rawValue,
+                maxResults: max(1, min(maxResults, 10)),
+                includeAnswer: includeAnswer,
+                includeRawContent: false
             ),
-            as: Response.self
+            as: TavilySearchResponse.self
         )
         var hits =
             response.results?.map {
                 SearchHit(
                     title: $0.title ?? "(untitled)",
                     url: $0.url ?? "",
-                    content: $0.content ?? $0.raw_content ?? "",
+                    content: $0.content ?? $0.rawContent ?? "",
                     score: $0.score
                 )
             } ?? []
@@ -205,31 +186,13 @@ public struct TavilyClient: Sendable {
     // MARK: - Extract
 
     public func extract(urls: [String], maxCharactersPerPage: Int = 6_000) async throws -> [ExtractResult] {
-        struct Request: Encodable {
-            let urls: [String]
-            let extract_depth: String
-        }
-        struct Response: Decodable {
-            struct Item: Decodable {
-                let url: String?
-                let title: String?
-                let raw_content: String?
-            }
-            struct Failure: Decodable {
-                let url: String?
-                let error: String?
-            }
-            let results: [Item]?
-            let failed_results: [Failure]?
-        }
-
         let response = try await post(
             path: "/extract",
-            body: Request(urls: urls, extract_depth: "basic"),
-            as: Response.self
+            body: TavilyExtractRequest(urls: urls, extractDepth: "basic"),
+            as: TavilyExtractResponse.self
         )
 
-        if let failures = response.failed_results, !failures.isEmpty,
+        if let failures = response.failedResults, !failures.isEmpty,
             (response.results ?? []).isEmpty
         {
             let detail = failures.compactMap { $0.error }.joined(separator: "; ")
@@ -237,7 +200,7 @@ public struct TavilyClient: Sendable {
         }
 
         return (response.results ?? []).map { item in
-            let raw = item.raw_content ?? ""
+            let raw = item.rawContent ?? ""
             let clipped =
                 raw.count > maxCharactersPerPage
                 ? String(raw.prefix(maxCharactersPerPage)) + "\n…[truncated]"
@@ -316,5 +279,80 @@ public struct TavilyClient: Sendable {
         } catch {
             throw ChatBotsError.toolFailed("unreadable Tavily response: \(error.localizedDescription)")
         }
+    }
+}
+
+// MARK: - The wire types
+
+// At file scope rather than inside the two functions: `CodingKeys` is what maps Tavily's
+// snake_case field names onto Swift's, and a type nested that far trips the `nesting` rule.
+
+private struct TavilySearchRequest: Encodable {
+    let query: String
+    let searchDepth: String
+    let maxResults: Int
+    let includeAnswer: Bool
+    let includeRawContent: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case query
+        case searchDepth = "search_depth"
+        case maxResults = "max_results"
+        case includeAnswer = "include_answer"
+        case includeRawContent = "include_raw_content"
+    }
+}
+
+private struct TavilySearchItem: Decodable {
+    let title: String?
+    let url: String?
+    let content: String?
+    let rawContent: String?
+    let score: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case title, url, content, score
+        case rawContent = "raw_content"
+    }
+}
+
+private struct TavilySearchResponse: Decodable {
+    let results: [TavilySearchItem]?
+    let answer: String?
+}
+
+private struct TavilyExtractRequest: Encodable {
+    let urls: [String]
+    let extractDepth: String
+
+    enum CodingKeys: String, CodingKey {
+        case urls
+        case extractDepth = "extract_depth"
+    }
+}
+
+private struct TavilyExtractItem: Decodable {
+    let url: String?
+    let title: String?
+    let rawContent: String?
+
+    enum CodingKeys: String, CodingKey {
+        case url, title
+        case rawContent = "raw_content"
+    }
+}
+
+private struct TavilyExtractFailure: Decodable {
+    let url: String?
+    let error: String?
+}
+
+private struct TavilyExtractResponse: Decodable {
+    let results: [TavilyExtractItem]?
+    let failedResults: [TavilyExtractFailure]?
+
+    enum CodingKeys: String, CodingKey {
+        case results
+        case failedResults = "failed_results"
     }
 }

@@ -285,10 +285,9 @@ public enum PromptBuilder {
         // moderator's source material is in the same position — document text arrives over the
         // unauthenticated API, so it is untrusted data too, and the system message carries only
         // a pointer to it.
-        var briefing = [
-            systemMessage(
-                for: spec, others: others, topic: conversation.topic, moderator: moderator)
-        ]
+        let opening = systemMessage(
+            for: spec, others: others, topic: conversation.topic, moderator: moderator)
+        var briefing = [opening]
         // The moderator's source material is placed in the user turn with the log, fenced and
         // marked as data.
         let material = attachmentContext(conversation.attachments)

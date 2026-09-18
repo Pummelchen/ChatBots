@@ -141,12 +141,12 @@ struct PersonaPromptTests {
 
     @Test("The two default seats ship with contrasting styles")
     func defaultsContrast() {
-        let a = AgentSpec.seatA()
-        let b = AgentSpec.seatB()
-        #expect(a.personaID != b.personaID)
-        #expect(a.persona.id == AgentSpec.defaultPersonaA)
-        #expect(b.persona.id == AgentSpec.defaultPersonaB)
-        #expect(!a.persona.directive.isEmpty)
-        #expect(!b.persona.directive.isEmpty)
+        let seatA = AgentSpec.seatA()
+        let seatB = AgentSpec.seatB()
+        #expect(seatA.personaID != seatB.personaID)
+        #expect(seatA.persona.id == AgentSpec.defaultPersonaA)
+        #expect(seatB.persona.id == AgentSpec.defaultPersonaB)
+        #expect(!seatA.persona.directive.isEmpty)
+        #expect(!seatB.persona.directive.isEmpty)
     }
 }

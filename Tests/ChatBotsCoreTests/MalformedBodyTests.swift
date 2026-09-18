@@ -1,7 +1,7 @@
 // ChatBotsCoreTests — a body the server cannot read must not change the room.
 //
-// The fixture this suite drives lives in `APIServerFixture.swift` now that a second suite needs it
-//. What it is about is unchanged:
+// The fixture this suite drives lives in `APIServerFixture.swift` now that a second suite needs
+// it. What it is about is unchanged:
 //
 // `HTTPRequest.json` returns `nil` for two different situations: nothing was sent, and something was
 // sent that cannot be decoded. `translate` read both as "the field is absent" and answered with the

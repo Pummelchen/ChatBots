@@ -34,8 +34,7 @@ extension MLXEngine {
         await MLXGate.shared.acquire()
         let results: [ReuseProbeStep]
         do {
-            results = try await container.perform {
-                (modelContext: ModelContext) async throws -> [ReuseProbeStep] in
+            results = try await container.perform { (modelContext: ModelContext) async throws -> [ReuseProbeStep] in
                 let session = ChatSession(
                     modelContext, generateParameters: parameters, additionalContext: context)
                 var steps: [ReuseProbeStep] = []

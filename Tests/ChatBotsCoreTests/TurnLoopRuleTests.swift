@@ -326,7 +326,7 @@ struct MLXGateTests {
     func throwingBodyReleases() async {
         struct Boom: Error {}
         do {
-            try await MLXGate.exclusive { () async throws -> Void in throw Boom() }
+            try await MLXGate.exclusive { () async throws in throw Boom() }
             Issue.record("the body's error must propagate")
         } catch is Boom {
             // expected

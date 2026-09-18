@@ -57,8 +57,9 @@ final class RawConnection {
             + Double(timeout.components.attoseconds) / 1_000_000_000_000_000_000
         return await withCheckedContinuation { continuation in
             let resumed = Atomic<Bool>(false)
-            connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) {
-                data, _, _, _ in
+            connection.receive(
+                minimumIncompleteLength: 1, maximumLength: 64 * 1024
+            ) { data, _, _, _ in
                 if !resumed.exchange(true, ordering: .relaxed) {
                     continuation.resume(returning: data)
                 }

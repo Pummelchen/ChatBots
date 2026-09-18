@@ -143,10 +143,7 @@ public enum ModelStore {
         }
         candidates.append(root.appending(path: modelID, directoryHint: .isDirectory))
 
-        for candidate in candidates {
-            if isCompleteCheckpoint(candidate, fileManager: fileManager) { return candidate }
-        }
-        return nil
+        return candidates.first { isCompleteCheckpoint($0, fileManager: fileManager) }
     }
 
     /// True when a directory looks like a loadable MLX checkpoint.

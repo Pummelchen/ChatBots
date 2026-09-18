@@ -106,7 +106,7 @@ struct SecurityHeaderTests {
     func interfacePolicyIsStrict() {
         // The value the interface is served with: `/app.js` and `/style.css` from this origin,
         // same-origin `/api` for `fetch` and `EventSource`, and no inline grant at all.
-        let text = String(decoding: HTTPResponse.html("<p>hi</p>").serialised(keepAlive: true), as: UTF8.self)
+        let text = String(bytes: HTTPResponse.html("<p>hi</p>").serialised(keepAlive: true), encoding: .utf8) ?? ""
         #expect(text.contains("script-src 'self'"))
         #expect(text.contains("style-src 'self'"))
         #expect(text.contains("connect-src 'self'"))
@@ -115,8 +115,10 @@ struct SecurityHeaderTests {
 
     @Test("A response that renders nothing gets a policy that loads nothing")
     func jsonPolicyIsEmpty() {
-        let text = String(
-            decoding: HTTPResponse.json(["status": "ok"]).serialised(keepAlive: false), as: UTF8.self)
+        let text =
+            String(
+                bytes: HTTPResponse.json(["status": "ok"]).serialised(keepAlive: false),
+                encoding: .utf8) ?? ""
         #expect(text.contains("default-src 'none'"))
         #expect(!text.contains("script-src"))
     }
@@ -227,7 +229,7 @@ struct SecurityHeaderTests {
         #expect(status == 200)
         // The page really does carry the inline script, so the policy has to permit it or the
         // replay controls would be dead.
-        #expect(String(decoding: body, as: UTF8.self).contains("<script>"))
+        #expect(String(bytes: body, encoding: .utf8)?.contains("<script>") == true)
         let policy = response.value(forHTTPHeaderField: "Content-Security-Policy") ?? ""
         #expect(policy.contains("script-src 'self' 'unsafe-inline'"))
         #expect(policy.contains("style-src 'self' 'unsafe-inline'"))

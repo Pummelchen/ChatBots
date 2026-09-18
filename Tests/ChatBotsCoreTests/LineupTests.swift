@@ -107,9 +107,9 @@ struct LineupTests {
     func seedsDiffer() {
         // Not a statistical claim: two specific seeds, chosen so that a generator that ignored
         // its seed entirely — the easy way to get reproducibility wrong — fails here.
-        let a = RosterLibrary.draw(mode: .entertainment, seats: 4, seed: 1)
-        let b = RosterLibrary.draw(mode: .entertainment, seats: 4, seed: 2)
-        #expect(a.personaIDs != b.personaIDs)
+        let firstDraw = RosterLibrary.draw(mode: .entertainment, seats: 4, seed: 1)
+        let secondDraw = RosterLibrary.draw(mode: .entertainment, seats: 4, seed: 2)
+        #expect(firstDraw.personaIDs != secondDraw.personaIDs)
     }
 
     @Test("A draw seats nobody twice, and never more than the room holds")

@@ -115,8 +115,9 @@ extension HTTPServer {
 
     /// Accumulate until a whole request has arrived, then answer it.
     private func receive(on connection: NWConnection, buffer: Data) {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) {
-            [weak self] chunk, _, isComplete, error in
+        connection.receive(
+            minimumIncompleteLength: 1, maximumLength: 64 * 1024
+        ) { [weak self] chunk, _, isComplete, error in
             guard let self else { return }
 
             if let error {
@@ -241,8 +242,9 @@ extension HTTPServer {
     /// it fires; a keep-alive byte from a client that has nothing to say re-arms the wait rather
     /// than ending the stream.
     private func awaitClose(on connection: NWConnection) {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 4 * 1024) {
-            [weak self] _, _, isComplete, error in
+        connection.receive(
+            minimumIncompleteLength: 1, maximumLength: 4 * 1024
+        ) { [weak self] _, _, isComplete, error in
             guard let self else { return }
             if isComplete || error != nil {
                 self.finish(connection, error: error)

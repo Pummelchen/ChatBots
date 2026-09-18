@@ -246,7 +246,7 @@ struct SharedConversationHTTPTests {
         #expect(
             (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Type")?
                 .contains("text/html") == true)
-        let page = String(decoding: data, as: UTF8.self)
+        let page = String(bytes: data, encoding: .utf8) ?? ""
         #expect(page.contains("A shared question"))
         #expect(page.contains("id=\"play\""))
     }
@@ -259,7 +259,7 @@ struct SharedConversationHTTPTests {
         let unknownURL = try #require(URL(string: "\(base)/s/\(UUID().uuidString)"))
         let (data, response) = try await session.data(from: unknownURL)
         #expect((response as? HTTPURLResponse)?.statusCode == 404)
-        let page = String(decoding: data, as: UTF8.self)
+        let page = String(bytes: data, encoding: .utf8) ?? ""
         #expect(page.contains("No conversation with that link"))
 
         // And a malformed one is the same answer rather than a crash.

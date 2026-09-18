@@ -347,12 +347,10 @@ struct AttachmentPromptTests {
             configuration: configuration)
         let before = engine.contextUsage.tokens
         // Material is added before the conversation starts, as the interface requires.
-        #expect(
-            engine.setAttachments([
-                AttachedDocument(
-                    name: "book.txt", kind: .plainText,
-                    text: String(repeating: "x", count: 40_000))
-            ]))
+        let document = AttachedDocument(
+            name: "book.txt", kind: .plainText,
+            text: String(repeating: "x", count: 40_000))
+        #expect(engine.setAttachments([document]))
         engine.start(topic: "Eggs")
         #expect(engine.contextUsage.tokens > before + 9_000)
         #expect(engine.attachments.count == 1)

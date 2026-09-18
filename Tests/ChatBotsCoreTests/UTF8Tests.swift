@@ -38,7 +38,7 @@ struct UTF8Tests {
             let shortened = UTF8Text.prefix(unicodeSample, limit)
             #expect(!shortened.contains("\u{FFFD}"), "limit \(limit) produced a replacement character")
             // Re-decoding what we produced must be lossless.
-            #expect(String(decoding: Array(shortened.utf8), as: UTF8.self) == shortened)
+            #expect(String(bytes: Array(shortened.utf8), encoding: .utf8) == shortened)
         }
     }
 

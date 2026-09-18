@@ -154,21 +154,21 @@ extension MLXEngine {
     }
 
     static func toolSpec(for tool: any ToolProvider) -> ToolSpec {
-        [
+        let argument: [String: any Sendable] = [
+            "type": "string",
+            "description": tool.argumentDescription,
+        ]
+        let parameters: [String: any Sendable] = [
+            "type": "object",
+            "properties": [tool.argumentName: argument],
+            "required": [tool.argumentName],
+        ]
+        return [
             "type": "function",
             "function": [
                 "name": tool.name,
                 "description": tool.description,
-                "parameters": [
-                    "type": "object",
-                    "properties": [
-                        tool.argumentName: [
-                            "type": "string",
-                            "description": tool.argumentDescription,
-                        ] as [String: any Sendable]
-                    ] as [String: any Sendable],
-                    "required": [tool.argumentName],
-                ] as [String: any Sendable],
+                "parameters": parameters,
             ] as [String: any Sendable],
         ]
     }

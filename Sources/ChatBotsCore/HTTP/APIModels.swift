@@ -279,11 +279,6 @@ public struct DeviceList: Codable, Sendable {
         public var pixelRatio: Double
         public var year: Int
         public var common: Bool
-
-        enum CodingKeys: String, CodingKey {
-            case id, name, width, height, pixelRatio, year, common
-            case `class` = "class"
-        }
     }
 
     public var profiles: [Entry]

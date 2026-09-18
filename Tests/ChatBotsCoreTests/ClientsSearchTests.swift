@@ -17,8 +17,13 @@ import Testing
 
 /// The JSON body the client posts, so the test can assert what each attempt asked for.
 private struct TavilyRequestBody: Decodable {
-    let search_depth: String
-    let include_answer: Bool
+    let searchDepth: String
+    let includeAnswer: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case searchDepth = "search_depth"
+        case includeAnswer = "include_answer"
+    }
 }
 
 /// A loopback server that answers `/search` with a body chosen by `search_depth`, recording
@@ -56,9 +61,9 @@ private final class ScriptedTavilyServer {
                     let parsed = try? JSONDecoder().decode(
                         TavilyRequestBody.self, from: request.body)
                     state.seen.append(
-                        parsed ?? TavilyRequestBody(search_depth: "", include_answer: false))
+                        parsed ?? TavilyRequestBody(searchDepth: "", includeAnswer: false))
                     let body =
-                        parsed?.search_depth == "advanced" ? state.advancedBody : state.basicBody
+                        parsed?.searchDepth == "advanced" ? state.advancedBody : state.basicBody
                     return HTTPResponse(body: body)
                 })
             try server.start()
@@ -161,7 +166,7 @@ struct ClientsSearchTests {
         #expect(hits.count == 1)
         #expect(hits.first?.title == "A real page")
         #expect(
-            server.attempts.map(\.search_depth) == ["basic", "advanced"],
+            server.attempts.map(\.searchDepth) == ["basic", "advanced"],
             "the blank response must be what triggers the advanced attempt")
     }
 
@@ -224,7 +229,7 @@ struct ClientsSearchTests {
         let hits = try await server.client().search(query: "an ordinary query")
 
         #expect(hits.count == 1)
-        #expect(server.attempts.map(\.search_depth) == ["basic"])
+        #expect(server.attempts.map(\.searchDepth) == ["basic"])
     }
 
     /// The recursive call dropped `includeAnswer`, so the retry asked for less than the first
@@ -239,8 +244,8 @@ struct ClientsSearchTests {
 
         _ = try await server.client().search(query: "a query", includeAnswer: true)
 
-        #expect(server.attempts.map(\.include_answer) == [true, true])
-        #expect(server.attempts.map(\.search_depth) == ["basic", "advanced"])
+        #expect(server.attempts.map(\.includeAnswer) == [true, true])
+        #expect(server.attempts.map(\.searchDepth) == ["basic", "advanced"])
     }
 
     /// A caller already at advanced depth gets one attempt and an empty result, not a loop.
@@ -253,7 +258,7 @@ struct ClientsSearchTests {
         let hits = try await server.client().search(query: "a query", depth: .advanced)
 
         #expect(hits.isEmpty)
-        #expect(server.attempts.map(\.search_depth) == ["advanced"])
+        #expect(server.attempts.map(\.searchDepth) == ["advanced"])
     }
 }
 

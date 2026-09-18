@@ -77,9 +77,9 @@ struct ThinkingModeTests {
 
     @Test("Both seats share the requested preset by default")
     func sharedPreset() {
-        let a = AgentSpec.seatA()
-        let b = AgentSpec.seatB()
-        for spec in [a, b] {
+        let seatA = AgentSpec.seatA()
+        let seatB = AgentSpec.seatB()
+        for spec in [seatA, seatB] {
             #expect(spec.temperature == 0.7)
             #expect(spec.topP == 0.8)
             #expect(spec.topK == 20)
@@ -91,10 +91,10 @@ struct ThinkingModeTests {
         // The repetition penalty must not be neutral. `1.0` is what MLX treats as "off", and
         // shipping that is part of why the seats looped on a fixed topic — see `QwenSampling`
         // for the measurement.
-        #expect(a.repetitionPenalty != 1.0)
+        #expect(seatA.repetitionPenalty != 1.0)
         // MLX subtracts the presence penalty, so the stored value must be negative.
-        #expect(a.presencePenalty == -1.5)
-        #expect(b.presencePenalty == -1.5)
+        #expect(seatA.presencePenalty == -1.5)
+        #expect(seatB.presencePenalty == -1.5)
     }
 
     @Test("The seat's thinking level can change without touching the model")
@@ -132,11 +132,9 @@ struct RepetitionDetectorTests {
         var detector = RepetitionDetector()
         var fired = false
         // Feed in chunks, the way generation arrives.
-        for chunk in Self.looping.chunked(into: 20) {
-            if detector.ingest(chunk) {
-                fired = true
-                break
-            }
+        for chunk in Self.looping.chunked(into: 20) where detector.ingest(chunk) {
+            fired = true
+            break
         }
         #expect(fired)
     }

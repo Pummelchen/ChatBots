@@ -136,10 +136,9 @@ struct DocumentConversionTests {
     func stateIsAnsweredDuringConversion() async throws {
         let entered = DispatchSemaphore(value: 0)
         let release = DispatchSemaphore(value: 0)
-        let ingestor = DocumentIngestor(extractors: [
-            .plainText: ControlledExtractor(
-                staged: StagedFile(), entered: entered, release: release)
-        ])
+        let extractor = ControlledExtractor(
+            staged: StagedFile(), entered: entered, release: release)
+        let ingestor = DocumentIngestor(extractors: [.plainText: extractor])
         let service = await MainActor.run { makeService(ingestor: ingestor) }
 
         let upload = Task {
@@ -201,10 +200,9 @@ struct UploadStagingTests {
     @Test("A conversion that throws still returns its refusal and is cleaned up")
     func failedConversionRefusesAndCleansUp() async {
         let staged = StagedFile()
-        let ingestor = DocumentIngestor(extractors: [
-            .plainText: ControlledExtractor(
-                staged: staged, entered: nil, release: nil, failure: "the extractor said no")
-        ])
+        let extractor = ControlledExtractor(
+            staged: staged, entered: nil, release: nil, failure: "the extractor said no")
+        let ingestor = DocumentIngestor(extractors: [.plainText: extractor])
         let service = makeService(ingestor: ingestor)
 
         let reply = await service.handle(

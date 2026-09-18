@@ -179,7 +179,7 @@ struct HTTPResponseTests {
     @Test("The body is appended after the blank line, with nothing lost")
     func framing() {
         let response = HTTPResponse.json(["status": "ok"])
-        let text = String(decoding: response.serialised(keepAlive: false), as: UTF8.self)
+        let text = String(bytes: response.serialised(keepAlive: false), encoding: .utf8) ?? ""
         let parts = text.components(separatedBy: "\r\n\r\n")
         #expect(parts.count == 2, "exactly one blank line separates head from body")
         #expect(parts[1].contains("\"status\""))
@@ -210,7 +210,7 @@ struct WebAssetTests {
     @Test("The page references only assets that exist")
     func pageReferencesRealAssets() throws {
         let html = try #require(WebAssets.asset(for: "/")?.body)
-        let text = String(decoding: html, as: UTF8.self)
+        let text = String(bytes: html, encoding: .utf8) ?? ""
         for name in ["style.css", "app.js"] {
             #expect(text.contains("/\(name)"), "the page should reference \(name)")
             #expect(WebAssets.asset(for: "/\(name)") != nil, "\(name) should be served")
@@ -227,7 +227,7 @@ struct WebAssetTests {
     func encoding() throws {
         let body = try #require(WebAssets.asset(for: "/")?.body)
         #expect(String(data: body, encoding: .utf8) != nil)
-        #expect(String(decoding: body, as: UTF8.self).contains("charset=\"utf-8\""))
+        #expect(String(bytes: body, encoding: .utf8)?.contains("charset=\"utf-8\"") == true)
     }
 }
 

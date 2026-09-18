@@ -261,13 +261,12 @@ struct ModePromptTests {
         var spec = AgentSpec.seat(index: 0)
         spec.mode = mode
         spec.personaID = mode.defaultPersonaID(forSeat: 0)
+        let topicTurn = Turn(
+            sequence: 1, speakerName: "Moderator", kind: .topic,
+            content: "Should Company X enter the German EV market?")
         let conversation = Conversation(
             topic: "Should Company X enter the German EV market?",
-            turns: [
-                Turn(
-                    sequence: 1, speakerName: "Moderator", kind: .topic,
-                    content: "Should Company X enter the German EV market?")
-            ])
+            turns: [topicTurn])
         return PromptBuilder.prompt(
             for: spec, others: [AgentSpec.seat(index: 1)], conversation: conversation
         )[0].content

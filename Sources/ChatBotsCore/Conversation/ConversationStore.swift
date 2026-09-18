@@ -367,7 +367,7 @@ extension StoredConversation {
     /// The seats are *not* applied over the current ones — a loaded conversation's
     /// participants are part of what it was, and overwriting the present roster with them would
     /// change who is in the room because of something read from a file.
-    public var turns_: [Turn] {
+    private var rebuiltTurns: [Turn] {
         turns.map { stored in
             Turn(
                 id: stored.id,
@@ -384,7 +384,7 @@ extension StoredConversation {
 
     public func conversation() -> Conversation {
         Conversation(
-            topic: topic, turns: turns_, research: research, report: report,
+            topic: topic, turns: rebuiltTurns, research: research, report: report,
             votes: votes ?? [])
     }
 }

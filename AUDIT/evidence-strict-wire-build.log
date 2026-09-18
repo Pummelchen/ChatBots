@@ -1,0 +1,52 @@
+Building for debugging...
+[Computing dependencies]
+[Provisioning 5 / 64]
+[2 / 17] ChatBotsCore
+[4 / 21]
+[6 / 21] ChatBotsCore
+[9 / 24] ChatBotsCore
+[17 / 31] ChatBotsCore
+[21 / 38] ChatBotsCore-product
+[21 / 38] chatbots-probe-product
+[23 / 40] chatbots-probe-product
+[28 / 49] ChatBots
+[28 / 49] chatbots-cli-product
+[31 / 67] ChatBots
+[34 / 67] chatbots-cli-product
+[34 / 67] ChatBots
+[37 / 67] ChatBots
+[39 / 77] chatbots-probe-product
+[43 / 77] chatbots-cli-product
+[45 / 77] chatbots-cli-product
+[47 / 77] ChatBotsCoreTests-product
+[51 / 77] ChatBotsCoreTests-product
+[52 / 77] ChatBotsCoreTests-product
+[53 / 77] chatbots-cli-product
+[55 / 77] chatbots-cli-product
+[56 / 77] ChatBots-product
+[56 / 77] chatbots-cli-product
+[58 / 78] chatbots-cli-product
+[59 / 78] chatbots-cli-product
+[61 / 78] ChatBots-product
+[62 / 78] ChatBots-product
+[64 / 78] ChatBots-product
+[64 / 78] ChatBots
+[66 / 79] ChatBots-product
+[67 / 79] ChatBots-product
+[68 / 82]
+[68 / 82] ChatBots
+[68 / 82] ChatBots-product
+[70 / 82] ChatBots-product
+[72 / 83] ChatBots-product
+[74 / 82] ChatBotsAppTests-product
+[82 / 91] ChatBotsAppTests-product
+[83 / 91] ChatBotsAppTests-product
+[87 / 93] ChatBotsAppTests-product
+[89 / 96] ChatBotsAppTests-product
+[91 / 96] ChatBotsAppTests-product
+[94 / 97] ChatBotsCoreTests-product
+[97 / 101] ChatBotsCoreTests-product
+[99 / 101] ChatBotsCoreTests-product
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+Build complete! (18,55 secs)
+EXIT=0

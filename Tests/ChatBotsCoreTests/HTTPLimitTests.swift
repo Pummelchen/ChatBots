@@ -76,7 +76,7 @@ struct HTTPLimitTests {
 
         // And it was told why rather than dropped in silence.
         let response = await client.receiveOnce(timeout: .seconds(4))
-        #expect(response.map { String(decoding: $0, as: UTF8.self).contains("408") } == true)
+        #expect(response.map { String(bytes: $0, encoding: .utf8)?.contains("408") } == true)
     }
 
     /// The idle deadline alone is not a bound: every chunk re-arms it. The wall-clock deadline
@@ -198,7 +198,7 @@ struct HTTPLimitTests {
         surplus.send("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
 
         let reply = await surplus.receiveOnce(timeout: .seconds(4))
-        let text = reply.map { String(decoding: $0, as: UTF8.self) }
+        let text = reply.map { String(bytes: $0, encoding: .utf8) ?? "" }
         #expect(text?.contains("503") == true, "a connection over the cap should be refused")
         #expect(server.refusedConnectionCount == 1)
         #expect(server.connectionCount == ceiling, "the refused connection entered the table")

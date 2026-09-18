@@ -219,12 +219,8 @@ public struct ThinkingStripper: Sendable {
     private static func holdbackLength(of text: String, matching delimiter: String) -> Int {
         let maximum = min(text.count, delimiter.count - 1)
         guard maximum > 0 else { return 0 }
-        for length in stride(from: maximum, through: 1, by: -1) {
-            if text.hasSuffix(String(delimiter.prefix(length))) {
-                return length
-            }
-        }
-        return 0
+        return stride(from: maximum, through: 1, by: -1)
+            .first { text.hasSuffix(String(delimiter.prefix($0))) } ?? 0
     }
 }
 

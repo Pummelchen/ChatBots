@@ -121,7 +121,7 @@ struct SavedConversationHTTPTests {
         #expect(list?.first?["topic"] as? String == "A question worth keeping")
         // The summary carries the count a list wants without carrying the transcript.
         #expect((list?.first?["replies"] as? Int ?? 0) >= 1)
-        #expect(list?.first?["id"] as? String != nil)
+        #expect(list?.first?["id"] is String)
     }
 
     @Test("A kept conversation comes back with its transcript and its topic")
@@ -205,10 +205,9 @@ struct SavedConversationHTTPTests {
     func replyAccessorsMatchTheWire() {
         // The SwiftUI controller reads `reply.saved` and `reply.refusal`; the browser reads the
         // same replies as JSON. A test for one and not the other is how they drift.
-        let summaries = [
-            SavedConversationSummary(
-                id: "1", topic: "t", summary: "s", replies: 2, updatedAt: .now, startedAt: .now)
-        ]
+        let summary = SavedConversationSummary(
+            id: "1", topic: "t", summary: "s", replies: 2, updatedAt: .now, startedAt: .now)
+        let summaries = [summary]
         #expect(EngineReply.savedConversations(summaries).saved?.count == 1)
         #expect(EngineReply.refused("no").refusal == "no")
         #expect(EngineReply.savedConversations(summaries).refusal == nil)
