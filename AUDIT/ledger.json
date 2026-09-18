@@ -295,15 +295,14 @@
     "project": "ChatBotsCore",
     "file_line": "Sources/ChatBotsCore/HTTP/APIServer.swift:77-101; Caddyfile",
     "title": "The whole /api surface is unauthenticated and, through Caddy, reachable from the LAN by design",
-    "category": "authz",
-    "status": "BLOCKED",
+    "category": "accepted-risk",
+    "status": "DONE",
     "host": "Node1.local",
     "discovered_by": "human",
     "evidence_before": "crossOriginRefusal (APIServer.swift:77-101) blocks cross-origin browser requests and requires application/json, but there is no authentication or authorization anywhere on the routes: any client that can reach the port can read every conversation, drive every control and upload attachments. SECURITY.md documents this as deliberate (the LAN phone use case) and AGENTS.md repeats it; Caddyfile carries no host so it listens on every interface. This is recorded so the risk is explicit rather than hidden, not as an unnoticed defect.",
-    "fix_summary": "",
-    "evidence_after": "",
-    "commit": "",
-    "blocked_reason": "OWNER: repository owner (Pummelchen). REASON: /api has no authentication and the shipped Caddy default binds every interface; SECURITY.md and AGENTS.md both state this is deliberate for the phone-on-the-LAN use case, so removing it is a product decision rather than a code defect the audit can resolve alone. TRIED: read SECURITY.md, AGENTS.md, Caddyfile and tools/start.sh; confirmed crossOriginRefusal blocks cross-origin browser requests and requires application/json, confirmed there is no authn on any route, and confirmed --local-only inserts `bind 127.0.0.1`. OPTIONS FOR A HUMAN: (1) sign off the documented LAN-trust model and record it as an accepted risk; (2) add a shared-secret bearer token (or password) to state-changing routes and make loopback the default bind, updating the web page, the SwiftUI app, the CLI and the probe to send it \u2014 a cross-project contract change with four consumers."
+    "fix_summary": "ACCEPTED RISK, SIGNED OFF BY THE OWNER on 2026-09-18. The owner reviewed this finding and the options recorded against it and chose to accept the documented LAN-trust model rather than change it. **No code changed**: this row is closed as a decision on the record, not as a fix, and the behaviour it describes is still present and still deliberate. The decision and the declined alternative are written into `SECURITY.md` under \"The website, once you start it, carries the engine's pages onto the network with it\". Chosen option: (1) sign off the LAN-trust model. The declined option was a shared-secret bearer token on state-changing routes with a loopback default bind.",
+    "evidence_after": "SECURITY.md records the acceptance; this ledger row is the owner's decision. Nothing was verified to change, because nothing changed.",
+    "commit": "security(AUDIT-0018/0071/0077): the owner accepts the LAN-trust model"
   },
   {
     "id": "AUDIT-0019",
@@ -1198,15 +1197,14 @@
     "project": "ChatBotsCore",
     "file_line": "Sources/ChatBotsCore/HTTP/APIServer.swift:83-90",
     "title": "The same-origin check compares Origin against Host/X-Forwarded-Host, so DNS rebinding defeats it",
-    "category": "authz",
-    "status": "BLOCKED",
+    "category": "accepted-risk",
+    "status": "DONE",
     "host": "Node1.local",
     "discovered_by": "subagent-http",
     "evidence_before": "`originHost == addressedHost` compares two names the browser derives from the URL it fetched. A page served at http://evil.example:7788 that DNS-rebinds to the Mac sends Origin evil.example and X-Forwarded-Host evil.example (Caddy sets it from the original Host; the Caddyfile carries no host so any Host is served), so a same-origin POST is accepted and Sec-Fetch-Site is same-origin. Chrome Private Network Access may block public-to-private fetches; Safari and Firefox do not implement it.",
-    "fix_summary": "",
-    "evidence_after": "",
-    "commit": "",
-    "blocked_reason": "OWNER: repository owner (Pummelchen). REASON: the same-origin check compares Origin against Host/X-Forwarded-Host, which a DNS-rebinding page satisfies because both are the attacker's own name; the defense needs either authentication (AUDIT-0018's decision) or a Host allow-list of the names this deployment is legitimately served under, and the latter is not derivable without owner input \u2014 Caddy serves any Host, and a legitimate remote-access name (a VPN name, say) must not be broken. TRIED: read APIServer.crossOriginRefusal, the Caddyfile and tools/start.sh; confirmed the equality check and the application/json requirement, and that Sec-Fetch-Site is same-origin after a rebind. OPTIONS FOR A HUMAN: (1) resolve AUDIT-0018 by adding authentication, which subsumes this; (2) configure an explicit Host allow-list (loopback/LAN IPs, .local names, plus any owner-named remote host) and refuse others; (3) accept the risk explicitly as part of the LAN-trust sign-off."
+    "fix_summary": "ACCEPTED RISK, SIGNED OFF BY THE OWNER on 2026-09-18. The owner reviewed this finding and the options recorded against it and chose to accept the documented LAN-trust model rather than change it. **No code changed**: this row is closed as a decision on the record, not as a fix, and the behaviour it describes is still present and still deliberate. The decision and the declined alternative are written into `SECURITY.md` under \"The website, once you start it, carries the engine's pages onto the network with it\". Chosen option: (3) accept the risk explicitly as part of the LAN-trust sign-off. Options (1) authentication and (2) a Host allow-list were both declined.",
+    "evidence_after": "SECURITY.md records the acceptance; this ledger row is the owner's decision. Nothing was verified to change, because nothing changed.",
+    "commit": "security(AUDIT-0018/0071/0077): the owner accepts the LAN-trust model"
   },
   {
     "id": "AUDIT-0072",
@@ -1300,15 +1298,14 @@
     "project": "repo",
     "file_line": "Caddyfile:40-42; tools/start.sh:53,289-303",
     "title": "The shipped default publishes the unauthenticated site and API on every interface over plaintext HTTP",
-    "category": "authz",
-    "status": "BLOCKED",
+    "category": "accepted-risk",
+    "status": "DONE",
     "host": "Node1.local",
     "discovered_by": "subagent-tools",
     "evidence_before": "Caddyfile:40 `http://:7788 {` carries no bind, so the site listens on every interface; bind 127.0.0.1 is only generated when --local-only is passed (start.sh:53 defaults LOCAL_ONLY=0). /api/* and /s/* proxy to loopback with no authentication or TLS, so anyone on the LAN can read and steer conversations and an on-path reader can also write. SECURITY.md documents the exposure as deliberate and start.sh prints it; recorded as a sign-off item because the shipped default is the exposed one.",
-    "fix_summary": "",
-    "evidence_after": "",
-    "commit": "",
-    "blocked_reason": "OWNER: repository owner (Pummelchen). REASON: the same deliberate LAN-trust decision as AUDIT-0018, seen from the Caddy side \u2014 Caddyfile:40 carries no bind, so the unauthenticated site and API are published on every interface, over plaintext HTTP, unless --local-only is passed. TRIED: read the Caddyfile, tools/start.sh (default LOCAL_ONLY=0) and SECURITY.md; start.sh already prints the exposure. OPTIONS FOR A HUMAN: (1) accept and sign off; (2) make the default Caddyfile bind 127.0.0.1 and require an explicit --lan flag to publish, adding TLS for the LAN case."
+    "fix_summary": "ACCEPTED RISK, SIGNED OFF BY THE OWNER on 2026-09-18. The owner reviewed this finding and the options recorded against it and chose to accept the documented LAN-trust model rather than change it. **No code changed**: this row is closed as a decision on the record, not as a fix, and the behaviour it describes is still present and still deliberate. The decision and the declined alternative are written into `SECURITY.md` under \"The website, once you start it, carries the engine's pages onto the network with it\". Chosen option: (1) accept and sign off. The declined option was to make the default Caddyfile bind 127.0.0.1 and require an explicit --lan flag.",
+    "evidence_after": "SECURITY.md records the acceptance; this ledger row is the owner's decision. Nothing was verified to change, because nothing changed.",
+    "commit": "security(AUDIT-0018/0071/0077): the owner accepts the LAN-trust model"
   },
   {
     "id": "AUDIT-0078",
