@@ -5,60 +5,51 @@ orientation note so a resumed run does not restart discovery.
 
 ## Where the run is
 
-- **Phase A — complete and committed** (`fb3cfc3`): inventory and tier table,
-  environment and language-standard proofs, baseline, ledger opened.
-- **Phase B/C — in progress.** All discovery passes have run (L0-L7 plus the facade
-  sweep); the ledger holds every finding. Fixes land in severity order.
+- **Phase A — complete and committed** (`fb3cfc3`): inventory and tier table, environment
+  and language-standard proofs, baseline, ledger opened.
+- **Phase B/C — nearly drained.** All discovery passes have run (L0-L7 plus the facade
+  sweep); every S0, S1 and all but one S2 are closed. The S3 sweep remains.
 - **Phase D/E — not started.**
 
 ## Ledger state at the last commit
 
-`done: 38, open: 58, blocked: 0` — S0 0, S1 0, S2 11, S3 47.
+`done: 44, open: 48, blocked: 4` — S0 0, S1 0, S2 1, S3 47.
 
 The closure invariant holds: non-terminal count has gone 96 → 90 → 83 → 76 → 71 → 66 →
-62 → 59 → 58 across the milestone reports.
+62 → 59 → 58 → 56 → 54 → 51 → 50 → 49 → 48 across the milestone reports.
 
-### Closed
+## The one remaining S2
 
-S0/S1: AUDIT-0001 (device-resolver overflow), AUDIT-0002 (model-id traversal),
-AUDIT-0003 (silent save loss), AUDIT-0049 (models-probe SSRF).
+**AUDIT-0029 — SwiftLint/swift-format `--strict`, and `force_unwrapping`.** The gates are
+enforced against recorded waiver counts in `tools/analysis-waivers.txt` (215/444), and
+`.swiftlint.yml` has no `opt_in_rules`, so `force_unwrapping` never fires. Closing it needs:
 
-S2: AUDIT-0004 (image pixel cap), 0005 (attachment total bound), 0006 (transcript
-forgery), 0007/0008 (store recovery), 0009 (models dir), 0010 (.secrets mode),
-0011 (Tavily redirects), 0012 (search budget), 0013 (tool-call cap), 0014 (fetch_page
-SSRF), 0015 (tool-result fencing), 0016 (synthesis fence), 0017 (history mode),
-0030 (Python rules), 0043 (context window overflow), 0049, 0050 (link-local spellings),
-0051 (trace off), 0052 (trace URL), 0054 (compat host), 0055 (base URL query),
-0056 (unreadable SSE), 0059 (refusal), 0060 (cancellation),
-0061 (main-thread read), 0062 (launcher), 0078 (release gate), 0088 (follow),
-0089 (topic order), 0090 (Cmd+Enter), 0096 (.gitignore).
+1. Enable `force_unwrapping` and fix the 32 sites it then reports.
+2. Then drive SwiftLint to zero so `--strict` can be turned on: 112 `line_length`
+   (mostly prose string literals), 22 `cyclomatic_complexity`, 10 `function_body_length`,
+   15 `closure_parameter_position`, 14 `optional_data_string_conversion`, and the rest.
+   Reconfiguring a threshold to pass would be a §0 violation, so these are real edits or
+   real refactors.
+3. The same for swift-format's 439 diagnostics (`--strict` is what the brief names).
 
-## Next actions, in severity order
+Because this is much larger than one task, split it into sub-tasks the moment work starts,
+each with its own id, and note on AUDIT-0029 that its scope was split rather than narrowed.
 
-All S0/S1 are closed. The **eleven remaining S2** entries:
+## The S3 sweep (47)
 
-1. **AUDIT-0029** — SwiftLint/swift-format `--strict` and `force_unwrapping`. The largest
-   single item (215 SwiftLint findings: 112 line_length, 22 cyclomatic_complexity, 32
-   force_unwrapping once enabled). Needs a real sweep/refactor; reconfiguring a threshold
-   to pass is a §0 violation.
-2. **AUDIT-0031** — JavaScript has no committed formatter or linter and no pinned toolchain.
-3. **AUDIT-0069** — slowloris: the idle deadline is re-armed by any chunk, no total-request
-   deadline.
-4. **AUDIT-0070** — SSE has no backpressure and no idle deadline.
-5. **AUDIT-0071** — the same-origin check trusts Origin against Host, so DNS rebinding
-   defeats it.
-6. **AUDIT-0053** — SSE line buffering is unbounded before the 600-character cap.
-7. **AUDIT-0033** — the transport client cancels but never awaits the old reader, which can
-   poison the new session.
-8. **AUDIT-0057** — a seat baseURL/apiKey change is reported but never reaches the live
-   client (facade).
-9. **AUDIT-0058** — the app adopts any process answering on 7790 and hands it Keychain keys.
-10. **AUDIT-0077** and **AUDIT-0018** — the shipped default publishes the unauthenticated
-    site/API on every interface, and `/api/*` has no authn. Both are documented as
-    deliberate; they need an explicit owner sign-off or a design change, so they will most
-    likely become BLOCKED(owner) with the options written down.
+All are style/formatting/test-quality. They are resolved as rule-class sweeps through the
+formatter/linter, one commit per class, with no test and no cold re-read (§8). The
+`tools/analysis-waivers.txt` counts are the tracker: each class swept reduces them toward
+zero, and the waiver file is deleted when it reaches zero.
 
-Then the S3 sweep by rule class (47 entries).
+## BLOCKED-with-owner (4)
+
+- AUDIT-0018 — `/api` has no authentication; deliberate LAN-trust design.
+- AUDIT-0077 — Caddy binds every interface by default; same decision.
+- AUDIT-0071 — DNS rebinding defeats the same-origin check; needs auth or a Host allow-list.
+- AUDIT-0058 — the app adopts any process on 7790 and sends it Keychain keys.
+
+Each carries the owner, the reason, what was tried and 2+ options in the ledger.
 
 ## Phase E is BLOCKED on a second host
 
@@ -67,14 +58,15 @@ exists, and a Swift 6.4 / macOS 26 Apple-Silicon host cannot be provisioned with
 No VPS satisfies the Apple-Silicon + macOS 26 floor. **Owner: the repository owner.**
 Options: (a) provide a second Mac with Xcode 27 and authorise a fresh-clone
 `tools/mac-checks.sh` there; (b) accept a signed waiver that Phase E is verified on the
-primary host only, recorded in the ledger. Until then Phase E is BLOCKED-with-owner.
+primary host only, recorded in the ledger.
 
 ## Conventions in force
 
 - Branch `audit/2026-09-18` only; no force-push, no history rewrite.
 - One commit per S0/S1 task; S2/S3 batch by class or coherent group.
 - Every fix carries before/after evidence in `AUDIT/evidence-*.log`.
-- `bash tools/mac-checks.sh` is the gate after every batch; SwiftLint must stay ≤ 217
-  (currently 215) and swift-format ≤ 444 (currently 439).
+- `bash tools/mac-checks.sh` is the gate after every batch — now **9 gates**, including
+  eslint and prettier (`npm ci` first). Metrics must not regress: SwiftLint ≤ 217
+  (now 215), swift-format ≤ 444 (now 439), no file over 500 lines.
 - `python3 tools/embed-web.py` must be re-run whenever `web/` changes.
 - Nothing is closed by narrowing scope; new findings get a new id immediately.
