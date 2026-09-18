@@ -13,11 +13,10 @@ orientation note so a resumed run does not restart discovery.
 
 ## Ledger state at the last commit
 
-`done: 77, open: 16, blocked: 4` — S0 0, S1 0, S2 1, S3 15.
+`done: 79, open: 14, blocked: 4` — S0 0, S1 0, S2 1, S3 13.
 
 The closure invariant holds: non-terminal count has gone 96 → 90 → 83 → 76 → 71 → 66 →
-62 → 59 → 58 → 56 → 54 → 51 → 50 → 49 → 48 → 43 → 40 → 36 → 33 → 31 → 25 → 22 → 16 across the
-milestone reports.
+62 → … → 25 → 22 → 16 → 14 across the milestone reports.
 
 ## The one remaining S2
 
@@ -38,7 +37,7 @@ tightened the waivers from 217/444 to 211/413 (measured 209/411).
 Because this is much larger than one task, split it into sub-tasks the moment work starts,
 each with its own id, and note on AUDIT-0029 that its scope was split rather than narrowed.
 
-## The S3 sweep (15)
+## The S3 sweep (13)
 
 All are style/formatting/test-quality. They are resolved as rule-class sweeps through the
 formatter/linter, one commit per class, with no test and no cold re-read (§8). The
@@ -71,9 +70,11 @@ primary host only, recorded in the ledger.
   reasons and header CR/LF, shell traps, CLI exit codes, /api/seat validation and ordering,
   the event feed's high-water mark, CLI flag refusal, the Tavily answer/retry-cost/body cap,
   the runtime-directory docs, the vision markers, the desktop profiles, the attachment reads,
-  three tool-script bounds, and the SwiftUI app). The remaining S3 classes are the transport
-  (0034, 0035, 0036, 0037, 0038, 0039, 0041, 0042, 0044, 0045, 0047), the remaining tools
-  (0079, 0082), and the web front end (0091).
+  three tool-script bounds, the SwiftUI app, and the signing/web pair). The remaining S3 work is
+  the transport group (0034-0039, 0041, 0042, 0044, 0045, 0047 — double-close, missing reasons,
+  the TLS key window, serial shutdown, the receive buffer, the installer banner, `fcntl`, the
+  stream writer, `unload`, the MLX gate, and the inherited environment) plus AUDIT-0082 (model
+  weights are verified by byte length, from a length the upstream supplies).
 - Every fix carries before/after evidence in `AUDIT/evidence-*.log`.
 - `bash tools/mac-checks.sh` is the gate after every batch — now **9 gates**, including
   eslint and prettier (`npm ci` first). Metrics must not regress: SwiftLint ≤ 217
