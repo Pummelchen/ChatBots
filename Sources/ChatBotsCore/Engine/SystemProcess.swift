@@ -68,8 +68,8 @@ public enum SystemProcess {
         // deadlock both once either pipe passed its 64 KB buffer.
         let outDescriptor = out.fileHandleForReading.fileDescriptor
         let errDescriptor = err.fileHandleForReading.fileDescriptor
-        Self.makeNonBlocking(outDescriptor)
-        Self.makeNonBlocking(errDescriptor)
+        try Self.makeNonBlocking(outDescriptor)
+        try Self.makeNonBlocking(errDescriptor)
 
         let deadline = Date.now.addingTimeInterval(timeout)
         let collected = Self.collectOutput(
@@ -185,10 +185,19 @@ public enum SystemProcess {
 
     /// Put a descriptor in non-blocking mode so `drain` returns on EAGAIN instead of
     /// waiting for the child.
-    private static func makeNonBlocking(_ descriptor: Int32) {
+    ///
+    /// The result is checked. It used to be discarded, and a failure there is not cosmetic: the
+    /// drain that follows assumes a non-blocking read end, so a blocking one makes `collectOutput`'s
+    /// deadline unreachable and a child that never writes wedges the caller for good — which is how
+    /// `CertificateStore`'s `openssl` invocation could hang engine start instead of timing out.
+    private static func makeNonBlocking(_ descriptor: Int32) throws {
         let flags = fcntl(descriptor, F_GETFL, 0)
-        guard flags >= 0 else { return }
-        _ = fcntl(descriptor, F_SETFL, flags | O_NONBLOCK)
+        guard flags >= 0 else {
+            throw DocumentError.unreadable("could not read the pipe's flags: \(errno)")
+        }
+        guard fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) >= 0 else {
+            throw DocumentError.unreadable("could not put the pipe in non-blocking mode: \(errno)")
+        }
     }
 
     /// What one pass over a non-blocking read end found.

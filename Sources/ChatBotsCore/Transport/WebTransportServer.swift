@@ -100,6 +100,27 @@ public final class WebTransportEngineServer {
     /// what lets `stop()` end them.
     var sessions: [UUID: WebTransportSession] = [:]
     var sessionTasks: [UUID: Task<Void, Never>] = [:]
+    /// Bytes held by sessions whose frame is not yet complete, and the ceiling on them.
+    ///
+    /// `LengthFraming` refuses a *declared* length above `ProtocolLimits.maximumMessageBytes`, but
+    /// a peer can send that many bytes and the session holds them until the frame completes:
+    /// sixteen sessions at the maximum is over a gigabyte on an eight-gigabyte machine, from a
+    /// loopback peer. This keeps the aggregate a property of the buffered bytes rather than of how
+    /// many peers happen to be mid-frame.
+    var bufferedFrameBytes = 0
+    static let maximumBufferedFrameBytes = 2 * ProtocolLimits.maximumMessageBytes
+
+    /// Reserve `count` bytes of the buffered-frame budget, or refuse when it is spent.
+    func reserveFrameBytes(_ count: Int) -> Bool {
+        guard bufferedFrameBytes + count <= Self.maximumBufferedFrameBytes else { return false }
+        bufferedFrameBytes += count
+        return true
+    }
+
+    /// Give back `count` bytes that have been decoded or dropped.
+    func releaseFrameBytes(_ count: Int) {
+        bufferedFrameBytes = max(0, bufferedFrameBytes - count)
+    }
     /// The sessions that have said something, so the startup deadline knows which ones have not. Main-actor
     /// state like the tables above: the serve loop and the watchdog that reads it are both on this actor.
     var spokenSessions: Set<UUID> = []
@@ -206,7 +227,16 @@ public final class WebTransportEngineServer {
         sessions.removeAll()
         sessionTasks.removeAll()
         for task in liveTasks { task.cancel() }
-        for session in liveSessions { try? await session.close() }
+        // Closed concurrently, not one after another. Each session's close waits for its peer on
+        // the library's own deadline (fifteen seconds), so running them serially meant sixteen
+        // unresponsive peers could hold the main actor for minutes during shutdown; a task group
+        // bounds the wait to roughly one close. `WebTransportSession` has no timeout overload, so
+        // the deadline is the library's — this changes the total, not the per-close wait.
+        await withTaskGroup(of: Void.self) { group in
+            for session in liveSessions {
+                group.addTask { try? await session.close() }
+            }
+        }
 
         if let listener {
             listener.shutdown()

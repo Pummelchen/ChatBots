@@ -17,6 +17,8 @@ public struct TransportCheckReport: Sendable {
     public var refusedAsExpected = false
     public var receivedState = false
     public var receivedEvent = false
+    /// The sessions this check opened, which is what it can observe: the engine's own tally lives
+    /// in another process. This was a literal `1`, so it read the same after a failed connect.
     public var sessionCount = 0
     public var failures: [String] = []
 
@@ -313,12 +315,21 @@ public enum TransportCheck {
             report.recordFailure("state after refusals: \(error.localizedDescription)")
         }
 
-        // Give the event stream a moment to deliver the initial state.
-        try? await Task.sleep(for: .milliseconds(400))
-        let seen = await collector.snapshot()
+        // Wait for the collector to see the state the engine pushes to a new session, against a
+        // deadline rather than a fixed sleep. The 400 ms pause was a guess — too short on a busy
+        // machine and pure waiting on an idle one — and nothing recorded which had happened.
+        let streamDeadline = ContinuousClock.now.advanced(by: .seconds(5))
+        var seen = await collector.snapshot()
+        while !seen.state, ContinuousClock.now < streamDeadline {
+            try? await Task.sleep(for: .milliseconds(50))
+            seen = await collector.snapshot()
+        }
         report.recordEventStream(state: seen.state, event: seen.event)
 
-        report.sessionCount = 1
+        // What this check can observe about sessions is its own: it opened one connection and has
+        // not closed it yet. The engine's tally lives in another process and was never read — the
+        // field was a literal 1, so it read the same after a failed connect.
+        report.sessionCount = report.connected ? 1 : 0
 
         collectTask.cancel()
         await client.disconnect()

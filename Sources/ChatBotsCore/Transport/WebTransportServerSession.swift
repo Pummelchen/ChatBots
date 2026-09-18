@@ -92,6 +92,11 @@ extension WebTransportEngineServer {
         await send(.event(.state(service.snapshot())), on: stream)
 
         var buffer = Data()
+        // What this session holds from the server's buffered-frame budget. It is given back as the
+        // buffer is consumed and on every exit, so the budget is a bound on live buffers rather
+        // than on sessions ever seen.
+        var reserved = 0
+        defer { releaseFrameBytes(reserved) }
         while !Task.isCancelled {
             let chunk: Data
             do {
@@ -101,6 +106,11 @@ extension WebTransportEngineServer {
                 return
             }
             if chunk.isEmpty { return }
+            guard reserveFrameBytes(chunk.count) else {
+                note("an incomplete frame would exceed the buffered-frame budget")
+                return
+            }
+            reserved += chunk.count
             buffer.append(chunk)
 
             // Several frames can arrive together and one can be split across reads; the
@@ -116,6 +126,9 @@ extension WebTransportEngineServer {
                     return
                 }
                 guard case .message(let payload, let remainder) = result else { break }
+                let consumed = buffer.count - remainder.count
+                releaseFrameBytes(consumed)
+                reserved -= consumed
                 buffer = remainder
                 // A whole frame, so the session is a conversation rather than a client that sent a byte and
                 // stopped: the startup deadline no longer applies to it. It is *bytes* that make the server
