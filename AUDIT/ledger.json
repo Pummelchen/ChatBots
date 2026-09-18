@@ -245,13 +245,13 @@
     "file_line": "Sources/ChatBotsCore/Research/WebTools.swift:41-47,121-128; Sources/ChatBotsCore/Engine/TurnLoop.swift:309",
     "title": "Fetched web content enters the prompt undelimited and uninspected for instruction smuggling",
     "category": "prompt-injection",
-    "status": "OPEN",
+    "status": "DONE",
     "host": "Node1.local",
     "discovered_by": "subagent-research",
     "evidence_before": "WebSearchTool concatenates hit.title/url/content and FetchPageTool returns \"Content of \\(page.url) (\\(page.title)):\\n\\n\\(page.content)\" with no fence or untrusted marker; TurnLoop.swift:309 inserts the string verbatim as a role:\"tool\" entry. A fetched page can therefore inject instructions into the running model, which is allowed to invoke further privileged tools. Newlines in a hostile page title also forge transcript lines in the synthesis prompt (ConversationEngine+Research.swift:44-47, ConversationEngine+TurnLoop.swift:311).",
-    "fix_summary": "",
-    "evidence_after": "",
-    "commit": "",
+    "fix_summary": "MLXEngine.fencedToolResult wraps a tool result in an explicit untrusted-data fence naming it as material rather than an instruction, and appendToolRound uses it for every tool turn, so fetched page text and search summaries no longer enter the conversation unmarked.",
+    "evidence_after": "TurnLoopRuleTests and TurnLoopModelTests now assert both that the tool's data is present and that it is fenced. Evidence: AUDIT/evidence-batch8-tests.log (49 tests in 7 suites) and AUDIT/evidence-batch8-mac-checks.log (all 8 Mac gates passed, EXIT=0: 1071 tests, swiftlint 215/217, swift-format 439/444). ",
+    "commit": "audit(AUDIT-0015): fence tool results as untrusted data",
     "blocked_reason": ""
   },
   {

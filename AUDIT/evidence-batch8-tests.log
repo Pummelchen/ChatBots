@@ -1,0 +1,387 @@
+Building for debugging...
+[Computing dependencies]
+[Using on-disk description]
+[1 / 6] swift-crypto_Crypto
+[18 / 298] yyjson
+[22 / 311] MLXHuggingFaceMacros
+[27 / 323] ArgumentParserToolInfo
+[33 / 336] _NumericsShims
+[41 / 347] RealModule
+[46 / 348] WebTransportQUICCore
+[53 / 351] WebTransportQUICCore
+[55 / 357] InternalCollectionsUtilities
+[56 / 357] WebTransportTLSCore
+[65 / 377] WebTransportCryptoApple
+[68 / 380] WebTransportTLSCore
+[71 / 380] WebTransportTLSCore
+[77 / 381] WebTransportHTTP3Core
+[78 / 381] WebTransportHTTP3Core
+[81 / 382] WebTransportHTTP3Core
+[85 / 382] WebTransportHTTP3Core
+[87 / 382] WebTransportHTTP3Core
+[94 / 384] WebTransportUDPApple
+[97 / 386] yyjson
+[102 / 388] WebTransportCryptoApple
+[106 / 403] MLXHuggingFaceMacros
+[110 / 403] WebTransportNetworkRuntime
+[114 / 403] RealModule
+[123 / 406] WebTransportNetworkRuntime
+[126 / 408] InternalCollectionsUtilities
+[127 / 410] WebTransport
+[130 / 412] WebTransport
+[135 / 422] WebTransport
+[140 / 422] OrderedCollections
+[143 / 422] OrderedCollections
+[145 / 422] OrderedCollections
+[146 / 422] OrderedCollections
+[150 / 422] EventSource
+[152 / 422] Crypto
+[154 / 424] HuggingFace
+[158 / 424] Crypto
+[161 / 424] ComplexModule
+[168 / 435] HuggingFace
+[171 / 437] HuggingFace
+[180 / 442] Numerics
+[182 / 451] WebTransportNetworkRuntime
+[183 / 451] Jinja
+[186 / 452] HuggingFace
+[189 / 452] HuggingFace
+[190 / 452] Jinja
+[192 / 452] Jinja
+[194 / 452] Jinja
+[201 / 452] ComplexModule
+[202 / 452] ArgumentParserToolInfo
+[204 / 455] Jinja
+[209 / 464] HuggingFace
+[216 / 467] Jinja
+[219 / 467] Hub
+[221 / 475] ArgumentParser
+[224 / 475] ArgumentParser
+[229 / 475] Hub
+[231 / 475] Hub
+[234 / 475] Hub
+[238 / 478] Tokenizers
+[239 / 481] encuda-product
+[240 / 481]
+[242 / 487] encuda-product
+[247 / 496] Tokenizers
+[250 / 496] WebTransportTLSCore
+[252 / 496] encuda-product
+[256 / 496] encuda-product
+[258 / 497] Tokenizers
+[262 / 497] Tokenizers
+[264 / 497] WebTransportCryptoApple
+[270 / 497] Jinja
+[272 / 497] ArgumentParser
+[275 / 498] Tokenizers
+[278 / 498] encuda-product
+[292 / 501] Cmlx
+[293 / 510] MLX
+[294 / 510] Cmlx
+[295 / 510] Cmlx
+[297 / 510] Cmlx
+[303 / 510] Cmlx
+[309 / 512] Cmlx
+[313 / 512] Cmlx
+[324 / 512] Cmlx
+[325 / 512] Cmlx
+[326 / 512] Cmlx
+[328 / 512] Cmlx
+[329 / 512] Cmlx
+[331 / 512] Cmlx
+[333 / 512] Cmlx
+[335 / 512] Cmlx
+[336 / 512] Cmlx
+[337 / 512] Cmlx
+[338 / 512] Cmlx
+[340 / 512] Cmlx
+[341 / 512] Cmlx
+[343 / 512] Cmlx
+[345 / 512] Cmlx
+[346 / 512] Cmlx
+[351 / 512] Cmlx
+[353 / 512] Cmlx
+[355 / 512] Cmlx
+[357 / 512] Cmlx
+[359 / 512] Cmlx
+[362 / 512] Cmlx
+[365 / 512] Cmlx
+[368 / 512] Cmlx
+[369 / 512] Cmlx
+[371 / 512] Cmlx
+[372 / 512] Cmlx
+[375 / 512] Cmlx
+[377 / 512] Cmlx
+[379 / 512] Cmlx
+[380 / 512] Cmlx
+[381 / 512] Cmlx
+[382 / 512] Cmlx
+[383 / 512] Cmlx
+[386 / 512] Cmlx
+[387 / 512] Cmlx
+[388 / 512] Cmlx
+[389 / 512] Cmlx
+[391 / 512] Cmlx
+[392 / 512] Cmlx
+[395 / 512] Cmlx
+[398 / 512] Cmlx
+[402 / 512] Cmlx
+[404 / 512] Cmlx
+[406 / 512] Cmlx
+[407 / 512] Cmlx
+[410 / 512] Cmlx
+[411 / 512] Cmlx
+[412 / 512] Cmlx
+[413 / 512] Cmlx
+[415 / 512] Cmlx
+[416 / 512] Cmlx
+[417 / 512] Cmlx
+[418 / 512] Cmlx
+[419 / 512] Cmlx
+[420 / 512] Cmlx
+[422 / 512] Cmlx
+[424 / 512] Cmlx
+[425 / 512] Cmlx
+[427 / 512] Cmlx
+[428 / 512] Cmlx
+[430 / 512] Cmlx
+[431 / 512] Cmlx
+[432 / 512] Cmlx
+[433 / 512] Cmlx
+[434 / 512] Cmlx
+[435 / 512] Cmlx
+[436 / 512] Cmlx
+[438 / 512] Cmlx
+[440 / 512] Cmlx
+[443 / 512] Cmlx
+[445 / 512] Cmlx
+[446 / 512] Cmlx
+[447 / 512] Cmlx
+[448 / 512] Cmlx
+[449 / 512] Cmlx
+[450 / 512] Cmlx
+[451 / 512] Cmlx
+[453 / 512] Cmlx
+[458 / 512] Cmlx
+[459 / 512] Cmlx
+[460 / 512] Cmlx
+[461 / 512] Cmlx
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+[463 / 512] mlx-swift_Cmlx
+[466 / 511] MLX
+[466 / 511] Cmlx
+[468 / 511] MLX
+[471 / 513] MLXNN
+[471 / 513] MLX
+[474 / 522] MLX
+[477 / 522] MLXNN
+[478 / 522] MLXNN
+[482 / 524] MLXNN
+[486 / 526] MLXNN
+[488 / 526] Cmlx
+[490 / 529] Cmlx
+[493 / 530] MLXOptimizers
+[495 / 532] MLXOptimizers
+[495 / 532] MLXNN
+[495 / 533] MLXLMCommon
+[498 / 541] MLX
+[500 / 541] MLXLMCommon
+[500 / 541] MLXNN
+[502 / 541] MLXLMCommon
+[508 / 543] MLXLMCommon
+[510 / 548] MLXVLM
+[511 / 548] MLXLLM
+[511 / 548] MLXVLM
+[514 / 557] MLXVLM
+[515 / 566] MLXLLM
+[516 / 566] MLXLMCommon
+[519 / 566] MLXVLM
+[520 / 566] MLXVLM
+[521 / 566] MLXVLM
+[523 / 568] MLXVLM
+[526 / 570] MLXVLM
+[532 / 570] MLXLLM
+[533 / 570] MLXLLM
+[533 / 570] MLXVLM
+[534 / 570] Cmlx
+[536 / 570] MLXLLM
+[536 / 570] MLXVLM
+[538 / 570] MLXLLM
+[540 / 570] Cmlx
+[543 / 573] MLX
+[545 / 575] MLXNN
+[546 / 575]
+[552 / 579] MLXLMCommon
+[554 / 579] MLXLLM
+[557 / 590] MLXLLM
+[566 / 590] ChatBotsCore
+[573 / 602] chatbots-probe-product
+[574 / 602] chatbots-cli-product
+[575 / 604] chatbots-probe-product
+[577 / 604] ChatBots
+[579 / 613] chatbots-cli-product
+[580 / 613] chatbots-cli-product
+[582 / 622] ChatBots-product
+[584 / 631] chatbots-probe-product
+[586 / 631] chatbots-probe-product
+[588 / 631] chatbots-cli-product
+[589 / 631] chatbots-cli-product
+[590 / 631] chatbots-cli-product
+[591 / 631] ChatBots-product
+[592 / 631] ChatBots-product
+[594 / 631] ChatBots-product
+[596 / 631] ChatBots
+[598 / 631] ChatBots
+[600 / 631] ChatBots-product
+[603 / 631] chatbots-cli-product
+[606 / 631] ChatBots
+[606 / 632] ChatBots-product
+[608 / 632] ChatBots-product
+[610 / 638] ChatBots
+[612 / 638] ChatBots
+[612 / 638]
+[615 / 635] ChatBotsCoreTests-product
+[616 / 637] ChatBots
+[619 / 637] ChatBots
+[627 / 646] ChatBotsCoreTests-product
+[628 / 646] ChatBotsCoreTests-product
+[629 / 646] ChatBots-product
+[630 / 646] ChatBots
+[631 / 646] ChatBotsCoreTests-product
+[632 / 648] ChatBots-product
+[633 / 648] ChatBots-product
+[636 / 644] ChatBotsCoreTests-product
+[636 / 644] ChatBotsAppTests-product
+[642 / 653] ChatBotsAppTests-product
+[644 / 653] ChatBotsAppTests-product
+[645 / 653] ChatBotsAppTests-product
+[650 / 656] ChatBotsAppTests-product
+[652 / 659] ChatBotsCoreTests-product
+[652 / 659] ChatBotsAppTests-product
+[654 / 659] ChatBotsAppTests-product
+[655 / 659] ChatBotsCoreTests-product
+[657 / 660] chatbots-probe-product
+[658 / 661] ChatBotsCoreTests-product
+[660 / 664] ChatBotsCoreTests-product
+[662 / 664] ChatBotsCoreTests-product
+Build complete! (100,58 secs)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "An unloaded seat still behaves" started.
+◇ Suite "A turn runs only the tools its caller offered" started.
+◇ Suite "Peer text stays out of the system role" started.
+◇ Suite "Turn-loop rules without a model" started.
+◇ Suite "Prompt shape" started.
+◇ Suite "The turn loop runs on a stubbed model" started.
+◇ Test "Live changes move currentSpec and leave spec alone" started.
+◇ Test "A caller-supplied tool runs even when the registry has never heard of it" started.
+◇ Suite "The MLX gate serialises access" started.
+◇ Test "An offered tool runs" started.
+◇ Test "A failing offered tool is reported to the model rather than thrown" started.
+◇ Test "A seat built with one engine answers on either backend" started.
+◇ Test "The registry chooses the instance for an offered name" started.
+◇ Test "Attachments keep only what the engine can actually use" started.
+◇ Test "Unloading an unloaded seat reports idle" started.
+◇ Test "Offering one tool does not make another reachable" started.
+◇ Test "A fresh seat reports its spec and is not loaded" started.
+◇ Test "A tool the caller did not offer is refused, even when the registry holds it" started.
+◇ Test "An empty offer is empty, which is what suppresses the tool specs" started.
+◇ Test "Engine state reports readiness only for ready" started.
+◇ Test "A finished turn reports at most the failures it earned, in order" started.
+◇ Test "A plain entertainment prompt is template-compatible" started.
+◇ Test "Both extra sections at once still produce one system message" started.
+◇ Test "The last message is the ask, from the user" started.
+◇ Test "A stray delimiter or echoed speaker tag is removed from the answer" started.
+◇ Test "An entertainment prompt with a social history is template-compatible" started.
+◇ Test "Legitimate names are unchanged" started.
+◇ Test "A research prompt carries no social state" started.
+◇ Test "Only decodable images reach the engine" started.
+◇ Test "The app note is in the log, marked as not a message" started.
+◇ Test "An entertainment prompt with source material is template-compatible" started.
+◇ Test "A forged seat name cannot forge a log tag" started.
+◇ Test "One turn dispatches at most the per-turn tool-call cap" started.
+◇ Test "A forged moderator name cannot draw a second tag" started.
+◇ Test "A seat's display name cannot add a line to another seat's system message" started.
+◇ Test "Steering appended while generating keeps the shape" started.
+◇ Test "The stop reason is reported as the template's own word" started.
+◇ Test "The briefing's peer text is not in the system message" started.
+◇ Test "A research prompt with source material is template-compatible" started.
+◇ Test "Statistics are derived from the info event" started.
+◇ Test "The model's tool spec carries the provider's own description" started.
+◇ Test "Fabricated tool syntax is stripped and the speaker tag removed" started.
+◇ Test "Reasoning with no answer is reported as having spent the budget" started.
+◇ Test "The tool round is framed as assistant calls, results, then a user turn" started.
+◇ Test "Tool rounds are bounded, whatever the model keeps asking for" started.
+◇ Test "A round with no info event still reports honest statistics" started.
+◇ Test "Two exclusive bodies never overlap" started.
+◇ Test "Prompt assembly sends the opening messages unchanged, in order" started.
+◇ Test "A throwing body still releases the gate" started.
+◇ Test "A tool round is framed as the template requires, and callable again" started.
+◇ Test "Images ride on the last user entry of the first round only" started.
+◇ Test "Exclusive access returns what the body returned" started.
+◇ Test "The round's parameters mirror the turn's settings" started.
+◇ Test "The reported stats come from the round's info event" started.
+◇ Test "The reasoning ceiling ends the turn and fails it with no answer" started.
+◇ Test "A call for a tool the turn did not offer is refused, not run" started.
+✔ Test "A caller-supplied tool runs even when the registry has never heard of it" passed after 0.001 seconds.
+✔ Test "Offering one tool does not make another reachable" passed after 0.001 seconds.
+✔ Test "An offered tool runs" passed after 0.002 seconds.
+✔ Test "Live changes move currentSpec and leave spec alone" passed after 0.002 seconds.
+✔ Test "A tool the caller did not offer is refused, even when the registry holds it" passed after 0.002 seconds.
+✔ Test "Unloading an unloaded seat reports idle" passed after 0.003 seconds.
+[ChatBots] Agent 1 stripped 2 line(s) of fabricated tool syntax from the answer
+✔ Test "The registry chooses the instance for an offered name" passed after 0.003 seconds.
+✔ Test "A failing offered tool is reported to the model rather than thrown" passed after 0.003 seconds.
+✔ Test "Engine state reports readiness only for ready" passed after 0.003 seconds.
+✔ Test "An empty offer is empty, which is what suppresses the tool specs" passed after 0.003 seconds.
+✔ Test "A finished turn reports at most the failures it earned, in order" passed after 0.003 seconds.
+✔ Test "A stray delimiter or echoed speaker tag is removed from the answer" passed after 0.003 seconds.
+✔ Test "A fresh seat reports its spec and is not loaded" passed after 0.004 seconds.
+✔ Test "Legitimate names are unchanged" passed after 0.003 seconds.
+✔ Test "The last message is the ask, from the user" passed after 0.003 seconds.
+✔ Test "A plain entertainment prompt is template-compatible" passed after 0.003 seconds.
+✔ Test "A research prompt carries no social state" passed after 0.003 seconds.
+✔ Test "An entertainment prompt with a social history is template-compatible" passed after 0.003 seconds.
+✔ Test "One turn dispatches at most the per-turn tool-call cap" passed after 0.003 seconds.
+✔ Test "A forged seat name cannot forge a log tag" passed after 0.003 seconds.
+✔ Test "The app note is in the log, marked as not a message" passed after 0.003 seconds.
+✔ Test "The stop reason is reported as the template's own word" passed after 0.003 seconds.
+✔ Test "An entertainment prompt with source material is template-compatible" passed after 0.003 seconds.
+✔ Test "A seat's display name cannot add a line to another seat's system message" passed after 0.003 seconds.
+✔ Test "Both extra sections at once still produce one system message" passed after 0.003 seconds.
+✔ Test "A research prompt with source material is template-compatible" passed after 0.003 seconds.
+✔ Test "Statistics are derived from the info event" passed after 0.003 seconds.
+✔ Test "A seat built with one engine answers on either backend" passed after 0.004 seconds.
+✔ Test "The model's tool spec carries the provider's own description" passed after 0.003 seconds.
+✔ Test "The tool round is framed as assistant calls, results, then a user turn" passed after 0.003 seconds.
+✔ Test "The briefing's peer text is not in the system message" passed after 0.003 seconds.
+✔ Test "Tool rounds are bounded, whatever the model keeps asking for" passed after 0.003 seconds.
+✔ Test "Fabricated tool syntax is stripped and the speaker tag removed" passed after 0.003 seconds.
+✔ Test "Exclusive access returns what the body returned" passed after 0.003 seconds.
+✔ Test "A throwing body still releases the gate" passed after 0.003 seconds.
+✔ Test "Prompt assembly sends the opening messages unchanged, in order" passed after 0.003 seconds.
+✔ Test "The round's parameters mirror the turn's settings" passed after 0.003 seconds.
+✔ Test "Images ride on the last user entry of the first round only" passed after 0.003 seconds.
+✔ Test "Steering appended while generating keeps the shape" passed after 0.003 seconds.
+✔ Test "A round with no info event still reports honest statistics" passed after 0.003 seconds.
+✔ Test "A forged moderator name cannot draw a second tag" passed after 0.003 seconds.
+✔ Suite "A turn runs only the tools its caller offered" passed after 0.004 seconds.
+✔ Test "The reported stats come from the round's info event" passed after 0.003 seconds.
+✔ Test "A tool round is framed as the template requires, and callable again" passed after 0.003 seconds.
+✔ Test "The reasoning ceiling ends the turn and fails it with no answer" passed after 0.003 seconds.
+✔ Test "A call for a tool the turn did not offer is refused, not run" passed after 0.003 seconds.
+✔ Suite "Peer text stays out of the system role" passed after 0.004 seconds.
+✔ Test "Reasoning with no answer is reported as having spent the budget" passed after 0.003 seconds.
+✔ Suite "Prompt shape" passed after 0.004 seconds.
+✔ Suite "The turn loop runs on a stubbed model" passed after 0.004 seconds.
+✔ Test "Two exclusive bodies never overlap" passed after 0.027 seconds.
+✔ Suite "The MLX gate serialises access" passed after 0.028 seconds.
+[ChatBots] Agent 1 could not read the attached image broken.png
+[ChatBots] Agent 1 could not read the attached image broken.png
+✔ Test "Only decodable images reach the engine" passed after 0.037 seconds.
+✔ Test "Attachments keep only what the engine can actually use" passed after 0.038 seconds.
+✔ Suite "An unloaded seat still behaves" passed after 0.038 seconds.
+✔ Suite "Turn-loop rules without a model" passed after 0.038 seconds.
+✔ Test run with 49 tests in 7 suites passed after 0.038 seconds.
+EXIT=0

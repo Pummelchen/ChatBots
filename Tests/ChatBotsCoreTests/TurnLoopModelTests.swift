@@ -122,7 +122,10 @@ struct TurnLoopModelTests {
         #expect(second.entries[1].toolCalls.count == 1)
         #expect(second.entries[1].toolCalls.first?.function.name == "web_search")
         #expect(second.entries[2].toolResultID == "c1")
-        #expect(second.entries[2].content == "result for ev market")
+        #expect(second.entries[2].content.contains("result for ev market"))
+        #expect(
+            second.entries[2].content.contains("BEGIN TOOL DATA"),
+            "a fetched or searched result is fenced as untrusted data")
         #expect(second.entries[3].content == MLXEngine.toolContinuation)
     }
 

@@ -30,7 +30,10 @@ struct TurnLoopRuleTests {
         #expect(entries[1].toolCalls.map(\.id) == ["c1", "c2"])
         #expect(entries[1].content.isEmpty)
         #expect(entries[2].toolResultID == "c1")
-        #expect(entries[2].content == "one")
+        #expect(entries[2].content.contains("one"), "the tool's data is still there")
+        #expect(
+            entries[2].content.contains("BEGIN TOOL DATA"),
+            "and it is fenced, because it comes from outside the app")
         #expect(entries[3].toolResultID == "c2")
         #expect(entries[4].content == MLXEngine.toolContinuation)
     }
