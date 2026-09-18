@@ -10,13 +10,15 @@ only the orientation a resumed run needs, so it does not repeat either.
   language-standard proofs, baseline, ledger opened.
 - **Phase B/C — drained except one S2.** All discovery passes have run (L0-L7 plus the facade
   sweep); every S0, S1 and S3 is closed. `AUDIT-0029` is the last open task.
-- **Phase D — recorded as AUDIT-0104 and not yet run.** The tree is frozen; the sweep is the next step.
-- **Phase E — recorded as AUDIT-0105, BLOCKED with the repository owner as owner.** It needs a second host (below).
+- **Phase D — DONE (AUDIT-0104).** Every scanner CI runs was run by hand over the frozen tree; two gates
+  were red and are fixed (AUDIT-0106 ruff format, AUDIT-0107 the shellcheck probe).
+- **Phase E — AUDIT-0105, BLOCKED with the repository owner as owner.** It needs a second host (below).
 
 ## Ledger state at the last commit
 
-`done: 99, open: 1, blocked: 5` — S0 0, S1 0, S2 2, S3 0. The one open task is Phase D
-(AUDIT-0104); the five blocked are the four security decisions plus Phase E (AUDIT-0105).
+`done: 102, open: 0, blocked: 5` — S0 0, S1 0, S2 0, S3 0. Every task is DONE or
+BLOCKED-with-owner. The five awaiting a decision are the four security findings
+(AUDIT-0018, 0058, 0071, 0077) and Phase E (AUDIT-0105).
 
 The closure invariant holds: the non-terminal count fell at every milestone report, from 96 at
 the start to 1 now.

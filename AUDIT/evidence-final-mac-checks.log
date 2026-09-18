@@ -1,0 +1,48 @@
+mac-checks commit: 173071dcc3ae0181d82b46436a23dceb2b513335
+
+=== 1/9  file sizes: tracked code ===
+PASS  file sizes: every code file is within 500 lines
+
+=== 2/9  build: products and tests, warnings are errors ===
+PASS  build: swift build --build-tests
+
+=== 3/9  tests: the full suite ===
+      1086 tests in 197 suites
+PASS  tests: 1086 tests in 197 suites
+
+=== 4/9  coverage: Sources/ ===
+      TOTAL                                                                7017              2693    61.62%        2717              1094    59.74%       21717             10124    53.38%           0                 0         -
+PASS  coverage: TOTAL                                                                7017              2693    61.62%        2717              1094    59.74%       21717             10124    53.38%           0                 0         -
+
+=== 5/9  swiftlint: Sources, Tests (strict) ===
+PASS  swiftlint: no findings under --strict
+
+=== 6/9  swift-format lint: Sources, Tests (strict) ===
+PASS  swift-format: no diagnostics under --strict
+
+=== 7/9  web: the rules the page runs ===
+PASS  web: deltas merge (34 cases)
+PASS  web: the verdict rule (12 cases)
+
+=== 8/9  web toolchain: eslint and prettier ===
+PASS  eslint: web/ and the web check scripts
+PASS  prettier: web/ and the web check scripts
+
+=== 9/9  identity: the version and its mirrors ===
+PASS  identity: 1.0 is stated once and agrees everywhere
+
+=== summary ===
+PASS  file sizes: every code file is within 500 lines
+PASS  build: swift build --build-tests
+PASS  tests: 1086 tests in 197 suites
+PASS  coverage: TOTAL                                                                7017              2693    61.62%        2717              1094    59.74%       21717             10124    53.38%           0                 0         -
+PASS  swiftlint: no findings under --strict
+PASS  swift-format: no diagnostics under --strict
+PASS  web: deltas merge (34 cases)
+PASS  web: the verdict rule (12 cases)
+PASS  eslint: web/ and the web check scripts
+PASS  prettier: web/ and the web check scripts
+PASS  identity: 1.0 is stated once and agrees everywhere
+
+All 9 Mac-only gates passed.
+EXIT=0
