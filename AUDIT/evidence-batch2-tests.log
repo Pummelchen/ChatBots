@@ -1,0 +1,373 @@
+Building for debugging...
+[Computing dependencies]
+[Using on-disk description]
+[1 / 1]
+[1 / 62] WebTransportQUICCore
+[17 / 298] ArgumentParserToolInfo
+[20 / 310] RealModule
+[26 / 328] WebTransportQUICCore
+[33 / 335] _NumericsShims
+[39 / 345] RealModule
+[46 / 349] WebTransportSecurityShim
+[53 / 357] WebTransportTLSCore
+[56 / 357] InternalCollectionsUtilities
+[63 / 380] RealModule
+[73 / 381] WebTransportCryptoApple
+[74 / 381] WebTransportTLSCore
+[75 / 381] WebTransportTLSCore
+[82 / 381] WebTransportHTTP3Core
+[83 / 381] WebTransportHTTP3Core
+[87 / 382] WebTransportHTTP3Core
+[89 / 382] WebTransportCryptoApple
+[96 / 385] WebTransportUDPApple
+[100 / 388] WebTransportNetworkRuntime
+[105 / 397] ComplexModule
+[110 / 403] RealModule
+[116 / 403] ComplexModule
+[125 / 408] MLXHuggingFaceMacros
+[129 / 419] OrderedCollections
+[130 / 421] WebTransport
+[133 / 421] OrderedCollections
+[137 / 422] OrderedCollections
+[138 / 422] OrderedCollections
+[142 / 422] WebTransport
+[143 / 422] MLXHuggingFaceMacros
+[146 / 422] EventSource
+[151 / 422] Crypto
+[155 / 424] Crypto
+[159 / 424] Crypto
+[163 / 435] Numerics
+[171 / 439] OrderedCollections
+[178 / 442] Numerics
+[181 / 451] Jinja
+[182 / 451] WebTransportNetworkRuntime
+[184 / 452] HuggingFace
+[188 / 452] Jinja
+[189 / 452] Jinja
+[191 / 452] Jinja
+[192 / 452] Jinja
+[194 / 452] HuggingFace
+[195 / 452] EventSource
+[198 / 452] ComplexModule
+[204 / 455] Hub
+[208 / 458] WebTransportQUICCore
+[211 / 458] Crypto
+[216 / 458] WebTransportCryptoApple
+[220 / 475] OrderedCollections
+[221 / 475] WebTransportTLSCore
+[222 / 475] WebTransportCryptoApple
+[224 / 475] ComplexModule
+[227 / 475] Jinja
+[236 / 479] Tokenizers
+[240 / 481] encuda-product
+[242 / 481] ArgumentParserToolInfo
+[246 / 496] Tokenizers
+[250 / 496] encuda-product
+[252 / 496] Tokenizers
+[255 / 496] encuda-product
+[259 / 497] Tokenizers
+[262 / 497] Tokenizers
+[265 / 497] ArgumentParser
+[269 / 497]
+[272 / 497] ArgumentParser
+[274 / 497] ArgumentParser
+[277 / 498] encuda-product
+[288 / 501] MLX
+[290 / 510] MLX
+[290 / 510] Cmlx
+[292 / 510] Cmlx
+[293 / 510] Cmlx
+[296 / 510] Cmlx
+[300 / 510] Cmlx
+[304 / 512] MLX
+[307 / 512] Cmlx
+[308 / 512] Cmlx
+[312 / 512] Cmlx
+[317 / 512] Cmlx
+[321 / 512] Cmlx
+[323 / 512] Cmlx
+[326 / 512] Cmlx
+[328 / 512] Cmlx
+[330 / 512] Cmlx
+[331 / 512] Cmlx
+[333 / 512] Cmlx
+[337 / 512] Cmlx
+[338 / 512] Cmlx
+[340 / 512] Cmlx
+[344 / 512] Cmlx
+[345 / 512] Cmlx
+[347 / 512] Cmlx
+[348 / 512] Cmlx
+[354 / 512] Cmlx
+[356 / 512] Cmlx
+[358 / 512] Cmlx
+[359 / 512] Cmlx
+[360 / 512] Cmlx
+[361 / 512] Cmlx
+[362 / 512] Cmlx
+[363 / 512] Cmlx
+[364 / 512] Cmlx
+[368 / 512] Cmlx
+[369 / 512] Cmlx
+[372 / 512] Cmlx
+[374 / 512] Cmlx
+[375 / 512] Cmlx
+[377 / 512] Cmlx
+[378 / 512] Cmlx
+[379 / 512] Cmlx
+[382 / 512] Cmlx
+[383 / 512] Cmlx
+[385 / 512] Cmlx
+[387 / 512] Cmlx
+[389 / 512] Cmlx
+[391 / 512] Cmlx
+[393 / 512] Cmlx
+[395 / 512] Cmlx
+[396 / 512] Cmlx
+[400 / 512] Cmlx
+[407 / 512] Cmlx
+[410 / 512] Cmlx
+[411 / 512] Cmlx
+[413 / 512] Cmlx
+[414 / 512] Cmlx
+[417 / 512] Cmlx
+[419 / 512] Cmlx
+[420 / 512] Cmlx
+[421 / 512] Cmlx
+[422 / 512] Cmlx
+[425 / 512] Cmlx
+[426 / 512] Cmlx
+[427 / 512] Cmlx
+[428 / 512] Cmlx
+[430 / 512] Cmlx
+[432 / 512] Cmlx
+[433 / 512] Cmlx
+[435 / 512] Cmlx
+[436 / 512] Cmlx
+[437 / 512] Cmlx
+[440 / 512] Cmlx
+[441 / 512] Cmlx
+[444 / 512] Cmlx
+[445 / 512] Cmlx
+[446 / 512] Cmlx
+[447 / 512] Cmlx
+[448 / 512] Cmlx
+[449 / 512] Cmlx
+[450 / 512] Cmlx
+[451 / 512] Cmlx
+[453 / 512] Cmlx
+[458 / 512] Cmlx
+[460 / 512] Cmlx
+[462 / 512] Cmlx
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+[464 / 511] Cmlx
+[466 / 511] MLX
+[467 / 511] MLX
+[469 / 513] MLXNN
+[471 / 513] MLXNN
+[472 / 522] MLX
+[476 / 522] MLX
+[478 / 522] MLXNN
+[481 / 522] MLXNN
+[486 / 524] Cmlx
+[489 / 526] MLXNN
+[492 / 529] MLXOptimizers
+[495 / 532] MLX
+[496 / 532] MLXLMCommon
+[502 / 541] MLXLMCommon
+[503 / 541] MLXLMCommon
+[509 / 543] MLXLMCommon
+[512 / 548] MLXLLM
+[513 / 548] MLXHuggingFaceMacros
+[516 / 560] MLXHuggingFace
+[518 / 562] MLXHuggingFace
+[519 / 571] MLXLLM
+[519 / 571] MLXHuggingFace
+[520 / 571] MLXLMCommon
+[522 / 572] MLXLMCommon
+[524 / 572] MLXVLM
+[525 / 572] MLXLMCommon
+[528 / 574] MLXVLM
+[530 / 574] MLXVLM
+[536 / 576] MLXVLM
+[537 / 576] MLXVLM
+[538 / 576] MLXLLM
+[539 / 576] Cmlx
+[541 / 576] Cmlx
+[543 / 576] MLXLLM
+[544 / 576] MLXHuggingFace
+[546 / 579] ChatBotsCore
+[546 / 579] MLXLLM
+[549 / 579] MLXNN
+[552 / 579] MLXHuggingFace
+[554 / 590]
+[557 / 590] ChatBotsCore
+[558 / 590] MLXVLM
+[559 / 590] MLXLLM
+[561 / 590] MLXVLM
+[564 / 590] ChatBotsCore
+[568 / 590] MLXLLM
+[572 / 595] MLXVLM
+[574 / 602] chatbots-cli-product
+[576 / 604] chatbots-probe-product
+[577 / 604] ChatBots
+[578 / 604] chatbots-probe-product
+[579 / 613] chatbots-cli-product
+[580 / 622] ChatBots-product
+[581 / 622] chatbots-cli-product
+[581 / 631] chatbots-probe-product
+[584 / 631] chatbots-probe-product
+[587 / 631] chatbots-cli-product
+[588 / 631] chatbots-cli-product
+[590 / 631] chatbots-cli-product
+[593 / 631] ChatBots-product
+[594 / 631] ChatBots-product
+[595 / 631] ChatBots-product
+[595 / 631] chatbots-cli-product
+[599 / 631] ChatBots
+[600 / 631] ChatBots-product
+[603 / 631] ChatBotsCore
+[604 / 631] ChatBotsCore
+[606 / 632] ChatBots-product
+[608 / 632] ChatBots-product
+[609 / 638] ChatBots-product
+[610 / 638] ChatBots
+[612 / 638] ChatBots
+[612 / 638]
+[615 / 635] ChatBotsCoreTests-product
+[616 / 635] ChatBotsCore-product
+[617 / 635] ChatBotsCoreTests-product
+[619 / 637] ChatBotsCoreTests-product
+[624 / 646] ChatBots
+[626 / 646] ChatBots
+[628 / 646] ChatBotsCoreTests-product
+[631 / 646] ChatBots
+[632 / 648] ChatBots-product
+[633 / 648] ChatBots-product
+[636 / 644] ChatBotsAppTests-product
+[640 / 653] ChatBotsAppTests-product
+[641 / 653] ChatBotsAppTests-product
+[644 / 653] ChatBotsAppTests-product
+[645 / 653] ChatBotsAppTests-product
+[646 / 653] chatbots-cli-product
+[651 / 657] ChatBotsAppTests-product
+[653 / 660] ChatBotsCoreTests-product
+[653 / 660] ChatBotsAppTests-product
+[654 / 660] ChatBotsAppTests-product
+[655 / 660] ChatBotsCoreTests-product
+[656 / 660] chatbots-cli-product
+[658 / 661] chatbots-probe-product
+[659 / 662] ChatBotsCoreTests-product
+[661 / 665] ChatBotsCoreTests-product
+[663 / 665] ChatBotsCoreTests-product
+Build complete! (95,28 secs)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "A configured endpoint is checked before anything is sent to it" started.
+◇ Suite "An unloaded seat still behaves" started.
+◇ Suite "Turn-loop rules without a model" started.
+◇ Suite "The MLX gate serialises access" started.
+◇ Test "The endpoints this app is actually for are allowed" started.
+◇ Suite "Responses API requests" started.
+◇ Suite "An attachment can be removed while the conversation runs" started.
+◇ Suite "The API trace switch" started.
+◇ Test "Live changes move currentSpec and leave spec alone" started.
+◇ Test "Engine state reports readiness only for ready" started.
+◇ Test "A fresh seat reports its spec and is not loaded" started.
+◇ Test "The models probe uses the same policy and the same redirect refusal as generation" started.
+◇ Test "A base URL that is not http or https is refused" started.
+◇ Suite "A key read from a CRLF file is usable" started.
+◇ Test "Unloading an unloaded seat reports idle" started.
+◇ Test "A seat built with one engine answers on either backend" started.
+◇ Test "A redirect is not followed" started.
+◇ Test "Parameter-set inference matches the host, not a substring" started.
+◇ Test "A refused endpoint fails as itself, and says which rule refused it" started.
+◇ Test "A link-local address is refused however it is spelled" started.
+◇ Test "A link-local address is refused" started.
+◇ Test "Only decodable images reach the engine" started.
+◇ Test "A base URL's query or fragment does not swallow the API path" started.
+◇ Test "A finished turn reports at most the failures it earned, in order" started.
+◇ Test "A stray delimiter or echoed speaker tag is removed from the answer" started.
+◇ Test "The tool round is framed as assistant calls, results, then a user turn" started.
+◇ Test "The stop reason is reported as the template's own word" started.
+◇ Test "The model's tool spec carries the provider's own description" started.
+◇ Test "Attachments keep only what the engine can actually use" started.
+◇ Test "Statistics are derived from the info event" started.
+◇ Test "Exclusive access returns what the body returned" started.
+◇ Test "Two exclusive bodies never overlap" started.
+◇ Test "A throwing body still releases the gate" started.
+◇ Test "Thinking off keeps a smaller floor, since nothing is being reasoned" started.
+◇ Test "Asking for reasoning text also asks for the effort" started.
+◇ Test "The effort is sent even when the reasoning text is not wanted" started.
+◇ Test "Every thinking level maps to an effort the server understands" started.
+◇ Test "A generous answer budget is not lowered" started.
+◇ Test "Clearing them once the conversation has started is refused the same way" started.
+◇ Test "The output ceiling leaves room for reasoning, which shares it" started.
+◇ Test "Removing an attachment once the conversation has started is refused, not silently ignored" started.
+◇ Test "Only a value that means 'on' turns the trace on" started.
+◇ Test "The id is matched as a UUID, so a lowercased one still removes the file" started.
+◇ Test "Before the conversation starts, removing works and says so" started.
+◇ Test "Adding a second file mid-run is refused too, which is why the flag gates both" started.
+◇ Test "A CRLF environment variable is normalised too" started.
+◇ Test "Lone carriage returns and a missing final newline still parse" started.
+◇ Test "A CRLF file is split into its lines, comments included" started.
+◇ Test "Quoted values survive CRLF and are unquoted" started.
+◇ Test "Both key paths agree about the same CRLF file" started.
+◇ Test "A CRLF file yields values with no carriage return" started.
+◇ Test "A value that is only a line ending counts as no key" started.
+✔ Test "Engine state reports readiness only for ready" passed after 0.001 seconds.
+✔ Test "A base URL that is not http or https is refused" passed after 0.001 seconds.
+✔ Test "Live changes move currentSpec and leave spec alone" passed after 0.001 seconds.
+✔ Test "Parameter-set inference matches the host, not a substring" passed after 0.001 seconds.
+✔ Test "The endpoints this app is actually for are allowed" passed after 0.001 seconds.
+✔ Test "A base URL's query or fragment does not swallow the API path" passed after 0.001 seconds.
+✔ Test "Unloading an unloaded seat reports idle" passed after 0.001 seconds.
+✔ Test "A link-local address is refused however it is spelled" passed after 0.001 seconds.
+✔ Test "A link-local address is refused" passed after 0.001 seconds.
+✔ Test "A stray delimiter or echoed speaker tag is removed from the answer" passed after 0.001 seconds.
+✔ Test "A finished turn reports at most the failures it earned, in order" passed after 0.001 seconds.
+✔ Test "The stop reason is reported as the template's own word" passed after 0.001 seconds.
+✔ Test "The model's tool spec carries the provider's own description" passed after 0.001 seconds.
+✔ Test "The tool round is framed as assistant calls, results, then a user turn" passed after 0.001 seconds.
+✔ Test "Statistics are derived from the info event" passed after 0.005 seconds.
+✔ Test "Exclusive access returns what the body returned" passed after 0.005 seconds.
+✔ Test "A throwing body still releases the gate" passed after 0.005 seconds.
+✔ Test "A fresh seat reports its spec and is not loaded" passed after 0.006 seconds.
+✔ Test "Thinking off keeps a smaller floor, since nothing is being reasoned" passed after 0.005 seconds.
+✔ Test "Every thinking level maps to an effort the server understands" passed after 0.005 seconds.
+✔ Test "A seat built with one engine answers on either backend" passed after 0.006 seconds.
+✔ Test "A generous answer budget is not lowered" passed after 0.005 seconds.
+✔ Test "The output ceiling leaves room for reasoning, which shares it" passed after 0.005 seconds.
+✔ Test "Only a value that means 'on' turns the trace on" passed after 0.005 seconds.
+✔ Test "A CRLF environment variable is normalised too" passed after 0.005 seconds.
+✔ Test "Lone carriage returns and a missing final newline still parse" passed after 0.005 seconds.
+✔ Test "A CRLF file is split into its lines, comments included" passed after 0.005 seconds.
+✔ Test "Quoted values survive CRLF and are unquoted" passed after 0.005 seconds.
+✔ Test "Both key paths agree about the same CRLF file" passed after 0.005 seconds.
+✔ Test "A CRLF file yields values with no carriage return" passed after 0.005 seconds.
+✔ Test "A value that is only a line ending counts as no key" passed after 0.005 seconds.
+✔ Suite "A key read from a CRLF file is usable" passed after 0.006 seconds.
+◇ Test "The trace names the destination without userinfo, query or fragment" started.
+✔ Test "The trace names the destination without userinfo, query or fragment" passed after 0.001 seconds.
+◇ Test "Switching it on prints a bounded body with the image payloads left out" started.
+✔ Test "Switching it on prints a bounded body with the image payloads left out" passed after 0.009 seconds.
+◇ Test "A body that fits is traced whole, so the switch still shows what was sent" started.
+✔ Test "A body that fits is traced whole, so the switch still shows what was sent" passed after 0.002 seconds.
+◇ Test "Switching it off prints nothing at all" started.
+✔ Test "Switching it off prints nothing at all" passed after 0.001 seconds.
+✔ Suite "The API trace switch" passed after 0.019 seconds.
+✔ Test "Two exclusive bodies never overlap" passed after 0.027 seconds.
+✔ Suite "The MLX gate serialises access" passed after 0.028 seconds.
+[ChatBots] Agent 1 could not read the attached image broken.png
+[ChatBots] Agent 1 could not read the attached image broken.png
+✔ Test "Only decodable images reach the engine" passed after 0.039 seconds.
+✔ Suite "Turn-loop rules without a model" passed after 0.040 seconds.
+✔ Test "Attachments keep only what the engine can actually use" passed after 0.039 seconds.
+✔ Suite "An unloaded seat still behaves" passed after 0.040 seconds.
+✔ Test "Clearing them once the conversation has started is refused the same way" passed after 0.049 seconds.
+✔ Test "Removing an attachment once the conversation has started is refused, not silently ignored" passed after 0.049 seconds.
+✔ Test "Adding a second file mid-run is refused too, which is why the flag gates both" passed after 0.049 seconds.
+✔ Suite "An attachment can be removed while the conversation runs" passed after 0.050 seconds.
+✔ Test run with 48 tests in 8 suites passed after 0.050 seconds.
+EXIT=0

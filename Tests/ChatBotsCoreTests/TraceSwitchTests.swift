@@ -53,13 +53,26 @@ struct TraceSwitchTests {
 
     @Test("Only a value that means 'on' turns the trace on")
     func truthiness() {
-        // The defect: `!= nil` meant every one of these turned it on.
-        for off in [nil, "", "0", "false", "FALSE", "no", "  "] {
+        // The defect: `!= nil` meant every one of these turned it on. `off` and its synonyms
+        // were a second defect: outside the off-list, `off` turned the trace on.
+        for off in [nil, "", "0", "false", "FALSE", "no", "off", "OFF", "Off", "disabled", "none", "  "] {
             #expect(!OpenAIResponsesClient.traceIsOn(off), "\(off ?? "nil") must not enable the trace")
         }
         for on in ["1", "true", "yes", "on", "anything"] {
             #expect(OpenAIResponsesClient.traceIsOn(on), "\(on) must enable the trace")
         }
+    }
+
+    @Test("The trace names the destination without userinfo, query or fragment")
+    func traceURLDropsCredentials() {
+        // `absoluteString` printed a key a user embedded in the base URL, which SECURITY.md
+        // says the trace does not do.
+        let url = URL(string: "https://user:sk-secret@api.example.com/v1/responses?api_key=sk-q#frag")!
+        let safe = OpenAIResponsesClient.traceSafeURL(url)
+        #expect(!safe.contains("sk-secret"), "the userinfo password must not be printed")
+        #expect(!safe.contains("api_key"), "the query must not be printed")
+        #expect(!safe.contains("frag"), "the fragment must not be printed")
+        #expect(safe == "https://api.example.com/v1/responses")
     }
 
     @Test("Switching it on prints a bounded body with the image payloads left out")

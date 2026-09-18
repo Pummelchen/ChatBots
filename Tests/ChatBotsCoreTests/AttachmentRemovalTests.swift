@@ -88,6 +88,19 @@ struct AttachmentRemovalTests {
         let reply = await service.handle(.addAttachment(filename: "second.txt", contents: Data("x".utf8)))
         #expect(reply.refusal != nil, "a running conversation does not take new source material")
     }
+
+    @Test("The id is matched as a UUID, so a lowercased one still removes the file")
+    func lowercaseIDStillRemoves() async {
+        let (service, engine) = makeService()
+        await attached(service, engine)
+        // `UUID(uuidString:)` is case-insensitive while `uuidString` is uppercase, so a client
+        // that echoed the id lowercased passed the validity guard and then matched nothing.
+        let id = engine.attachments[0].id.uuidString.lowercased()
+
+        let reply = await service.handle(.removeAttachment(id: id))
+        #expect(reply.refusal == nil, "a valid id in a different case is still the same file")
+        #expect(engine.attachments.isEmpty)
+    }
 }
 
 /// A seat that produces nothing, so these tests are about the attachment rules.

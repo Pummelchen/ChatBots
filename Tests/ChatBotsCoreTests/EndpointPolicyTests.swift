@@ -39,6 +39,50 @@ struct EndpointPolicyTests {
         #expect(refusal("http://[fe80::1]") != nil)
     }
 
+    @Test("A link-local address is refused however it is spelled")
+    func linkLocalSpellingsAreRefused() {
+        // The prefix check matched the dotted-quad form only. `url.host` strips the brackets,
+        // so the IPv4-mapped IPv6 form reached the metadata service, and the integer/hex IPv4
+        // forms CFNetwork accepts did too.
+        #expect(refusal("http://[::ffff:169.254.169.254]") != nil, "IPv4-mapped IPv6")
+        #expect(refusal("http://[0:0:0:0:0:ffff:a9fe:a9fe]") != nil, "the same address, expanded")
+        #expect(refusal("http://[::ffff:169.254.0.1]:8080") != nil)
+        #expect(refusal("http://2852039166") != nil, "169.254.169.254 as a decimal integer")
+        #expect(refusal("http://0xA9FEA9FE") != nil, "the same address as hex")
+        // The mapped form of a *non*-link-local address is still allowed, so the rule is not
+        // a blanket refusal of mapped addresses.
+        #expect(refusal("http://[::ffff:127.0.0.1]:1234") == nil, "mapped loopback stays usable")
+        #expect(refusal("http://192.168.1.10") == nil)
+    }
+
+    @Test("A base URL's query or fragment does not swallow the API path")
+    func queryOrFragmentDoesNotLoseThePath() {
+        // Concatenating text made `https://host?x=1` put the path in the query and send the
+        // request to `/`; the failure looked like a server problem.
+        #expect(
+            OpenAIEndpoint(baseURL: "https://host.example#frag").responsesURL?.absoluteString
+                == "https://host.example/v1/responses")
+        #expect(
+            OpenAIEndpoint(baseURL: "https://host.example?x=1").responsesURL?.absoluteString
+                == "https://host.example/v1/responses")
+        #expect(
+            OpenAIEndpoint(baseURL: "https://host.example/v1?x=1").modelsURL?.absoluteString
+                == "https://host.example/v1/models")
+    }
+
+    @Test("Parameter-set inference matches the host, not a substring")
+    func compatibilityMatchesTheHost() {
+        #expect(APICompatibility.inferred(fromBaseURL: "https://api.openai.com") == .strict)
+        #expect(APICompatibility.inferred(fromBaseURL: "https://team.openai.azure.com") == .strict)
+        #expect(APICompatibility.inferred(fromBaseURL: "https://openrouter.ai/api/v1") == .strict)
+        // A lookalike host and a local engine are both extended, not strict.
+        #expect(
+            APICompatibility.inferred(fromBaseURL: "https://api.openai.com.evil.test") == .extended)
+        #expect(
+            APICompatibility.inferred(fromBaseURL: "https://evil.test/?x=api.openai.com") == .extended)
+        #expect(APICompatibility.inferred(fromBaseURL: "http://localhost:1234") == .extended)
+    }
+
     @Test("The endpoints this app is actually for are allowed")
     func localAndLANEndpointsStillWork() {
         // Refusing these would close the finding by breaking the product.

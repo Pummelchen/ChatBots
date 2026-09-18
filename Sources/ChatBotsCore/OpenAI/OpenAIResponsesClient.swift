@@ -199,7 +199,25 @@ public struct OpenAIResponsesClient: Sendable {
     static func traceIsOn(_ value: String?) -> Bool {
         guard let value else { return false }
         let lowered = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return !(lowered.isEmpty || lowered == "0" || lowered == "false" || lowered == "no")
+        // `off`, `disabled` and `none` were outside this list, so `CHATBOTS_TRACE_API=off` —
+        // the most natural way to write "do not print the conversation" — turned the trace
+        // **on**. An operator who writes `off` must get off.
+        let off: Set<String> = ["0", "false", "no", "off", "disabled", "none"]
+        return !(lowered.isEmpty || off.contains(lowered))
+    }
+
+    /// The URL with userinfo, query and fragment removed, for the trace line.
+    ///
+    /// `absoluteString` reproduced a credential a user had embedded in the base URL
+    /// (`https://user:sk-…@host`) or passed as a query parameter, while `SECURITY.md` says the
+    /// trace does not print the API key. The trace only needs the destination.
+    static func traceSafeURL(_ url: URL) -> String {
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.user = nil
+        components?.password = nil
+        components?.query = nil
+        components?.fragment = nil
+        return components?.string ?? "\(url.scheme ?? "?")://\(url.host ?? "?")\(url.path)"
     }
 
     private func endpointURL() throws -> URL {
@@ -263,7 +281,7 @@ public struct OpenAIResponsesClient: Sendable {
             (try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])) ?? Data()
         let text = String(data: encoded, encoding: .utf8) ?? "?"
         let preview = UTF8Text.prefix(text, Self.traceLimit)
-        let header = "[trace] POST \(url.absoluteString) (\(encoded.count) bytes\(omitted))\n"
+        let header = "[trace] POST \(Self.traceSafeURL(url)) (\(encoded.count) bytes\(omitted))\n"
         FileHandle.standardError.write(Data(header.utf8))
         FileHandle.standardError.write(Data("[trace] \(preview)\n".utf8))
     }

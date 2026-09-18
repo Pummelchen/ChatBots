@@ -207,7 +207,7 @@ extension MLXEngine {
                     // what keeps a bad sampler setting from producing 32k tokens of noise.
                     if repetition.ingest(step.answer) {
                         loopDetected = true
-                        break rounds
+                        break chunks
                     }
 
                 case .toolCall(let call):
@@ -223,6 +223,12 @@ extension MLXEngine {
             if !tail.reasoning.isEmpty { stripperSpentItsBudget = true }
             answer += tail.answer
             await report(ThinkingStripper.Segment(reasoning: tail.reasoning, answer: tail.answer))
+
+            // The loop stop is taken here rather than at the detection above, so the
+            // held-back partial delimiter this flush exists for is not dropped: `break rounds`
+            // from inside the chunk loop skipped `assembler.finish()`, losing up to 7
+            // characters of the answer (`ThinkingStripper` holds `endDelimiter.count - 1`).
+            if loopDetected { break rounds }
 
             // A round the ceiling abandoned ends the turn here, whatever fragments arrived
             // while it was still inside reasoning. Dispatching a `.toolCall` collected in

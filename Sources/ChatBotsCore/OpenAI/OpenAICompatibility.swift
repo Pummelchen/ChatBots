@@ -25,13 +25,19 @@ public enum APICompatibility: String, Sendable, Codable, CaseIterable, Identifia
     }
 
     /// A sensible default from the URL: anything that is not OpenAI is probably local.
+    ///
+    /// Matched on the *host*, not the whole string. `contains` made
+    /// `https://api.openai.com.evil.test` and `https://evil.test/?x=api.openai.com` infer
+    /// `.strict`, silently dropping `top_k`/`min_p`/`repetition_penalty` for an endpoint that
+    /// was not OpenAI at all — the same mistake `BuiltInKeys.key` refuses to make about a key's
+    /// destination. Azure serves OpenAI from a per-resource subdomain
+    /// (`<name>.openai.azure.com`), which the suffix test allows with a label boundary.
     public static func inferred(fromBaseURL baseURL: String) -> APICompatibility {
-        let lowered = baseURL.lowercased()
-        let isOpenAI =
-            lowered.contains("api.openai.com")
-            || lowered.contains("openai.azure.com")
-            || lowered.contains("openrouter.ai")
-        return isOpenAI ? .strict : .extended
+        let trimmed = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let host = URL(string: trimmed)?.host?.lowercased() else { return .extended }
+        if ["api.openai.com", "openai.azure.com", "openrouter.ai"].contains(host) { return .strict }
+        if host.hasSuffix(".openai.azure.com") || host.hasSuffix(".openrouter.ai") { return .strict }
+        return .extended
     }
 }
 

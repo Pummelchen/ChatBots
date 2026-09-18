@@ -43,8 +43,10 @@ Worth knowing before you report, because several things that look like leaks are
   images left out — the trace line says how many were omitted — and it does not print the API key.
   Where that output ends up
   is wherever standard error goes — a terminal, or a log file you have pointed it at — so treat it as
-  writing the conversation to that place. Any value other than `0`, `false`, `no` or the empty string
-  turns it on.
+  writing the conversation to that place. The trace names only the destination — scheme, host
+  and path, with any userinfo, query and fragment removed — so a key embedded in the base URL
+  is not printed either. `0`, `false`, `no`, `off`, `disabled` and `none` (any case, surrounding
+  whitespace ignored) leave it off; any other value turns it on.
 
 ## The local trust boundary, stated honestly
 

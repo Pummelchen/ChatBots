@@ -238,10 +238,14 @@ public final class EngineService {
             // And an id that matches nothing is a refusal rather than a success, which is what `castVote`
             // already answered for the same shape of request. Filtering produced a state identical to the
             // one the caller had — a removal that never happened, reported as one that did.
-            guard UUID(uuidString: id) != nil else {
+            guard let attachmentID = UUID(uuidString: id) else {
                 return .refused("that is not a valid file id")
             }
-            let remaining = engine.attachments.filter { $0.id.uuidString != id }
+            // Compared as a UUID, not as text: `UUID(uuidString:)` is case-insensitive while
+            // `uuidString` is uppercase, so a client echoing the id lowercased passed the guard
+            // above and then matched nothing — "there is no attached file with that id" for a
+            // file that was attached. `castVote` already parses to a UUID for the same reason.
+            let remaining = engine.attachments.filter { $0.id != attachmentID }
             guard remaining.count != engine.attachments.count else {
                 return .refused("there is no attached file with that id")
             }

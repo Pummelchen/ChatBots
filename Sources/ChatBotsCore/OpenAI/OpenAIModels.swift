@@ -75,15 +75,7 @@ public struct OpenAIEndpoint: Sendable, Hashable, Codable {
     ///
     /// Nil when the endpoint is one this client will not send to, which is `endpointRefusal`'s
     /// decision rather than a parsing accident.
-    public var responsesURL: URL? {
-        var trimmed = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        while trimmed.hasSuffix("/") { trimmed.removeLast() }
-        guard !trimmed.isEmpty else { return nil }
-        let path = trimmed.hasSuffix("/v1") ? "/responses" : "/v1/responses"
-        guard let url = URL(string: trimmed + path) else { return nil }
-        guard Self.endpointRefusal(url) == nil else { return nil }
-        return url
-    }
+    public var responsesURL: URL? { Self.endpointURL(base: baseURL, suffix: "/responses") }
 
     /// The models endpoint, under the same endpoint policy `responsesURL` applies.
     ///
@@ -92,12 +84,24 @@ public struct OpenAIEndpoint: Sendable, Hashable, Codable {
     /// Authorization header was attached — so a `file://` or link-local base URL was fetched
     /// and a 302 was followed to a host the check never saw. Derived here so both paths share
     /// one rule rather than one path carrying it and the other not.
-    public var modelsURL: URL? {
-        var trimmed = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        while trimmed.hasSuffix("/") { trimmed.removeLast() }
-        guard !trimmed.isEmpty else { return nil }
-        let path = trimmed.hasSuffix("/v1") ? "/models" : "/v1/models"
-        guard let url = URL(string: trimmed + path) else { return nil }
+    public var modelsURL: URL? { Self.endpointURL(base: baseURL, suffix: "/models") }
+
+    /// A base URL and an API path joined into the endpoint, or nil when it is refused.
+    ///
+    /// Built through `URLComponents` rather than by concatenating text: a base URL carrying a
+    /// query or a fragment (`https://host.example?x=1`, `https://host.example#frag`) swallowed
+    /// the appended path, so the request went to `/` with the path in the query or fragment
+    /// and the failure looked like a server problem. The query and fragment are dropped here
+    /// because a base URL is a prefix for a path, not a complete URL.
+    static func endpointURL(base: String, suffix: String) -> URL? {
+        let trimmed = base.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, var components = URLComponents(string: trimmed) else { return nil }
+        components.query = nil
+        components.fragment = nil
+        var basePath = components.path
+        while basePath.hasSuffix("/") { basePath.removeLast() }
+        components.path = basePath.hasSuffix("/v1") ? basePath + suffix : basePath + "/v1" + suffix
+        guard let url = components.url else { return nil }
         guard Self.endpointRefusal(url) == nil else { return nil }
         return url
     }
@@ -122,8 +126,49 @@ public struct OpenAIEndpoint: Sendable, Hashable, Codable {
         guard let host = url.host?.lowercased(), !host.isEmpty else {
             return "the endpoint has no host"
         }
-        if host.hasPrefix("169.254.") || host.hasPrefix("fe80:") || host.hasPrefix("[fe80:") {
+        if Self.isLinkLocalLiteral(host) {
             return "it is link-local, which is where cloud metadata services answer"
+        }
+        return nil
+    }
+
+    /// Whether `host` is a literal address in a link-local range.
+    ///
+    /// A string prefix missed the IPv4-mapped IPv6 form: `url.host` for
+    /// `http://[::ffff:169.254.169.254]/` is the bare `::ffff:169.254.169.254` with the
+    /// brackets already stripped, so `hasPrefix("169.254.")` did not match it and the address
+    /// reached the metadata service anyway. The integer and hex IPv4 spellings CFNetwork also
+    /// accepts (`http://2852039166/`, `http://0xA9FEA9FE/`) were missed the same way. Parsed to
+    /// bytes, so the check is about the address rather than about how it was written.
+    static func isLinkLocalLiteral(_ host: String) -> Bool {
+        if host.contains(":") {
+            var bytes = [UInt8](repeating: 0, count: 16)
+            guard inet_pton(AF_INET6, host, &bytes) == 1 else { return false }
+            // fe80::/10
+            if bytes[0] == 0xfe, (bytes[1] & 0xc0) == 0x80 { return true }
+            // ::ffff:a.b.c.d, the IPv4-mapped range, whose IPv4 part is link-local.
+            let mapped = bytes[0..<10].allSatisfy { $0 == 0 } && bytes[10] == 0xff && bytes[11] == 0xff
+            if mapped { return bytes[12] == 169 && bytes[13] == 254 }
+            return false
+        }
+        guard let value = ipv4Integer(host) else { return false }
+        // 169.254.0.0/16
+        return (value >> 16) == 0xA9FE
+    }
+
+    /// The 32-bit value of an IPv4 literal in dotted-quad, decimal or `0x` hex form, or nil.
+    static func ipv4Integer(_ host: String) -> UInt32? {
+        var bytes = [UInt8](repeating: 0, count: 4)
+        if inet_pton(AF_INET, host, &bytes) == 1 {
+            return UInt32(bytes[0]) << 24 | UInt32(bytes[1]) << 16 | UInt32(bytes[2]) << 8
+                | UInt32(bytes[3])
+        }
+        if host.hasPrefix("0x") {
+            return UInt32(host.dropFirst(2), radix: 16)
+        }
+        if !host.isEmpty, host.allSatisfy(\.isNumber) {
+            // The decimal-integer form: 2852039166 is 169.254.169.254.
+            return UInt32(host)
         }
         return nil
     }
