@@ -224,10 +224,10 @@ public enum BuiltInKeys {
                     "[ChatBots] restricted \(url.lastPathComponent) to owner-only (0600); it holds API keys\n"
                         .utf8))
         } catch {
-            FileHandle.standardError.write(
-                Data(
-                    "[ChatBots] \(url.lastPathComponent) is readable by other users and could not be restricted: \(error.localizedDescription)\n"
-                        .utf8))
+            let message =
+                "[ChatBots] \(url.lastPathComponent) is readable by other users and could not be "
+                + "restricted: \(error.localizedDescription)\n"
+            FileHandle.standardError.write(Data(message.utf8))
         }
     }
 

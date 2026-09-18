@@ -26,25 +26,7 @@ extension ChatController {
 
         // The event stream delivers states and output fragments; it is started before the
         // first request so nothing that happens in between is missed.
-        var lastError: String?
-        for attempt in 0..<8 {
-            do {
-                try await client.connect()
-                lastError = nil
-                break
-            } catch {
-                lastError = error.localizedDescription
-                // Cancellation stops the retry: `try?` swallowed it, so the remaining attempts
-                // ran back to back with no delay and could still install the client — and start
-                // its pumps — after the view was gone.
-                if Task.isCancelled { return }
-                do {
-                    try await Task.sleep(for: .milliseconds(400 * (attempt + 1)))
-                } catch {
-                    return
-                }
-            }
-        }
+        let lastError = await connectWithRetries(client)
         guard !Task.isCancelled else { return }
         guard client.isConnected else {
             // A client that never connected is not a connection, so it is not stored: `client != nil`
@@ -106,6 +88,32 @@ extension ChatController {
                 }
             }
         )
+    }
+
+    /// Try to connect eight times with a growing delay, returning the last error.
+    ///
+    /// Extracted so `connect` stays inside its complexity budget, and because the retry and its
+    /// cancellation rule are one thing: a closed window must stop the loop rather than run the
+    /// remaining attempts back to back — `try?` swallowed the CancellationError, so the delay
+    /// vanished and the client could still be installed, with its pumps running, after the view
+    /// was gone.
+    private func connectWithRetries(_ client: WebTransportEngineClient) async -> String? {
+        var lastError: String?
+        for attempt in 0..<8 {
+            do {
+                try await client.connect()
+                return nil
+            } catch {
+                lastError = error.localizedDescription
+                if Task.isCancelled { return lastError }
+                do {
+                    try await Task.sleep(for: .milliseconds(400 * (attempt + 1)))
+                } catch {
+                    return lastError
+                }
+            }
+        }
+        return lastError
     }
 
     /// Stop drawing from the engine. The engine itself is the supervisor's business.

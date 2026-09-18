@@ -51,6 +51,11 @@ for tool in swift swiftlint swift-format xcrun jq node; do
     fi
 done
 
+# The commit this run measured. `tools/make-release.sh --gates-log` requires this line, so a
+# gate log produced on some other commit cannot be reused as evidence for this one.
+head_sha="$(git rev-parse HEAD 2>/dev/null || true)"
+printf 'mac-checks commit: %s\n' "${head_sha:-unknown}"
+
 logs=".build/mac-checks"
 mkdir -p "$logs"
 summary="$logs/summary.txt"

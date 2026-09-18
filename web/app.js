@@ -222,6 +222,10 @@ function wire() {
     // it must insert one.
     if (event.key === "Enter" && !event.shiftKey && document.body.dataset.device === "desktop") {
       event.preventDefault();
+      // The window handler below also matches Cmd/Ctrl+Enter and presses Start, which restarts
+      // and resets a running conversation — so one keystroke both sent the message and threw the
+      // room away. Stopping propagation keeps the modifier chord on this handler.
+      event.stopPropagation();
       send();
     }
   });
@@ -294,12 +298,20 @@ function wire() {
 
   wirePaneControls();
 
-  for (const container of containers()) {
-    container.addEventListener("scroll", () => {
-      const distance = container.scrollHeight - container.scrollTop - container.clientHeight;
-      state.follow = distance < 40;
-    }, { passive: true });
-  }
+  // Scroll events do not bubble, and the panes are created after this runs, so this listens in
+  // the capture phase on the document rather than attaching a listener to each container once
+  // at start-up. Attaching then only ever saw #thread — which the split layout hides — so
+  // `state.follow` was never set to false and every streaming delta pulled the pane to the
+  // bottom, making it impossible to read back while a reply arrived.
+  document.addEventListener("scroll", (event) => {
+    const container = event.target;
+    const isTranscript =
+      container === $("thread") ||
+      (container.classList && container.classList.contains("transcript"));
+    if (!isTranscript) return;
+    const distance = container.scrollHeight - container.scrollTop - container.clientHeight;
+    state.follow = distance < 40;
+  }, { capture: true, passive: true });
 
   window.addEventListener("keydown", (event) => {
     if (event.metaKey || event.ctrlKey) {

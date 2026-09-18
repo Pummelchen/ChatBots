@@ -175,6 +175,11 @@ if [ -n "$GATES_LOG" ]; then
     [ -f "$GATES_LOG" ] || die "--gates-log $GATES_LOG does not exist"
     cp "$GATES_LOG" "$STAGE/gates-reused.txt"
     grep -q 'Mac-only gates passed' "$GATES_LOG" || die "the reused gate log does not show a passing run"
+    # Bound to the commit. `Mac-only gates passed` is a string any file can contain; the line
+    # `mac-checks.sh` prints from `git rev-parse HEAD` is what makes the log evidence about
+    # *this* revision rather than text a caller supplied.
+    grep -q "mac-checks commit: $HEAD_SHA" "$GATES_LOG" \
+        || die "the reused gate log was not produced on this commit ($HEAD_SHA)"
     record "  gates reused from $GATES_LOG (recorded in gates-reused.txt)"
 else
     bash tools/check-identity.sh | tee "$STAGE/identity.txt"

@@ -116,31 +116,39 @@ public struct FetchPageTool: ToolProvider {
     /// spellings are parsed rather than prefix-matched.
     static func hostRefusal(_ host: String) -> String? {
         let lowered = host.lowercased()
-        if let value = OpenAIEndpoint.ipv4Integer(lowered) {
-            let first = UInt8((value >> 24) & 0xff)
-            let second = UInt8((value >> 16) & 0xff)
-            switch (first, second) {
-            case (0, _): return "it is not a routable address"
-            case (10, _), (127, _): return "it is a private or loopback address"
-            case (169, 254): return "it is link-local"
-            case (172, 16...31), (192, 168): return "it is a private address"
-            default: return nil
-            }
-        }
+        if let value = OpenAIEndpoint.ipv4Integer(lowered) { return ipv4Refusal(value) }
         var bytes = [UInt8](repeating: 0, count: 16)
         if lowered.contains(":"), inet_pton(AF_INET6, lowered, &bytes) == 1 {
-            if bytes[0..<15].allSatisfy({ $0 == 0 }), bytes[15] == 1 { return "it is loopback" }
-            if bytes[0] == 0xfe, (bytes[1] & 0xc0) == 0x80 { return "it is link-local" }
-            if (bytes[0] & 0xfe) == 0xfc { return "it is a private address" }
-            let mapped =
-                bytes[0..<10].allSatisfy { $0 == 0 } && bytes[10] == 0xff && bytes[11] == 0xff
-            if mapped {
-                return hostRefusal("\(bytes[12]).\(bytes[13]).\(bytes[14]).\(bytes[15])")
-            }
-            return nil
+            return ipv6Refusal(bytes)
         }
         if lowered == "localhost" || lowered.hasSuffix(".localhost") { return "it is loopback" }
         return nil
+    }
+
+    /// Why an IPv4 literal is not one this tool will fetch, or nil.
+    private static func ipv4Refusal(_ value: UInt32) -> String? {
+        let first = UInt8((value >> 24) & 0xff)
+        let second = UInt8((value >> 16) & 0xff)
+        switch (first, second) {
+        case (0, _): return "it is not a routable address"
+        case (10, _), (127, _): return "it is a private or loopback address"
+        case (169, 254): return "it is link-local"
+        case (172, 16...31), (192, 168): return "it is a private address"
+        default: return nil
+        }
+    }
+
+    /// Why an IPv6 literal is not one this tool will fetch, or nil.
+    private static func ipv6Refusal(_ bytes: [UInt8]) -> String? {
+        if bytes[0..<15].allSatisfy({ $0 == 0 }), bytes[15] == 1 { return "it is loopback" }
+        if bytes[0] == 0xfe, (bytes[1] & 0xc0) == 0x80 { return "it is link-local" }
+        if (bytes[0] & 0xfe) == 0xfc { return "it is a private address" }
+        let mapped = bytes[0..<10].allSatisfy { $0 == 0 } && bytes[10] == 0xff && bytes[11] == 0xff
+        guard mapped else { return nil }
+        // ::ffff:a.b.c.d — the IPv4 part carries the meaning.
+        return ipv4Refusal(
+            UInt32(bytes[12]) << 24 | UInt32(bytes[13]) << 16 | UInt32(bytes[14]) << 8
+                | UInt32(bytes[15]))
     }
 
     public func run(argument: String) async throws -> ToolOutcome {

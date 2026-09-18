@@ -38,6 +38,22 @@ public enum ResearchReporting {
             .replacingOccurrences(of: "=====", with: "-----")
     }
 
+    /// A caller-supplied value that has to stay on one prompt line.
+    ///
+    /// The topic and the seat display names are settable through the unauthenticated API, and
+    /// they were interpolated raw into the synthesis prompt — so a value containing a newline
+    /// plus the fence token could draw a second transcript boundary ahead of the real one, with
+    /// whatever instructions the attacker liked inside it. Flattened to a single line and run
+    /// through the same boundary neutralisation as the transcript itself.
+    static func inline(_ value: String) -> String {
+        let flattened =
+            value
+            .replacingOccurrences(of: "\r\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+            .replacingOccurrences(of: "\n", with: " ")
+        return fencedTranscript(flattened)
+    }
+
     /// Remove the app's boundary, and anything the model echoed between a BEGIN and END fence.
     ///
     /// `fencedTranscript` removes the fence's token from the transcript before it is embedded,
@@ -110,9 +126,9 @@ public enum ResearchReporting {
             You are the Research Moderator. The investigation is finished and your job now is \
             to write the report. You are organising what the analysts found, not adding to it.
 
-            The question was: \(question)
-            The analysts were: \(participants.joined(separator: ", "))
-            The investigation ended because: \(stopReason)
+            The question was: \(inline(question))
+            The analysts were: \(participants.map(inline).joined(separator: ", "))
+            The investigation ended because: \(inline(stopReason))
 
             Write the report with exactly these sections, in this order, using the headings \
             verbatim:

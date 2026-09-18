@@ -1,0 +1,155 @@
+Building for debugging...
+[Computing dependencies]
+[Using on-disk description]
+[1 / 52] RealModule
+[2 / 21] ChatBotsCore
+[6 / 25] ChatBotsCore
+[8 / 27] ChatBotsCore
+[17 / 35] ChatBotsCore
+[21 / 38] ChatBotsCore-product
+[21 / 38] chatbots-probe-product
+[23 / 38] ChatBots
+[27 / 39] chatbots-cli-product
+[29 / 39] chatbots-probe-product
+[30 / 41] ChatBotsCoreTests-product
+[30 / 41] chatbots-probe-product
+[38 / 49] chatbots-cli-product
+[38 / 51] chatbots-cli-product
+[42 / 50] ChatBotsCoreTests-product
+[44 / 54] ChatBotsCoreTests-product
+[46 / 54] ChatBotsCoreTests-product
+[48 / 55] ChatBotsAppTests-product
+[49 / 55] ChatBotsAppTests-product
+[51 / 60] ChatBotsCoreTests-product
+[51 / 60] ChatBotsAppTests-product
+[53 / 60] ChatBotsAppTests-product
+[54 / 60] chatbots-cli-product
+[57 / 62] chatbots-probe-product
+[57 / 62] ChatBotsCoreTests-product
+[63 / 67] ChatBotsCoreTests-product
+[65 / 67] ChatBotsCoreTests-product
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+Build complete! (11,26 secs)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "A finished research conversation is not reported twice" started.
+◇ Suite "A report's claims can be traced to an analyst" started.
+◇ Suite "When a research session stops" started.
+◇ Suite "The synthesis instruction" started.
+◇ Suite "Unlabelled claims are counted against the report" started.
+◇ Suite "The topic and source material are user-role data" started.
+◇ Suite "The research report" started.
+◇ Test "A session saved mid-run is still resumed rather than suppressed" started.
+◇ Suite "The moderator's brief uses the room's own mode" started.
+◇ Suite "Research budget" started.
+◇ Test "An unattributed claim is marked rather than silently kept" started.
+◇ Test "A trailing attribution names the analyst" started.
+◇ Test "Reopening a finished session and pressing Start writes no second report" started.
+◇ Test "Two analysts in one sentence is left unattributed rather than guessed between" started.
+◇ Test "A report with no labels at all is not called traceable" started.
+◇ Test "Prose after a dash is not read as a name" started.
+◇ Test "The prompt requires labels and forbids inventing findings" started.
+◇ Test "A fully attributed report carries no traceability warning" started.
+◇ Test "The prompt asks for every required section, by name" started.
+◇ Test "The transcript is included" started.
+◇ Test "A session survives a save and reload, keeping its clock and counters" started.
+◇ Test "The prompt tells the moderator it is organising, not adding" started.
+◇ Test "A single analyst named in the sentence is an attribution" started.
+◇ Test "A claim attributed to somebody who was not in the room is named as such" started.
+◇ Test "A crafted topic is not system-role instruction" started.
+◇ Test "The status line reports progress while running and the reason once finished" started.
+◇ Test "A claim section with no labels at all is still not labelled" started.
+◇ Test "The moderator can stop it, and a finished session does not restart" started.
+◇ Test "Prose in a section that is not a claim is not an unlabelled claim" started.
+◇ Test "A run of contributions that add nothing is read as convergence" started.
+◇ Test "One labelled claim beside fifty bare assertions is not labelled" started.
+◇ Test "A crafted topic or seat name cannot draw a second transcript fence" started.
+◇ Test "A stopped session still counts as finished, so a report is written" started.
+◇ Test "A crafted document is not system-role instruction" started.
+◇ Test "Reaching the time budget stops it, without any rounds" started.
+◇ Test "A document cannot forge the app's fence" started.
+◇ Test "The markdown carries the question, the budget and the reason it stopped" started.
+◇ Test "Section headings are matched however the model words them" started.
+◇ Test "A deeper session tolerates more quiet turns before giving up" started.
+◇ Test "A report survives a save and reload" started.
+◇ Test "Prose with no headings is still kept as a summary" started.
+◇ Test "The markdown says how many claims carry no label" started.
+◇ Test "A document name cannot start a line of app text" started.
+◇ Test "Missing sections are named, not quietly omitted" started.
+◇ Test "Reaching the round budget stops it" started.
+◇ Test "A report with no claims at all is not called labelled" started.
+◇ Test "Reaching the search budget stops it" started.
+◇ Test "Only fact and sourced count as reliable" started.
+◇ Test "Markdown emphasis around a label is tolerated" started.
+◇ Test "A fresh session is running" started.
+◇ Test "Labelled claims are read with their labels" started.
+◇ Test "One contribution that adds something resets the convergence count" started.
+◇ Test "A report with no labels is reported as unlabelled rather than rejected" started.
+◇ Test "A research run does not describe the moderator as a reality-show character" started.
+◇ Test "A research persona is found in the research library" started.
+◇ Test "An entertainment run still resolves an entertainment persona" started.
+◇ Test "A custom duration scales the other limits to match" started.
+◇ Test "An entertainment persona is not substituted into a research briefing" started.
+◇ Test "The presets match the brief" started.
+✔ Test "Two analysts in one sentence is left unattributed rather than guessed between" passed after 0.003 seconds.
+✔ Test "Prose after a dash is not read as a name" passed after 0.003 seconds.
+✔ Test "The transcript is included" passed after 0.003 seconds.
+✔ Test "A trailing attribution names the analyst" passed after 0.003 seconds.
+✔ Test "The prompt tells the moderator it is organising, not adding" passed after 0.003 seconds.
+✔ Test "A session survives a save and reload, keeping its clock and counters" passed after 0.003 seconds.
+✔ Test "The prompt asks for every required section, by name" passed after 0.003 seconds.
+✔ Test "A claim section with no labels at all is still not labelled" passed after 0.003 seconds.
+✔ Test "A single analyst named in the sentence is an attribution" passed after 0.003 seconds.
+✔ Test "The moderator can stop it, and a finished session does not restart" passed after 0.003 seconds.
+✔ Test "A run of contributions that add nothing is read as convergence" passed after 0.003 seconds.
+✔ Test "Prose in a section that is not a claim is not an unlabelled claim" passed after 0.003 seconds.
+✔ Test "The status line reports progress while running and the reason once finished" passed after 0.003 seconds.
+✔ Test "A stopped session still counts as finished, so a report is written" passed after 0.003 seconds.
+✔ Test "One labelled claim beside fifty bare assertions is not labelled" passed after 0.003 seconds.
+✔ Test "A report with no labels at all is not called traceable" passed after 0.003 seconds.
+✔ Test "A document cannot forge the app's fence" passed after 0.003 seconds.
+✔ Test "A crafted topic or seat name cannot draw a second transcript fence" passed after 0.003 seconds.
+✔ Test "A crafted topic is not system-role instruction" passed after 0.003 seconds.
+✔ Test "The prompt requires labels and forbids inventing findings" passed after 0.003 seconds.
+✔ Test "A deeper session tolerates more quiet turns before giving up" passed after 0.003 seconds.
+✔ Test "Reaching the time budget stops it, without any rounds" passed after 0.003 seconds.
+✔ Test "A crafted document is not system-role instruction" passed after 0.003 seconds.
+✔ Test "A document name cannot start a line of app text" passed after 0.003 seconds.
+✔ Test "Prose with no headings is still kept as a summary" passed after 0.003 seconds.
+✔ Test "Reaching the round budget stops it" passed after 0.003 seconds.
+✔ Test "Section headings are matched however the model words them" passed after 0.003 seconds.
+✔ Test "A fully attributed report carries no traceability warning" passed after 0.004 seconds.
+✔ Test "Reaching the search budget stops it" passed after 0.003 seconds.
+✔ Test "A report with no claims at all is not called labelled" passed after 0.003 seconds.
+✔ Test "Only fact and sourced count as reliable" passed after 0.003 seconds.
+✔ Test "A fresh session is running" passed after 0.003 seconds.
+✔ Test "One contribution that adds something resets the convergence count" passed after 0.003 seconds.
+✔ Test "An unattributed claim is marked rather than silently kept" passed after 0.004 seconds.
+✔ Test "A claim attributed to somebody who was not in the room is named as such" passed after 0.004 seconds.
+✔ Test "The markdown carries the question, the budget and the reason it stopped" passed after 0.003 seconds.
+✔ Test "Markdown emphasis around a label is tolerated" passed after 0.003 seconds.
+✔ Test "A report with no labels is reported as unlabelled rather than rejected" passed after 0.003 seconds.
+✔ Test "Labelled claims are read with their labels" passed after 0.003 seconds.
+✔ Test "A custom duration scales the other limits to match" passed after 0.003 seconds.
+✔ Test "The presets match the brief" passed after 0.003 seconds.
+✔ Test "A research run does not describe the moderator as a reality-show character" passed after 0.003 seconds.
+✔ Test "A research persona is found in the research library" passed after 0.003 seconds.
+✔ Test "An entertainment persona is not substituted into a research briefing" passed after 0.003 seconds.
+✔ Test "Missing sections are named, not quietly omitted" passed after 0.003 seconds.
+✔ Suite "Research budget" passed after 0.004 seconds.
+✔ Test "The markdown says how many claims carry no label" passed after 0.003 seconds.
+✔ Suite "The synthesis instruction" passed after 0.004 seconds.
+✔ Suite "A report's claims can be traced to an analyst" passed after 0.004 seconds.
+✔ Suite "The topic and source material are user-role data" passed after 0.004 seconds.
+✔ Suite "Unlabelled claims are counted against the report" passed after 0.004 seconds.
+✔ Suite "When a research session stops" passed after 0.004 seconds.
+✔ Test "A report survives a save and reload" passed after 0.003 seconds.
+✔ Suite "The research report" passed after 0.004 seconds.
+✔ Test "An entertainment run still resolves an entertainment persona" passed after 0.003 seconds.
+✔ Suite "The moderator's brief uses the room's own mode" passed after 0.004 seconds.
+✔ Test "Reopening a finished session and pressing Start writes no second report" passed after 0.014 seconds.
+✔ Test "A session saved mid-run is still resumed rather than suppressed" passed after 0.018 seconds.
+✔ Suite "A finished research conversation is not reported twice" passed after 0.018 seconds.
+✔ Test run with 50 tests in 9 suites passed after 0.018 seconds.
+EXIT=0
