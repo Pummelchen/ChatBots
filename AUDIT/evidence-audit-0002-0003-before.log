@@ -1,0 +1,122 @@
+Building for debugging...
+[Computing dependencies]
+[Using on-disk description]
+[1 / 2] swift-transformers_Hub
+[1 / 39] ArgumentParser
+[2 / 19] ChatBotsCore
+[4 / 25]
+[8 / 25] ChatBotsCore
+[13 / 18] ChatBotsCoreTests-product
+[16 / 21] ChatBotsCoreTests-product
+[18 / 23] ChatBotsCoreTests-product
+[24 / 28] ChatBotsCoreTests-product
+[26 / 28] ChatBotsCoreTests-product
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+Build complete! (9,85 secs)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test "Web tools are offered only to seats that enable them" started.
+◇ Test "Reset clears the log and the turn counters" started.
+◇ Suite "A sharded checkpoint is complete only with its shards" started.
+◇ Test "Introduction names the topic and every participant" started.
+◇ Test "Pause stops new turns; resume continues the rotation" started.
+◇ Test "Tool turns and thinking are kept out of the prompt log" started.
+◇ Test "Steering an idle conversation starts it" started.
+◇ Test "A turn prompt is a valid system+user pair carrying every tagged log entry" started.
+◇ Test "Mid-turn steering is queued, delivered once, and seen by both seats" started.
+◇ Test "Other seats are named in a seat's system message, never itself as an other" started.
+◇ Test "The opening log is topic then introduction, numbered in order" started.
+◇ Test "Each seat carries its own model id and sampling parameters" started.
+◇ Test "Start is refused without a topic" started.
+◇ Test "Turn limit pauses the loop instead of running forever" started.
+◇ Test "Seats alternate and both see the identical shared log" started.
+◇ Test "Seat B reads seat A's message in its prompt" started.
+◇ Test "A conversation the store cannot save is reported instead of silently lost" started.
+◇ Test "Stop ends the loop and leaves loaded weights alone" started.
+◇ Test "An index with none of its shards is not a usable checkpoint" started.
+✔ Test "Each seat carries its own model id and sampling parameters" passed after 0.001 seconds.
+✔ Test "Other seats are named in a seat's system message, never itself as an other" passed after 0.002 seconds.
+✔ Test "A turn prompt is a valid system+user pair carrying every tagged log entry" passed after 0.003 seconds.
+✔ Test "Tool turns and thinking are kept out of the prompt log" passed after 0.003 seconds.
+✔ Test "Introduction names the topic and every participant" passed after 0.003 seconds.
+✔ Test "An index with none of its shards is not a usable checkpoint" passed after 0.005 seconds.
+◇ Test "A model id is a name, not a path, so it cannot escape the models root" started.
+✘ Test "A conversation the store cannot save is reported instead of silently lost" recorded an issue at ConversationEngineTests.swift:435:5: Expectation failed: engine.notices.contains { $0.contains("could not be saved") }
+↳ a failed save must reach the notices the interface shows
+↳ engine.notices.contains { $0.contains("could not be saved") } → <not evaluated>
+✘ Test "A conversation the store cannot save is reported instead of silently lost" failed after 0.006 seconds with 1 issue.
+✔ Test "Stop ends the loop and leaves loaded weights alone" passed after 0.007 seconds.
+✔ Test "Start is refused without a topic" passed after 0.008 seconds.
+✔ Test "Turn limit pauses the loop instead of running forever" passed after 0.018 seconds.
+✔ Test "Web tools are offered only to seats that enable them" passed after 0.019 seconds.
+✔ Test "Reset clears the log and the turn counters" passed after 0.022 seconds.
+✔ Test "The opening log is topic then introduction, numbered in order" passed after 0.022 seconds.
+✔ Test "Seat B reads seat A's message in its prompt" passed after 0.022 seconds.
+✔ Test "Seats alternate and both see the identical shared log" passed after 0.022 seconds.
+✔ Test "Steering an idle conversation starts it" passed after 0.022 seconds.
+✘ Test "A model id is a name, not a path, so it cannot escape the models root" recorded an issue at ShardedCheckpointTests.swift:74:9: Expectation failed: ModelStore.localCheckpoint(for: outside.path, in: root) == nil
+↳ // The id arrives from the unauthenticated API via `POST /api/seat`.
+↳ ModelStore.localCheckpoint(for: outside.path, in: root) == nil → false
+↳   ModelStore.localCheckpoint(for: outside.path, in: root) → file:///var/folders/7l/ry9rvd3d72z864w_jd2my37m0000gn/T/chatbots-modelstore-audit-76DD723F-70E2-40F4-A725-8C1B8CEC85B2/outside/
+↳     some → file:///var/folders/7l/ry9rvd3d72z864w_jd2my37m0000gn/T/chatbots-modelstore-audit-76DD723F-70E2-40F4-A725-8C1B8CEC85B2/outside/
+↳       _url → Foundation._SwiftURL
+↳         _parseInfo → Foundation.URLParseInfo
+↳           urlString → "file:///var/folders/7l/ry9rvd3d72z864w_jd2my37m0000gn/T/chatbots-modelstore-audit-76DD723F-70E2-40F4-A725-8C1B8CEC85B2/outside/"
+↳           schemeRange → 0[any] ..< 4[utf8]
+↳             some → 0[any] ..< 4[utf8]
+↳               lowerBound → 0[any]
+↳                 _rawBits → 15
+↳               upperBound → 4[utf8]
+↳                 _rawBits → 262148
+↳           userRange → nil
+↳           passwordRange → nil
+↳           hostRange → 7[utf8] ..< 7[utf8]
+↳             some → 7[utf8] ..< 7[utf8]
+↳               lowerBound → 7[utf8]
+↳                 _rawBits → 458756
+↳               upperBound → 7[utf8]
+↳                 _rawBits → 458756
+↳           portRange → nil
+↳           pathRange → 7[utf8] ..< 127[utf8]
+↳             some → 7[utf8] ..< 127[utf8]
+↳               lowerBound → 7[utf8]
+↳                 _rawBits → 458756
+↳               upperBound → 127[utf8]
+↳                 _rawBits → 8323079
+↳           queryRange → nil
+↳           fragmentRange → nil
+↳           isIPLiteral → false
+↳           didPercentEncodeHost → false
+↳           pathHasFileID → false
+↳           encodedComponents → EncodedComponentSet(rawValue: 0)
+↳             rawValue → 0
+↳         _baseURL → nil
+↳         _encoding → Unicode (UTF-8)
+↳           rawValue → 4
+↳         _isCanonicalFileURL → true
+↳         _nsurlLock → ()
+✘ Test "A model id is a name, not a path, so it cannot escape the models root" recorded an issue at ShardedCheckpointTests.swift:75:9: Expectation failed: ModelStore.localCheckpoint(for: "../outside", in: root) == nil
+↳ ModelStore.localCheckpoint(for: "../outside", in: root) == nil → false
+↳   ModelStore.localCheckpoint(for: "../outside", in: root) → file:///var/folders/7l/ry9rvd3d72z864w_jd2my37m0000gn/T/chatbots-modelstore-audit-76DD723F-70E2-40F4-A725-8C1B8CEC85B2/models/../outside/
+↳     some → file:///var/folders/7l/ry9rvd3d72z864w_jd2my37m0000gn/T/chatbots-modelstore-audit-76DD723F-70E2-40F4-A725-8C1B8CEC85B2/models/../outside/
+↳       _url → file:///var/folders/7l/ry9rvd3d72z864w_jd2my37m0000gn/T/chatbots-modelstore-audit-76DD723F-70E2-40F4-A725-8C1B8CEC85B2/models/../outside/
+↳         _url → file:///var/folders/7l/ry9rvd3d72z864w_jd2my37m0000gn/T/chatbots-modelstore-audit-76DD723F-70E2-40F4-A725-8C1B8CEC85B2/models/../outside/
+✘ Test "A model id is a name, not a path, so it cannot escape the models root" failed after 0.081 seconds with 2 issues.
+◇ Test "An index missing one of its shards is not a usable checkpoint" started.
+✔ Test "An index missing one of its shards is not a usable checkpoint" passed after 0.002 seconds.
+◇ Test "An index with every shard beside it is a usable checkpoint" started.
+✔ Test "An index with every shard beside it is a usable checkpoint" passed after 0.002 seconds.
+◇ Test "An index that cannot be read proves nothing" started.
+✔ Test "An index that cannot be read proves nothing" passed after 0.001 seconds.
+◇ Test "An index naming a shard outside the directory is not complete" started.
+✔ Test "An index naming a shard outside the directory is not complete" passed after 0.001 seconds.
+◇ Test "A single-blob checkpoint is still complete without an index" started.
+✔ Test "A single-blob checkpoint is still complete without an index" passed after 0.002 seconds.
+✘ Suite "A sharded checkpoint is complete only with its shards" failed after 0.099 seconds with 2 issues.
+✔ Test "Mid-turn steering is queued, delivered once, and seen by both seats" passed after 0.144 seconds.
+✔ Test "Pause stops new turns; resume continues the rotation" passed after 0.347 seconds.
+✘ Test run with 24 tests in 1 suite failed after 0.347 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ChatBotsCoreTests (Swift Testing)
+EXIT=1

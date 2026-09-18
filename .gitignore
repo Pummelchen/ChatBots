@@ -4,8 +4,14 @@
 *.xcodeproj
 dist/
 
-# Downloaded checkpoints (multi-GB local data, never committed)
-models/
+# Downloaded checkpoints (multi-GB local data, never committed).
+#
+# Anchored to the repository root with a leading `/`. Unanchored, `models/` also matched
+# `Sources/ChatBotsCore/Models/` on a case-insensitive filesystem (the macOS default,
+# `core.ignorecase=true`), so a *new* source file added to the Models directory was
+# silently ignored by `git add` — the tracked files were unaffected, which is what made
+# it invisible until `git add` on a new one failed or skipped.
+/models/
 
 # Installer output. These are logs and caches rather than sources, and they contain
 # machine-specific paths.
@@ -15,8 +21,8 @@ models/
 # so `git status` was never clean after running the installer. A new log should not have to
 # be remembered in two places.
 .install*.log
-models/.huggingface-file-list.txt
-models/.hf-model.json
+/models/.huggingface-file-list.txt
+/models/.hf-model.json
 
 # Runtime state from tools/start.sh (pid files and logs)
 .run/

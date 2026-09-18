@@ -98,9 +98,16 @@ public enum ModelStore {
     /// A local directory holding a complete, flat checkpoint for `modelID`, if there is one.
     ///
     /// `modelID` may be a bare name (`Qwen3.5-4B-MLX-4bit`) or a repo id
-    /// (`mlx-community/Qwen3.5-4B-MLX-4bit`); both are tried, along with an exact path.
-    /// "Complete" means the files a load actually needs — a config, weights, and a
-    /// tokenizer — so a partial download is not mistaken for a usable model.
+    /// (`mlx-community/Qwen3.5-4B-MLX-4bit`). "Complete" means the files a load actually needs —
+    /// a config, weights, and a tokenizer — so a partial download is not mistaken for a usable
+    /// model.
+    ///
+    /// The id is a name, never a path. It arrives from the unauthenticated HTTP API
+    /// (`POST /api/seat` → `EngineService` → `MLXEngine.load`), and `root.appending(path:)`
+    /// does not contain an absolute prefix or a `..` component, so accepting either would let
+    /// a caller point the engine at any complete checkpoint on the machine, inside `models/`
+    /// or not. Every component must therefore be a plain one: no empty, `.` or `..`, and no
+    /// backslash or NUL. A value that is not a name is refused rather than resolved.
     public static func localCheckpoint(
         for modelID: String,
         in root: URL? = nil
@@ -109,12 +116,16 @@ public enum ModelStore {
         let fileManager = FileManager.default
         var candidates: [URL] = []
 
-        // An absolute path given directly.
-        if modelID.hasPrefix("/") {
-            candidates.append(URL(fileURLWithPath: modelID))
-        }
+        let components = modelID.split(separator: "/", omittingEmptySubsequences: false)
+        guard !components.isEmpty,
+            components.allSatisfy({
+                !$0.isEmpty && $0 != "." && $0 != ".."
+                    && !$0.contains("\\") && !$0.contains("\0")
+            })
+        else { return nil }
+
         // The repo-id tail, and the id as-is.
-        if let tail = modelID.split(separator: "/").last {
+        if let tail = components.last {
             candidates.append(root.appending(path: String(tail), directoryHint: .isDirectory))
         }
         candidates.append(root.appending(path: modelID, directoryHint: .isDirectory))

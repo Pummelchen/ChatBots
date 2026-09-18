@@ -59,6 +59,26 @@ struct ShardedCheckpointTests {
         #expect(ModelStore.availableCheckpoints(in: root).isEmpty)
     }
 
+    @Test("A model id is a name, not a path, so it cannot escape the models root")
+    func modelIDCannotEscapeTheRoot() throws {
+        let parent = try temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let root = parent.appending(path: "models", directoryHint: .isDirectory)
+        let outside = parent.appending(path: "outside", directoryHint: .isDirectory)
+        // Complete checkpoints on both sides of the root, so only the containment rule can
+        // decide: the traversal test passes exactly when the outside one is refused.
+        try checkpoint(at: outside, blob: true)
+        try checkpoint(at: root.appending(path: "inside"), blob: true)
+
+        // The id arrives from the unauthenticated API via `POST /api/seat`.
+        #expect(ModelStore.localCheckpoint(for: outside.path, in: root) == nil)
+        #expect(ModelStore.localCheckpoint(for: "../outside", in: root) == nil)
+        #expect(ModelStore.localCheckpoint(for: "a/../../outside", in: root) == nil)
+        #expect(ModelStore.localCheckpoint(for: "", in: root) == nil)
+        // A plain name inside the root still resolves, so the rule did not remove the feature.
+        #expect(ModelStore.localCheckpoint(for: "inside", in: root) != nil)
+    }
+
     @Test("An index missing one of its shards is not a usable checkpoint")
     func oneMissingShardIsNotComplete() throws {
         let root = try temporaryRoot()
