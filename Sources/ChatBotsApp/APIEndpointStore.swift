@@ -27,6 +27,9 @@ final class APIEndpointStore: ObservableObject {
     @Published private(set) var endpoints: [OpenAIEndpoint]
     /// Per-seat keys, mirrored from the Keychain on load.
     @Published private(set) var keys: [String]
+    /// Why the last Keychain write failed, so the sheet can say so instead of showing a key that
+    /// is not stored. The write's result used to be discarded.
+    @Published private(set) var keyStoreError: String?
 
     private let defaultsKey = "apiEndpoints"
     private static let keychainService = "local.chatbots.twollms.openai"
@@ -83,8 +86,15 @@ final class APIEndpointStore: ObservableObject {
 
     func setKey(_ value: String, seat: Int) {
         guard keys.indices.contains(seat) else { return }
+        // The result is checked, and the mirror is only updated when the Keychain holds the value:
+        // a failed write used to leave the field showing a key as configured while nothing had
+        // been stored — and the old key had already been deleted on the way in.
+        guard Self.storeKey(value, seat: seat) else {
+            keyStoreError = "This key could not be saved to the Keychain, so it is not in use."
+            return
+        }
+        keyStoreError = nil
         keys[seat] = value
-        Self.storeKey(value, seat: seat)
     }
 
     private func update(seat: Int, _ change: (inout OpenAIEndpoint) -> Void) {
@@ -166,17 +176,22 @@ final class APIEndpointStore: ObservableObject {
     @discardableResult
     static func storeKey(_ key: String, seat: Int) -> Bool {
         let query = query(seat: seat)
-        // Always replace rather than update: deleting is simpler to reason about, and the
-        // item is tiny.
-        SecItemDelete(query as CFDictionary)
-        guard !key.isEmpty else { return true }
+        guard !key.isEmpty else {
+            // An empty value means "no key", which deletion is; a missing item is already that.
+            let status = SecItemDelete(query as CFDictionary)
+            return status == errSecSuccess || status == errSecItemNotFound
+        }
+        let changes: [String: Any] = [
+            kSecValueData as String: Data(key.utf8),
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked,
+        ]
+        // Updated in place, added only when there is nothing to update. The old item used to be
+        // deleted before the new one was written, so a failed add destroyed a working key.
+        let updated = SecItemUpdate(query as CFDictionary, changes as CFDictionary)
+        if updated == errSecSuccess { return true }
+        guard updated == errSecItemNotFound else { return false }
         var attributes = query
-        attributes[kSecValueData as String] = Data(key.utf8)
-        attributes[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
+        attributes.merge(changes) { _, new in new }
         return SecItemAdd(attributes as CFDictionary, nil) == errSecSuccess
-    }
-
-    static func deleteKey(seat: Int) {
-        SecItemDelete(query(seat: seat) as CFDictionary)
     }
 }

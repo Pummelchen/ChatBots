@@ -124,7 +124,16 @@ struct ChatBotsApp: App {
                 // teardown the termination path uses, so a child that ignores SIGTERM does not
                 // outlive the window either. Quitting does not depend on this firing — see
                 // `AppDelegate.applicationShouldTerminate`.
-                .onDisappear { Task { await supervisor.shutdown() } }
+                // The session is closed before the engine is stopped.
+                //
+                // Only the supervisor used to be torn down, so the QUIC session and the one-second
+                // poll survived against a killed engine: the poll loop ends only when the reader
+                // records an error, so a connection that merely timed out kept a failing poll,
+                // each send up to ten seconds, for the life of the app process.
+                .onDisappear {
+                    controller.disconnect()
+                    Task { await supervisor.shutdown() }
+                }
                 // The black theme is dark-only regardless of the Mac's setting; the
                 // original theme follows the system.
                 .preferredColorScheme(theme.mode == .black ? .dark : nil)

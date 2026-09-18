@@ -88,6 +88,12 @@ struct APIEndpointsSheet: View {
                         .textFieldStyle(.roundedBorder)
                         .scaledFont(size: 11.5, design: .monospaced)
                 }
+                if let keyError = store.keyStoreError {
+                    GridRow {
+                        Text("").scaledFont(size: 11)
+                        Text(keyError).scaledFont(size: 11).foregroundStyle(.orange)
+                    }
+                }
                 GridRow {
                     Text("Parameters").scaledFont(size: 11).foregroundStyle(.secondary)
                     Picker("", selection: compatibilityBinding(seat)) {

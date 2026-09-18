@@ -36,6 +36,16 @@ public enum TextZoom {
         min(max(scale, minimumScale), maximumScale)
     }
 
+    /// The scale to use for a value that came from storage or from a caller.
+    ///
+    /// `clamped` fixes a finite value outside the range; this also replaces a non-finite one with
+    /// the default. A persisted preference is the way such a value arrives — the app never writes
+    /// one itself — and it would otherwise reach `percent`, whose `Int` conversion traps on NaN or
+    /// a value outside `Int`'s range, and the window's `NSSize`.
+    public static func sanitised(_ scale: Double) -> Double {
+        scale.isFinite ? clamped(scale) : `default`
+    }
+
     /// The scale one step from `scale` in the direction of `larger`, holding at either end.
     public static func stepped(from scale: Double, larger: Bool) -> Double {
         next(from: scale, larger: larger) ?? (larger ? maximumScale : minimumScale)
@@ -55,6 +65,7 @@ public enum TextZoom {
     /// The whole percentage a scale displays as.
     ///
     /// Rounded rather than truncated, because binary floating point makes 1.15 × 100 come out at
-    /// 114.99999999999999.
-    public static func percent(of scale: Double) -> Int { Int((scale * 100).rounded()) }
+    /// 114.99999999999999. `sanitised` is what makes this total: the `Int` conversion traps for
+    /// NaN or a value outside its range.
+    public static func percent(of scale: Double) -> Int { Int((sanitised(scale) * 100).rounded()) }
 }

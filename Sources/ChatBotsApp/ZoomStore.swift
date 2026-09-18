@@ -31,7 +31,10 @@ final class ZoomStore: ObservableObject {
     @AppStorage("textScale") private var storedScale: Double = TextZoom.default
 
     var scale: Double {
-        get { storedScale }
+        // Sanitised on the way out as well as on the way in: `@AppStorage` hands back whatever the
+        // defaults hold, and a corrupted value reaches `percent` — which traps for NaN or an
+        // out-of-range double — and `minimumWindowSize`, which feeds it into an `NSSize`.
+        get { TextZoom.sanitised(storedScale) }
         set { storedScale = TextZoom.clamped(newValue) }
     }
 

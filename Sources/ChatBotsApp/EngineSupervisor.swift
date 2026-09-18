@@ -79,7 +79,14 @@ public final class EngineSupervisor: ObservableObject {
     /// going, or a second copy of the app, should share one conversation rather than silently
     /// starting a rival on a different port that the website cannot see.
     public func start() async {
-        if case .running = state { return }
+        // `.starting` as well as `.running`: the wait below is cancellation-blind, so a second
+        // call while the first is still waiting would launch a second child, and `launch` assigns
+        // `self.process` — the first child would become unreachable and would be left holding the
+        // GPU and the transport port. This is the failure mode the comment on `launch` records.
+        switch state {
+        case .running, .starting: return
+        default: break
+        }
 
         state = .starting
 
@@ -253,7 +260,16 @@ public final class EngineSupervisor: ObservableObject {
         process.standardError = handle
         logHandle = handle
 
-        try process.run()
+        do {
+            try process.run()
+        } catch {
+            // The handle was opened and assigned before the launch, so a failed `run()` used to
+            // leave it open: `terminateChild` returns early on a nil `process`, and the close at
+            // its end never ran. One descriptor leaked per failed launch.
+            try? handle.close()
+            logHandle = nil
+            throw error
+        }
         self.process = process
     }
 
@@ -329,9 +345,20 @@ public final class EngineSupervisor: ObservableObject {
 
     /// The end of the engine log, for saying what went wrong.
     private func tailOfLog(maximumCharacters: Int = 400) -> String? {
-        guard let text = try? String(contentsOf: logURL, encoding: .utf8), !text.isEmpty else {
-            return nil
-        }
+        // Only the end of the file is read. The whole file used to be decoded on the main actor,
+        // and nothing rotates `app-engine.log` — the child is given it append-only — so with
+        // `CHATBOTS_TRACE_API` set it also carries conversation content and grows for the life of
+        // the install. A cut can land inside a multi-byte character, so the bytes are decoded
+        // lossily rather than with a strict `String(contentsOf:)`.
+        let maximumBytes = 4 * maximumCharacters
+        guard let handle = try? FileHandle(forReadingFrom: logURL) else { return nil }
+        defer { try? handle.close() }
+        guard let size = try? handle.seekToEnd() else { return nil }
+        let start = size > UInt64(maximumBytes) ? size - UInt64(maximumBytes) : 0
+        guard (try? handle.seek(toOffset: start)) != nil,
+            let data = try? handle.readToEnd(), !data.isEmpty,
+            let text = UTF8Text.decodeTruncated(data), !text.isEmpty
+        else { return nil }
         let tail = text.suffix(maximumCharacters)
         let cleaned =
             tail

@@ -108,4 +108,25 @@ struct ZoomStepTests {
         #expect(TextZoom.clamped(9.0) == TextZoom.maximumScale)
         #expect(TextZoom.clamped(1.3) == 1.3)
     }
+
+    @Test("A corrupted stored scale has a percentage rather than trapping")
+    func corruptedScaleIsSane() {
+        // `percent` is `Int((scale * 100).rounded())`, which traps for NaN or a value outside
+        // `Int`'s range — and the scale comes from a persisted preference that the app never
+        // writes out of range itself. `sanitised` is what makes the conversion total.
+        // Not a number at all: the default is the only sane answer.
+        for bad in [Double.nan, .infinity, -.infinity] {
+            #expect(TextZoom.sanitised(bad) == TextZoom.default, "\(bad) is not a scale")
+            #expect(TextZoom.percent(of: bad) == 100, "\(bad) must report the default's percentage")
+        }
+        // A number that is merely enormous is clamped like any other out-of-range value, and the
+        // percentage follows it rather than trapping.
+        for (bad, expected) in [(1e300, TextZoom.maximumScale), (-1e300, TextZoom.minimumScale)] {
+            #expect(TextZoom.sanitised(bad) == expected)
+            #expect(TextZoom.percent(of: bad) == TextZoom.percent(of: expected))
+        }
+        // The ordinary paths are unchanged.
+        #expect(TextZoom.sanitised(1.3) == 1.3)
+        #expect(TextZoom.sanitised(0.1) == TextZoom.minimumScale)
+    }
 }

@@ -1,0 +1,81 @@
+Building for debugging...
+[Computing dependencies]
+[Using on-disk description]
+[1 / 1]
+[1 / 79] yyjson
+[1 / 11] ChatBotsCoreTests-product
+[2 / 7] ChatBotsCoreTests-product
+[6 / 11] ChatBotsCoreTests-product
+[11 / 15] ChatBotsCoreTests-product
+[13 / 15] ChatBotsCoreTests-product
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+Build complete! (7,85 secs)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Text size steps" started.
+◇ Test "Stepping up moves to the next level and stops at the top" started.
+◇ Test "Levels are strictly increasing between 85% and 200%" started.
+◇ Test "Repeated stepping covers the whole range in both directions" started.
+◇ Test "A scale outside the range is pulled back into it" started.
+◇ Test "What a menu offers is what stepping lands on, and nothing at the ends" started.
+◇ Test "A corrupted stored scale has a percentage rather than trapping" started.
+◇ Test "⌘0 lands exactly on 100%" started.
+◇ Test "Stepping down moves to the previous level and stops at the bottom" started.
+◇ Test "Every level is a clean percentage once rounded for display" started.
+✔ Test "Stepping up moves to the next level and stops at the top" passed after 0.001 seconds.
+◇ Test "A scale that came back from storage still counts as being on its level" started.
+✔ Test "Repeated stepping covers the whole range in both directions" passed after 0.001 seconds.
+✔ Test "⌘0 lands exactly on 100%" passed after 0.001 seconds.
+✔ Test "Levels are strictly increasing between 85% and 200%" passed after 0.001 seconds.
+✔ Test "Stepping down moves to the previous level and stops at the bottom" passed after 0.001 seconds.
+✔ Test "A scale outside the range is pulled back into it" passed after 0.001 seconds.
+✔ Test "A scale that came back from storage still counts as being on its level" passed after 0.001 seconds.
+✔ Test "A corrupted stored scale has a percentage rather than trapping" passed after 0.001 seconds.
+✔ Test "What a menu offers is what stepping lands on, and nothing at the ends" passed after 0.001 seconds.
+✔ Test "Every level is a clean percentage once rounded for display" passed after 0.001 seconds.
+✔ Suite "Text size steps" passed after 0.001 seconds.
+✔ Test run with 10 tests in 1 suite passed after 0.001 seconds.
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "A refused command is not an accepted one" started.
+◇ Suite "The API endpoint store" started.
+◇ Suite "Choosing a checkpoint in the app" started.
+◇ Suite "The settings store" started.
+◇ Test "A per-seat endpoint edit lands on that seat and no other" started.
+◇ Suite "The engine supervisor's published state" started.
+◇ Test "The endpoint list is padded to the supported seat count" started.
+◇ Test "A cloud seat is the one with the OpenAI backend, whatever else it carries" started.
+◇ Test "A key an older build left in the preferences plist is removed when it is loaded" started.
+◇ Test "An empty store starts from the fallback topic rather than failing" started.
+◇ Test "Settings that cannot be decoded are reported once and replaced by the fallback" started.
+◇ Test "A fresh supervisor is idle and owns nothing" started.
+◇ Test "A change that could not be sent leaves the seat on the model it has" started.
+◇ Test "A refusal or a failure is not acceptance" started.
+◇ Test "What is saved is what the next store loads" started.
+◇ Test "A report or a list is acceptance" started.
+◇ Test "An alias is resolved to the repository id before anything is stored" started.
+◇ Test "The storage description says something about where settings live" started.
+◇ Test "Every state has a label a user can read" started.
+✔ Test "A per-seat endpoint edit lands on that seat and no other" passed after 0.013 seconds.
+✔ Test "An empty store starts from the fallback topic rather than failing" passed after 0.021 seconds.
+✔ Test "An alias is resolved to the repository id before anything is stored" passed after 0.021 seconds.
+✔ Test "Every state has a label a user can read" passed after 0.021 seconds.
+✔ Test "What is saved is what the next store loads" passed after 0.021 seconds.
+✔ Test "The storage description says something about where settings live" passed after 0.021 seconds.
+✔ Test "Settings that cannot be decoded are reported once and replaced by the fallback" passed after 0.021 seconds.
+✔ Test "A fresh supervisor is idle and owns nothing" passed after 0.021 seconds.
+✔ Test "The endpoint list is padded to the supported seat count" passed after 0.021 seconds.
+✔ Test "A report or a list is acceptance" passed after 0.021 seconds.
+✔ Test "A refusal or a failure is not acceptance" passed after 0.021 seconds.
+✔ Suite "The engine supervisor's published state" passed after 0.022 seconds.
+✔ Test "A key an older build left in the preferences plist is removed when it is loaded" passed after 0.021 seconds.
+✔ Test "A cloud seat is the one with the OpenAI backend, whatever else it carries" passed after 0.021 seconds.
+✔ Suite "The settings store" passed after 0.022 seconds.
+✔ Suite "A refused command is not an accepted one" passed after 0.022 seconds.
+✔ Suite "The API endpoint store" passed after 0.022 seconds.
+✔ Test "A change that could not be sent leaves the seat on the model it has" passed after 0.068 seconds.
+✔ Suite "Choosing a checkpoint in the app" passed after 0.068 seconds.
+✔ Test run with 14 tests in 5 suites passed after 0.069 seconds.
+EXIT=0
