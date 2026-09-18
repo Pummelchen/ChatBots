@@ -35,4 +35,4 @@ case " $* " in
   *) DEFAULTS+=("--open" "desktop") ;;
 esac
 
-exec bash "$SCRIPT_DIR/start.sh" "${DEFAULTS[@]}" "$@"
+exec bash "$SCRIPT_DIR/start.sh" ${DEFAULTS[@]+"${DEFAULTS[@]}"} "$@"

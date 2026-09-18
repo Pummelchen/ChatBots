@@ -80,6 +80,26 @@ struct HeadParsingTests {
         #expect(request.headers["x-b"] == "two")
     }
 
+    @Test("A bare CR or LF inside a field value is refused")
+    func bareLineBreakInAValue() throws {
+        // RFC 9112 §5.1 requires a recipient to reject a field value carrying a bare CR or LF. The
+        // head is split on CRLF, so a lone CR or LF survives the split and used to be read as part of
+        // the value — the shape a smuggling payload needs to make a proxy and this server disagree
+        // about where the head ends.
+        guard case .malformed? = refusal("GET / HTTP/1.1\r\nHost: a\nX-Injected: b\r\n\r\n") else {
+            Issue.record("a bare LF in a field value was accepted")
+            return
+        }
+        guard case .malformed? = refusal("GET / HTTP/1.1\r\nHost: a\rX-Injected: b\r\n\r\n") else {
+            Issue.record("a bare CR in a field value was accepted")
+            return
+        }
+
+        // The counterweight: an ordinary value with inner spaces still parses.
+        let request = try parse("GET / HTTP/1.1\r\nX-Note: a  b\r\n\r\n")
+        #expect(request.headers["x-note"] == "a  b")
+    }
+
     @Test("The HTTP version must be one this server speaks")
     func versionIsChecked() throws {
         // The version was never read: `split(omittingEmptySubsequences: true)` plus `count >= 2` meant a

@@ -124,7 +124,7 @@ else
       · another app holding the GPU, such as LM Studio or a game
       · a leftover process from an earlier run — check with:
           pgrep -fl chatbots-cli
-      · a partial model download — delete $MODEL_DIR and run this script again
+      · a partial model download — delete $MODELS_DIR and run this script again
 
 EOF
 fi

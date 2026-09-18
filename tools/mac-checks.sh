@@ -75,7 +75,7 @@ fail() {
     failures=$((failures + 1))
 }
 
-printf '\n=== 1/7  file sizes: tracked code ===\n'
+printf '\n=== 1/9  file sizes: tracked code ===\n'
 if bash tools/check-file-sizes.sh > "$logs/file-sizes.log" 2>&1; then
     pass "$(tail -1 "$logs/file-sizes.log" | sed 's/^PASS  //')"
 else
@@ -84,7 +84,7 @@ else
     fail "file sizes: a tracked code file is over 500 lines"
 fi
 
-printf '\n=== 2/7  build: products and tests, warnings are errors ===\n'
+printf '\n=== 2/9  build: products and tests, warnings are errors ===\n'
 if swift build --build-tests > "$logs/build.log" 2>&1; then
     pass "build: swift build --build-tests"
 else
@@ -93,7 +93,7 @@ else
     fail "build: swift build --build-tests"
 fi
 
-printf '\n=== 3/7  tests: the full suite ===\n'
+printf '\n=== 3/9  tests: the full suite ===\n'
 if swift test --enable-code-coverage > "$logs/test.log" 2>&1; then
     # Summed across test bundles: `swift test` runs one process per test target and each prints its
     # own "Test run with" line, so taking the last one reported a single target's count.
@@ -108,7 +108,7 @@ else
     fail "tests: swift test --enable-code-coverage"
 fi
 
-printf '\n=== 4/7  coverage: Sources/ ===\n'
+printf '\n=== 4/9  coverage: Sources/ ===\n'
 bin_path="$(swift build --show-bin-path 2>/dev/null)"
 profile="$bin_path/codecov/default.profdata"
     # One test bundle per test target, named after the target. The single bundle this used to name was
@@ -138,7 +138,7 @@ else
     fail "coverage: llvm-cov report over Sources/"
 fi
 
-printf '\n=== 5/7  swiftlint: Sources, Tests ===\n'
+printf '\n=== 5/9  swiftlint: Sources, Tests ===\n'
 # The configs were added with their residual recorded, so this gate is "no worse than the
 # recorded number" rather than "zero" — which is the only form of it that can pass
 # without hiding findings. The waivers live in tools/analysis-waivers.txt so that raising one is a deliberate,
@@ -168,18 +168,30 @@ case "${findings:-}" in
         ;;
 esac
 
-printf '\n=== 6/7  swift-format lint: Sources, Tests ===\n'
+printf '\n=== 6/9  swift-format lint: Sources, Tests ===\n'
 # Authored Swift only: the generated `WebAssets.swift` and `NameLists.swift` carry thousands
 # of diagnostics of their own, which makes the count a function of `web/` and `names/` rather than
 # of this repository's code. swiftlint excludes the same two in `.swiftlint.yml`.
+#
+# The exit status is checked as well as the count. `swift-format lint` exits non-zero when it
+# reports a diagnostic, so the status alone cannot say "the tool failed" — but a non-zero status
+# with *no* diagnostic lines means it never linted anything, and that used to pass this gate as
+# "0 diagnostic(s)".
+swift_files="$(find Sources Tests -name '*.swift' ! -name 'WebAssets.swift' ! -name 'NameLists.swift')"
 find Sources Tests -name '*.swift' ! -name 'WebAssets.swift' ! -name 'NameLists.swift' -print0 \
     | xargs -0 swift-format lint > "$logs/swift-format.txt" 2>&1
+format_status=$?
 # Counted from the diagnostic lines, NOT with `wc -l` on the output. This gate reported `wc -l`
 # first, which is exactly the mistake this gate once made: a 3,003-diagnostic run produces about 30,000
 # lines, so the number it printed was the size of the file rather than the size of the problem.
 diagnostics="$(grep -cE 'warning:|error:' "$logs/swift-format.txt" || true)"
 allowed="$(waiver_for swift-format)"
-if [ -z "$allowed" ]; then
+if [ -z "$swift_files" ]; then
+    fail "swift-format: no Swift file was found to lint"
+elif [ "$format_status" -ne 0 ] && [ "$diagnostics" -eq 0 ]; then
+    tail -n 20 "$logs/swift-format.txt" | sed 's/^/      /'
+    fail "swift-format: exited $format_status without reporting a diagnostic, so it did not lint"
+elif [ -z "$allowed" ]; then
     fail "swift-format: $diagnostics diagnostic(s) and no waiver recorded in tools/analysis-waivers.txt"
 elif [ "$diagnostics" -le "$allowed" ]; then
     pass "swift-format: $diagnostics diagnostic(s), within the recorded waiver of $allowed"
@@ -187,7 +199,7 @@ else
     fail "swift-format: $diagnostics diagnostic(s) exceeds the recorded waiver of $allowed"
 fi
 
-printf '\n=== 7/7  web: the rules the page runs ===\n'
+printf '\n=== 7/9  web: the rules the page runs ===\n'
 # The page's streaming reply is drawn from `state.snapshot.live`, and the merge that fills it from the
 # engine's `delta` events is pure JavaScript in `web/deltas.js`. It used to live inline in `app.js` and
 # there was no way to run it, which is how the page came to listen for nothing but whole-turn

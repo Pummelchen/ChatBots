@@ -90,22 +90,41 @@ public struct HTTPResponse: Sendable {
     }
 
     /// The status line's reason phrase. Kept short; nothing depends on it.
+    ///
+    /// Every status this server actually emits has its own phrase. The fallback used to be `"OK"`,
+    /// which made a 403, 415 or 431 read `403 OK` on the wire — a reason phrase that contradicts
+    /// the code, and the one part of the status line a human debugging with `curl -v` reads.
     public var reason: String {
         switch status {
         case 200: "OK"
         case 201: "Created"
         case 204: "No Content"
         case 400: "Bad Request"
+        case 401: "Unauthorized"
+        case 403: "Forbidden"
         case 404: "Not Found"
         case 405: "Method Not Allowed"
         case 408: "Request Timeout"
         case 409: "Conflict"
         case 413: "Payload Too Large"
+        case 415: "Unsupported Media Type"
+        case 422: "Unprocessable Content"
+        case 429: "Too Many Requests"
+        case 431: "Request Header Fields Too Large"
         case 500: "Internal Server Error"
         case 501: "Not Implemented"
-        case 505: "HTTP Version Not Supported"
         case 503: "Service Unavailable"
-        default: "OK"
+        case 505: "HTTP Version Not Supported"
+        default:
+            // A status with no phrase of its own gets its class rather than a lie.
+            switch status {
+            case 100..<200: "Informational"
+            case 200..<300: "Success"
+            case 300..<400: "Redirection"
+            case 400..<500: "Client Error"
+            case 500..<600: "Server Error"
+            default: "Unknown"
+            }
         }
     }
 

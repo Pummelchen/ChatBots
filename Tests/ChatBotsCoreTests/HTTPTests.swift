@@ -230,3 +230,32 @@ struct WebAssetTests {
         #expect(String(decoding: body, as: UTF8.self).contains("charset=\"utf-8\""))
     }
 }
+
+@Suite("The status line's reason phrase")
+struct HTTPReasonPhraseTests {
+
+    @Test("Every status this server emits has a reason of its own")
+    func reasonsAreTrue() {
+        // The fallback used to be "OK", so a 403, 415 or 431 went out as `403 OK` — a reason phrase
+        // that contradicts the code, and the one part of the status line a person reads when
+        // debugging with `curl -v`.
+        #expect(HTTPResponse(status: 200).reason == "OK")
+        #expect(HTTPResponse(status: 400).reason == "Bad Request")
+        #expect(HTTPResponse(status: 403).reason == "Forbidden")
+        #expect(HTTPResponse(status: 404).reason == "Not Found")
+        #expect(HTTPResponse(status: 408).reason == "Request Timeout")
+        #expect(HTTPResponse(status: 409).reason == "Conflict")
+        #expect(HTTPResponse(status: 413).reason == "Payload Too Large")
+        #expect(HTTPResponse(status: 415).reason == "Unsupported Media Type")
+        #expect(HTTPResponse(status: 431).reason == "Request Header Fields Too Large")
+        #expect(HTTPResponse(status: 500).reason == "Internal Server Error")
+        #expect(HTTPResponse(status: 503).reason == "Service Unavailable")
+    }
+
+    @Test("A status with no phrase of its own gets its class, not a lie")
+    func unknownStatusIsNotOK() {
+        #expect(HTTPResponse(status: 299).reason == "Success")
+        #expect(HTTPResponse(status: 418).reason == "Client Error")
+        #expect(HTTPResponse(status: 599).reason == "Server Error")
+    }
+}

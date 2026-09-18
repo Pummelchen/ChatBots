@@ -93,6 +93,13 @@ public enum HTTPParser {
                 throw HTTPError.malformed("a header field name was not a token: \"\(name)\"")
             }
             let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            // RFC 9112 §5.1: a recipient MUST reject a field value with a bare CR or LF. The head is
+            // split on CRLF, so a lone CR or LF survives the split and used to be accepted — the
+            // shape a request-smuggling payload needs to make two parsers disagree about where the
+            // head ends. (A CR followed by an LF cannot be here: that pair is the split.)
+            guard !value.contains("\r"), !value.contains("\n") else {
+                throw HTTPError.malformed("a header field value contained a bare CR or LF")
+            }
             let key = name.lowercased()
             // Repeated headers are joined, which is harmless for the ones we read.
             headers[key] = headers[key].map { "\($0), \(value)" } ?? value

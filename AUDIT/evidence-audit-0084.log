@@ -1,0 +1,9 @@
+AUDIT-0084: the swift-format gate used to pass when the tool produced no diagnostics at all.
+
+== with a swift-format that exits 1 and prints no diagnostic (must FAIL) ==
+FAIL  swift-format: exited 1 without reporting a diagnostic, so it did not lint
+failures=1
+
+== with the real swift-format (must PASS) ==
+PASS  swift-format: 411 diagnostic(s), within the recorded waiver of 413
+failures=0
