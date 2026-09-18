@@ -221,6 +221,7 @@ extension ConversationEngine {
             return
         } catch {
             if Task.isCancelled { return }
+            failedTurns += 1
             note("\(agentID) error: \(error.localizedDescription)")
             publishEvent(.turnFailed(agentID: agentID, message: error.localizedDescription))
         }

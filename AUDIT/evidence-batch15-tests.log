@@ -1,0 +1,290 @@
+Building for debugging...
+[Computing dependencies]
+[Using on-disk description]
+[1 / 37] InternalCollectionsUtilities
+[18 / 298] yyjson
+[27 / 311] RealModule
+[32 / 335] WebTransportQUICCore
+[46 / 347] WebTransportQUICCore
+[53 / 355] WebTransportTLSCore
+[55 / 355] WebTransportCryptoApple
+[61 / 377] WebTransportHTTP3Core
+[68 / 380] WebTransportTLSCore
+[72 / 380] WebTransportTLSCore
+[76 / 381] WebTransportCryptoApple
+[80 / 381] WebTransportHTTP3Core
+[84 / 382] WebTransportHTTP3Core
+[90 / 382] WebTransportQUICCore
+[92 / 382] WebTransportCryptoApple
+[96 / 384] WebTransportUDPApple
+[102 / 389] RealModule
+[108 / 398] InternalCollectionsUtilities
+[115 / 404] MLXHuggingFaceMacros
+[122 / 406] WebTransportNetworkRuntime
+[127 / 408] WebTransportNetworkRuntime
+[133 / 419] OrderedCollections
+[138 / 419] OrderedCollections
+[140 / 421] WebTransport
+[143 / 422] OrderedCollections
+[145 / 422] WebTransport
+[148 / 422] EventSource
+[152 / 424] WebTransport
+[155 / 424] Crypto
+[156 / 424] OrderedCollections
+[165 / 438] Numerics
+[170 / 441] Numerics
+[176 / 442] Numerics
+[179 / 451] Jinja
+[179 / 451] Numerics
+[181 / 451] WebTransportNetworkRuntime
+[184 / 452] Jinja
+[186 / 452] Jinja
+[188 / 452] Jinja
+[191 / 452] HuggingFace
+[191 / 452] Jinja
+[198 / 452] ComplexModule
+[200 / 452] HuggingFace
+[208 / 458] WebTransportQUICCore
+[212 / 458] yyjson
+[220 / 458] WebTransportSecurityShim
+[224 / 468] Hub
+[224 / 475] ArgumentParserToolInfo
+[225 / 475] Jinja
+[229 / 475] ArgumentParser
+[236 / 477] Hub
+[241 / 480] Numerics
+[243 / 480] Tokenizers
+[247 / 491] Tokenizers
+[250 / 497] encuda-product
+[254 / 497] Tokenizers
+[258 / 497] encuda-product
+[260 / 497] Tokenizers
+[264 / 497] Hub
+[270 / 497] HuggingFace
+[272 / 497] Tokenizers
+[274 / 497] ArgumentParser
+[277 / 498] encuda-product
+[289 / 501] Cmlx
+[290 / 510] MLX
+[290 / 510] Cmlx
+[293 / 510] MLX
+[294 / 510] Cmlx
+[297 / 512] MLX
+[303 / 512] Cmlx
+[305 / 512] Cmlx
+[306 / 512] Cmlx
+[307 / 512] Cmlx
+[310 / 512] Cmlx
+[312 / 512] Cmlx
+[315 / 512] Cmlx
+[321 / 512] Cmlx
+[329 / 512] Cmlx
+[331 / 512] Cmlx
+[334 / 512] Cmlx
+[336 / 512] Cmlx
+[337 / 512] Cmlx
+[338 / 512] Cmlx
+[343 / 512] Cmlx
+[344 / 512] Cmlx
+[345 / 512] Cmlx
+[346 / 512] Cmlx
+[350 / 512] Cmlx
+[353 / 512] Cmlx
+[354 / 512] Cmlx
+[357 / 512] Cmlx
+[360 / 512] Cmlx
+[362 / 512] Cmlx
+[363 / 512] Cmlx
+[365 / 512] Cmlx
+[366 / 512] Cmlx
+[370 / 512] Cmlx
+[371 / 512] Cmlx
+[372 / 512] Cmlx
+[374 / 512] Cmlx
+[376 / 512] Cmlx
+[381 / 512] Cmlx
+[382 / 512] Cmlx
+[383 / 512] Cmlx
+[384 / 512] Cmlx
+[387 / 512] Cmlx
+[389 / 512] Cmlx
+[391 / 512] Cmlx
+[392 / 512] Cmlx
+[394 / 512] Cmlx
+[395 / 512] Cmlx
+[397 / 512] Cmlx
+[399 / 512] Cmlx
+[401 / 512] Cmlx
+[402 / 512] Cmlx
+[404 / 512] Cmlx
+[407 / 512] Cmlx
+[412 / 512] Cmlx
+[413 / 512] Cmlx
+[416 / 512] Cmlx
+[418 / 512] Cmlx
+[419 / 512] Cmlx
+[421 / 512] Cmlx
+[423 / 512] Cmlx
+[424 / 512] Cmlx
+[425 / 512] Cmlx
+[426 / 512] Cmlx
+[427 / 512] Cmlx
+[428 / 512] Cmlx
+[430 / 512] Cmlx
+[431 / 512] Cmlx
+[434 / 512] Cmlx
+[436 / 512] Cmlx
+[437 / 512] Cmlx
+[439 / 512] Cmlx
+[440 / 512] Cmlx
+[444 / 512] Cmlx
+[446 / 512] Cmlx
+[447 / 512] Cmlx
+[449 / 512] Cmlx
+[451 / 512] Cmlx
+[452 / 512] Cmlx
+[453 / 512] Cmlx
+[454 / 512] Cmlx
+[455 / 512] Cmlx
+[461 / 512] Cmlx
+[462 / 512] Cmlx
+[465 / 512] mlx-swift_Cmlx
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+[468 / 511] MLX
+[470 / 511] MLX
+[473 / 513] MLX
+[475 / 513] Cmlx
+[477 / 522] Cmlx
+[479 / 522] MLXNN
+[481 / 522] MLXNN
+[483 / 522] MLXNN
+[486 / 524] MLXNN
+[487 / 524] MLXNN
+[489 / 526] MLXOptimizers
+[492 / 529] MLXOptimizers
+[495 / 532] MLXOptimizers
+[495 / 532] MLXNN
+[504 / 541] MLXLMCommon
+[505 / 541] MLXLMCommon
+[507 / 541] MLXLMCommon
+[512 / 548]
+[514 / 549] MLXHuggingFaceMacros
+[515 / 551] MLXVLM
+[518 / 562] MLXHuggingFace
+[518 / 571] MLXLMCommon
+[520 / 571] MLXVLM
+[521 / 571] MLXVLM
+[523 / 571] MLXHuggingFace
+[528 / 574] MLXVLM
+[531 / 574] MLXVLM
+[532 / 574] MLXLMCommon
+[535 / 576] MLXLLM
+[538 / 576] MLXLLM
+[539 / 576] MLXLLM
+[541 / 576] MLXLLM
+[542 / 576] MLXLLM
+[543 / 576] MLXLLM
+[545 / 579] ChatBotsCore
+[546 / 579] ChatBotsCore
+[547 / 579] MLXVLM
+[550 / 590] Cmlx
+[554 / 590] ChatBotsCore
+[554 / 590] MLX
+[556 / 590] ChatBotsCore
+[557 / 590] ChatBotsCore
+[558 / 590] ChatBotsCore
+[558 / 590] MLXLLM
+[559 / 590] ChatBotsCore
+[562 / 590] ChatBotsCore
+[567 / 593] ChatBotsCore
+[569 / 602] chatbots-probe-product
+[571 / 604] chatbots-probe-product
+[572 / 613] chatbots-cli-product
+[572 / 613] ChatBotsCore
+[575 / 613] chatbots-cli-product
+[576 / 622] ChatBots-product
+[577 / 622] chatbots-probe-product
+[580 / 631] chatbots-cli-product
+[582 / 631] chatbots-cli-product
+[584 / 631] chatbots-cli-product
+[585 / 631] MLXNN
+[588 / 631] MLXOptimizers
+[591 / 631] ChatBots-product
+[592 / 631] ChatBots
+[596 / 631] ChatBots-product
+[598 / 631] ChatBots
+[602 / 632] chatbots-cli-product
+[605 / 638] ChatBots
+[605 / 638] ChatBots-product
+[607 / 638]
+[610 / 638] MLXLLM
+[611 / 638] MLXVLM
+[615 / 635] ChatBotsCoreTests-product
+[616 / 635] ChatBotsCore-product
+[619 / 637] ChatBots
+[625 / 646] ChatBotsCoreTests-product
+[626 / 646] ChatBotsCoreTests-product
+[628 / 646] ChatBotsCoreTests-product
+[629 / 646] ChatBots-product
+[630 / 646] ChatBots-product
+[632 / 646] ChatBotsCoreTests-product
+[632 / 648] ChatBots-product
+[633 / 648] ChatBots-product
+[636 / 644] ChatBotsAppTests-product
+[642 / 653] ChatBotsAppTests-product
+[643 / 653] ChatBotsAppTests-product
+[645 / 653] ChatBotsAppTests-product
+[651 / 657] ChatBotsAppTests-product
+[653 / 660] ChatBotsCoreTests-product
+[654 / 660] ChatBotsAppTests-product
+[655 / 660] ChatBotsAppTests-product
+[658 / 661] chatbots-probe-product
+[659 / 663] ChatBotsCoreTests-product
+[661 / 663] ChatBotsCoreTests-product
+[663 / 665] ChatBotsCoreTests-product
+Build complete! (72,68 secs)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test "Steering an idle conversation starts it" started.
+◇ Test "A failed turn is counted, because the run's status does not stay failed" started.
+◇ Test "A turn that produces no text still charges the research budget" started.
+◇ Test "Seats alternate and both see the identical shared log" started.
+◇ Test "Other seats are named in a seat's system message, never itself as an other" started.
+◇ Test "A conversation the store cannot save is reported instead of silently lost" started.
+◇ Test "Introduction names the topic and every participant" started.
+◇ Test "Mid-turn steering is queued, delivered once, and seen by both seats" started.
+◇ Test "A turn prompt is a valid system+user pair carrying every tagged log entry" started.
+◇ Test "Turn limit pauses the loop instead of running forever" started.
+◇ Test "An endpoint change replaces the OpenAI engine rather than only being stored" started.
+◇ Test "The opening log is topic then introduction, numbered in order" started.
+◇ Test "Start is refused without a topic" started.
+◇ Test "Pause stops new turns; resume continues the rotation" started.
+◇ Test "Stop ends the loop and leaves loaded weights alone" started.
+◇ Test "Seat B reads seat A's message in its prompt" started.
+◇ Test "Each seat carries its own model id and sampling parameters" started.
+◇ Test "Tool turns and thinking are kept out of the prompt log" started.
+◇ Test "Web tools are offered only to seats that enable them" started.
+◇ Test "Reset clears the log and the turn counters" started.
+✔ Test "Each seat carries its own model id and sampling parameters" passed after 0.001 seconds.
+✔ Test "Other seats are named in a seat's system message, never itself as an other" passed after 0.001 seconds.
+✔ Test "Tool turns and thinking are kept out of the prompt log" passed after 0.001 seconds.
+✔ Test "A turn prompt is a valid system+user pair carrying every tagged log entry" passed after 0.001 seconds.
+✔ Test "Introduction names the topic and every participant" passed after 0.002 seconds.
+✔ Test "A conversation the store cannot save is reported instead of silently lost" passed after 0.003 seconds.
+✔ Test "An endpoint change replaces the OpenAI engine rather than only being stored" passed after 0.004 seconds.
+✔ Test "Stop ends the loop and leaves loaded weights alone" passed after 0.007 seconds.
+✔ Test "Start is refused without a topic" passed after 0.007 seconds.
+✔ Test "A turn that produces no text still charges the research budget" passed after 0.015 seconds.
+✔ Test "Turn limit pauses the loop instead of running forever" passed after 0.017 seconds.
+✔ Test "Web tools are offered only to seats that enable them" passed after 0.018 seconds.
+✔ Test "The opening log is topic then introduction, numbered in order" passed after 0.021 seconds.
+✔ Test "Reset clears the log and the turn counters" passed after 0.021 seconds.
+✔ Test "Seat B reads seat A's message in its prompt" passed after 0.021 seconds.
+✔ Test "Steering an idle conversation starts it" passed after 0.021 seconds.
+✔ Test "Seats alternate and both see the identical shared log" passed after 0.021 seconds.
+✔ Test "A failed turn is counted, because the run's status does not stay failed" passed after 0.022 seconds.
+✔ Test "Mid-turn steering is queued, delivered once, and seen by both seats" passed after 0.148 seconds.
+✔ Test "Pause stops new turns; resume continues the rotation" passed after 0.353 seconds.
+✔ Test run with 20 tests in 0 suites passed after 0.353 seconds.
+EXIT=0

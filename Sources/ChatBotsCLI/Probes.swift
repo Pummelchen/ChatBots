@@ -40,7 +40,12 @@ enum Probes {
         for turn in 1...3 {
             turns.append(
                 .init(
-                    role: turn == 1 ? .user : .assistant,
+                    // Every turn here is a question put to the model, so every turn is a user
+                    // message. `turn == 1 ? .user : .assistant` sent the follow-ups as if the
+                    // model had said them, so the prompt was system, user(Q1), assistant(Q2),
+                    // assistant(Q3) — not the shared-prefix conversation this probe claims to
+                    // measure. The assistant slot is filled by the placeholder appended below.
+                    role: .user,
                     content: turn == 1
                         ? "Why are bird eggs ovoid rather than spherical? Answer in one sentence."
                         : "And what does that imply for shell thickness? Answer in one sentence."))
@@ -108,8 +113,17 @@ enum Probes {
         for turn in 1...3 {
             // Alternates A and B when both exist, and stays on A when the roster has one seat:
             // `turn % 2` asked for `engines[1]` on a one-seat roster and trapped.
-            _ = try? await engines[turn % min(2, engines.count)].generate(
-                messages: prompt, tools: [], onToolCall: { _, _ in }, onEvent: { _ in })
+            do {
+                _ = try await engines[turn % min(2, engines.count)].generate(
+                    messages: prompt, tools: [], onToolCall: { _, _ in }, onEvent: { _ in })
+            } catch {
+                // `try?` here swallowed the failure, so a model that loaded but could not
+                // generate produced a plausible memory table for turns that made no tokens, and
+                // the probe exited 0 — the same false success the session probe and the
+                // benchmark were fixed for.
+                log("  turn \(turn) failed: \(error.localizedDescription)")
+                exit(1)
+            }
             report("after turn \(turn)")
         }
         exit(0)

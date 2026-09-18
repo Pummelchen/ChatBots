@@ -90,9 +90,23 @@ enum HeadlessRun {
         statusTask.cancel()
 
         header("END")
-        log("done — \(engine.conversation.turns.filter { $0.kind == .chat }.count) messages exchanged")
+        let exchanged = engine.conversation.turns.filter { $0.kind == .chat }.count
+        log("done — \(exchanged) messages exchanged")
         for notice in engine.notices {
             log("  note: \(notice)")
+        }
+
+        // The exit code has to reflect what happened. This mode ended at `header("END")`
+        // whatever occurred — the same false success the benchmark and the probes were fixed
+        // for — so a run in which a turn errored, or in which no turn produced a message at all,
+        // reported 0 to the install or CI script reading the status.
+        if engine.failedTurns > 0 {
+            log("\(engine.failedTurns) turn(s) failed")
+            exit(1)
+        }
+        if exchanged == 0 {
+            log("no turn produced a message")
+            exit(1)
         }
     }
 

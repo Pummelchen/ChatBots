@@ -52,6 +52,8 @@ extension ConversationEngine {
         }
         guard generationTask == nil else { return }
 
+        // A restarted conversation is a new run, so its failure count starts again.
+        failedTurns = 0
         seedOpeningTurns()
         setStatus(.preparing)
 

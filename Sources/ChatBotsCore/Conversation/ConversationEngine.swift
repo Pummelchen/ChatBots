@@ -173,6 +173,13 @@ public final class ConversationEngine {
     public internal(set) var queuedSteering: [Turn] = []
     /// Non-fatal notices, newest last. The UI drains these into a running commentary.
     public internal(set) var notices: [String] = []
+    /// How many turns have failed since this conversation started.
+    ///
+    /// A failed turn left a notice and a `.turnFailed` event, but the run's status went on to
+    /// `.finished`, so a caller that read `status` or `lastError` after the loop saw a success.
+    /// A headless caller needs a count it can turn into an exit code; `notices` is capped and its
+    /// strings are for a person, not a test.
+    public internal(set) var failedTurns = 0
     var noticeContinuation: AsyncStream<[String]>.Continuation?
 
     /// Why a seat's model could not be loaded, by seat id, from the last attempt to load it.
