@@ -32,8 +32,25 @@ extension HTTPServer {
                 thenClose: true)
             return
         }
-        armIdleDeadline(for: connection)
+        armRequestDeadlines(for: connection)
         receive(on: connection, buffer: Data())
+    }
+
+    /// Arm the idle deadline and the whole-request wall-clock deadline for a new connection.
+    ///
+    /// Two timers because one is not enough: the idle deadline is re-armed by every chunk, so a
+    /// peer that trickles one byte just inside it never trips it; the wall-clock one is armed
+    /// here and never replaced, so it ends that connection however slowly it drips.
+    private func armRequestDeadlines(for connection: NWConnection) {
+        armIdleDeadline(for: connection)
+
+        let token = UUID()
+        stateLock.lock()
+        totalDeadlines[ObjectIdentifier(connection)] = token
+        stateLock.unlock()
+        queue.asyncAfter(deadline: .now() + maximumRequestDuration) { [weak self] in
+            self?.totalDeadlineFired(for: connection, token: token)
+        }
     }
 
     /// Start, or restart, the idle deadline for a connection whose request is not complete.
@@ -53,10 +70,12 @@ extension HTTPServer {
         }
     }
 
-    /// The connection's request has been read in full; it is no longer idle.
-    private func disarmIdleDeadline(for connection: NWConnection) {
+    /// The connection's request has been read in full; it is no longer idle, and its
+    /// wall-clock deadline no longer applies.
+    private func disarmRequestDeadlines(for connection: NWConnection) {
         stateLock.lock()
         idleDeadlines[ObjectIdentifier(connection)] = nil
+        totalDeadlines[ObjectIdentifier(connection)] = nil
         stateLock.unlock()
     }
 
@@ -73,6 +92,24 @@ extension HTTPServer {
         note("request: not completed in time")
         write(
             .error("the request was not completed in time", status: 408), to: connection,
+            thenClose: true)
+    }
+
+    /// Drop a connection whose request has been open longer than the wall-clock allowance.
+    ///
+    /// This is what a trickling peer trips: it resets the idle deadline with every byte, so the
+    /// only bound on how long it can hold a slot is this one.
+    private func totalDeadlineFired(for connection: NWConnection, token: UUID) {
+        stateLock.lock()
+        let isCurrent = totalDeadlines[ObjectIdentifier(connection)] == token
+        let isLive = connections[ObjectIdentifier(connection)] != nil
+        if isCurrent { totalDeadlines[ObjectIdentifier(connection)] = nil }
+        stateLock.unlock()
+
+        guard isCurrent, isLive else { return }
+        note("request: open longer than the wall-clock allowance")
+        write(
+            .error("the request took too long to send", status: 408), to: connection,
             thenClose: true)
     }
 
@@ -100,7 +137,7 @@ extension HTTPServer {
                 // The request is complete, so the connection is no longer idle. This is what
                 // lets an event stream stay open past `requestTimeout`: the deadline covers
                 // reading the request, not the conversation the connection is kept for.
-                self.disarmIdleDeadline(for: connection)
+                self.disarmRequestDeadlines(for: connection)
                 self.respond(to: request, on: connection)
             } catch is HTTPParser.Incomplete {
                 if isComplete {
@@ -225,6 +262,7 @@ extension HTTPServer {
         stateLock.lock()
         connections[ObjectIdentifier(connection)] = nil
         idleDeadlines[ObjectIdentifier(connection)] = nil
+        totalDeadlines[ObjectIdentifier(connection)] = nil
         for stream in streams where stream.matches(connection) { stream.markClosed() }
         streams.removeAll { !$0.isOpen }
         stateLock.unlock()

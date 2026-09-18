@@ -1,0 +1,36 @@
+Building for debugging...
+[Computing dependencies]
+[Using on-disk description]
+[1 / 1]
+[1 / 70] EventSource
+[2 / 17] ChatBotsCore
+[4 / 21]
+[6 / 21] ChatBotsCore
+[11 / 25] ChatBotsCore
+[16 / 24] ChatBotsCore-product
+[16 / 24] chatbots-probe-product
+[17 / 25] ChatBots-product
+[19 / 27] ChatBots-product
+[21 / 22] ChatBotsCoreTests-product
+[21 / 22] ChatBotsAppTests-product
+[23 / 25] ChatBotsAppTests-product
+[24 / 25] chatbots-cli-product
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+Build complete! (5,19 secs)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "HTTP connections have limits" started.
+◇ Test "A connection that sends a partial request and stalls is dropped" started.
+✔ Test "A connection that sends a partial request and stalls is dropped" passed after 3.111 seconds.
+◇ Test "A connection that trickles bytes inside the idle deadline is still dropped" started.
+✔ Test "A connection that trickles bytes inside the idle deadline is still dropped" passed after 1.271 seconds.
+◇ Test "The parser refuses a head that cannot fit, and still parses one that does" started.
+✔ Test "The parser refuses a head that cannot fit, and still parses one that does" passed after 0.001 seconds.
+◇ Test "A connection whose head cannot fit is answered 431" started.
+✔ Test "A connection whose head cannot fit is answered 431" passed after 0.046 seconds.
+◇ Test "Connections over the cap are refused rather than entered in the table" started.
+✔ Test "Connections over the cap are refused rather than entered in the table" passed after 0.075 seconds.
+✔ Suite "HTTP connections have limits" passed after 4.507 seconds.
+✔ Test run with 5 tests in 1 suite passed after 4.507 seconds.
+EXIT=0

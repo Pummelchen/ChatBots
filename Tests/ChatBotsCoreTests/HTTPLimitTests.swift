@@ -19,7 +19,8 @@ import Testing
 /// A server that answers every request with `ok`, on a port of its own.
 @MainActor
 private func startServer(
-    maximumConnections: Int, requestTimeout: TimeInterval
+    maximumConnections: Int, requestTimeout: TimeInterval,
+    maximumRequestDuration: TimeInterval = 300
 ) async throws -> (HTTPServer, UInt16) {
     for _ in 0..<8 {
         let port = allocateTestPort()
@@ -27,7 +28,8 @@ private func startServer(
             port: port,
             handler: { _ in .text("ok") },
             maximumConnections: maximumConnections,
-            requestTimeout: requestTimeout)
+            requestTimeout: requestTimeout,
+            maximumRequestDuration: maximumRequestDuration)
         try server.start()
         if await server.waitUntilReady() { return (server, port) }
         server.stop()
@@ -75,6 +77,38 @@ struct HTTPLimitTests {
         // And it was told why rather than dropped in silence.
         let response = await client.receiveOnce(timeout: .seconds(4))
         #expect(response.map { String(decoding: $0, as: UTF8.self).contains("408") } == true)
+    }
+
+    /// The idle deadline alone is not a bound: every chunk re-arms it. The wall-clock deadline
+    /// is armed once at accept and is what ends a peer that trickles just inside the idle one.
+    @Test("A connection that trickles bytes inside the idle deadline is still dropped")
+    func tricklingConnectionIsReaped() async throws {
+        let (server, port) = try await startServer(
+            maximumConnections: 8, requestTimeout: 10, maximumRequestDuration: 1)
+        defer { server.stop() }
+
+        let client = try RawConnection(port: port)
+        defer { client.cancel() }
+        #expect(await client.connect())
+        // A head that never terminates.
+        client.send("POST /api/attachments HTTP/1.1\r\nHost: 127.0.0.1\r\n")
+
+        let registered = ContinuousClock.now.advanced(by: .seconds(5))
+        while server.connectionCount == 0, ContinuousClock.now < registered {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(server.connectionCount == 1, "the partial head should have been accepted")
+
+        // One byte every 300 ms: inside the 10-second idle deadline every time, but past the
+        // 1-second wall-clock allowance overall.
+        let reaped = ContinuousClock.now.advanced(by: .seconds(8))
+        while server.connectionCount > 0, ContinuousClock.now < reaped {
+            client.send("X")
+            try? await Task.sleep(for: .milliseconds(300))
+        }
+        #expect(
+            server.connectionCount == 0,
+            "a trickling connection was held past the wall-clock allowance")
     }
 
     /// The other half of the finding: `connections` had no maximum at all.

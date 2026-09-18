@@ -57,6 +57,17 @@ public final class HTTPServer: @unchecked Sendable {
     /// attachment must not be cut off for being slow, while one that has gone quiet is.
     public let requestTimeout: TimeInterval
 
+    /// The longest a whole request may take from accept to a parsed head and body.
+    ///
+    /// `requestTimeout` is only an *idle* deadline and is re-armed by every chunk, so a peer
+    /// that sends one byte just inside it holds a slot, its buffer and its table entry
+    /// indefinitely — thirty-two such peers are the connection cap and the server answers 503
+    /// to everyone else. This is the wall-clock bound that closes that: it is armed once when
+    /// the connection is accepted and never re-armed. It is deliberately loose (five minutes)
+    /// because a legitimate large upload over a LAN through Caddy must not be cut off; what it
+    /// removes is the *unbounded* hold, not slowness.
+    public let maximumRequestDuration: TimeInterval
+
     /// The most connections the server will hold at once.
     ///
     /// A cap has to be sized against what one connection can buffer, and that answer changed
@@ -76,6 +87,12 @@ public final class HTTPServer: @unchecked Sendable {
     /// that has already fired for a previous token is a no-op rather than a cancellation of
     /// the connection it was armed for.
     var idleDeadlines: [ObjectIdentifier: UUID] = [:]
+
+    /// The current wall-clock deadline token for each connection, under `stateLock`.
+    ///
+    /// Separate from `idleDeadlines` because it is armed once and never re-armed: the idle
+    /// token is replaced on every chunk, this one is not.
+    var totalDeadlines: [ObjectIdentifier: UUID] = [:]
 
     /// Its own lock rather than `stateLock`, so that recording a failure is safe on every path —
     /// including the ones that already hold `stateLock` — without nesting one lock inside another.
@@ -151,7 +168,8 @@ public final class HTTPServer: @unchecked Sendable {
         handler: @escaping Handler,
         streamer: Streamer? = nil,
         maximumConnections: Int = 32,
-        requestTimeout: TimeInterval = 30
+        requestTimeout: TimeInterval = 30,
+        maximumRequestDuration: TimeInterval = 300
     ) {
         self.port = port
         self.handler = handler
@@ -160,6 +178,10 @@ public final class HTTPServer: @unchecked Sendable {
         // reading of both of these is the strict one.
         self.maximumConnections = max(1, maximumConnections)
         self.requestTimeout = max(0.1, requestTimeout)
+        // Not clamped to `requestTimeout`: a total deadline shorter than the idle one is a
+        // legitimate configuration (and a client actively sending within the idle window can
+        // still exceed the total), so clamping would quietly disable the bound.
+        self.maximumRequestDuration = max(0.1, maximumRequestDuration)
     }
 
     /// Start listening. Throws if the port cannot be taken, which the caller must report
@@ -231,6 +253,7 @@ public final class HTTPServer: @unchecked Sendable {
         let active = Array(connections.values)
         connections.removeAll()
         idleDeadlines.removeAll()
+        totalDeadlines.removeAll()
         stateLock.unlock()
         for stream in open { stream.close() }
         for connection in active { connection.cancel() }
