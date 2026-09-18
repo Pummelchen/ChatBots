@@ -90,55 +90,67 @@ extension EngineService {
         // The belt to the validation's braces: even if the name check above were ever bypassed,
         // the write is refused unless the destination really is a direct child of the directory
         // created a moment ago.
-        let temporary = staged.file
-        guard Self.isDirectChild(temporary, of: directory) else {
+        guard Self.isDirectChild(staged.file, of: directory) else {
             return .refused("the uploaded file name is not a usable name")
         }
 
-        // Detached rather than a structured child, so the read is not cancelled by a caller
-        // that goes away — the staged file is removed when this method returns, and returning
-        // while the conversion still held the path would delete it under the extractor.
-        let conversion = await Task.detached(
+        switch await Self.read(staged.file, using: attachmentIngestor) {
+        case .refused(let reason):
+            return .refused(reason)
+        case .document(let document):
+            return accept(document)
+        }
+    }
+
+    /// Read a staged file as a document, off this actor.
+    ///
+    /// Detached rather than a structured child, so the read is not cancelled by a caller that
+    /// goes away — the staged file is removed when the caller returns, and returning while the
+    /// conversion still held the path would delete it under the extractor. A conversion that
+    /// throws is reported as the same refusal it was before.
+    private static func read(
+        _ file: URL, using attachmentIngestor: @escaping @Sendable () throws -> DocumentIngestor
+    ) async -> StagedConversion {
+        await Task.detached(
             priority: .userInitiated
         ) { [attachmentIngestor] () -> StagedConversion in
             do {
                 let ingestor = try attachmentIngestor()
-                return .document(try ingestor.add(url: temporary))
+                return .document(try ingestor.add(url: file))
             } catch let error as DocumentError {
                 return .refused(error.errorDescription ?? "the file could not be read")
             } catch {
                 return .refused(error.localizedDescription)
             }
         }.value
+    }
 
-        switch conversion {
-        case .refused(let reason):
-            return .refused(reason)
-        case .document(let document):
-            guard !document.kind.isImage || engine.allSeatsSupportVision else {
-                return .refused("images need every seat to support vision")
-            }
-            // Counted again here, on the main actor with the append below and after the `await`, because
-            // that is the only place the count cannot have moved: the guard at the top of this method ran
-            // before the conversion, so uploads arriving together all passed it.
-            guard engine.attachments.count < Self.maximumAttachments else {
-                return .refused("too many attached files")
-            }
-            // The aggregate bound, checked on the main actor with the append for the same
-            // reason the count is: the top-of-method guard ran before the conversion, so
-            // uploads arriving together all saw the same total.
-            let attachedBytes = engine.attachments.reduce(0) { $0 + $1.byteCount }
-            let (total, overflow) = attachedBytes.addingReportingOverflow(document.byteCount)
-            guard !overflow, total <= Self.maximumTotalAttachmentBytes else {
-                return .refused(
-                    "the attached files total more than "
-                        + "\(Self.maximumTotalAttachmentBytes / (1024 * 1024)) MB")
-            }
-            guard engine.setAttachments(engine.attachments + [document]) else {
-                return .refused(Self.sourceMaterialIsFixed)
-            }
-            return .state(snapshot())
+    /// Take a converted document into the conversation.
+    ///
+    /// The bounds are checked again here, on the main actor with the append and after the
+    /// `await`, because that is the only place they cannot have moved: the guards at the top of
+    /// `addAttachment` ran before the conversion, so uploads arriving together all passed them.
+    private func accept(_ document: AttachedDocument) -> EngineReply {
+        guard !document.kind.isImage || engine.allSeatsSupportVision else {
+            return .refused("images need every seat to support vision")
         }
+        guard engine.attachments.count < Self.maximumAttachments else {
+            return .refused("too many attached files")
+        }
+        // The aggregate bound, checked on the main actor with the append for the same
+        // reason the count is: the top-of-method guard ran before the conversion, so
+        // uploads arriving together all saw the same total.
+        let attachedBytes = engine.attachments.reduce(0) { $0 + $1.byteCount }
+        let (total, overflow) = attachedBytes.addingReportingOverflow(document.byteCount)
+        guard !overflow, total <= Self.maximumTotalAttachmentBytes else {
+            return .refused(
+                "the attached files total more than "
+                    + "\(Self.maximumTotalAttachmentBytes / (1024 * 1024)) MB")
+        }
+        guard engine.setAttachments(engine.attachments + [document]) else {
+            return .refused(Self.sourceMaterialIsFixed)
+        }
+        return .state(snapshot())
     }
 
     /// One staged upload: the private directory it lives in and the file inside it.

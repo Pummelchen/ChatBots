@@ -149,6 +149,9 @@ public enum SystemProcess {
         var timedOut = false
         /// stdout reached its ceiling, so the run is a refusal rather than a result.
         var outputExceeded = false
+        /// Whether each pipe's writer has still to close its end.
+        var outOpen = true
+        var errOpen = true
     }
 
     /// Read both of a child's pipes until they close, the deadline passes, or stdout passes its
@@ -160,21 +163,15 @@ public enum SystemProcess {
         outDescriptor: Int32, errDescriptor: Int32, deadline: Date, maximumOutputBytes: Int
     ) -> CollectedOutput {
         var collected = CollectedOutput()
-        var outOpen = true
-        var errOpen = true
-        while outOpen || errOpen {
+        while collected.outOpen || collected.errOpen {
             let remaining = deadline.timeIntervalSinceNow
             if remaining <= 0 {
                 collected.timedOut = true
                 break
             }
-            var descriptors: [pollfd] = []
-            if outOpen {
-                descriptors.append(pollfd(fd: outDescriptor, events: Int16(POLLIN), revents: 0))
-            }
-            if errOpen {
-                descriptors.append(pollfd(fd: errDescriptor, events: Int16(POLLIN), revents: 0))
-            }
+            var descriptors = descriptorsToPoll(
+                outDescriptor: outDescriptor, errDescriptor: errDescriptor,
+                outOpen: collected.outOpen, errOpen: collected.errOpen)
             // Short poll slices, so a process that closes its pipes and then exits is
             // noticed promptly and the deadline is checked on every pass.
             let waitMilliseconds = Int32(min(max(remaining, 0.001), 0.25) * 1_000)
@@ -185,30 +182,55 @@ public enum SystemProcess {
                 if errno == EINTR { continue }
                 break
             }
-            for index in descriptors.indices {
-                let revents = descriptors[index].revents
-                guard revents & Int16(POLLIN | POLLHUP | POLLERR | POLLNVAL) != 0 else { continue }
-                if descriptors[index].fd == outDescriptor {
-                    let outcome = Self.drain(
-                        outDescriptor, into: &collected.output, limit: maximumOutputBytes)
-                    outOpen = outcome.stillOpen
-                    if outcome.overLimit {
-                        collected.outputExceeded = true
-                        break
-                    }
-                } else {
-                    // Past the ceiling this end is left unread rather than emptied and discarded:
-                    // the child then blocks on a full stderr, and the deadline is what ends it. Both
-                    // memory and time stay bounded, and no tool that produces a usable document
-                    // writes this much to stderr.
-                    let outcome = Self.drain(
-                        errDescriptor, into: &collected.error, limit: maximumOutputBytes)
-                    errOpen = outcome.stillOpen && !outcome.overLimit
-                }
-            }
+            drainReady(
+                descriptors, outDescriptor: outDescriptor, errDescriptor: errDescriptor,
+                maximumOutputBytes: maximumOutputBytes, into: &collected)
             if collected.outputExceeded { break }
         }
         return collected
+    }
+
+    /// The pipes that are still open, in the order `collectOutput` reads them.
+    private static func descriptorsToPoll(
+        outDescriptor: Int32, errDescriptor: Int32, outOpen: Bool, errOpen: Bool
+    ) -> [pollfd] {
+        var descriptors: [pollfd] = []
+        if outOpen {
+            descriptors.append(pollfd(fd: outDescriptor, events: Int16(POLLIN), revents: 0))
+        }
+        if errOpen {
+            descriptors.append(pollfd(fd: errDescriptor, events: Int16(POLLIN), revents: 0))
+        }
+        return descriptors
+    }
+
+    /// Read whichever of the polled pipes are ready, recording what is still open and whether
+    /// stdout passed its ceiling.
+    private static func drainReady(
+        _ descriptors: [pollfd], outDescriptor: Int32, errDescriptor: Int32,
+        maximumOutputBytes: Int, into collected: inout CollectedOutput
+    ) {
+        for index in descriptors.indices {
+            let revents = descriptors[index].revents
+            guard revents & Int16(POLLIN | POLLHUP | POLLERR | POLLNVAL) != 0 else { continue }
+            if descriptors[index].fd == outDescriptor {
+                let outcome = Self.drain(
+                    outDescriptor, into: &collected.output, limit: maximumOutputBytes)
+                collected.outOpen = outcome.stillOpen
+                if outcome.overLimit {
+                    collected.outputExceeded = true
+                    break
+                }
+            } else {
+                // Past the ceiling this end is left unread rather than emptied and discarded:
+                // the child then blocks on a full stderr, and the deadline is what ends it. Both
+                // memory and time stay bounded, and no tool that produces a usable document
+                // writes this much to stderr.
+                let outcome = Self.drain(
+                    errDescriptor, into: &collected.error, limit: maximumOutputBytes)
+                collected.errOpen = outcome.stillOpen && !outcome.overLimit
+            }
+        }
     }
 
     /// Put a descriptor in non-blocking mode so `drain` returns on EAGAIN instead of

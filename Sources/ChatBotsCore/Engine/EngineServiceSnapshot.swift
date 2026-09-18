@@ -23,59 +23,19 @@ extension EngineService {
             isPaused: engine.isPaused,
             turnsCompleted: engine.startedTurns,
             seats: engine.specs.map(seat),
-            messages: engine.displayTurns.map { turn in
-                APISnapshot.Message(
-                    id: turn.id.uuidString,
-                    sequence: turn.sequence,
-                    speaker: turn.speakerName,
-                    speakerID: turn.speakerID,
-                    kind: turn.kind.rawValue,
-                    text: turn.content,
-                    timestamp: turn.timestamp,
-                    toolDetail: turn.toolDetail)
-            },
-            live: engine.liveSeats.map { live in
-                APISnapshot.Live(
-                    seatID: live.id,
-                    isGenerating: live.isGenerating,
-                    text: live.text,
-                    reasoning: live.reasoning,
-                    activity: live.activity,
-                    toolLog: live.toolLog,
-                    stats: live.stats)
-            },
+            messages: messages(),
+            live: liveSeats(),
             notices: engine.notices.suffix(12).map { $0 },
             error: engine.lastError,
             contextTokens: usage.tokens,
             contextWindow: usage.window,
             contextFraction: usage.fraction,
             compactThreshold: engine.configuration.compactThreshold,
-            attachments: engine.attachments.map { document in
-                // Metadata only: the bytes stay in the engine, which is where the model request
-                // reads them from. They used to be re-encoded into every snapshot.
-                APIAttachment(
-                    id: document.id.uuidString,
-                    name: document.name,
-                    kind: document.kind.rawValue,
-                    summary: document.summary,
-                    tokens: document.estimatedTokens,
-                    wasTruncated: document.wasTruncated)
-            },
+            attachments: attachments(),
             canAttach: engine.canAttachFiles,
             imagesAllowed: engine.allSeatsSupportVision,
-            availablePersonas: PersonaCatalog.styles(for: roomMode).map {
-                APIPersona(
-                    id: $0.id, name: $0.name, category: $0.group, summary: $0.summary,
-                    emoji: $0.emoji, isAnalyst: $0.isAnalyst)
-            },
-            // The checkpoint list travels with every state for the same reason the personas do: a
-            // front end offers what this engine can actually run, without a second copy of the
-            // catalogue to keep in step (ModelCatalog).
-            availableModels: ModelCatalog.choices.map { choice in
-                APIModelOption(
-                    id: choice.id, name: choice.name, summary: choice.summary,
-                    sizeLabel: choice.sizeLabel)
-            },
+            availablePersonas: personas(for: roomMode),
+            availableModels: modelOptions(),
             serverTime: .now,
             revision: snapshotRevision,
             research: engine.researchStatus(),
@@ -86,27 +46,105 @@ extension EngineService {
                 seatIndex: 0
             ).name,
             shareBase: shareBase,
-            votes: engine.conversation.votes.map { vote in
-                APISnapshot.Vote(
-                    turnID: vote.turnID.uuidString, seatID: vote.seatID,
-                    verdict: vote.verdict.rawValue)
-            },
-            audience: engine.audience.scores.map { entry in
-                APISnapshot.AudienceEntry(
-                    seatID: entry.seatID,
-                    name: engine.specs.first { $0.id == entry.seatID }?.displayName ?? entry.seatID,
-                    strong: entry.strong, weak: entry.weak, score: entry.score)
-            },
-            report: engine.researchReport().map { report in
-                APISnapshot.ReportSummary(
-                    question: report.question,
-                    producedAt: report.producedAt,
-                    stopReason: report.stopReason,
-                    labelledClaims: report.labelledStatements,
-                    isLabelled: report.isLabelled,
-                    missingSections: report.missingSections,
-                    markdown: report.markdown())
-            })
+            votes: votes(),
+            audience: audience(),
+            report: reportSummary())
+    }
+
+    /// The log, one wire message per turn.
+    private func messages() -> [APISnapshot.Message] {
+        engine.displayTurns.map { turn in
+            APISnapshot.Message(
+                id: turn.id.uuidString,
+                sequence: turn.sequence,
+                speaker: turn.speakerName,
+                speakerID: turn.speakerID,
+                kind: turn.kind.rawValue,
+                text: turn.content,
+                timestamp: turn.timestamp,
+                toolDetail: turn.toolDetail)
+        }
+    }
+
+    /// The seats generating right now, with their live fragments.
+    private func liveSeats() -> [APISnapshot.Live] {
+        engine.liveSeats.map { live in
+            APISnapshot.Live(
+                seatID: live.id,
+                isGenerating: live.isGenerating,
+                text: live.text,
+                reasoning: live.reasoning,
+                activity: live.activity,
+                toolLog: live.toolLog,
+                stats: live.stats)
+        }
+    }
+
+    /// The attachments, as metadata only: the bytes stay in the engine, which is where the model
+    /// request reads them from. They used to be re-encoded into every snapshot.
+    private func attachments() -> [APIAttachment] {
+        engine.attachments.map { document in
+            APIAttachment(
+                id: document.id.uuidString,
+                name: document.name,
+                kind: document.kind.rawValue,
+                summary: document.summary,
+                tokens: document.estimatedTokens,
+                wasTruncated: document.wasTruncated)
+        }
+    }
+
+    /// The personas worth offering for a mode.
+    private func personas(for mode: DiscussionMode) -> [APIPersona] {
+        PersonaCatalog.styles(for: mode).map {
+            APIPersona(
+                id: $0.id, name: $0.name, category: $0.group, summary: $0.summary,
+                emoji: $0.emoji, isAnalyst: $0.isAnalyst)
+        }
+    }
+
+    /// The checkpoint list travels with every state for the same reason the personas do: a front
+    /// end offers what this engine can actually run, without a second copy of the catalogue to
+    /// keep in step (ModelCatalog).
+    private func modelOptions() -> [APIModelOption] {
+        ModelCatalog.choices.map { choice in
+            APIModelOption(
+                id: choice.id, name: choice.name, summary: choice.summary,
+                sizeLabel: choice.sizeLabel)
+        }
+    }
+
+    /// The audience's verdicts on contributions.
+    private func votes() -> [APISnapshot.Vote] {
+        engine.conversation.votes.map { vote in
+            APISnapshot.Vote(
+                turnID: vote.turnID.uuidString, seatID: vote.seatID,
+                verdict: vote.verdict.rawValue)
+        }
+    }
+
+    /// The audience's standing, with each seat's display name resolved from its id.
+    private func audience() -> [APISnapshot.AudienceEntry] {
+        engine.audience.scores.map { entry in
+            APISnapshot.AudienceEntry(
+                seatID: entry.seatID,
+                name: engine.specs.first { $0.id == entry.seatID }?.displayName ?? entry.seatID,
+                strong: entry.strong, weak: entry.weak, score: entry.score)
+        }
+    }
+
+    /// A summary of the finished report, when one exists.
+    private func reportSummary() -> APISnapshot.ReportSummary? {
+        engine.researchReport().map { report in
+            APISnapshot.ReportSummary(
+                question: report.question,
+                producedAt: report.producedAt,
+                stopReason: report.stopReason,
+                labelledClaims: report.labelledStatements,
+                isLabelled: report.isLabelled,
+                missingSections: report.missingSections,
+                markdown: report.markdown())
+        }
     }
 
     private func seat(_ spec: AgentSpec) -> APISnapshot.Seat {
