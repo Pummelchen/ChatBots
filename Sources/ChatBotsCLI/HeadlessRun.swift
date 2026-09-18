@@ -140,7 +140,7 @@ enum HeadlessRun {
             switch event {
             case .toolCall(let agentID, let name, let query):
                 log("  [\(agentID)] → \(name)(\(UTF8Text.prefix(query, 70)))")
-            case .toolResult(let agentID, let name, let summary, _):
+            case .toolResult(let agentID, let name, let summary, _, _):
                 log("  [\(agentID)] ← \(name): \(summary)")
             case .toolFailure(let agentID, let name, let message):
                 log("  [\(agentID)] ✗ \(name): \(message)")

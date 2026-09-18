@@ -88,12 +88,35 @@ public struct TavilyClient: Sendable {
 
     // MARK: - Search
 
+    /// The largest success body this client will read from Tavily.
+    ///
+    /// A search result is kilobytes and an extract is bounded by `maxCharactersPerPage` per page,
+    /// so this is far past any honest response and still a bound on what an upstream can make this
+    /// process allocate.
+    static let maximumResponseBytes = 16 * 1024 * 1024
+
     public func search(
         query: String,
         maxResults: Int = 5,
         depth: Depth = .basic,
         includeAnswer: Bool = false
     ) async throws -> [SearchHit] {
+        try await searchDetailed(
+            query: query, maxResults: maxResults, depth: depth, includeAnswer: includeAnswer
+        ).hits
+    }
+
+    /// The hits and how many billed upstream requests they cost.
+    ///
+    /// One request at `basic`. Two when the basic result was empty and the search retried at
+    /// `advanced` — the research budget charges per call, so a `web_search` that retried used to
+    /// cost two billed calls and be charged for one.
+    public func searchDetailed(
+        query: String,
+        maxResults: Int = 5,
+        depth: Depth = .basic,
+        includeAnswer: Bool = false
+    ) async throws -> (hits: [SearchHit], billedUnits: Int) {
         struct Request: Encodable {
             let query: String
             let search_depth: String
@@ -113,18 +136,19 @@ public struct TavilyClient: Sendable {
             let answer: String?
         }
 
-        let mapped =
-            try await post(
-                path: "/search",
-                body: Request(
-                    query: query,
-                    search_depth: depth.rawValue,
-                    max_results: max(1, min(maxResults, 10)),
-                    include_answer: includeAnswer,
-                    include_raw_content: false
-                ),
-                as: Response.self
-            ).results?.map {
+        let response = try await post(
+            path: "/search",
+            body: Request(
+                query: query,
+                search_depth: depth.rawValue,
+                max_results: max(1, min(maxResults, 10)),
+                include_answer: includeAnswer,
+                include_raw_content: false
+            ),
+            as: Response.self
+        )
+        var hits =
+            response.results?.map {
                 SearchHit(
                     title: $0.title ?? "(untitled)",
                     url: $0.url ?? "",
@@ -132,17 +156,28 @@ public struct TavilyClient: Sendable {
                     score: $0.score
                 )
             } ?? []
+        // `include_answer` asked Tavily for its own summary and then threw it away: the field was
+        // decoded and never read, so the flag was a no-op and the retry's own comment about
+        // keeping it was false. It is now the first hit, which is where a model reading the list
+        // will see it.
+        if includeAnswer, let answer = response.answer,
+            !answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
+            hits.insert(
+                SearchHit(title: "Tavily answer", url: "", content: answer, score: nil), at: 0)
+        }
 
-        switch Self.outcome(for: mapped, depth: depth) {
-        case .hits(let hits):
-            return hits
+        switch Self.outcome(for: hits, depth: depth) {
+        case .hits(let usable):
+            return (usable, 1)
         case .retryAdvanced:
             // The retry keeps the caller's `includeAnswer`. The recursive call used to drop it,
             // so a caller that asked for Tavily's own answer lost it on exactly the path the
-            // retry exists for. No caller passes `true` today, which is why it went unnoticed.
-            return try await search(
+            // retry exists for.
+            let retried = try await searchDetailed(
                 query: query, maxResults: maxResults, depth: .advanced,
                 includeAnswer: includeAnswer)
+            return (retried.hits, retried.billedUnits + 1)
         }
     }
 
@@ -239,24 +274,45 @@ public struct TavilyClient: Sendable {
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(body)
 
-        let (data, response): (Data, URLResponse)
+        // The body is bounded while it arrives. `data(for:)` buffered whatever the peer sent, so a
+        // hostile or compromised upstream could force an allocation of any size before a single
+        // check ran; neither the results array nor the field lengths are bounded either, so the cap
+        // is on the bytes rather than on a count that a long string can sidestep. A non-2xx only
+        // needs a snippet for the message, so it stops at the snippet's length.
+        var received = Data()
+        let http: HTTPURLResponse
         do {
-            (data, response) = try await session.session.data(for: request)
+            let (bytes, response) = try await session.session.bytes(for: request)
+            guard let typed = response as? HTTPURLResponse else {
+                throw ChatBotsError.toolFailed("no HTTP response")
+            }
+            http = typed
+            let isSuccess = (200..<300).contains(typed.statusCode)
+            let limit = isSuccess ? Self.maximumResponseBytes : 400
+            for try await byte in bytes {
+                if received.count >= limit {
+                    if isSuccess {
+                        throw ChatBotsError.toolFailed(
+                            "the Tavily response was larger than \(limit) bytes")
+                    }
+                    break
+                }
+                received.append(byte)
+            }
+        } catch let error as ChatBotsError {
+            throw error
         } catch {
             throw ChatBotsError.toolFailed("network error: \(error.localizedDescription)")
         }
 
-        guard let http = response as? HTTPURLResponse else {
-            throw ChatBotsError.toolFailed("no HTTP response")
-        }
         guard (200..<300).contains(http.statusCode) else {
             // Cut bytes safely: a raw `data.prefix` can split a multi-byte character.
-            let snippet = UTF8Text.decodeTruncated(UTF8Text.bytePrefix(data, 400)) ?? ""
+            let snippet = UTF8Text.decodeTruncated(UTF8Text.bytePrefix(received, 400)) ?? ""
             throw ChatBotsError.toolFailed("HTTP \(http.statusCode) \(snippet)")
         }
 
         do {
-            return try JSONDecoder().decode(Result.self, from: data)
+            return try JSONDecoder().decode(Result.self, from: received)
         } catch {
             throw ChatBotsError.toolFailed("unreadable Tavily response: \(error.localizedDescription)")
         }

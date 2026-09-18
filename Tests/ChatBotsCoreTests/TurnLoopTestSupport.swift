@@ -63,7 +63,7 @@ enum TurnLoopHarness {
         }
         var toolResults: [(name: String, summary: String, detail: String)] {
             events.compactMap {
-                if case .toolResult(_, let name, let summary, let detail) = $0 {
+                if case .toolResult(_, let name, let summary, let detail, _) = $0 {
                     return (name, summary, detail)
                 }
                 return nil

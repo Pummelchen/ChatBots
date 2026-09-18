@@ -30,11 +30,15 @@ public struct WebSearchTool: ToolProvider {
             throw ChatBotsError.toolFailed("empty search query")
         }
 
-        let hits = try await client.search(query: query, maxResults: maxResults)
+        let found = try await client.searchDetailed(query: query, maxResults: maxResults)
+        let hits = found.hits
         guard !hits.isEmpty else {
             return ToolOutcome(
                 text: "No results for \"\(query)\".",
-                summary: "no results for \"\(query)\""
+                summary: "no results for \"\(query)\"",
+                // A retry at advanced depth that found nothing still cost the caller two billed
+                // searches, and the budget has to hear about it.
+                billedUnits: found.billedUnits
             )
         }
 
@@ -55,7 +59,8 @@ public struct WebSearchTool: ToolProvider {
                 Cite the URLs you rely on. If these results do not settle the point, search again \
                 with different wording instead of guessing.
                 """,
-            summary: "\(hits.count) result(s) for \"\(query)\" — \(hits.first?.title ?? "")"
+            summary: "\(hits.count) result(s) for \"\(query)\" — \(hits.first?.title ?? "")",
+            billedUnits: found.billedUnits
         )
     }
 }

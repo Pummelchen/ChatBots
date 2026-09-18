@@ -309,7 +309,10 @@ extension ConversationEngine {
             }
             publishEvent(event)
 
-        case .toolResult(let id, let name, let summary, let detail):
+        case .toolResult(let id, let name, let summary, let detail, let billedUnits):
+            // The call was already charged once through `noteToolCall`; a tool that retried reports
+            // more, and the budget charges what was actually spent rather than what was dispatched.
+            toolCallsThisTurn += max(0, billedUnits - 1)
             conversation.turns.append(
                 Turn(
                     sequence: nextSequence(),

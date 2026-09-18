@@ -11,10 +11,17 @@ public struct ToolOutcome: Sendable {
     public var text: String
     /// One-line summary for the transcript.
     public var summary: String
+    /// How many billed upstream calls this invocation made.
+    ///
+    /// One for a tool that talks to nothing metered. `web_search` reports two when its basic
+    /// search came back empty and it retried at `advanced` depth: the research budget charges per
+    /// call, and it used to charge one for a call that cost two.
+    public var billedUnits: Int
 
-    public init(text: String, summary: String) {
+    public init(text: String, summary: String, billedUnits: Int = 1) {
         self.text = text
         self.summary = summary
+        self.billedUnits = max(1, billedUnits)
     }
 }
 

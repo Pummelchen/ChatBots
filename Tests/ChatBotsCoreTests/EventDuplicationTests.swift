@@ -42,7 +42,8 @@ private actor CountingEngine: LLMEngine {
         }
         await onEvent(
             .toolResult(
-                agentID: spec.id, name: "search", summary: "one result", detail: "the detail"))
+                agentID: spec.id, name: "search", summary: "one result", detail: "the detail",
+                billedUnits: 1))
         let text = tokens.joined()
         await onEvent(
             .turnFinished(

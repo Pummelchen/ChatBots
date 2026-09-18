@@ -20,13 +20,16 @@ private actor ToolCallStub: LLMEngine {
     /// How many tool calls the next turn makes, consumed in order; the last value repeats.
     private var script: [Int]
     private let reportsResults: Bool
+    /// What each reported result says it cost upstream. A tool that retried reports two.
+    private let billedPerCall: Int
     private let text: String
     private var turn = 0
 
-    init(spec: AgentSpec, script: [Int], reportsResults: Bool, text: String) {
+    init(spec: AgentSpec, script: [Int], reportsResults: Bool, billedPerCall: Int = 1, text: String) {
         self.spec = spec
         self.script = script
         self.reportsResults = reportsResults
+        self.billedPerCall = billedPerCall
         self.text = text
     }
 
@@ -51,7 +54,7 @@ private actor ToolCallStub: LLMEngine {
                 await onEvent(
                     .toolResult(
                         agentID: spec.id, name: "web_search", summary: "result \(index)",
-                        detail: "result \(index)"))
+                        detail: "result \(index)", billedUnits: billedPerCall))
             }
         }
         await onEvent(
@@ -67,7 +70,8 @@ private func budgetEngine(
     scripts: [[Int]],
     maxSearches: Int,
     rounds: Int,
-    reportsResults: Bool = true
+    reportsResults: Bool = true,
+    billedPerCall: Int = 1
 ) -> (ConversationEngine, [ToolCallStub]) {
     let specs = AgentSpec.makeSeats(count: 2).map { seat -> AgentSpec in
         var copy = seat
@@ -81,6 +85,7 @@ private func budgetEngine(
             spec: spec,
             script: index < scripts.count ? scripts[index] : [],
             reportsResults: reportsResults,
+            billedPerCall: billedPerCall,
             // Sourced so the turn counts as progress and the session does not converge before
             // the search ceiling is what stops it, and naming no subject so it cannot claim the
             // investigation is answered.
@@ -155,5 +160,22 @@ struct ResearchSearchBudgetTests {
         #expect(session?.stop == .searchesReached)
         #expect((session?.searches ?? 0) >= 4, "the ceiling was reached")
         #expect(session?.rounds == 2, "two turns of two calls is the ceiling")
+    }
+
+    @Test("A call that reports two billed searches is charged two, not one")
+    func retriedCallIsChargedTwice() async {
+        // `web_search` retries at advanced depth when the basic search comes back empty, so one
+        // tool call can cost two billed calls. The dispatch callback charges one; the result's
+        // `billedUnits` is what makes up the difference. With one call a turn at two units, a
+        // ceiling of two must be reached after one turn, not two.
+        let (engine, _) = budgetEngine(
+            scripts: [[1], [1]], maxSearches: 2, rounds: 12, billedPerCall: 2)
+        engine.start(topic: "A question")
+        await engine.waitUntilFinished()
+
+        let session = engine.researchSession
+        #expect(session?.searches == 2, "the retry was charged")
+        #expect(session?.stop == .searchesReached)
+        #expect(session?.rounds == 1, "one turn of two billed calls is the ceiling")
     }
 }

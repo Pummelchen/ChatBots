@@ -62,7 +62,7 @@ extension ConversationEngine {
             liveState[agentID, default: LiveState()].reasoning += text
         case .toolCall(let agentID, let name, let query):
             liveState[agentID, default: LiveState()].activity = "\(name)(\(UTF8Text.prefix(query, 60)))"
-        case .toolResult(let agentID, _, let summary, _):
+        case .toolResult(let agentID, _, let summary, _, _):
             liveState[agentID, default: LiveState()].toolLog.append(summary)
             liveState[agentID]?.activity = nil
         case .toolFailure(let agentID, _, let message):

@@ -102,7 +102,7 @@ private actor ToolTurnEngine: LLMEngine {
         await onEvent(
             .toolResult(
                 agentID: spec.id, name: "web_search", summary: "3 results",
-                detail: "the three results"))
+                detail: "the three results", billedUnits: 1))
         let text = "A sourced answer"
         await onEvent(
             .turnFinished(

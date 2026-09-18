@@ -17,8 +17,9 @@ public enum TurnEvent: Sendable {
     case reasoning(agentID: String, text: String)
     /// The model asked for a web tool.
     case toolCall(agentID: String, name: String, query: String)
-    /// Result of that tool, truncated for display.
-    case toolResult(agentID: String, name: String, summary: String, detail: String)
+    /// Result of that tool, truncated for display. `billedUnits` is what the call actually cost
+    /// upstream, so a tool that retried can be charged for both attempts.
+    case toolResult(agentID: String, name: String, summary: String, detail: String, billedUnits: Int)
     /// A tool failed; the model is told so and carries on.
     case toolFailure(agentID: String, name: String, message: String)
     /// The turn produced its final text.

@@ -1,0 +1,111 @@
+Building for debugging...
+[Computing dependencies]
+[Provisioning 1 / 64]
+[Using on-disk description]
+[1 / 2] swift-transformers_Hub
+[1 / 46] ComplexModule
+[3 / 13] ChatBots
+[14 / 25] ChatBotsCoreTests-product
+[15 / 25] ChatBots
+[16 / 25] ChatBotsCoreTests-product
+[19 / 27] ChatBotsCoreTests-product
+[21 / 28] ChatBotsAppTests-product
+[23 / 28] ChatBotsAppTests-product
+[24 / 28] ChatBotsCoreTests-product
+[24 / 28] chatbots-cli-product
+[26 / 29] ChatBotsCoreTests-product
+[27 / 30] ChatBotsCoreTests-product
+[29 / 33] ChatBotsCoreTests-product
+[31 / 33] ChatBotsCoreTests-product
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+Build complete! (14,88 secs)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "The web_search tool's own branches" started.
+◇ Suite "The empty-result retry follows the blank filter" started.
+◇ Suite "Engine events are published once" started.
+◇ Suite "A turn's end is observable in the engine's live view" started.
+◇ Suite "The turn loop runs on a stubbed model" started.
+◇ Test "A failed turn clears isGenerating too" started.
+◇ Test "Three blank items retry at advanced and return the real hits" started.
+◇ Test "The events stream also carries each event once" started.
+◇ Test "The tool log reaches a state-only client through the live view" started.
+◇ Test "An observeEvents subscriber sees each token once, in order" started.
+◇ Test "A turn in flight reports isGenerating, and its end clears it" started.
+◇ Suite "The search budget counts real tool calls" started.
+◇ Test "A hit is only blank when it has neither title nor content" started.
+◇ Test "Blank hits are removed before the retry is decided" started.
+◇ Test "A redirect from the search endpoint is reported, not followed with the key" started.
+◇ Test "A search that finds nothing says so instead of returning an empty list" started.
+◇ Test "An empty query is refused before any request is made" started.
+◇ Test "A usable basic response is not retried" started.
+◇ Test "The advanced retry keeps includeAnswer" started.
+◇ Test "includeAnswer puts Tavily's own summary first instead of dropping it" started.
+◇ Test "One usable hit among blanks is used, not retried" started.
+◇ Test "A retry is reported as two billed searches, and a single attempt as one" started.
+◇ Test "Hits become a numbered list with their URLs, and a summary that says how many" started.
+◇ Test "An empty response retries at basic and stops at advanced" started.
+◇ Test "An advanced search does not retry again" started.
+◇ Test "A tool round is framed as the template requires, and callable again" started.
+◇ Test "The round's parameters mirror the turn's settings" started.
+◇ Test "Reasoning with no answer is reported as having spent the budget" started.
+◇ Test "Tool rounds are bounded, whatever the model keeps asking for" started.
+◇ Test "Fabricated tool syntax is stripped and the speaker tag removed" started.
+◇ Test "A response past the byte cap is refused rather than decoded" started.
+◇ Test "Images ride on the last user entry of the first round only" started.
+◇ Test "The reported stats come from the round's info event" started.
+◇ Test "A call for a tool the turn did not offer is refused, not run" started.
+◇ Test "The reasoning ceiling ends the turn and fails it with no answer" started.
+◇ Test "An unbounded session stops at the ceiling rather than running past it" started.
+◇ Test "A round with no info event still reports honest statistics" started.
+◇ Test "A turn that makes no call is charged nothing even after one that did" started.
+◇ Test "A call that reports two billed searches is charged two, not one" started.
+◇ Test "Prompt assembly sends the opening messages unchanged, in order" started.
+◇ Test "The ceiling stops the session on the count that was spent" started.
+◇ Test "A turn that makes three tool calls is charged three, not one" started.
+[ChatBots] Agent 1 stripped 2 line(s) of fabricated tool syntax from the answer
+✔ Test "The round's parameters mirror the turn's settings" passed after 0.001 seconds.
+✔ Test "Fabricated tool syntax is stripped and the speaker tag removed" passed after 0.001 seconds.
+✔ Test "Tool rounds are bounded, whatever the model keeps asking for" passed after 0.001 seconds.
+✔ Test "Images ride on the last user entry of the first round only" passed after 0.001 seconds.
+✔ Test "The reported stats come from the round's info event" passed after 0.001 seconds.
+✔ Test "Prompt assembly sends the opening messages unchanged, in order" passed after 0.001 seconds.
+✔ Test "A round with no info event still reports honest statistics" passed after 0.001 seconds.
+✔ Test "A tool round is framed as the template requires, and callable again" passed after 0.001 seconds.
+✔ Test "Reasoning with no answer is reported as having spent the budget" passed after 0.001 seconds.
+✔ Test "A call for a tool the turn did not offer is refused, not run" passed after 0.001 seconds.
+✔ Test "The reasoning ceiling ends the turn and fails it with no answer" passed after 0.001 seconds.
+✔ Suite "The turn loop runs on a stubbed model" passed after 0.001 seconds.
+✔ Test "An empty query is refused before any request is made" passed after 0.016 seconds.
+✔ Test "Blank hits are removed before the retry is decided" passed after 0.017 seconds.
+✔ Test "One usable hit among blanks is used, not retried" passed after 0.017 seconds.
+✔ Test "A hit is only blank when it has neither title nor content" passed after 0.017 seconds.
+✔ Test "An empty response retries at basic and stops at advanced" passed after 0.017 seconds.
+✔ Test "A failed turn clears isGenerating too" passed after 0.025 seconds.
+✔ Test "The tool log reaches a state-only client through the live view" passed after 0.032 seconds.
+✔ Test "An observeEvents subscriber sees each token once, in order" passed after 0.035 seconds.
+✔ Test "A call that reports two billed searches is charged two, not one" passed after 0.036 seconds.
+✔ Test "Three blank items retry at advanced and return the real hits" passed after 0.041 seconds.
+✔ Test "A usable basic response is not retried" passed after 0.041 seconds.
+✔ Test "includeAnswer puts Tavily's own summary first instead of dropping it" passed after 0.044 seconds.
+✔ Test "An advanced search does not retry again" passed after 0.044 seconds.
+✔ Test "Hits become a numbered list with their URLs, and a summary that says how many" passed after 0.044 seconds.
+✔ Test "A turn in flight reports isGenerating, and its end clears it" passed after 0.046 seconds.
+✔ Suite "A turn's end is observable in the engine's live view" passed after 0.046 seconds.
+✔ Test "The advanced retry keeps includeAnswer" passed after 0.046 seconds.
+✔ Test "A search that finds nothing says so instead of returning an empty list" passed after 0.046 seconds.
+✔ Test "The ceiling stops the session on the count that was spent" passed after 0.046 seconds.
+✔ Test "An unbounded session stops at the ceiling rather than running past it" passed after 0.047 seconds.
+✔ Test "A redirect from the search endpoint is reported, not followed with the key" passed after 0.085 seconds.
+✔ Suite "The web_search tool's own branches" passed after 0.085 seconds.
+✔ Test "A retry is reported as two billed searches, and a single attempt as one" passed after 0.085 seconds.
+✔ Test "A turn that makes no call is charged nothing even after one that did" passed after 0.115 seconds.
+✔ Test "A turn that makes three tool calls is charged three, not one" passed after 0.115 seconds.
+✔ Suite "The search budget counts real tool calls" passed after 0.116 seconds.
+✔ Test "The events stream also carries each event once" passed after 0.300 seconds.
+✔ Suite "Engine events are published once" passed after 0.300 seconds.
+✔ Test "A response past the byte cap is refused rather than decoded" passed after 1.183 seconds.
+✔ Suite "The empty-result retry follows the blank filter" passed after 1.183 seconds.
+✔ Test run with 36 tests in 6 suites passed after 1.183 seconds.
+EXIT=0

@@ -165,6 +165,56 @@ struct ClientsSearchTests {
             "the blank response must be what triggers the advanced attempt")
     }
 
+    @Test("A retry is reported as two billed searches, and a single attempt as one")
+    func retryCostsTwoSearches() async throws {
+        // The research budget charges per tool call; the advanced retry is a second billed call
+        // and used to be charged as one. `searchDetailed` is what tells the tool what it spent.
+        let retried = try await ScriptedTavilyServer(
+            basicBody: blankResults, advancedBody: realResult)
+        defer { retried.stop() }
+        let two = try await retried.client().searchDetailed(query: "blank first")
+        #expect(two.billedUnits == 2, "basic then advanced is two billed calls")
+        #expect(two.hits.count == 1)
+
+        let single = try await ScriptedTavilyServer(
+            basicBody: realResult, advancedBody: blankResults)
+        defer { single.stop() }
+        let one = try await single.client().searchDetailed(query: "answered first time")
+        #expect(one.billedUnits == 1)
+    }
+
+    @Test("includeAnswer puts Tavily's own summary first instead of dropping it")
+    func answerReachesTheCaller() async throws {
+        // `answer` was decoded and never read, so `include_answer: true` was a no-op.
+        let withAnswer = Data(
+            #"""
+            {"answer":"Eggs are ovoid because a pointed end would crack.","results":[
+              {"title":"A real page","url":"https://real.example","content":"some text","score":0.9}]}
+            """#.utf8)
+        let server = try await ScriptedTavilyServer(basicBody: withAnswer, advancedBody: withAnswer)
+        defer { server.stop() }
+
+        let hits = try await server.client().search(query: "why ovoid", includeAnswer: true)
+
+        #expect(hits.first?.title == "Tavily answer", "the answer leads the list")
+        #expect(hits.first?.content == "Eggs are ovoid because a pointed end would crack.")
+        #expect(hits.count == 2, "and the real result is still there")
+    }
+
+    @Test("A response past the byte cap is refused rather than decoded")
+    func oversizedResponseIsRefused() async throws {
+        // The cap is applied while the body arrives; `data(for:)` used to buffer whatever the peer
+        // sent before any limit ran, and nothing bounded the results array either.
+        let oversized = Data(
+            repeating: UInt8(ascii: "x"), count: TavilyClient.maximumResponseBytes + 1)
+        let server = try await ScriptedTavilyServer(basicBody: oversized, advancedBody: oversized)
+        defer { server.stop() }
+
+        await #expect(throws: ChatBotsError.self) {
+            _ = try await server.client().search(query: "anything")
+        }
+    }
+
     @Test("A usable basic response is not retried")
     func usableResponseIsNotRetried() async throws {
         let server = try await ScriptedTavilyServer(

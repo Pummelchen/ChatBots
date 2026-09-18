@@ -263,7 +263,8 @@ extension MLXEngine {
                 let outcome = await turnTools.run(name: name, argument: argument)
                 await onEvent(
                     .toolResult(
-                        agentID: agentID, name: name, summary: outcome.summary, detail: outcome.text)
+                        agentID: agentID, name: name, summary: outcome.summary,
+                        detail: outcome.text, billedUnits: outcome.billedUnits)
                 )
                 dispatched.append(DispatchedCall(call: call, outcome: outcome))
             }
