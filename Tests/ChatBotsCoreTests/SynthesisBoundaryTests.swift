@@ -31,12 +31,13 @@ struct SynthesisBoundaryTests {
     private func parse(_ body: String) -> ResearchReport {
         ResearchReporting.parse(
             body,
-            question: "Does the shape matter?",
-            participants: ["Economist", "Statistician"],
-            stopReason: "the budget was reached",
-            budgetSummary: "quick",
-            rounds: 3,
-            searches: 1)
+            facts: .init(
+                question: "Does the shape matter?",
+                participants: ["Economist", "Statistician"],
+                stopReason: "the budget was reached",
+                budgetSummary: "quick",
+                rounds: 3,
+                searches: 1))
     }
 
     @Test("The rules are stated again after the transcript")

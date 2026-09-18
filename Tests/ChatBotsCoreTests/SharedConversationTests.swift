@@ -115,8 +115,10 @@ struct SharedConversationPageTests {
     func reportIsIncluded() {
         let report = ResearchReporting.parse(
             "## Key Findings\n\n- FACT: registrations rose — Economist\n",
-            question: "A question", participants: ["Economist"],
-            stopReason: "the budget was reached", budgetSummary: "quick", rounds: 2, searches: 0)
+            facts: .init(
+                question: "A question", participants: ["Economist"],
+                stopReason: "the budget was reached", budgetSummary: "quick", rounds: 2,
+                searches: 0))
         let page = SharedConversationPage.html(record(turns: [chat(1, "Ada", "hello")], report: report))
         #expect(page.contains("Research report"))
         #expect(page.contains("registrations rose"))

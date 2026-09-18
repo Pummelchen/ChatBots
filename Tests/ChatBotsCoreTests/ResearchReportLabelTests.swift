@@ -15,12 +15,13 @@ struct ResearchReportLabelTests {
     private func report(_ body: String) -> ResearchReport {
         ResearchReporting.parse(
             body,
-            question: "A question",
-            participants: ["Economist", "Statistician"],
-            stopReason: "the budget was reached",
-            budgetSummary: "quick",
-            rounds: 3,
-            searches: 0)
+            facts: .init(
+                question: "A question",
+                participants: ["Economist", "Statistician"],
+                stopReason: "the budget was reached",
+                budgetSummary: "quick",
+                rounds: 3,
+                searches: 0))
     }
 
     @Test("One labelled claim beside fifty bare assertions is not labelled")

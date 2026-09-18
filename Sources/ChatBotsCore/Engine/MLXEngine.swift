@@ -359,9 +359,7 @@ public actor MLXEngine: LLMEngine {
         // `perform`.
         let text = try await runTurn(
             settings: settings,
-            messages: messages,
-            tools: tools,
-            images: images,
+            prompt: TurnPrompt(messages: messages, tools: tools, images: images),
             makeStream: { prompt in
                 await container.perform { context -> AsyncThrowingStream<Generation, Error> in
                     // Decoded here, inside the model's isolation, from bytes that crossed it.
@@ -393,8 +391,7 @@ public actor MLXEngine: LLMEngine {
                     return session.streamDetails(to: messagesForRound)
                 }
             },
-            onToolCall: onToolCall,
-            onEvent: onEvent)
+            observers: TurnObservers(onToolCall: onToolCall, onEvent: onEvent))
         logConfigurationOnce(container: container, settings: settings)
         return text
     }

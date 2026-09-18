@@ -178,12 +178,13 @@ struct ResearchReportTests {
     private func parsed(_ text: String = "") -> ResearchReport {
         ResearchReporting.parse(
             text.isEmpty ? sample : text,
-            question: "Should Company X enter the German EV market?",
-            participants: ["Research Moderator", "Economist", "Investor"],
-            stopReason: "The time budget was reached.",
-            budgetSummary: "Standard (20–30 minutes)",
-            rounds: 20,
-            searches: 14)
+            facts: .init(
+                question: "Should Company X enter the German EV market?",
+                participants: ["Research Moderator", "Economist", "Investor"],
+                stopReason: "The time budget was reached.",
+                budgetSummary: "Standard (20–30 minutes)",
+                rounds: 20,
+                searches: 14))
     }
 
     @Test("Labelled claims are read with their labels")
@@ -338,12 +339,13 @@ struct ReportAttributionTests {
     private func report(_ body: String) -> ResearchReport {
         ResearchReporting.parse(
             body,
-            question: "A question",
-            participants: analysts,
-            stopReason: "the budget was reached",
-            budgetSummary: "quick",
-            rounds: 3,
-            searches: 0)
+            facts: .init(
+                question: "A question",
+                participants: analysts,
+                stopReason: "the budget was reached",
+                budgetSummary: "quick",
+                rounds: 3,
+                searches: 0))
     }
 
     @Test("A trailing attribution names the analyst")

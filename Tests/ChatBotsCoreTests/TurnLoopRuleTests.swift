@@ -44,13 +44,13 @@ struct TurnLoopRuleTests {
         #expect(
             MLXEngine.turnNotices(
                 finalAnswer: "an answer", sawReasoning: false, reasoningWasTruncated: false,
-                loopDetected: false, thinking: .high, ceiling: 8_192, generationCap: 9_000
+                loopDetected: false, budget: .init(thinking: .high, ceiling: 8_192, generationCap: 9_000)
             ).isEmpty)
 
         // Reasoning and no answer, with the ceiling not reached: the budget notice.
         let spent = MLXEngine.turnNotices(
             finalAnswer: "", sawReasoning: true, reasoningWasTruncated: false,
-            loopDetected: false, thinking: .high, ceiling: 8_192, generationCap: 9_000)
+            loopDetected: false, budget: .init(thinking: .high, ceiling: 8_192, generationCap: 9_000))
         #expect(spent.count == 1)
         #expect(spent[0].name == "generation")
         #expect(spent[0].message.contains("9000-token"))
@@ -58,7 +58,7 @@ struct TurnLoopRuleTests {
         // The ceiling reached and no answer: only the ceiling's notice, not the budget's.
         let truncated = MLXEngine.turnNotices(
             finalAnswer: "", sawReasoning: true, reasoningWasTruncated: true,
-            loopDetected: false, thinking: .minimal, ceiling: 128, generationCap: 640)
+            loopDetected: false, budget: .init(thinking: .minimal, ceiling: 128, generationCap: 640))
         #expect(truncated.count == 1)
         #expect(truncated[0].name == "thinking")
         #expect(truncated[0].message.contains("128 reasoning tokens"))
@@ -67,13 +67,13 @@ struct TurnLoopRuleTests {
         // The ceiling reached *with* an answer keeps the answer and says so.
         let cutOffWithAnswer = MLXEngine.turnNotices(
             finalAnswer: "partial", sawReasoning: true, reasoningWasTruncated: true,
-            loopDetected: false, thinking: .minimal, ceiling: 128, generationCap: 640)
+            loopDetected: false, budget: .init(thinking: .minimal, ceiling: 128, generationCap: 640))
         #expect(cutOffWithAnswer[0].message.contains("keeps the answer written so far"))
 
         // A repetition loop is reported after the budget notice and before the ceiling's.
         let all = MLXEngine.turnNotices(
             finalAnswer: "", sawReasoning: true, reasoningWasTruncated: true,
-            loopDetected: true, thinking: .minimal, ceiling: 128, generationCap: 640)
+            loopDetected: true, budget: .init(thinking: .minimal, ceiling: 128, generationCap: 640))
         #expect(all.map(\.name) == ["generation", "thinking"])
         #expect(all[0].message.contains("repetition loop"))
     }

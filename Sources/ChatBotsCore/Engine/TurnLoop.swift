@@ -82,15 +82,33 @@ extension MLXEngine {
     /// it is exercised with a stub stream rather than only with weights.
     ///
     /// `makeStream` is called once per round with the fully assembled `RoundPrompt`.
+    /// The two callbacks a turn reports through: a tool call as it is dispatched, and an event as
+    /// it happens. Grouped so the callers cannot pass one and forget the other, and so `runTurn`
+    /// stays inside its parameter budget.
+    struct TurnObservers: Sendable {
+        var onToolCall: @Sendable (String, String) async -> Void
+        var onEvent: @Sendable (TurnEvent) async -> Void
+    }
+
+    /// What the turn is asked with: the messages, the tools it may call, and the images the seat
+    /// can see. Grouped for the same reason as `TurnObservers`.
+    struct TurnPrompt: Sendable {
+        var messages: [PromptMessage]
+        var tools: [any ToolProvider]
+        var images: [Data]
+    }
+
     func runTurn(
         settings: TurnSettings,
-        messages: [PromptMessage],
-        tools: [any ToolProvider],
-        images: [Data],
+        prompt: TurnPrompt,
         makeStream: @Sendable (RoundPrompt) async -> AsyncThrowingStream<Generation, Error>,
-        onToolCall: @escaping @Sendable (String, String) async -> Void,
-        onEvent: @escaping @Sendable (TurnEvent) async -> Void
+        observers: TurnObservers
     ) async throws -> String {
+        let messages = prompt.messages
+        let tools = prompt.tools
+        let images = prompt.images
+        let onToolCall = observers.onToolCall
+        let onEvent = observers.onEvent
         try Task.checkCancellation()
 
         let agentID = settings.agentID
@@ -296,9 +314,8 @@ extension MLXEngine {
             sawReasoning: stripperSpentItsBudget,
             reasoningWasTruncated: reasoningWasTruncated,
             loopDetected: loopDetected,
-            thinking: thinking,
-            ceiling: reasoningCeiling ?? 0,
-            generationCap: generationCap)
+            budget: ReasoningBudget(
+                thinking: thinking, ceiling: reasoningCeiling ?? 0, generationCap: generationCap))
         {
             await onEvent(.toolFailure(agentID: agentID, name: notice.name, message: notice.message))
         }
@@ -390,15 +407,23 @@ extension MLXEngine {
     /// all. That is legitimate behaviour, not an error, but the user must be told — otherwise
     /// the pane stays empty with no explanation. When the ceiling is what ended the turn, the
     /// ceiling's own notice is the truthful one and the budget notice is suppressed.
+    /// The reasoning budget the turn was given, for the notices that describe what it spent.
+    struct ReasoningBudget: Sendable {
+        var thinking: ThinkingMode
+        var ceiling: Int
+        var generationCap: Int
+    }
+
     static func turnNotices(
         finalAnswer: String,
         sawReasoning: Bool,
         reasoningWasTruncated: Bool,
         loopDetected: Bool,
-        thinking: ThinkingMode,
-        ceiling: Int,
-        generationCap: Int
+        budget: ReasoningBudget
     ) -> [TurnNotice] {
+        let thinking = budget.thinking
+        let ceiling = budget.ceiling
+        let generationCap = budget.generationCap
         var notices: [TurnNotice] = []
         if finalAnswer.isEmpty, sawReasoning, !reasoningWasTruncated {
             notices.append(

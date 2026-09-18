@@ -14,16 +14,41 @@ extension ResearchReporting {
     /// finding without a label, still produced something worth keeping; the parser records
     /// what it found and the report says what is missing. Refusing a whole report because one
     /// heading was worded differently would throw away the work of the entire session.
-    public static func parse(
-        _ text: String,
-        question: String,
-        participants: [String],
-        stopReason: String,
-        budgetSummary: String,
-        rounds: Int,
-        searches: Int,
-        producedAt: Date = Date.now
-    ) -> ResearchReport {
+    /// What the session reports about itself, as opposed to what the model wrote.
+    ///
+    /// Grouped so `parse` stays inside its parameter budget, and because these six values travel
+    /// together: they are the report's factual frame, and the model's text is the only other input.
+    public struct SessionFacts: Sendable {
+        public var question: String
+        public var participants: [String]
+        public var stopReason: String
+        public var budgetSummary: String
+        public var rounds: Int
+        public var searches: Int
+        public var producedAt: Date
+
+        public init(
+            question: String, participants: [String], stopReason: String, budgetSummary: String,
+            rounds: Int, searches: Int, producedAt: Date = .now
+        ) {
+            self.question = question
+            self.participants = participants
+            self.stopReason = stopReason
+            self.budgetSummary = budgetSummary
+            self.rounds = rounds
+            self.searches = searches
+            self.producedAt = producedAt
+        }
+    }
+
+    public static func parse(_ text: String, facts: SessionFacts) -> ResearchReport {
+        let question = facts.question
+        let participants = facts.participants
+        let stopReason = facts.stopReason
+        let budgetSummary = facts.budgetSummary
+        let rounds = facts.rounds
+        let searches = facts.searches
+        let producedAt = facts.producedAt
         var sections: [ResearchReport.Section] = []
         var currentTitle = "Executive Summary"
         var currentLines: [String] = []

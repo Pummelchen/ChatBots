@@ -73,12 +73,13 @@ extension ConversationEngine {
 
         let report = ResearchReporting.parse(
             text,
-            question: conversation.topic,
-            participants: seats.map { $0.spec.displayName },
-            stopReason: reason.explanation,
-            budgetSummary: "\(session.budget.depth.label) (\(session.budget.depth.summary))",
-            rounds: session.rounds,
-            searches: session.searches)
+            facts: .init(
+                question: conversation.topic,
+                participants: seats.map { $0.spec.displayName },
+                stopReason: reason.explanation,
+                budgetSummary: "\(session.budget.depth.label) (\(session.budget.depth.summary))",
+                rounds: session.rounds,
+                searches: session.searches))
 
         conversation.report = report
         conversation.turns.append(

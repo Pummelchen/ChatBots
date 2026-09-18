@@ -157,11 +157,10 @@ enum TurnLoopHarness {
     ) async throws -> String {
         try await engine.runTurn(
             settings: turnSettings,
-            messages: messages,
-            tools: tools,
-            images: images,
+            prompt: MLXEngine.TurnPrompt(messages: messages, tools: tools, images: images),
             makeStream: { await rounds.stream(for: $0) },
-            onToolCall: { name, argument in calls.record(name, argument) },
-            onEvent: { events.record($0) })
+            observers: MLXEngine.TurnObservers(
+                onToolCall: { name, argument in calls.record(name, argument) },
+                onEvent: { events.record($0) }))
     }
 }
