@@ -49,7 +49,7 @@ def main() -> int:
         print("usage: hf-file-list.py <api-response.json>", file=sys.stderr)
         return 2
     try:
-        with open(sys.argv[1]) as handle:
+        with open(sys.argv[1], encoding="utf-8") as handle:
             data: JsonValue = json.load(handle)
     except (OSError, json.JSONDecodeError) as error:
         print(f"could not read the model metadata: {error}", file=sys.stderr)

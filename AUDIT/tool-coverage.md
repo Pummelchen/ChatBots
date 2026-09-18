@@ -64,21 +64,40 @@ Found 2 errors.
 ```
 
 Bare `except:` (**E722**) is covered by Ruff's default rule set. The remaining pitfalls
-the brief names map as follows, and the ones with a rule are enabled under AUDIT-0030:
+the brief names map as follows, and the ones with a rule are enabled by the committed
+`ruff.toml` under AUDIT-0030:
 
-| Pitfall | Rule that catches it | Covered today? |
+| Pitfall | Rule that catches it | Covered? |
 | --- | --- | --- |
 | bare `except:` / `except Exception: pass` | E722, S110 | yes (proof above) |
-| mutable default argument `def f(x=[])` | B006 | no — enabled under AUDIT-0030 |
-| `assert` used for validation | S101 | no — enabled under AUDIT-0030 |
-| pytest style / tests that assert nothing | PT | no — enabled under AUDIT-0030 |
-| `datetime.now()`/`utcnow()` without a timezone | DTZ | no — enabled under AUDIT-0030 |
-| `open()` without `encoding=` | PLW1514 | no — enabled under AUDIT-0030 |
+| mutable default argument `def f(x=[])` | B006 | yes — enabled in `ruff.toml` |
+| `assert` used for validation | S101 | yes — enabled in `ruff.toml` |
+| pytest style / tests that cannot fail | PT011 | yes — enabled in `ruff.toml` |
+| `datetime.now()`/`utcnow()` without a timezone | DTZ005 | yes — enabled in `ruff.toml` |
+| `open()` / `read_text()` / `write_text()` without `encoding=` | PLW1514 | yes — enabled in `ruff.toml` (preview rule, enabled via `[lint] preview`) |
 | `is` compared against an int/string | F632 | yes (flake8 F, default) |
 | `subprocess` without `check=True` | **no rule exists** | kept as a human check (below) |
 | `time.sleep()` used to synchronize | **no rule exists** | kept as a human check (below) |
 | hardcoded paths / cwd dependence | **no rule exists** | kept as a human check (below) |
 | test order dependence / shared module state | **no rule exists** | kept as a human check (below) |
+
+**Proof for the enabled rules** (`AUDIT/probes/python-rules-probe.py`, run with the
+committed `ruff.toml`):
+
+```
+$ ruff check --output-format concise AUDIT/probes/python-rules-probe.py
+AUDIT/probes/python-rules-probe.py:11:23: mutable-argument-default: Do not use mutable data structures for argument defaults
+AUDIT/probes/python-rules-probe.py:16:5: assert: Use of `assert` detected
+AUDIT/probes/python-rules-probe.py:20:12: call-datetime-now-without-tzinfo: `datetime.datetime.now()` called without a `tz` argument
+AUDIT/probes/python-rules-probe.py:24:10: unspecified-encoding: `open` in text mode without explicit `encoding` argument
+AUDIT/probes/python-rules-probe.py:29:24: pytest-raises-too-broad: `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
+Found 5 errors.
+```
+
+`ruff.toml` targets `py313` rather than the 3.14 interpreter: Ruff 0.16's formatter
+rewrites `except (A, B):` to the PEP 758 `except A, B:` under a 3.14 target, and CI runs
+the scripts with the runner's older `python3`. The 3.14.7 interpreter the audit ran is
+recorded in `AUDIT/environment.md`.
 
 ### Shell — shellcheck
 

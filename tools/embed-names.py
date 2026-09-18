@@ -216,7 +216,7 @@ public enum Gender: String, Sendable, Codable, CaseIterable, Identifiable {
 def main() -> int:
     check = "--check" in sys.argv
     wanted = generate()
-    current = TARGET.read_text() if TARGET.exists() else ""
+    current = TARGET.read_text(encoding="utf-8") if TARGET.exists() else ""
     if wanted == current:
         return 0
     if check:
@@ -225,7 +225,7 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
-    TARGET.write_text(wanted)
+    TARGET.write_text(wanted, encoding="utf-8")
     print(f"wrote {TARGET.relative_to(ROOT)}")
     return 0
 

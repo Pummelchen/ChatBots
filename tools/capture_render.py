@@ -99,7 +99,8 @@ def build_index(rows: list[JsonObject]) -> None:
   </figure>"""
         for r in rows
     )
-    (output_directory() / "index.html").write_text(f"""<!DOCTYPE html>
+    (output_directory() / "index.html").write_text(
+        f"""<!DOCTYPE html>
 <meta charset="utf-8">
 <title>ChatBots device captures</title>
 <style>
@@ -116,4 +117,6 @@ def build_index(rows: list[JsonObject]) -> None:
 <div class="grid">
 {cards}
 </div>
-""")
+""",
+        encoding="utf-8",
+    )

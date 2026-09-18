@@ -134,7 +134,7 @@ def start_servers() -> subprocess.Popen[bytes] | None:
 
     # The engine's stderr is kept: the client reports what it measured about its own layout,
     # and that report is how alignment is actually verified rather than eyeballed.
-    log = (run_directory() / "capture-engine.log").open("w")
+    log = (run_directory() / "capture-engine.log").open("w", encoding="utf-8")
     engine = subprocess.Popen(
         [
             str(binary),
@@ -171,7 +171,7 @@ def capture_caddyfile() -> str:
     """
     text = (
         (ROOT / "Caddyfile")
-        .read_text()
+        .read_text(encoding="utf-8")
         .replace("http://:7788", f"http://:{PORT}")
         .replace("127.0.0.1:7789", f"127.0.0.1:{ENGINE_PORT}")
     )
@@ -182,7 +182,7 @@ def caddy_process() -> subprocess.Popen[bytes] | None:
     if not shutil.which("caddy"):
         return None
     config = run_directory() / "Caddyfile.capture"
-    config.write_text(capture_caddyfile())
+    config.write_text(capture_caddyfile(), encoding="utf-8")
     process = subprocess.Popen(
         ["caddy", "run", "--config", str(config), "--adapter", "caddyfile"],
         cwd=ROOT,

@@ -1,0 +1,41 @@
+# ruff.toml — the Python standard for `tools/`, stated once.
+#
+# Python here is test and glue code, so this is deliberately cheap: Ruff formats and lints,
+# and there is no strict type-checker mode beyond the `pyrightconfig.json` that already
+# exists. The rule selection below is exactly the set that catches the failure modes the
+# audit brief names, so the cost stays where the risk is:
+#
+#   * E722          bare `except:` — the failure is swallowed
+#   * S101          `assert` used for validation, which `-O` strips
+#   * B             flake8-bugbear: mutable default arguments (`def f(x=[])`), unused loop
+#                   variables, `raise` without `from`, and the rest of the bug class
+#   * PT            flake8-pytest-style: tests that cannot fail or are written against the
+#                   wrong API
+#   * DTZ           `datetime.now()` / `utcnow()` without a timezone
+#   * PLW1514       text I/O without an explicit `encoding=`
+#
+# E4/E7/E9/F are Ruff's defaults and stay so the baseline cannot regress. `lint.preview`
+# turns on the selected preview rules (PLW1514) without changing the formatter's output,
+# which a global `preview = true` would.
+
+# The lint/format *target* is 3.13, not the 3.14 interpreter `AUDIT/environment.md` pins for
+# running the scripts. Ruff 0.16's formatter rewrites `except (A, B):` to the PEP 758
+# `except A, B:` under a 3.14 target, which no interpreter before 3.14 can parse — and CI
+# runs the scripts with the runner's `python3`, not with the pinned 3.14. The target is
+# therefore the oldest runtime a generated file must parse on; the interpreter the audit
+# used is recorded separately.
+target-version = "py313"
+
+[lint]
+preview = true
+select = [
+    "E4",
+    "E7",
+    "E9",
+    "F",
+    "B",
+    "S101",
+    "PT",
+    "DTZ",
+    "PLW1514",
+]

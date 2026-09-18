@@ -106,7 +106,7 @@ def literal(text: str) -> str:
 
 def generate() -> str:
     out: list[str] = [HEADER]
-    for name, filename, content_type, *paths in FILES:
+    for name, _filename, content_type, *paths in FILES:
         # One case with several patterns: Swift has no fallthrough between cases.
         patterns = ", ".join(f'"{p}"' for p in paths)
         out.append(
@@ -117,7 +117,7 @@ def generate() -> str:
     out.append("        default:\n            return nil\n        }\n    }\n\n")
     for name, filename, _, *_ in FILES:
         out.append(
-            f"    static let {name} = {literal((WEB / filename).read_text())}\n\n"
+            f"    static let {name} = {literal((WEB / filename).read_text(encoding='utf-8'))}\n\n"
         )
     out.append("}\n")
     return "".join(out)
@@ -126,7 +126,7 @@ def generate() -> str:
 def main() -> int:
     check = "--check" in sys.argv
     wanted = generate()
-    current = TARGET.read_text() if TARGET.exists() else ""
+    current = TARGET.read_text(encoding="utf-8") if TARGET.exists() else ""
     if wanted == current:
         return 0
     if check:
@@ -136,7 +136,7 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
-    TARGET.write_text(wanted)
+    TARGET.write_text(wanted, encoding="utf-8")
     print(f"wrote {TARGET.relative_to(ROOT)}")
     return 0
 
