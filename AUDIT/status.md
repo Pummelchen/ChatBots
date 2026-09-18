@@ -13,16 +13,16 @@ orientation note so a resumed run does not restart discovery.
 
 ## Ledger state at the last commit
 
-`done: 62, open: 31, blocked: 4` — S0 0, S1 0, S2 1, S3 30.
+`done: 71, open: 22, blocked: 4` — S0 0, S1 0, S2 1, S3 21.
 
 The closure invariant holds: non-terminal count has gone 96 → 90 → 83 → 76 → 71 → 66 →
-62 → 59 → 58 → 56 → 54 → 51 → 50 → 49 → 48 → 43 → 40 → 36 → 33 → 31 across the milestone
-reports.
+62 → 59 → 58 → 56 → 54 → 51 → 50 → 49 → 48 → 43 → 40 → 36 → 33 → 31 → 25 → 22 across the
+milestone reports.
 
 ## The one remaining S2
 
 **AUDIT-0029 — SwiftLint/swift-format `--strict`, and `force_unwrapping`.** The gates are
-enforced against recorded waiver counts in `tools/analysis-waivers.txt` (211/413, tightened from 217/444), and
+enforced against recorded waiver counts in `tools/analysis-waivers.txt` (208/307, tightened from 217/444), and
 `.swiftlint.yml` has no `opt_in_rules`, so `force_unwrapping` never fires. Closing it needs:
 
 1. ~~Enable `force_unwrapping` and fix the 32 sites~~ — DONE as AUDIT-0097, which also
@@ -38,7 +38,7 @@ tightened the waivers from 217/444 to 211/413 (measured 209/411).
 Because this is much larger than one task, split it into sub-tasks the moment work starts,
 each with its own id, and note on AUDIT-0029 that its scope was split rather than narrowed.
 
-## The S3 sweep (30)
+## The S3 sweep (21)
 
 All are style/formatting/test-quality. They are resolved as rule-class sweeps through the
 formatter/linter, one commit per class, with no test and no cold re-read (§8). The
@@ -70,7 +70,9 @@ primary host only, recorded in the ledger.
   endpoint rebuild, reader generation, SSE line cap, JS toolchain, force_unwrapping, HTTP
   reasons and header CR/LF, shell traps, CLI exit codes, /api/seat validation and ordering,
   the event feed's high-water mark, CLI flag refusal, the Tavily answer/retry-cost/body cap,
-  and the runtime-directory docs).
+  the runtime-directory docs, the vision markers, the desktop profiles, the attachment reads,
+  and three tool-script bounds). The remaining S3 classes are the transport (0034-0045), the
+  SwiftUI app (0063-0068), the remaining tools (0079, 0082), and the web front end (0091).
 - Every fix carries before/after evidence in `AUDIT/evidence-*.log`.
 - `bash tools/mac-checks.sh` is the gate after every batch — now **9 gates**, including
   eslint and prettier (`npm ci` first). Metrics must not regress: SwiftLint ≤ 217
