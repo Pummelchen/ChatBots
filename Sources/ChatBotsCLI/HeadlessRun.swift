@@ -12,62 +12,9 @@ enum HeadlessRun {
 
     static func run(context: RunContext) async {
         let options = context.options
-        let specs = context.specs
-        let engines = context.engines
-
-        log("ChatBots headless run")
-        log("  topic     : \(options.topic)")
-        log("  turns     : \(options.turns)")
-        log("  seat A    : \(options.modelA)")
-        log("  seat B    : \(options.modelB)")
-        log("  thinking  : \(specs[0].thinking.rawValue) — \(specs[0].thinking.detail)")
-        for spec in specs {
-            log("  \(spec.id) style: \(spec.persona.name) — \(spec.persona.summary)")
-            log(
-                "  \(spec.id) backend: \(spec.backend.rawValue)"
-                    + (spec.backend == .openAIResponses
-                        ? " → \(spec.openAI.baseURL) as \(spec.openAI.model)" : ""))
-        }
-        log("  models    : \(context.modelsRoot.path)")
-        log("  tavily    : \(TavilyClient.isConfigured ? "configured" : "MISSING")")
-        print("")
-
-        var configuration = ConversationEngine.Configuration()
-        configuration.pace = .zero
-        configuration.maxTurns = max(1, options.turns)
-        if let threshold = options.compactThreshold { configuration.compactThreshold = threshold }
-        if let keep = options.keepRecent { configuration.compactKeepRecentTurns = keep }
-
-        let seats = zip(specs, engines).map { spec, mlx in
-            ConversationEngine.Seat(
-                spec: spec,
-                mlx: mlx,
-                openAI: OpenAIResponsesEngine(spec: spec)
-            )
-        }
-        var engineConfiguration = configuration
-        if let depth = options.researchDepth {
-            engineConfiguration.researchBudget = ResearchBudget.preset(depth)
-        }
-        let engine = ConversationEngine(seats: seats, configuration: engineConfiguration)
-
-        // Source material, read the same way the app reads it.
-        if !options.attachments.isEmpty {
-            DocumentIngestorProvider.install(SystemDocumentExtractor.ingestor)
-            let (documents, failures) = SystemDocumentExtractor.add(
-                urls: options.attachments.map { URL(fileURLWithPath: $0) })
-            for failure in failures { log("  attachment refused: \(failure)") }
-            guard engine.setAttachments(documents) else {
-                log("  attachments must be added before the conversation starts")
-                exit(2)
-            }
-            for document in documents {
-                log("  attached: \(document.name) — \(document.summary)")
-            }
-            if documents.contains(where: { $0.kind.isImage }) {
-                log("  images allowed: \(engine.allSeatsSupportVision)")
-            }
-        }
+        logHeader(context: context)
+        let engine = makeEngine(context: context)
+        attachDocuments(options: options, engine: engine)
 
         let transcriptTask = Task { await renderTranscript(engine) }
 
@@ -110,6 +57,72 @@ enum HeadlessRun {
         }
     }
 
+    /// The run banner: what this run is, seat by seat, and where its models are.
+    private static func logHeader(context: RunContext) {
+        let options = context.options
+        let specs = context.specs
+
+        log("ChatBots headless run")
+        log("  topic     : \(options.topic)")
+        log("  turns     : \(options.turns)")
+        log("  seat A    : \(options.modelA)")
+        log("  seat B    : \(options.modelB)")
+        log("  thinking  : \(specs[0].thinking.rawValue) — \(specs[0].thinking.detail)")
+        for spec in specs {
+            log("  \(spec.id) style: \(spec.persona.name) — \(spec.persona.summary)")
+            log(
+                "  \(spec.id) backend: \(spec.backend.rawValue)"
+                    + (spec.backend == .openAIResponses
+                        ? " → \(spec.openAI.baseURL) as \(spec.openAI.model)" : ""))
+        }
+        log("  models    : \(context.modelsRoot.path)")
+        log("  tavily    : \(TavilyClient.isConfigured ? "configured" : "MISSING")")
+        print("")
+    }
+
+    /// The engine this run drives, built from the flags and the context's seats.
+    private static func makeEngine(context: RunContext) -> ConversationEngine {
+        let options = context.options
+        var configuration = ConversationEngine.Configuration()
+        configuration.pace = .zero
+        configuration.maxTurns = max(1, options.turns)
+        if let threshold = options.compactThreshold { configuration.compactThreshold = threshold }
+        if let keep = options.keepRecent { configuration.compactKeepRecentTurns = keep }
+
+        let seats = zip(context.specs, context.engines).map { spec, mlx in
+            ConversationEngine.Seat(
+                spec: spec,
+                mlx: mlx,
+                openAI: OpenAIResponsesEngine(spec: spec)
+            )
+        }
+        var engineConfiguration = configuration
+        if let depth = options.researchDepth {
+            engineConfiguration.researchBudget = ResearchBudget.preset(depth)
+        }
+        return ConversationEngine(seats: seats, configuration: engineConfiguration)
+    }
+
+    /// Source material, read the same way the app reads it. Absent attachments leave the engine
+    /// as it was.
+    private static func attachDocuments(options: Options, engine: ConversationEngine) {
+        guard !options.attachments.isEmpty else { return }
+        DocumentIngestorProvider.install(SystemDocumentExtractor.ingestor)
+        let (documents, failures) = SystemDocumentExtractor.add(
+            urls: options.attachments.map { URL(fileURLWithPath: $0) })
+        for failure in failures { log("  attachment refused: \(failure)") }
+        guard engine.setAttachments(documents) else {
+            log("  attachments must be added before the conversation starts")
+            exit(2)
+        }
+        for document in documents {
+            log("  attached: \(document.name) — \(document.summary)")
+        }
+        if documents.contains(where: { $0.kind.isImage }) {
+            log("  images allowed: \(engine.allSeatsSupportVision)")
+        }
+    }
+
     /// Render the log as it grows, printing each entry once.
     private static func renderTranscript(_ engine: ConversationEngine) async {
         var printedTurnIDs = Set<UUID>()
@@ -117,20 +130,23 @@ enum HeadlessRun {
             for turn in turns where !printedTurnIDs.contains(turn.id) {
                 printedTurnIDs.insert(turn.id)
                 guard turn.kind != .tool else { continue }
-                let label: String
-                switch turn.kind {
-                case .topic: label = "\(turn.speakerName.uppercased()) · TOPIC"
-                case .introduction: label = "SETUP"
-                case .steering: label = turn.speakerName.uppercased()
-                case .direction: label = "RESEARCH MODERATOR — ASSIGNMENT"
-                case .tool: label = "TOOL"
-                case .summary: label = "CONDENSED EARLIER DISCUSSION"
-                case .report: label = "RESEARCH MODERATOR — FINAL REPORT"
-                case .chat: label = turn.speakerName.uppercased()
-                }
-                header(label)
+                header(label(for: turn))
                 print(turn.content)
             }
+        }
+    }
+
+    /// The heading a turn gets in the transcript.
+    private static func label(for turn: Turn) -> String {
+        switch turn.kind {
+        case .topic: return "\(turn.speakerName.uppercased()) · TOPIC"
+        case .introduction: return "SETUP"
+        case .steering: return turn.speakerName.uppercased()
+        case .direction: return "RESEARCH MODERATOR — ASSIGNMENT"
+        case .tool: return "TOOL"
+        case .summary: return "CONDENSED EARLIER DISCUSSION"
+        case .report: return "RESEARCH MODERATOR — FINAL REPORT"
+        case .chat: return turn.speakerName.uppercased()
         }
     }
 

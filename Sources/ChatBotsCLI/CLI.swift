@@ -15,9 +15,20 @@ enum CLI {
     /// Everything before `RunContext` needs no model; the context builds the engines the remaining
     /// modes share. Each earlier mode exits or returns before the next is reached.
     static func run(options: Options, modelsRoot: URL, runDirectory: URL) async {
-        // A flag that would otherwise be accepted and then ignored: `--seed` fills the server's
-        // engine with a sample conversation, and outside `--serve` there is no server engine to
-        // fill, so the run used to proceed silently as a real model conversation instead.
+        refuseSeedWithoutServe(options)
+        await runChecks(options: options, runDirectory: runDirectory)
+
+        let context = RunContext(options: options, modelsRoot: modelsRoot, runDirectory: runDirectory)
+
+        await runModes(context: context)
+
+        await HeadlessRun.run(context: context)
+    }
+
+    /// A flag that would otherwise be accepted and then ignored: `--seed` fills the server's
+    /// engine with a sample conversation, and outside `--serve` there is no server engine to
+    /// fill, so the run used to proceed silently as a real model conversation instead.
+    private static func refuseSeedWithoutServe(_ options: Options) {
         if options.seed, !options.serve {
             FileHandle.standardError.write(
                 Data(
@@ -25,15 +36,18 @@ enum CLI {
                         .utf8))
             exit(2)
         }
+    }
 
+    /// The checks that run before `RunContext`, and need no model: the certificate, the real
+    /// WebTransport channel driven by a real client, the model check, and the export format.
+    ///
+    /// The transport check runs before anything else, so a broken channel is found here rather
+    /// than in the app.
+    private static func runChecks(options: Options, runDirectory: URL) async {
         // Generate the engine's certificate, if it is not there yet.
         if options.prepareIdentity {
             Checks.prepareIdentity(in: runDirectory)
         }
-
-        // The transport check runs before anything else, and needs no model: it starts a real
-        // WebTransport server and drives it with a real client, so a broken channel is found here
-        // rather than in the app.
         if options.checkClient {
             await Checks.runClient(options: options, runDirectory: runDirectory)
         }
@@ -48,9 +62,12 @@ enum CLI {
         if options.exportSample {
             ExportSample.run(options: options)
         }
+    }
 
-        let context = RunContext(options: options, modelsRoot: modelsRoot, runDirectory: runDirectory)
-
+    /// The modes that share the built context, in the order the flags have always been
+    /// considered in.
+    private static func runModes(context: RunContext) async {
+        let options = context.options
         if options.benchmark {
             exit(await Benchmark.run(context: context))
         }
@@ -74,7 +91,5 @@ enum CLI {
         if options.serve {
             await ServeCommand.run(context: context)
         }
-
-        await HeadlessRun.run(context: context)
     }
 }

@@ -135,24 +135,7 @@ func probe(port: UInt16, cycles: Int, holdSeconds: Int, quiet: Bool) async -> Bo
                 // Attached and listening: anything the engine pushes is printed as it arrives.
                 // A connection that is accepted but never subscribed shows nothing here, which
                 // is the failure the app displays as an empty thread.
-                print("holding for \(holdSeconds)s — pushes appear below")
-                if let events = client.events {
-                    let deadline = ContinuousClock.now.advanced(by: .seconds(holdSeconds))
-                    let reader = Task {
-                        for await event in events {
-                            switch event {
-                            case .state(let pushed):
-                                print("  push: state — topic \"\(pushed.topic)\", \(pushed.messages.count) messages")
-                            case .output(let delta):
-                                print("  push: output \(delta.agentID) \(delta.kind) \(delta.text.count) chars")
-                            }
-                        }
-                    }
-                    while ContinuousClock.now < deadline { try? await Task.sleep(for: .milliseconds(100)) }
-                    reader.cancel()
-                } else {
-                    print("  no event stream: the client did not subscribe")
-                }
+                await hold(seconds: holdSeconds, events: client.events)
             }
         } catch {
             print("cycle \(cycle): FAILED — \(error.localizedDescription)")
@@ -161,6 +144,29 @@ func probe(port: UInt16, cycles: Int, holdSeconds: Int, quiet: Bool) async -> Bo
         await client.disconnect()
     }
     return allSucceeded
+}
+
+/// Stay attached and print every push the engine sends until `seconds` have passed.
+@MainActor
+private func hold(seconds: Int, events: AsyncStream<EngineEvent>?) async {
+    print("holding for \(seconds)s — pushes appear below")
+    guard let events else {
+        print("  no event stream: the client did not subscribe")
+        return
+    }
+    let deadline = ContinuousClock.now.advanced(by: .seconds(seconds))
+    let reader = Task {
+        for await event in events {
+            switch event {
+            case .state(let pushed):
+                print("  push: state — topic \"\(pushed.topic)\", \(pushed.messages.count) messages")
+            case .output(let delta):
+                print("  push: output \(delta.agentID) \(delta.kind) \(delta.text.count) chars")
+            }
+        }
+    }
+    while ContinuousClock.now < deadline { try? await Task.sleep(for: .milliseconds(100)) }
+    reader.cancel()
 }
 
 let options = parseOptions()

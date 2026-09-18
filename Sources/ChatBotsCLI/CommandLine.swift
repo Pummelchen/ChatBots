@@ -73,250 +73,33 @@ struct Options {
     var runDirectory: URL?
 
     static func parse(_ arguments: [String]) -> Options {
-        var options = Options()
-        var index = 0
-        while index < arguments.count {
-            let argument = arguments[index]
-            func next() -> String? {
-                index += 1
-                return index < arguments.count ? arguments[index] : nil
-            }
-            // One shape for every bad-argument message. It used to be built inline at each site,
-            // which meant ten copies of the same sentence — six of them long enough to trip the
-            // line-length gate. The lead is passed in because two sites
-            // ("unknown …") are not "invalid …".
-            func reject(_ lead: String, _ value: String, expected: String) -> Never {
-                let shown = value.isEmpty ? "(nothing)" : value
-                FileHandle.standardError.write(Data("\(lead): \(shown) — expected \(expected)\n".utf8))
-                exit(2)
-            }
-            // Shared so the two backend flags cannot drift apart, and so the accepted values are
-            // read from the enum rather than repeated in the message.
-            func backend(_ raw: String?, flag: String) -> AgentSpec.Backend {
-                let value = raw ?? ""
-                guard let parsed = AgentSpec.Backend(rawValue: value) else {
-                    let accepted = AgentSpec.Backend.allCases.map(\.rawValue).joined(separator: " or ")
-                    reject("unknown backend for \(flag)", value, expected: accepted)
-                }
-                return parsed
-            }
-            switch argument {
-            case "--topic", "-t": options.topic = next() ?? options.topic
-            case "--turns", "-n":
-                // `if let Int(...)` with no else meant `--turns abc` and `--turns 0` quietly kept
-                // the default of 4, so the run was not the one that had been asked for.
-                let turnsRaw = next() ?? ""
-                guard let value = Int(turnsRaw), value >= 1 else {
-                    reject("invalid turn count", turnsRaw, expected: "1 or more")
-                }
-                options.turns = value
-                options.turnsSpecified = true
-            // A catalogue alias or a repository id. Resolution happens here so everything downstream
-            // — the spec, the log, the seat — sees the id that will actually be loaded, and a
-            // mistyped alias is passed through as the id it looks like rather than being refused,
-            // because any repository id is a legitimate value (ModelCatalog).
-            case "--model-a": options.modelA = ModelCatalog.resolve(next() ?? options.modelA)
-            case "--model-b": options.modelB = ModelCatalog.resolve(next() ?? options.modelB)
-            case "--key":
-                // Refused rather than accepted. A value on the command line is readable by every
-                // process on the machine through `ps` and is kept in the shell's history file, so
-                // it is not a way to supply a secret. `TAVILY_API_KEY` in the environment and
-                // `.secrets.env` at the project root are both supported, and neither leaves the
-                // value behind.
-                FileHandle.standardError.write(
-                    Data(
-                        ("""
-                        --key is refused: the value would be visible to every process on this \
-                        machine and recorded in your shell history. Set TAVILY_API_KEY in the \
-                        environment, or put it in .secrets.env at the project root.
-                        """ + "\n").utf8))
-                exit(2)
-            case "--max-tokens":
-                // The same silent-default class: a nil from `Int(...)` left the seat's own budget in
-                // place without saying so.
-                let tokensRaw = next() ?? ""
-                guard let value = Int(tokensRaw), value >= 1 else {
-                    reject("invalid max tokens", tokensRaw, expected: "1 or more")
-                }
-                options.maxTokens = value
-            case "--backend-a": options.backendA = backend(next(), flag: "--backend-a")
-            case "--backend-b": options.backendB = backend(next(), flag: "--backend-b")
-            case "--base-url": options.baseURL = next() ?? options.baseURL
-            case "--api-model": options.apiModel = next() ?? options.apiModel
-            case "--api-key": options.apiKey = next()
-            case "--persona-a": options.personaA = next()
-            case "--persona-b": options.personaB = next()
-            case "--list-models":
-                Listings.printModels()
-                exit(0)
-            case "--list-personas":
-                Listings.printPersonas()
-                exit(0)
-            case "--thinking":
-                let raw = next() ?? ""
-                guard let mode = ThinkingMode(rawValue: raw.lowercased()) else {
-                    FileHandle.standardError.write(Data("unknown thinking mode: \(raw)\n".utf8))
-                    exit(2)
-                }
-                options.thinking = mode
-            case "--benchmark": options.benchmark = true
-            case "--memory-probe": options.memoryProbe = true
-            case "--session-probe": options.sessionProbe = true
-            case "--export-sample": options.exportSample = true
-            case "--check": options.check = true
-            case "--check-transport": options.checkTransport = true
-            case "--check-client": options.checkClient = true
-            case "--prepare-identity": options.prepareIdentity = true
-            case "--transport":
-                // Unvalidated, so `--transport webtransprot` served HTTP only while the value was
-                // never mentioned again, and the app then could not connect.
-                let transportRaw = next() ?? ""
-                guard ["webtransport", "http", "both"].contains(transportRaw) else {
-                    reject("unknown transport", transportRaw, expected: "webtransport, http or both")
-                }
-                options.transport = transportRaw
-                options.transportSpecified = true
-            case "--transport-port":
-                // Validated rather than swallowed: `UInt16(String)` returns nil for an
-                // out-of-range value, so this used to fall back silently to 7790 and the
-                // user's number was never mentioned again.
-                let transportRaw = next() ?? ""
-                guard let value = UInt16(transportRaw), value != 0 else {
-                    reject("invalid transport port", transportRaw, expected: "1–65535")
-                }
-                options.transportPort = value
-            case "--serve": options.serve = true
-            case "--attach":
-                // A missing value used to append an empty path, which then failed at read time with
-                // a message about a file nobody had named; a following flag was taken as the path.
-                // Refused here, where the cause is known. A path that really begins with `--` can
-                // be written `./--name`.
-                let attachRaw = next() ?? ""
-                guard !attachRaw.isEmpty, !attachRaw.hasPrefix("--") else {
-                    reject("invalid attachment path", attachRaw, expected: "a file path")
-                }
-                options.attachments.append(attachRaw)
-            case "--seed": options.seed = true
-            case "--research":
-                let raw = next() ?? ""
-                if let depth = ResearchBudget.Depth(rawValue: raw) {
-                    options.researchDepth = depth
-                    options.mode = .research
-                } else {
-                    FileHandle.standardError.write(
-                        Data("unknown research budget: \(raw) — try quick, standard or deep\n".utf8))
-                    exit(2)
-                }
-            case "--list-characters": options.listCharacters = true
-            case "--list-roles": options.listRoles = true
-            case "--mode":
-                let raw = next() ?? ""
-                if let parsed = DiscussionMode(rawValue: raw) {
-                    options.mode = parsed
-                } else {
-                    FileHandle.standardError.write(
-                        Data("unknown mode: \(raw) — try entertainment or research\n".utf8))
-                    exit(2)
-                }
-            case "--port":
-                // `Int` here and a trapping `UInt16` at the listener meant `--port -1` or
-                // `--port 70000` aborted the process instead of exiting 2 like every other
-                // bad value. Zero is refused as well: the server would bind an ephemeral
-                // port and then announce `http://127.0.0.1:0`, a URL that goes nowhere.
-                let portRaw = next() ?? ""
-                guard let value = UInt16(portRaw), value != 0 else {
-                    reject("invalid port", portRaw, expected: "1–65535")
-                }
-                options.port = value
-                options.portSpecified = true
-            case "--share-base":
-                // Where a share link should point. The engine can only know its own loopback port,
-                // and the phone the share feature exists for needs the address the website is
-                // published on — which only the deployment knows. Validated rather than
-                // accepted blindly, because a base that is not a URL produces links that go
-                // nowhere.
-                let baseRaw = next() ?? ""
-                guard let url = URL(string: baseRaw), url.scheme != nil, url.host != nil else {
-                    reject("invalid share base", baseRaw, expected: "a URL like http://192.168.1.5:7788")
-                }
-                options.shareBase = baseRaw
-                options.shareBaseSpecified = true
-            case "--compact-threshold":
-                // A nil here left the engine's own 0.7 in place, silently. The value is a
-                // fraction of the context window, so anything outside (0, 1] is not a threshold.
-                let thresholdRaw = next() ?? ""
-                guard let value = Double(thresholdRaw), value > 0, value <= 1 else {
-                    reject(
-                        "invalid compact threshold", thresholdRaw,
-                        expected: "a fraction above 0 and at most 1")
-                }
-                options.compactThreshold = value
-            case "--context-window":
-                // Zero and negatives already meant "unset" to `generationCap`, so a window could be
-                // set and silently ignored by the engine.
-                let windowRaw = next() ?? ""
-                guard let value = Int(windowRaw), value >= 1 else {
-                    reject("invalid context window", windowRaw, expected: "1 or more tokens")
-                }
-                options.contextWindow = value
-            case "--compact-keep":
-                // A negative value traps inside `dropLast`, which is the worst way to learn about
-                // it; zero is meaningful — keep no recent turns — so it is allowed.
-                let keepRaw = next() ?? ""
-                guard let value = Int(keepRaw), value >= 0 else {
-                    reject("invalid compact keep", keepRaw, expected: "0 or more turns")
-                }
-                options.keepRecent = value
-            case "--run-directory":
-                // Where this run's certificate and conversations live. The default is right for
-                // one engine on one machine; a second engine — a test one, or the one
-                // `TransportCheck` starts — needs its own, and the child it spawns has to be told
-                // the same path or the two disagree about the identity. A relative path is
-                // resolved against the working directory here, so the answer does not depend on
-                // where the child ends up running.
-                let runRaw = next() ?? ""
-                guard !runRaw.isEmpty else {
-                    reject("invalid run directory", runRaw, expected: "a path")
-                }
-                options.runDirectory = URL(fileURLWithPath: runRaw)
-            case "--solo": options.solo = true
-            case "--help", "-h":
-                print(Self.usage)
-                exit(0)
-            default:
-                FileHandle.standardError.write(Data("unknown argument: \(argument)\n".utf8))
-                print(Self.usage)
-                exit(2)
-            }
-            index += 1
-        }
-        // `--transport` only means something to `--serve`. Every other mode builds its own engine
-        // and opens no listener, so the flag was accepted and ignored — refused here rather
-        // than left to look as though it had been applied.
-        if options.transportSpecified, !options.serve {
+        OptionParser.parse(arguments)
+    }
+
+    /// A flag that only means something to another mode is refused rather than accepted and
+    /// ignored: `--transport`, `--port` and `--share-base` describe the listener only `--serve`
+    /// opens, and `--solo` describes the benchmark.
+    fileprivate func rejectInapplicableFlags() {
+        if transportSpecified, !serve {
             FileHandle.standardError.write(
                 Data("--transport only applies with --serve; without it the flag does nothing\n".utf8))
             exit(2)
         }
-        // The same rule for the rest. `--port` and `--share-base` describe the listener only
-        // `--serve` opens, and `--solo` describes the benchmark; every other mode accepted them and
-        // did nothing, so `chatbots-cli --port 9999 --turns 2` never bound anything and exited 0.
-        if options.portSpecified, !options.serve {
+        if portSpecified, !serve {
             FileHandle.standardError.write(
                 Data("--port only applies with --serve; without it the flag does nothing\n".utf8))
             exit(2)
         }
-        if options.shareBaseSpecified, !options.serve {
+        if shareBaseSpecified, !serve {
             FileHandle.standardError.write(
                 Data("--share-base only applies with --serve; without it the flag does nothing\n".utf8))
             exit(2)
         }
-        if options.solo, !options.benchmark {
+        if solo, !benchmark {
             FileHandle.standardError.write(
                 Data("--solo only applies with --benchmark; without it the flag does nothing\n".utf8))
             exit(2)
         }
-        return options
     }
 
     static let usage = """
@@ -388,5 +171,312 @@ struct Options {
     }
     var specB: AgentSpec {
         configured(AgentSpec.seatB(modelID: modelB), persona: personaB, backend: backendB)
+    }
+}
+
+// MARK: - Reading the command line
+
+/// One pass over the arguments. `next()` moves to the value that follows a flag; `advance()`
+/// moves past the argument just handled — the trailing `index += 1` the old loop did for every
+/// flag, with or without a value.
+private struct ArgumentReader {
+    private let arguments: [String]
+    private var index = 0
+
+    init(_ arguments: [String]) {
+        self.arguments = arguments
+    }
+
+    var isFinished: Bool { index >= arguments.count }
+
+    var current: String { arguments[index] }
+
+    mutating func next() -> String? {
+        index += 1
+        return index < arguments.count ? arguments[index] : nil
+    }
+
+    mutating func advance() {
+        index += 1
+    }
+}
+
+/// The command line, mid-parse: the arguments left to read and the options they have set. The
+/// flags are handled in groups small enough to read on their own; every flag, check and message
+/// is the one the single 189-line `parse` switch carried, so nothing here changes what a flag
+/// does.
+private final class OptionParser {
+    private var reader: ArgumentReader
+    private(set) var options = Options()
+
+    init(_ arguments: [String]) {
+        reader = ArgumentReader(arguments)
+    }
+
+    static func parse(_ arguments: [String]) -> Options {
+        let parser = OptionParser(arguments)
+        let groups: [(String) -> Bool] = [
+            parser.topicAndModels,
+            parser.backends,
+            parser.limits,
+            parser.listings,
+            parser.runToggles,
+            parser.displayToggles,
+            parser.server,
+            parser.research,
+            parser.compaction,
+        ]
+        while !parser.reader.isFinished {
+            let argument = parser.reader.current
+            let handled = groups.contains { $0(argument) }
+            guard handled else {
+                FileHandle.standardError.write(Data("unknown argument: \(argument)\n".utf8))
+                print(Options.usage)
+                exit(2)
+            }
+            parser.reader.advance()
+        }
+        parser.options.rejectInapplicableFlags()
+        return parser.options
+    }
+
+    /// One shape for every bad-argument message, built in one place instead of ten.
+    private func reject(_ lead: String, _ value: String, expected: String) -> Never {
+        let shown = value.isEmpty ? "(nothing)" : value
+        FileHandle.standardError.write(Data("\(lead): \(shown) — expected \(expected)\n".utf8))
+        exit(2)
+    }
+
+    /// Shared so the two backend flags cannot drift apart, and so the accepted values are read
+    /// from the enum rather than repeated in the message.
+    private func backend(_ raw: String?, flag: String) -> AgentSpec.Backend {
+        let value = raw ?? ""
+        guard let parsed = AgentSpec.Backend(rawValue: value) else {
+            let accepted = AgentSpec.Backend.allCases.map(\.rawValue).joined(separator: " or ")
+            reject("unknown backend for \(flag)", value, expected: accepted)
+        }
+        return parsed
+    }
+
+    private func topicAndModels(_ argument: String) -> Bool {
+        switch argument {
+        case "--topic", "-t": options.topic = reader.next() ?? options.topic
+        // A catalogue alias or a repository id; resolution happens here so every downstream
+        // reader sees the id that will actually be loaded (ModelCatalog).
+        case "--model-a": options.modelA = ModelCatalog.resolve(reader.next() ?? options.modelA)
+        case "--model-b": options.modelB = ModelCatalog.resolve(reader.next() ?? options.modelB)
+        case "--turns", "-n":
+            // `--turns abc` and `--turns 0` used to keep the default of 4 silently.
+            let turnsRaw = reader.next() ?? ""
+            guard let value = Int(turnsRaw), value >= 1 else {
+                reject("invalid turn count", turnsRaw, expected: "1 or more")
+            }
+            options.turns = value
+            options.turnsSpecified = true
+        default: return false
+        }
+        return true
+    }
+
+    private func backends(_ argument: String) -> Bool {
+        switch argument {
+        case "--backend-a": options.backendA = backend(reader.next(), flag: "--backend-a")
+        case "--backend-b": options.backendB = backend(reader.next(), flag: "--backend-b")
+        case "--base-url": options.baseURL = reader.next() ?? options.baseURL
+        case "--api-model": options.apiModel = reader.next() ?? options.apiModel
+        case "--api-key": options.apiKey = reader.next()
+        case "--persona-a": options.personaA = reader.next()
+        case "--persona-b": options.personaB = reader.next()
+        default: return false
+        }
+        return true
+    }
+
+    private func limits(_ argument: String) -> Bool {
+        switch argument {
+        case "--max-tokens":
+            // A nil from `Int(...)` left the seat's own budget in place without saying so.
+            let tokensRaw = reader.next() ?? ""
+            guard let value = Int(tokensRaw), value >= 1 else {
+                reject("invalid max tokens", tokensRaw, expected: "1 or more")
+            }
+            options.maxTokens = value
+        case "--thinking":
+            let raw = reader.next() ?? ""
+            guard let mode = ThinkingMode(rawValue: raw.lowercased()) else {
+                FileHandle.standardError.write(Data("unknown thinking mode: \(raw)\n".utf8))
+                exit(2)
+            }
+            options.thinking = mode
+        default: return false
+        }
+        return true
+    }
+
+    private func listings(_ argument: String) -> Bool {
+        switch argument {
+        case "--list-models":
+            Listings.printModels()
+            exit(0)
+        case "--list-personas":
+            Listings.printPersonas()
+            exit(0)
+        case "--key":
+            // Refused rather than accepted: a value here is readable through `ps` and kept in
+            // the shell history, so it is not a way to supply a secret.
+            FileHandle.standardError.write(
+                Data(
+                    ("""
+                    --key is refused: the value would be visible to every process on this \
+                    machine and recorded in your shell history. Set TAVILY_API_KEY in the \
+                    environment, or put it in .secrets.env at the project root.
+                    """ + "\n").utf8))
+            exit(2)
+        case "--help", "-h":
+            print(Options.usage)
+            exit(0)
+        default: return false
+        }
+        return true
+    }
+
+    private func runToggles(_ argument: String) -> Bool {
+        switch argument {
+        case "--benchmark": options.benchmark = true
+        case "--memory-probe": options.memoryProbe = true
+        case "--session-probe": options.sessionProbe = true
+        case "--export-sample": options.exportSample = true
+        case "--check": options.check = true
+        case "--check-transport": options.checkTransport = true
+        case "--check-client": options.checkClient = true
+        case "--prepare-identity": options.prepareIdentity = true
+        default: return false
+        }
+        return true
+    }
+
+    private func displayToggles(_ argument: String) -> Bool {
+        switch argument {
+        case "--serve": options.serve = true
+        case "--seed": options.seed = true
+        case "--list-characters": options.listCharacters = true
+        case "--list-roles": options.listRoles = true
+        case "--solo": options.solo = true
+        default: return false
+        }
+        return true
+    }
+
+    private func server(_ argument: String) -> Bool {
+        switch argument {
+        case "--transport":
+            // Unvalidated, so `--transport webtransprot` served HTTP only and the app could
+            // not connect.
+            let transportRaw = reader.next() ?? ""
+            guard ["webtransport", "http", "both"].contains(transportRaw) else {
+                reject("unknown transport", transportRaw, expected: "webtransport, http or both")
+            }
+            options.transport = transportRaw
+            options.transportSpecified = true
+        case "--transport-port":
+            // `UInt16(String)` is nil out of range, so this used to fall back silently to 7790.
+            let transportRaw = reader.next() ?? ""
+            guard let value = UInt16(transportRaw), value != 0 else {
+                reject("invalid transport port", transportRaw, expected: "1–65535")
+            }
+            options.transportPort = value
+        case "--port":
+            // A trapping `UInt16` at the listener aborted the process for `--port -1` or
+            // `--port 70000`; zero would announce a URL that goes nowhere.
+            let portRaw = reader.next() ?? ""
+            guard let value = UInt16(portRaw), value != 0 else {
+                reject("invalid port", portRaw, expected: "1–65535")
+            }
+            options.port = value
+            options.portSpecified = true
+        case "--share-base":
+            // Only the deployment knows the address the website is published on; a base that is
+            // not a URL produces links that go nowhere.
+            let baseRaw = reader.next() ?? ""
+            guard let url = URL(string: baseRaw), url.scheme != nil, url.host != nil else {
+                reject("invalid share base", baseRaw, expected: "a URL like http://192.168.1.5:7788")
+            }
+            options.shareBase = baseRaw
+            options.shareBaseSpecified = true
+        default: return false
+        }
+        return true
+    }
+
+    private func research(_ argument: String) -> Bool {
+        switch argument {
+        case "--research":
+            let raw = reader.next() ?? ""
+            if let depth = ResearchBudget.Depth(rawValue: raw) {
+                options.researchDepth = depth
+                options.mode = .research
+            } else {
+                FileHandle.standardError.write(
+                    Data("unknown research budget: \(raw) — try quick, standard or deep\n".utf8))
+                exit(2)
+            }
+        case "--mode":
+            let raw = reader.next() ?? ""
+            if let parsed = DiscussionMode(rawValue: raw) {
+                options.mode = parsed
+            } else {
+                FileHandle.standardError.write(
+                    Data("unknown mode: \(raw) — try entertainment or research\n".utf8))
+                exit(2)
+            }
+        case "--attach":
+            // A missing value used to append an empty path, or take the next flag as the path.
+            let attachRaw = reader.next() ?? ""
+            guard !attachRaw.isEmpty, !attachRaw.hasPrefix("--") else {
+                reject("invalid attachment path", attachRaw, expected: "a file path")
+            }
+            options.attachments.append(attachRaw)
+        default: return false
+        }
+        return true
+    }
+
+    private func compaction(_ argument: String) -> Bool {
+        switch argument {
+        case "--compact-threshold":
+            // A nil here left the engine's own 0.7 in place, silently.
+            let thresholdRaw = reader.next() ?? ""
+            guard let value = Double(thresholdRaw), value > 0, value <= 1 else {
+                reject(
+                    "invalid compact threshold", thresholdRaw,
+                    expected: "a fraction above 0 and at most 1")
+            }
+            options.compactThreshold = value
+        case "--context-window":
+            // Zero and negatives already meant "unset" to `generationCap`.
+            let windowRaw = reader.next() ?? ""
+            guard let value = Int(windowRaw), value >= 1 else {
+                reject("invalid context window", windowRaw, expected: "1 or more tokens")
+            }
+            options.contextWindow = value
+        case "--compact-keep":
+            // A negative value traps inside `dropLast`; zero is meaningful, so it is allowed.
+            let keepRaw = reader.next() ?? ""
+            guard let value = Int(keepRaw), value >= 0 else {
+                reject("invalid compact keep", keepRaw, expected: "0 or more turns")
+            }
+            options.keepRecent = value
+        case "--run-directory":
+            // A second engine — a test one, or the one `TransportCheck` starts — needs its own
+            // state directory, and a relative path is resolved here so the child it spawns can
+            // be told the same, working-directory-independent path.
+            let runRaw = reader.next() ?? ""
+            guard !runRaw.isEmpty else {
+                reject("invalid run directory", runRaw, expected: "a path")
+            }
+            options.runDirectory = URL(fileURLWithPath: runRaw)
+        default: return false
+        }
+        return true
     }
 }
