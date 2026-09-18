@@ -129,9 +129,10 @@ extension ConversationEngine {
     @discardableResult
     public func setModel(_ modelID: String, for agentID: String) -> Bool {
         let resolved = ModelCatalog.resolve(modelID)
-        guard !resolved.isEmpty, seats.contains(where: { $0.spec.id == agentID }) else { return false }
+        guard !resolved.isEmpty else { return false }
         guard !hasTurnInFlight else { return false }
-        var spec = seats.first(where: { $0.spec.id == agentID })!.spec
+        guard let index = seats.firstIndex(where: { $0.spec.id == agentID }) else { return false }
+        var spec = seats[index].spec
         guard spec.modelID != resolved else { return false }
         spec.modelID = resolved
         // From the identifier, as a seat built from scratch does: the label is what a front end shows

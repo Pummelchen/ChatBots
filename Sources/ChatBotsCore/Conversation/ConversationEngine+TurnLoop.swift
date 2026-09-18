@@ -190,9 +190,11 @@ extension ConversationEngine {
         let budgetRemaining = conversation.research.map {
             max(0, $0.budget.maxSearches - $0.searches)
         }
+        // No research session means no ceiling to spend against; a session means spend while it
+        // has budget left. Written as a `map` rather than an `||` with a force unwrap.
+        let hasSearchBudget = budgetRemaining.map { $0 > 0 } ?? true
         let tools: [any ToolProvider] =
-            seat.spec.webSearchEnabled && (budgetRemaining == nil || budgetRemaining! > 0)
-            ? WebToolbox.tools : []
+            seat.spec.webSearchEnabled && hasSearchBudget ? WebToolbox.tools : []
         let engine = seat.engine
         let agentID = seat.spec.id
 

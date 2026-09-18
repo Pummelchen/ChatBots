@@ -14,10 +14,18 @@ import Testing
 struct ImageUploadTests {
 
     /// A real 1×1 PNG, so the bytes are a genuine image rather than arbitrary data.
-    private let pngBytes = Data(
-        base64Encoded: """
-            iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==
-            """)!
+    private let pngBytes: Data = {
+        guard
+            let data = Data(
+                base64Encoded:
+                    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+            )
+        else {
+            Issue.record("the fixture PNG is not valid base64")
+            return Data()
+        }
+        return data
+    }()
 
     private func image(_ name: String = "cat.png", bytes: Data? = nil) -> AttachedDocument {
         AttachedDocument(

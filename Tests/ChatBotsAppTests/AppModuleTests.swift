@@ -20,9 +20,9 @@ import Testing
 @testable import ChatBots
 
 /// A `UserDefaults` of its own, so a test cannot read or write the preferences of whatever ran it.
-private func scratchDefaults(_ name: String = UUID().uuidString) -> UserDefaults {
+private func scratchDefaults(_ name: String = UUID().uuidString) throws -> UserDefaults {
     let suite = "ChatBotsAppTests.\(name)"
-    let defaults = UserDefaults(suiteName: suite)!
+    let defaults = try #require(UserDefaults(suiteName: suite))
     defaults.removePersistentDomain(forName: suite)
     return defaults
 }
@@ -32,8 +32,8 @@ private func scratchDefaults(_ name: String = UUID().uuidString) -> UserDefaults
 struct SettingsStoreTests {
 
     @Test("What is saved is what the next store loads")
-    func roundTrip() {
-        let defaults = scratchDefaults()
+    func roundTrip() throws {
+        let defaults = try scratchDefaults()
         let saved = UserSettings.defaults(topic: "A topic of my own")
 
         let writer = UserSettingsStore(defaults: defaults, fallbackTopic: "fallback")
@@ -46,15 +46,16 @@ struct SettingsStoreTests {
     }
 
     @Test("An empty store starts from the fallback topic rather than failing")
-    func emptyStoreUsesTheFallback() {
-        let store = UserSettingsStore(defaults: scratchDefaults(), fallbackTopic: "the fallback")
+    func emptyStoreUsesTheFallback() throws {
+        let store = UserSettingsStore(
+            defaults: try scratchDefaults(), fallbackTopic: "the fallback")
         #expect(store.settings.topic == "the fallback")
         #expect(store.loadWarning == nil)
     }
 
     @Test("Settings that cannot be decoded are reported once and replaced by the fallback")
-    func unreadableSettingsAreReportedOnce() {
-        let defaults = scratchDefaults()
+    func unreadableSettingsAreReportedOnce() throws {
+        let defaults = try scratchDefaults()
         defaults.set(Data("this is not the encoded settings".utf8), forKey: "userSettings")
 
         let store = UserSettingsStore(defaults: defaults, fallbackTopic: "the fallback")
@@ -70,7 +71,7 @@ struct SettingsStoreTests {
     func staleKeyIsScrubbedOnLoad() throws {
         // The defect: the key was written to the plist, so the fix has to remove one that is
         // already there, not only stop writing new ones.
-        let defaults = scratchDefaults()
+        let defaults = try scratchDefaults()
         var spec = AgentSpec.seat(index: 0)
         spec.openAI.apiKey = "sk-left-over-from-an-older-build"
         let stored = UserSettings.defaults(topic: "A topic", seats: [spec])

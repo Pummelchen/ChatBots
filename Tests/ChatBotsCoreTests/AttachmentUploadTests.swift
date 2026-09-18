@@ -195,7 +195,8 @@ struct AttachmentUploadPathTests {
         let canary = temporaryCanary("http-traversal")
         #expect(!FileManager.default.fileExists(atPath: canary.url.path))
 
-        var request = URLRequest(url: URL(string: "\(base)/api/attachments")!)
+        let attachmentsURL = try #require(URL(string: "\(base)/api/attachments"))
+        var request = URLRequest(url: attachmentsURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: [

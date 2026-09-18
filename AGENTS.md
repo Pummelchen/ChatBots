@@ -83,7 +83,7 @@ Warnings-as-errors is **not** a flag here: `Package.swift` sets
 the file and writes both `CFBundleShortVersionString` and `CFBundleVersion` from it, so
 the bundle cannot misreport what it is. `tools/check-identity.sh` fails when the file is
 malformed, when the bundle builder has grown a copy of its own, or when the release notes
-for that version are missing; it runs in CI and as the eighth gate of
+for that version are missing; it runs in CI and as the ninth gate of
 `tools/mac-checks.sh`, and `tools/make-release.sh` checks the built bundle's copy.
 `tools/set-version.sh <X.Y[.Z]>` is the one command a bump needs. The shipped checkpoint is
 a *decision* rather than a number a release propagates, so it keeps one declaration and a
@@ -96,7 +96,8 @@ test that pins it (`Tests/ChatBotsCoreTests/DefaultCheckpointTests.swift`).
   the generated files must be in step with their sources — plus
   `third-party-notices.py`, `bash -n` over every tracked shell script, `python3 -m
   py_compile` over the Python, `shellcheck`, `ruff`, `pyright`, `gitleaks` over the
-  full history, `semgrep` (through `tools/semgrep-waivers.py`), `osv-scanner`, and
+  full history, `semgrep` (through `tools/semgrep-waivers.py`), `osv-scanner`,
+  `npm ci` with `eslint` and `prettier` over the JavaScript, and
   `tools/check-file-sizes.sh` — no code file over 500 lines — and
   `tools/check-identity.sh`, which fails when `VERSION` and anything derived from it
   disagree. None of them is advisory: a finding fails the job.
@@ -105,14 +106,17 @@ test that pins it (`Tests/ChatBotsCoreTests/DefaultCheckpointTests.swift`).
   those versions disagree with `tools/toolchain-versions.txt`.
 - Two structural assertions: the bundle's `LSMinimumSystemVersion` must equal
   `Package.swift`'s `.macOS(.vN)`, and `install.sh` must not hardcode an OS literal.
-- The mac-only gate is `tools/mac-checks.sh`, eight gates in one command: the file-size
+- The mac-only gate is `tools/mac-checks.sh`, nine gates in one command: the file-size
   check, `swift build --build-tests`, `swift test --enable-code-coverage`,
   `llvm-cov report`, `swiftlint lint`, `swift-format lint` over `Sources`/`Tests`
-  excluding the two generated files, the two Node web-rule checks, and the identity
+  excluding the two generated files, the two Node web-rule checks, `eslint` and
+  `prettier` over the JavaScript, and the identity
   check. swiftlint and
   swift-format are judged against **recorded waivers** in
   `tools/analysis-waivers.txt`, not against zero — that file also carries the semgrep
   findings this project accepts, and is the only place either gate reads them from.
+  The JavaScript toolchain comes from `npm ci` against the committed
+  `package-lock.json`, and a missing install fails the gate rather than skipping it.
   The size limit is one number in one script (`tools/check-file-sizes.sh`), called by
   both CI and `mac-checks.sh`, so the two cannot disagree about which file is too long.
 - No git hooks and no pre-commit config.

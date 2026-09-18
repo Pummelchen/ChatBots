@@ -66,7 +66,8 @@ private func crossOriginServer() async throws -> XOriginTestServer {
 private func post(
     _ session: URLSession, _ url: String, body: String, headers: [String: String]
 ) async throws -> Int {
-    var request = URLRequest(url: URL(string: url)!)
+    let requestURL = try #require(URL(string: url))
+    var request = URLRequest(url: requestURL)
     request.httpMethod = "POST"
     for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
     request.httpBody = Data(body.utf8)
@@ -164,7 +165,8 @@ struct CrossOriginTests {
             headers: ["Content-Type": "application/json"])
         #expect(status == 200)
 
-        let (_, response) = try await session.data(from: URL(string: "\(base)/api/state")!)
+        let stateURL = try #require(URL(string: "\(base)/api/state"))
+        let (_, response) = try await session.data(from: stateURL)
         #expect((response as? HTTPURLResponse)?.statusCode == 200)
     }
 }

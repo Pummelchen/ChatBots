@@ -490,7 +490,9 @@
     "fix_summary": "",
     "evidence_after": "",
     "commit": "",
-    "blocked_reason": ""
+    "blocked_reason": "",
+    "note": "SCOPE SPLIT (audit round 3): the task as recorded was three jobs in one \u2014 enabling `force_unwrapping`, driving SwiftLint to zero so `--strict` can be turned on, and the same for swift-format. The first is AUDIT-0097 (DONE); the SwiftLint-zero sweep is AUDIT-0098 (line_length), AUDIT-0099 (complexity and body length refactors) and AUDIT-0100 (the remaining rule classes); the swift-format sweep is AUDIT-0101 and the switch to `--strict` plus deleting the waiver counts is AUDIT-0102. This record stays OPEN until those are done \u2014 the scope was split, not narrowed.",
+    "workaround": "see the note: split into AUDIT-0097 through AUDIT-0102"
   },
   {
     "id": "AUDIT-0030",
@@ -1630,5 +1632,21 @@
     "evidence_after": "A new file under Sources/ChatBotsCore/Models/ is no longer ignored (check-ignore prints nothing), and a new file under the root models/ still matches `/models/`. AUDIT gate: `bash tools/mac-checks.sh` -> all 8 gates passed, EXIT=0; 1052 tests in 195 suites (baseline 1048), 0 warnings, coverage 52.28% lines (baseline 52.12%), swiftlint 215 (baseline 215), swift-format 439 (baseline 439). Log: AUDIT/evidence-batch1-mac-checks.log.",
     "commit": "audit(AUDIT-0096): anchor the checkpoint ignore to the repository root",
     "blocked_reason": ""
+  },
+  {
+    "id": "AUDIT-0097",
+    "severity": "S2",
+    "tier": "A",
+    "project": "ChatBotsCore",
+    "file_line": ".swiftlint.yml; Sources/ChatBotsCore/Conversation/ConversationEngine+Seats.swift:134; Sources/ChatBotsCore/Conversation/ConversationEngine+TurnLoop.swift:194; 30 sites in Tests/",
+    "title": "SwiftLint never enabled force_unwrapping, and 32 sites force-unwrapped an optional",
+    "category": "correctness/crash",
+    "status": "DONE",
+    "host": "Node1.local",
+    "discovered_by": "audit-0029",
+    "evidence_before": "`.swiftlint.yml` had `disabled_rules: []` and no `opt_in_rules`, so SwiftLint's `force_unwrapping` never ran: `swiftlint lint --config <a config that enables it>` over Sources and Tests reported 32 sites (2 in production code, 30 in tests), all of which trap on the one path nobody exercised.",
+    "fix_summary": "`.swiftlint.yml` gains `opt_in_rules: [force_unwrapping]`. The two production sites are gone: `setModel` looks the seat up with `firstIndex(where:)` and returns false instead of `first(where:)!`, and the turn loop's search-budget test is `budgetRemaining.map { $0 > 0 } ?? true` instead of `budgetRemaining == nil || budgetRemaining! > 0`. The 30 test sites became `try #require(...)` (26) or, where a stored/global constant cannot be `throws`, a closure initialiser that records an issue and returns an empty fixture (4). SwiftLint's autofix also cleared 6 other findings, so the recorded waiver was tightened from 217 to 211.",
+    "evidence_after": "Repo-config SwiftLint over Sources and Tests reports 209 findings and 0 `force_unwrapping`; swift-format over authored Swift reports 411 (both better than the 215/439 baseline). `swift build --build-tests` EXIT=0 and all 9 Mac gates pass: see AUDIT/evidence-force-unwrap-mac-checks.log.",
+    "commit": "audit(AUDIT-0029/0097): enable force_unwrapping, and remove the 32 sites"
   }
 ]

@@ -239,7 +239,8 @@ struct SharedConversationHTTPTests {
         let list = try JSONSerialization.jsonObject(with: listData) as? [[String: Any]]
         let id = try #require(list?.first?["id"] as? String)
 
-        let (data, response) = try await session.data(from: URL(string: "\(base)/s/\(id)")!)
+        let shareURL = try #require(URL(string: "\(base)/s/\(id)"))
+        let (data, response) = try await session.data(from: shareURL)
         let status = (response as? HTTPURLResponse)?.statusCode
         #expect(status == 200)
         #expect(
@@ -255,14 +256,15 @@ struct SharedConversationHTTPTests {
         let (server, _, session, base) = try await shareServer()
         defer { server.stop() }
 
-        let (data, response) = try await session.data(
-            from: URL(string: "\(base)/s/\(UUID().uuidString)")!)
+        let unknownURL = try #require(URL(string: "\(base)/s/\(UUID().uuidString)"))
+        let (data, response) = try await session.data(from: unknownURL)
         #expect((response as? HTTPURLResponse)?.statusCode == 404)
         let page = String(decoding: data, as: UTF8.self)
         #expect(page.contains("No conversation with that link"))
 
         // And a malformed one is the same answer rather than a crash.
-        let (_, malformed) = try await session.data(from: URL(string: "\(base)/s/not-an-id")!)
+        let malformedURL = try #require(URL(string: "\(base)/s/not-an-id"))
+        let (_, malformed) = try await session.data(from: malformedURL)
         #expect((malformed as? HTTPURLResponse)?.statusCode == 404)
     }
 
@@ -298,7 +300,8 @@ struct SharedConversationHTTPTests {
                 .replacingOccurrences(of: "\\/", with: "/")
         }
 
-        var proxied = URLRequest(url: URL(string: "\(base)/s/\(id)")!)
+        let shareURL = try #require(URL(string: "\(base)/s/\(id)"))
+        var proxied = URLRequest(url: shareURL)
         proxied.setValue("192.168.1.5:7788", forHTTPHeaderField: "Host")
         let (data, response) = try await session.data(for: proxied)
         #expect((response as? HTTPURLResponse)?.statusCode == 200)
@@ -308,7 +311,7 @@ struct SharedConversationHTTPTests {
         #expect(!page.contains(base), "the engine's own base reached the page")
 
         // A Host that is not a host is not special-cased either, because nothing reads the header.
-        var hostile = URLRequest(url: URL(string: "\(base)/s/\(id)")!)
+        var hostile = URLRequest(url: shareURL)
         hostile.setValue("evil.example/../admin", forHTTPHeaderField: "Host")
         let (hostileData, _) = try await session.data(for: hostile)
         let hostilePage = decoded(try #require(String(bytes: hostileData, encoding: .utf8)))
@@ -320,6 +323,7 @@ struct SharedConversationHTTPTests {
 
 /// Fetch a body, so the tests read as assertions rather than as URL plumbing.
 private func fetch(_ session: URLSession, _ url: String) async throws -> Data {
-    let result = try await session.data(from: URL(string: url)!)
+    let requestURL = try #require(URL(string: url))
+    let result = try await session.data(from: requestURL)
     return result.0
 }

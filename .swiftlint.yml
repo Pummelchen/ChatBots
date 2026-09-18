@@ -35,6 +35,13 @@ excluded:
 
 disabled_rules: []
 
+# Rules that are off in SwiftLint's defaults and on here.
+opt_in_rules:
+  # A force unwrap is a crash on the one path nobody exercised, and the audit brief's rule is
+  # that a check is only in force if the build fails without it. Every site in this repository
+  # is gone, so this rule reports zero today and fails the moment one is added.
+  - force_unwrapping
+
 line_length:
   # Left at SwiftLint's defaults (warning 120, error 200) deliberately. Of the 124
   # findings, 121 are string content the codebase does not wrap — 90 plain string

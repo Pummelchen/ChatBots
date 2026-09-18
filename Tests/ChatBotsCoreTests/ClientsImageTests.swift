@@ -53,10 +53,18 @@ private func wireImageDirectory() throws -> URL {
 }
 
 /// A real 1×1 PNG, for the pass-through check.
-private let realPNG = Data(
-    base64Encoded: """
-        iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==
-        """)!
+private let realPNG: Data = {
+    guard
+        let data = Data(
+            base64Encoded:
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+        )
+    else {
+        Issue.record("the fixture PNG is not valid base64")
+        return Data()
+    }
+    return data
+}()
 
 @Suite("BMP and TIFF are converted, not sent as undocumented types")
 struct ClientsImageTests {

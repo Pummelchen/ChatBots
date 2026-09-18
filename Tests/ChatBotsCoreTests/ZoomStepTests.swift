@@ -33,12 +33,14 @@ struct ZoomStepTests {
     }
 
     @Test("Levels are strictly increasing between 85% and 200%")
-    func levelsAreSane() {
+    func levelsAreSane() throws {
         let levels = TextZoom.levels
         #expect(levels == levels.sorted())
         #expect(Set(levels).count == levels.count)
-        #expect(levels.first! >= 0.8, "below this the app's 8pt labels stop being readable")
-        #expect(levels.last! <= 2.0, "above this the two-pane layout stops being usable")
+        let smallest = try #require(levels.first)
+        let largest = try #require(levels.last)
+        #expect(smallest >= 0.8, "below this the app's 8pt labels stop being readable")
+        #expect(largest <= 2.0, "above this the two-pane layout stops being usable")
         #expect(levels.contains(1.0), "there must be an exact 100% to return to")
         #expect(TextZoom.minimumScale == levels.first)
         #expect(TextZoom.maximumScale == levels.last)

@@ -83,7 +83,7 @@ struct RealExtractorTests {
     func scannedPDFNeedsOCR() throws {
         let url = try scratchFile("blank.pdf")
         var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
-        let context = CGContext(url as CFURL, mediaBox: &mediaBox, nil)!
+        let context = try #require(CGContext(url as CFURL, mediaBox: &mediaBox, nil))
         context.beginPDFPage(nil)
         // A page with no text at all stands in for a scan.
         context.setFillColor(CGColor(red: 0.9, green: 0.9, blue: 0.9, alpha: 1))
@@ -138,10 +138,11 @@ struct RealExtractorTests {
     func image() throws {
         let url = try scratchFile("chart.png")
         // A real 1x1 PNG, so the bytes are a genuine image.
-        let png = Data(
-            base64Encoded: """
-                iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==
-                """)!
+        let png = try #require(
+            Data(
+                base64Encoded: """
+                    iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==
+                    """))
         try png.write(to: url)
 
         let document = try SystemDocumentExtractor.ingestor.add(url: url)

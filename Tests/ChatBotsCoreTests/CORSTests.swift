@@ -80,7 +80,8 @@ struct CORSTests {
         let (server, session, base) = try await corsServer()
         defer { server.stop() }
 
-        var request = URLRequest(url: URL(string: "\(base)/api/conversations")!)
+        let conversationsURL = try #require(URL(string: "\(base)/api/conversations"))
+        var request = URLRequest(url: conversationsURL)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         let (_, response) = try await session.data(for: request)
         let http = try #require(response as? HTTPURLResponse)
@@ -99,7 +100,8 @@ struct CORSTests {
 
         // The preflight a browser sends before a JSON POST. It must not be answered with a
         // grant: `204` plus the CORS headers is what let the write through.
-        var request = URLRequest(url: URL(string: "\(base)/api/conversations/new")!)
+        let newConversationURL = try #require(URL(string: "\(base)/api/conversations/new"))
+        var request = URLRequest(url: newConversationURL)
         request.httpMethod = "OPTIONS"
         request.setValue("http://evil.example", forHTTPHeaderField: "Origin")
         request.setValue("POST", forHTTPHeaderField: "Access-Control-Request-Method")
@@ -124,8 +126,8 @@ struct CORSTests {
 
         // The SSE head is written by hand rather than through `serialised`, so it has to be
         // checked on its own — it carried `Access-Control-Allow-Origin: *` too.
-        let (bytes, response) = try await session.bytes(
-            for: URLRequest(url: URL(string: "\(base)/api/events")!))
+        let eventsURL = try #require(URL(string: "\(base)/api/events"))
+        let (bytes, response) = try await session.bytes(for: URLRequest(url: eventsURL))
         let http = try #require(response as? HTTPURLResponse)
         #expect(http.statusCode == 200)
         for header in crossOriginHeaders {

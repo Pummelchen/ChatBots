@@ -55,10 +55,18 @@ private func temporaryDirectory() throws -> URL {
 }
 
 /// A real 1×1 PNG, for the pass-through case.
-private let pngBytes = Data(
-    base64Encoded: """
-        iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==
-        """)!
+private let pngBytes: Data = {
+    guard
+        let data = Data(
+            base64Encoded:
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+        )
+    else {
+        Issue.record("the fixture PNG is not valid base64")
+        return Data()
+    }
+    return data
+}()
 
 @Suite("An image intake can convert", .serialized)
 struct ImageMediaTests {

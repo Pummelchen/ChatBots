@@ -1,0 +1,48 @@
+mac-checks commit: 19dc608b070c73a7536d78542876197f31821518
+
+=== 1/7  file sizes: tracked code ===
+PASS  file sizes: every code file is within 500 lines
+
+=== 2/7  build: products and tests, warnings are errors ===
+PASS  build: swift build --build-tests
+
+=== 3/7  tests: the full suite ===
+      1074 tests in 196 suites
+PASS  tests: 1074 tests in 196 suites
+
+=== 4/7  coverage: Sources/ ===
+      TOTAL                                                                6689              2616    60.89%        2561              1078    57.91%       21047              9930    52.82%           0                 0         -
+PASS  coverage: TOTAL                                                                6689              2616    60.89%        2561              1078    57.91%       21047              9930    52.82%           0                 0         -
+
+=== 5/7  swiftlint: Sources, Tests ===
+PASS  swiftlint: 209 finding(s), within the recorded waiver of 211
+
+=== 6/7  swift-format lint: Sources, Tests ===
+PASS  swift-format: 411 diagnostic(s), within the recorded waiver of 413
+
+=== 7/7  web: the rules the page runs ===
+PASS  web: deltas merge (34 cases)
+PASS  web: the verdict rule (12 cases)
+
+=== 8/9  web toolchain: eslint and prettier ===
+PASS  eslint: web/ and the web check scripts
+PASS  prettier: web/ and the web check scripts
+
+=== 9/9  identity: the version and its mirrors ===
+PASS  identity: 1.0 is stated once and agrees everywhere
+
+=== summary ===
+PASS  file sizes: every code file is within 500 lines
+PASS  build: swift build --build-tests
+PASS  tests: 1074 tests in 196 suites
+PASS  coverage: TOTAL                                                                6689              2616    60.89%        2561              1078    57.91%       21047              9930    52.82%           0                 0         -
+PASS  swiftlint: 209 finding(s), within the recorded waiver of 211
+PASS  swift-format: 411 diagnostic(s), within the recorded waiver of 413
+PASS  web: deltas merge (34 cases)
+PASS  web: the verdict rule (12 cases)
+PASS  eslint: web/ and the web check scripts
+PASS  prettier: web/ and the web check scripts
+PASS  identity: 1.0 is stated once and agrees everywhere
+
+All 9 Mac-only gates passed.
+EXIT=0

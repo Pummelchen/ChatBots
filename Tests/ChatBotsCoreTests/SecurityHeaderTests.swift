@@ -78,7 +78,8 @@ private func responseHead(_ response: HTTPResponse) -> String {
 }
 
 private func get(_ session: URLSession, _ url: String) async throws -> (Int, HTTPURLResponse, Data) {
-    let (data, response) = try await session.data(for: URLRequest(url: URL(string: url)!))
+    let requestURL = try #require(URL(string: url))
+    let (data, response) = try await session.data(for: URLRequest(url: requestURL))
     let http = try #require(response as? HTTPURLResponse)
     return (http.statusCode, http, data)
 }
@@ -163,8 +164,8 @@ struct SecurityHeaderTests {
         // A stream never finishes, so `data(for:)` waits for a body that will not end — the first
         // version of this test sat there for the session's 60-second timeout. `bytes(for:)` hands back the
         // head as soon as it arrives, which is where the headers are.
-        let (bytes, response) = try await session.bytes(
-            for: URLRequest(url: URL(string: "\(base)/api/events")!))
+        let eventsURL = try #require(URL(string: "\(base)/api/events"))
+        let (bytes, response) = try await session.bytes(for: URLRequest(url: eventsURL))
         defer { bytes.task.cancel() }
         let http = try #require(response as? HTTPURLResponse)
         #expect(http.statusCode == 200)

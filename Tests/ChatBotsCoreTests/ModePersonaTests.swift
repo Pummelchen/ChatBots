@@ -170,11 +170,11 @@ struct AnalystMethodTests {
     }
 
     @Test("The methodological analysts are more skeptical than the advocate roles")
-    func skepticismOrdering() {
+    func skepticismOrdering() throws {
         let byID = Dictionary(uniqueKeysWithValues: AnalystLibrary.all.map { ($0.id, $0) })
-        let skeptic = byID["skeptic"]!
-        let methodologist = byID["methodologist"]!
-        let dataAnalyst = byID["data-analyst"]!
+        let skeptic = try #require(byID["skeptic"])
+        let methodologist = try #require(byID["methodologist"])
+        let dataAnalyst = try #require(byID["data-analyst"])
 
         #expect(skeptic.skepticism > dataAnalyst.skepticism)
         #expect(methodologist.skepticism >= .high)
@@ -184,7 +184,9 @@ struct AnalystMethodTests {
     @Test("The moderator is told not to hold a position, unlike the analysts")
     func moderatorIsNeutral() {
         let moderator = AnalystLibrary.role(id: "research-moderator")
-        #expect(moderator.directive.contains("Does not hold a position") || moderator.summary.contains("Does not hold a position"))
+        #expect(
+            moderator.directive.contains("Does not hold a position")
+                || moderator.summary.contains("Does not hold a position"))
         #expect(moderator.domain.contains("synthesis"))
     }
 
@@ -261,7 +263,11 @@ struct ModePromptTests {
         spec.personaID = mode.defaultPersonaID(forSeat: 0)
         let conversation = Conversation(
             topic: "Should Company X enter the German EV market?",
-            turns: [Turn(sequence: 1, speakerName: "Moderator", kind: .topic, content: "Should Company X enter the German EV market?")])
+            turns: [
+                Turn(
+                    sequence: 1, speakerName: "Moderator", kind: .topic,
+                    content: "Should Company X enter the German EV market?")
+            ])
         return PromptBuilder.prompt(
             for: spec, others: [AgentSpec.seat(index: 1)], conversation: conversation
         )[0].content
@@ -328,7 +334,10 @@ struct ModeSwitchTests {
         let engine = engine()
         // All three seats start on the same entertainment character, which is invalid in
         // research: a seat holding "The Villain" has no meaning there.
-        #expect(engine.specs.allSatisfy { PersonaCatalog.style(id: $0.personaID, mode: .entertainment, seatIndex: 0).isAnalyst == false })
+        #expect(
+            engine.specs.allSatisfy {
+                PersonaCatalog.style(id: $0.personaID, mode: .entertainment, seatIndex: 0).isAnalyst == false
+            })
 
         #expect(engine.setMode(.research))
         #expect(engine.specs.allSatisfy { $0.mode == .research })
@@ -367,11 +376,12 @@ struct ModeSwitchTests {
         let engine = engine()
         // `neutral` means "no style", which every mode needs, so a seat using it should not be
         // reseated just because the room changed.
-        engine.updateSeat({
-            var spec = engine.specs[0]
-            spec.personaID = PersonaLibrary.neutral.id
-            return spec
-        }())
+        engine.updateSeat(
+            {
+                var spec = engine.specs[0]
+                spec.personaID = PersonaLibrary.neutral.id
+                return spec
+            }())
         #expect(engine.setMode(.research))
         #expect(engine.specs[0].personaID == PersonaLibrary.neutral.id)
     }

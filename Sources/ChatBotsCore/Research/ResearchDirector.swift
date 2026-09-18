@@ -112,7 +112,7 @@ public enum ResearchSubQuestion: String, Sendable, CaseIterable, Codable {
 /// and rules are honest about structural facts. Whether a finding is *good* is left to the
 /// analysts, who are told to argue about it.
 @MainActor
-public struct ResearchDirector: Sendable {
+public struct ResearchDirector {
 
     /// The analysts available, by seat.
     public var seats: [AgentSpec]

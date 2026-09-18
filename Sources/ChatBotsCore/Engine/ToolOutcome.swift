@@ -36,7 +36,6 @@ public enum ChatBotsError: LocalizedError, Sendable {
     }
 }
 
-
 extension Array {
     /// Bounds-checked lookup, for optional per-seat configuration lists.
     subscript(safe index: Int) -> Element? {

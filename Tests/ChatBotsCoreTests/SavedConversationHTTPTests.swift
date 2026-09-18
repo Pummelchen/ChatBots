@@ -83,7 +83,8 @@ private enum HTTPTestError: Error {
 }
 
 private func get(_ session: URLSession, _ url: String) async throws -> (Int, Data) {
-    var request = URLRequest(url: URL(string: url)!)
+    let requestURL = try #require(URL(string: url))
+    var request = URLRequest(url: requestURL)
     request.setValue("application/json", forHTTPHeaderField: "Accept")
     let (data, response) = try await session.data(for: request)
     return ((response as? HTTPURLResponse)?.statusCode ?? 0, data)
@@ -92,7 +93,8 @@ private func get(_ session: URLSession, _ url: String) async throws -> (Int, Dat
 private func post(_ session: URLSession, _ url: String, _ body: [String: String]) async throws
     -> (Int, Data)
 {
-    var request = URLRequest(url: URL(string: url)!)
+    let requestURL = try #require(URL(string: url))
+    var request = URLRequest(url: requestURL)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     request.httpBody = try JSONSerialization.data(withJSONObject: body)

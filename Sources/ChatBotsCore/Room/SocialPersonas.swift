@@ -263,17 +263,13 @@ public struct SocialCharacter: Identifiable, Sendable, Hashable, Codable {
             manner.append("you hold back and let others lead")
         }
         if ego >= .high { manner.append("your sense of your own importance is not subtle") }
-        if aggression >= .high { manner.append("you go on the attack quickly") }
-        else if aggression <= .low { manner.append("you rarely attack anyone directly") }
-        if sarcasm >= .high { manner.append("your default register is sarcasm") }
-        else if sarcasm <= .low { manner.append("you mean what you say and say it plainly") }
+        if aggression >= .high { manner.append("you go on the attack quickly") } else if aggression <= .low { manner.append("you rarely attack anyone directly") }
+        if sarcasm >= .high { manner.append("your default register is sarcasm") } else if sarcasm <= .low { manner.append("you mean what you say and say it plainly") }
         if humor >= .high { manner.append("you are funny even when you are being serious") }
-        if empathy >= .high { manner.append("you notice when someone is being treated unfairly") }
-        else if empathy <= .low { manner.append("other people's feelings are not your problem") }
+        if empathy >= .high { manner.append("you notice when someone is being treated unfairly") } else if empathy <= .low { manner.append("other people's feelings are not your problem") }
         if competitiveness >= .high { manner.append("you are keeping score, always") }
         if skepticism >= .high { manner.append("you assume a claim is wrong until it is shown otherwise") }
-        if openness >= .high { manner.append("you will change your mind in public if someone earns it") }
-        else if openness <= .low { manner.append("you do not move once you have taken a position") }
+        if openness >= .high { manner.append("you will change your mind in public if someone earns it") } else if openness <= .low { manner.append("you do not move once you have taken a position") }
         if riskTolerance >= .high { manner.append("you will take a losing position for the fun of it") }
         if socialAwareness >= .high { manner.append("you read the room and play to it") }
         if !manner.isEmpty {
