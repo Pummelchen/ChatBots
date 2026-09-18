@@ -1,0 +1,193 @@
+Building for debugging...
+[Computing dependencies]
+[Using on-disk description]
+[1 / 1]
+[1 / 43] MLXLMCommon
+[2 / 17] ChatBotsCore
+[4 / 21]
+[6 / 21] ChatBotsCore
+[7 / 22] ChatBotsCore
+[15 / 31] ChatBotsCore
+[19 / 36] ChatBotsCore-product
+[19 / 36] chatbots-probe-product
+[23 / 36] ChatBots
+[25 / 37] ChatBots
+[27 / 37] ChatBots-product
+[27 / 37] chatbots-probe-product
+[29 / 41] chatbots-probe-product
+[31 / 41] ChatBotsCoreTests-product
+[33 / 43] ChatBots
+[36 / 46] ChatBots-product
+[38 / 49] ChatBots-product
+[40 / 48] ChatBotsCoreTests-product
+[40 / 48] ChatBotsAppTests-product
+[43 / 49] ChatBotsAppTests-product
+[45 / 54] ChatBotsAppTests-product
+[47 / 54] ChatBotsAppTests-product
+[50 / 55] chatbots-probe-product
+[51 / 56] ChatBotsCoreTests-product
+[55 / 59] ChatBotsCoreTests-product
+[57 / 59] ChatBotsCoreTests-product
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+Build complete! (10,75 secs)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Real extractors" started.
+◇ Suite "Attachment intake bounds what it reads" started.
+◇ Suite "Source material in the prompt" started.
+◇ Suite "What the interface branches on" started.
+◇ Suite "Device profiles" started.
+◇ Suite "Adding documents" started.
+◇ Suite "Resolving an unknown screen" started.
+◇ Suite "Vision support" started.
+◇ Suite "File kinds" started.
+◇ Suite "Vision capability" started.
+◇ Test "A file over the cap is refused before it is converted" started.
+◇ Test "A regular file is still converted, and its byte count is the bytes that were read" started.
+◇ Test "A directory is refused as a file" started.
+◇ Test "A symbolic link is not a regular file, whether or not it dangles" started.
+◇ Test "A conversation that has started refuses new material" started.
+◇ Test "Attachments count towards the context estimate" started.
+◇ Test "Only a phone gets the single-column layout by default" started.
+◇ Test "A FIFO is refused, and named as what it is" started.
+◇ Test "The cap is enforced by the read, not by a size the file reported" started.
+◇ Test "The source material is data in the user turn, never the system message" started.
+◇ Test "Attachments survive the context estimate being computed" started.
+◇ Test "No attachments means no extra message" started.
+◇ Test "Attached text is given to the models, delimited and named" started.
+◇ Test "Breakpoints put the narrowest tablet in one column" started.
+◇ Test "A path whose size cannot be read is refused, not read unbounded" started.
+◇ Test "An image is added with its bytes and no text" started.
+◇ Test "A long document is shortened and says so" started.
+◇ Test "The list covers iPads back eight years" started.
+◇ Test "A document is added with its text, name and size" started.
+◇ Test "A PDF with no text layer is reported as needing OCR, not as empty" started.
+◇ Test "The list covers the phones the brief asked for" started.
+◇ Test "An unsupported extension is refused with a clear reason" started.
+◇ Test "The list reaches down to the narrowest screens in use" started.
+◇ Test "An image with no data is refused" started.
+◇ Test "Viewports are CSS points, not marketing resolutions" started.
+◇ Test "An empty document is refused rather than attached as nothing" started.
+◇ Test "A file over the size limit is refused before it is read" started.
+◇ Test "Every profile is usable and named" started.
+➜ Test "The checkpoint downloaded on this machine declares vision" skipped.
+◇ Test "A checkpoint whose config declares a vision tower is read as yes" started.
+◇ Test "A config with no vision tower is a definite no, not an unknown" started.
+◇ Test "The capture set has one entry per distinct shape" started.
+◇ Test "An override settles it for a model that cannot be recognised" started.
+◇ Test "Recognised API model families are supported" started.
+◇ Test "An unrecognised API model is unknown, so images are not offered" started.
+◇ Test "A local seat without vision weights is unsupported" started.
+◇ Test "Identifiers are unique, so a profile is addressable" started.
+◇ Test "A real .rtf is converted to plain text" started.
+◇ Test "A desktop is not matched against phones, however narrow the window" started.
+◇ Test "A real PDF's text layer is extracted" started.
+◇ Test "Markdown is passed through as written, not converted" started.
+◇ Test "A near miss resolves to the closest device of the same class" started.
+◇ Test "A wide screen is treated as a desktop" started.
+◇ Test "Each kind has a label and a symbol" started.
+◇ Test "The size limit is enforced for real files" started.
+◇ Test "Every kind is reachable from the extensions it advertises" started.
+◇ Test "A PDF with no text layer is reported as needing OCR" started.
+◇ Test "Extensions map to the right kind" started.
+◇ Test "A large text file is shortened to fit, and says so" started.
+◇ Test "An image is read as bytes and produces no text" started.
+◇ Test "No extension belongs to two kinds" started.
+◇ Test "Images are distinguished from documents" started.
+◇ Test "A plain text file is read, including non-ASCII" started.
+◇ Test "An RTF file is rich text, not Word, and its chip says so" started.
+◇ Test "Several files are added, and one bad file does not discard the good ones" started.
+◇ Test "An absurd viewport is admitted as unknown rather than trapping the process" started.
+◇ Test "A real .docx is converted to plain text" started.
+◇ Test "Tablets are matched as tablets, not as large phones" started.
+◇ Test "The endpoint's model is what decides, not the local checkpoint's id" started.
+◇ Test "An exact match is returned as itself" started.
+◇ Test "An explicit override beats the guess" started.
+◇ Test "A local seat's answer comes from the checkpoint, not the name" started.
+◇ Test "DeepSeek's pro tier is not offered images, because it cannot read them" started.
+◇ Test "A device unlike anything listed resolves to nothing, so width rules take over" started.
+◇ Test "DeepSeek's flash tier accepts images" started.
+◇ Test "A plain checkpoint id is not mistaken for a vision model" started.
+◇ Test "Other families that do see images are still recognised" started.
+◇ Test "A two-character marker matches a whole token, not a substring" started.
+✔ Test "Only a phone gets the single-column layout by default" passed after 0.004 seconds.
+✔ Test "Attachments count towards the context estimate" passed after 0.005 seconds.
+✔ Test "No attachments means no extra message" passed after 0.006 seconds.
+✔ Test "Breakpoints put the narrowest tablet in one column" passed after 0.007 seconds.
+✔ Test "Attached text is given to the models, delimited and named" passed after 0.008 seconds.
+✔ Test "A path whose size cannot be read is refused, not read unbounded" passed after 0.008 seconds.
+✔ Test "The source material is data in the user turn, never the system message" passed after 0.008 seconds.
+✔ Test "The list covers iPads back eight years" passed after 0.008 seconds.
+✔ Test "A regular file is still converted, and its byte count is the bytes that were read" passed after 0.008 seconds.
+✔ Test "A directory is refused as a file" passed after 0.008 seconds.
+✔ Test "A long document is shortened and says so" passed after 0.008 seconds.
+✔ Test "A file over the cap is refused before it is converted" passed after 0.008 seconds.
+✔ Test "The list reaches down to the narrowest screens in use" passed after 0.008 seconds.
+✔ Test "The list covers the phones the brief asked for" passed after 0.008 seconds.
+✔ Test "The cap is enforced by the read, not by a size the file reported" passed after 0.008 seconds.
+✔ Test "A symbolic link is not a regular file, whether or not it dangles" passed after 0.008 seconds.
+✔ Test "Viewports are CSS points, not marketing resolutions" passed after 0.008 seconds.
+✔ Test "A PDF with no text layer is reported as needing OCR, not as empty" passed after 0.008 seconds.
+✔ Test "An unsupported extension is refused with a clear reason" passed after 0.008 seconds.
+✔ Test "A document is added with its text, name and size" passed after 0.008 seconds.
+✔ Test "The capture set has one entry per distinct shape" passed after 0.008 seconds.
+✔ Test "An override settles it for a model that cannot be recognised" passed after 0.008 seconds.
+✔ Test "An empty document is refused rather than attached as nothing" passed after 0.008 seconds.
+✔ Test "Every profile is usable and named" passed after 0.008 seconds.
+✔ Test "A file over the size limit is refused before it is read" passed after 0.008 seconds.
+✔ Test "Identifiers are unique, so a profile is addressable" passed after 0.008 seconds.
+✔ Test "Recognised API model families are supported" passed after 0.008 seconds.
+✔ Test "A desktop is not matched against phones, however narrow the window" passed after 0.008 seconds.
+✔ Test "An image with no data is refused" passed after 0.008 seconds.
+✔ Test "An unrecognised API model is unknown, so images are not offered" passed after 0.008 seconds.
+✔ Test "A config with no vision tower is a definite no, not an unknown" passed after 0.008 seconds.
+✔ Test "A wide screen is treated as a desktop" passed after 0.007 seconds.
+✔ Test "A near miss resolves to the closest device of the same class" passed after 0.007 seconds.
+✔ Test "A local seat without vision weights is unsupported" passed after 0.008 seconds.
+✔ Test "A checkpoint whose config declares a vision tower is read as yes" passed after 0.008 seconds.
+✔ Test "Each kind has a label and a symbol" passed after 0.007 seconds.
+✔ Test "Every kind is reachable from the extensions it advertises" passed after 0.007 seconds.
+✔ Test "Extensions map to the right kind" passed after 0.007 seconds.
+✔ Test "No extension belongs to two kinds" passed after 0.007 seconds.
+✔ Test "Markdown is passed through as written, not converted" passed after 0.008 seconds.
+✔ Test "The size limit is enforced for real files" passed after 0.007 seconds.
+✔ Test "An RTF file is rich text, not Word, and its chip says so" passed after 0.007 seconds.
+✔ Test "Images are distinguished from documents" passed after 0.007 seconds.
+✔ Test "A large text file is shortened to fit, and says so" passed after 0.007 seconds.
+✔ Test "An absurd viewport is admitted as unknown rather than trapping the process" passed after 0.007 seconds.
+✔ Test "Tablets are matched as tablets, not as large phones" passed after 0.007 seconds.
+✔ Test "A plain text file is read, including non-ASCII" passed after 0.007 seconds.
+✔ Test "The endpoint's model is what decides, not the local checkpoint's id" passed after 0.007 seconds.
+✔ Test "An exact match is returned as itself" passed after 0.007 seconds.
+✔ Test "Several files are added, and one bad file does not discard the good ones" passed after 0.007 seconds.
+✔ Test "An explicit override beats the guess" passed after 0.007 seconds.
+✔ Test "A local seat's answer comes from the checkpoint, not the name" passed after 0.007 seconds.
+✔ Test "DeepSeek's flash tier accepts images" passed after 0.007 seconds.
+✔ Test "A device unlike anything listed resolves to nothing, so width rules take over" passed after 0.007 seconds.
+✔ Test "DeepSeek's pro tier is not offered images, because it cannot read them" passed after 0.007 seconds.
+✔ Test "A plain checkpoint id is not mistaken for a vision model" passed after 0.007 seconds.
+✔ Test "A two-character marker matches a whole token, not a substring" passed after 0.007 seconds.
+✔ Test "Other families that do see images are still recognised" passed after 0.007 seconds.
+✔ Test "Attachments survive the context estimate being computed" passed after 0.009 seconds.
+✔ Suite "What the interface branches on" passed after 0.009 seconds.
+✔ Suite "Device profiles" passed after 0.009 seconds.
+✔ Suite "Resolving an unknown screen" passed after 0.009 seconds.
+✔ Test "An image is added with its bytes and no text" passed after 0.009 seconds.
+✔ Suite "Vision support" passed after 0.009 seconds.
+✔ Suite "File kinds" passed after 0.009 seconds.
+✔ Suite "Vision capability" passed after 0.009 seconds.
+✔ Suite "Adding documents" passed after 0.009 seconds.
+✔ Test "An image is read as bytes and produces no text" passed after 0.009 seconds.
+✔ Test "A conversation that has started refuses new material" passed after 0.014 seconds.
+✔ Suite "Source material in the prompt" passed after 0.014 seconds.
+✔ Test "A PDF with no text layer is reported as needing OCR" passed after 0.046 seconds.
+✔ Test "A real PDF's text layer is extracted" passed after 0.047 seconds.
+✔ Test "A real .rtf is converted to plain text" passed after 0.221 seconds.
+✔ Test "A real .docx is converted to plain text" passed after 0.228 seconds.
+✔ Suite "Real extractors" passed after 0.230 seconds.
+✔ Test "A FIFO is refused, and named as what it is" passed after 1.055 seconds.
+✔ Suite "Attachment intake bounds what it reads" passed after 1.055 seconds.
+✔ Test run with 68 tests in 10 suites passed after 1.055 seconds.
+/bin/sh: /var/folders/7l/ry9rvd3d72z864w_jd2my37m0000gn/T/intake-09516C7A-EFA1-4B28-AD21-9BD5F10B61CC/pipe.txt: No such file or directory
+EXIT=0

@@ -62,8 +62,12 @@ public struct PDFTextExtractor: DocumentExtracting {
             throw DocumentError.unreadable("the PDF could not be opened")
         }
 
+        // `pageCount` is an `Int` from PDFKit over bytes a caller supplied, and the range below
+        // traps on a negative value. Clamped rather than trusted: a negative count is no pages,
+        // not a crash, and the clamped value is what the document reports.
+        let pageCount = max(0, document.pageCount)
         var budget = PDFTextBudget(maximum: limits.maximumTextCharacters)
-        for index in 0..<document.pageCount {
+        for index in 0..<pageCount {
             guard let page = document.page(at: index), let pageText = page.string else { continue }
             // Stop reading once the budget is spent rather than extracting a whole book to
             // then throw most of it away.
@@ -72,7 +76,7 @@ public struct PDFTextExtractor: DocumentExtracting {
 
         return AttachedDocument(
             name: "", kind: .pdf, text: budget.text,
-            pageCount: document.pageCount,
+            pageCount: pageCount,
             wasTruncated: budget.wasTruncated
         )
     }
@@ -132,17 +136,32 @@ struct PDFTextBudget {
 
 /// Converts Word, RTF, ODT, HTML and WebArchive with the system's own converter.
 public struct TextutilExtractor: DocumentExtracting {
-    /// The one extractor that still works from the path: `textutil` is a system tool that takes a file,
-    /// and staging the bytes to a temporary file to satisfy it would double the reading and writing for
-    /// no gain. What bounds it is the same as before — its output is capped and it is killed if it
-    /// overstays (`SystemProcess`) — and the input is a regular file the ingestor has already
-    /// measured and read.
+    /// The bytes the ingestor already bounded are what is converted, not the path read again.
+    ///
+    /// `textutil` takes a file, so the data is staged into a private temporary file and removed
+    /// afterwards. Running it on `url.path` re-opened the file after the ingestor had lstat-ed and
+    /// read it, so the regular-file check and the size ceiling applied to a different read than
+    /// the conversion consumed. Feeding stdin instead would need a writer thread, because the
+    /// child can fill its output pipe before it has read its input. The output is capped and the
+    /// process is killed if it overstays, exactly as before (`SystemProcess`).
     public func extract(data: Data, from url: URL, kind: DocumentKind, limits: AttachmentLimits) throws
         -> AttachedDocument
     {
+        let staged = FileManager.default.temporaryDirectory
+            .appending(path: "chatbots-textutil-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: staged) }
+        // Created with the permissions in place rather than chmod-ed afterwards, so there is no
+        // window in which another process could read a document the user attached.
+        guard
+            FileManager.default.createFile(
+                atPath: staged.path, contents: data, attributes: [.posixPermissions: 0o600])
+        else {
+            throw DocumentError.unreadable("the document could not be staged for conversion")
+        }
+
         let result = try SystemProcess.run(
             "/usr/bin/textutil",
-            ["-convert", "txt", "-stdout", "-encoding", "UTF-8", url.path],
+            ["-convert", "txt", "-stdout", "-encoding", "UTF-8", staged.path],
             timeout: SystemProcess.timeout,
             // The text this produces is what gets attached, so it is bounded by the same figure the
             // attachment is.

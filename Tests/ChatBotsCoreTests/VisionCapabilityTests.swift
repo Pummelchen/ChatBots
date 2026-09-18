@@ -47,22 +47,37 @@ struct VisionCapabilityTests {
 
         var pro = apiSeat(model: "deepseek-v4-pro")
         pro.modelID = "mlx-community/Qwen3.5-4B-MLX-4bit"
-        #expect(pro.visionSupport == .unknown,
-                "the checkpoint id must not be read as evidence about the API model")
+        #expect(
+            pro.visionSupport == .unknown,
+            "the checkpoint id must not be read as evidence about the API model")
     }
 
-    @Test("A plain checkpoint id is not mistaken for a vision model by substring")
+    @Test("A plain checkpoint id is not mistaken for a vision model")
     func noSubstringCollision() {
-        // "qwen3-vl" is contained in "Qwen3.5-4B", so matching both names at once read a
-        // plain text checkpoint as a vision model. Found by this suite failing.
+        // An API seat with no endpoint model named falls back to the checkpoint id, and
+        // "mlx-community/Qwen3.5-4B-MLX-4bit" is not a vision family. This used to assert
+        // `== .unknown || == .supported`, which passes when the answer is `.supported` — the
+        // outcome it is named for — and its comment claimed "qwen3-vl" was a substring of
+        // "Qwen3.5-4B", which it never was.
         var spec = AgentSpec.seat(index: 0)
         spec.backend = .openAIResponses
         spec.modelID = "mlx-community/Qwen3.5-4B-MLX-4bit"
-        // No endpoint model set, so the checkpoint id is all there is — and it is not a
-        // marker.
-        // The checkpoint is not consulted at all when the endpoint names a model, which is
-        // what the test above shows. This one records why that is the safe way round.
-        #expect(spec.visionSupport == .unknown || spec.visionSupport == .supported)
+        #expect(spec.visionSupport == .unknown, "a text checkpoint's id is not evidence")
+    }
+
+    @Test("A two-character marker matches a whole token, not a substring")
+    func shortMarkersNeedWholeTokens() {
+        // "o3" and "o4" are two characters, and `contains` declared any id carrying them able to
+        // see. A token boundary is what separates the real ids from a name that merely contains
+        // the letters and digits.
+        for model in ["o3-mini", "o4-mini", "openai/o3"] {
+            #expect(apiSeat(model: model).visionSupport == .supported, "\(model) should see")
+        }
+        for model in ["llama-o3xyz", "gpt-4o3", "qwen3-o4t-preview"] {
+            #expect(
+                apiSeat(model: model).visionSupport == .unknown,
+                "\(model) must not be read as a vision family")
+        }
     }
 
     @Test("An explicit override beats the guess")
@@ -80,8 +95,10 @@ struct VisionCapabilityTests {
     @Test("Other families that do see images are still recognised")
     func knownFamiliesStillWork() {
         // The change added an entry; it must not have replaced the reasoning for the rest.
-        for model in ["gpt-4o", "gpt-4o-mini", "claude-3-5-sonnet", "gemini-1.5-pro",
-                      "qwen2.5-vl-7b", "llava-1.6"] {
+        for model in [
+            "gpt-4o", "gpt-4o-mini", "claude-3-5-sonnet", "gemini-1.5-pro",
+            "qwen2.5-vl-7b", "llava-1.6",
+        ] {
             #expect(apiSeat(model: model).visionSupport == .supported, "\(model) should see")
         }
         // And a text-only model is still not offered images.

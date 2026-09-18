@@ -109,7 +109,17 @@ public final class DocumentIngestor: @unchecked Sendable {
         // A chunk size rather than one call: `read(upToCount:)` returns what is available, so a file
         // larger than the limit arrives in pieces and the check below happens on each of them.
         while data.count <= limit {
-            guard let chunk = try? handle.read(upToCount: 64 * 1024), !chunk.isEmpty else { break }
+            let chunk: Data
+            do {
+                guard let read = try handle.read(upToCount: 64 * 1024), !read.isEmpty else { break }
+                chunk = read
+            } catch {
+                // A mid-file read error used to be swallowed by `try?`: the loop broke and the
+                // bytes read so far were returned as the whole document, with nothing to tell a
+                // short file from a failed read. The failure is raised instead.
+                throw DocumentError.unreadable(
+                    "\(name) could not be read: \(error.localizedDescription)")
+            }
             data.append(chunk)
         }
         guard data.count <= limit else {

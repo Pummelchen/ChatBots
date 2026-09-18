@@ -14,13 +14,17 @@ struct DeviceProfileTests {
     func phoneCoverage() {
         let ids = DeviceProfiles.all.map(\.id)
         // iPhone 12 onwards.
-        for expected in ["iphone-12-mini", "iphone-12", "iphone-13", "iphone-14-pro",
-                         "iphone-15-pro-max", "iphone-16-pro", "iphone-se"] {
+        for expected in [
+            "iphone-12-mini", "iphone-12", "iphone-13", "iphone-14-pro",
+            "iphone-15-pro-max", "iphone-16-pro", "iphone-se",
+        ] {
             #expect(ids.contains(expected), "missing \(expected)")
         }
         // Samsung, entry level to flagship, last five years.
-        for expected in ["galaxy-a13", "galaxy-a14", "galaxy-a53", "galaxy-s21",
-                         "galaxy-s23", "galaxy-s23-ultra", "galaxy-z-flip"] {
+        for expected in [
+            "galaxy-a13", "galaxy-a14", "galaxy-a53", "galaxy-s21",
+            "galaxy-s23", "galaxy-s23-ultra", "galaxy-z-flip",
+        ] {
             #expect(ids.contains(expected), "missing \(expected)")
         }
         // Android tablets: the top models only, as asked.
@@ -118,14 +122,18 @@ struct DeviceResolutionTests {
     @Test("A desktop is not matched against phones, however narrow the window")
     func desktopIsNotAPhone() {
         let match = DeviceProfiles.nearest(width: 390, height: 844, isMobile: false)
-        #expect(match == nil || match?.kind == .desktop,
-                "a desktop window must not resolve to a handset profile")
+        #expect(
+            match == nil || match?.kind == .desktop,
+            "a desktop window must not resolve to a handset profile")
     }
 
     @Test("A wide screen is treated as a desktop")
     func wideIsDesktop() {
+        // `all` held no desktop profile, so this branch could only ever return nil and the old
+        // assertion accepted that. Now it has to find one.
         let match = DeviceProfiles.nearest(width: 1440, height: 900, isMobile: false)
-        #expect(match == nil || match?.kind == .desktop)
+        #expect(match?.kind == .desktop, "a desktop viewport must resolve to a desktop profile")
+        #expect(match?.id == "laptop-13")
     }
 
     @Test("Tablets are matched as tablets, not as large phones")

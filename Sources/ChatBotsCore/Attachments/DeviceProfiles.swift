@@ -84,124 +84,191 @@ public enum DeviceProfiles {
 
     public static let phones: [DeviceProfile] = [
         // iPhone 12 family (2020)
-        DeviceProfile(id: "iphone-12-mini", name: "iPhone 12 mini", kind: .phone,
-                      width: 375, height: 812, pixelRatio: 3, year: 2020),
-        DeviceProfile(id: "iphone-12", name: "iPhone 12 / 12 Pro", kind: .phone,
-                      width: 390, height: 844, pixelRatio: 3, year: 2020, isCommon: true),
-        DeviceProfile(id: "iphone-12-pro-max", name: "iPhone 12 Pro Max", kind: .phone,
-                      width: 428, height: 926, pixelRatio: 3, year: 2020),
+        DeviceProfile(
+            id: "iphone-12-mini", name: "iPhone 12 mini", kind: .phone,
+            width: 375, height: 812, pixelRatio: 3, year: 2020),
+        DeviceProfile(
+            id: "iphone-12", name: "iPhone 12 / 12 Pro", kind: .phone,
+            width: 390, height: 844, pixelRatio: 3, year: 2020, isCommon: true),
+        DeviceProfile(
+            id: "iphone-12-pro-max", name: "iPhone 12 Pro Max", kind: .phone,
+            width: 428, height: 926, pixelRatio: 3, year: 2020),
         // iPhone 13 (2021)
-        DeviceProfile(id: "iphone-13-mini", name: "iPhone 13 mini", kind: .phone,
-                      width: 375, height: 812, pixelRatio: 3, year: 2021),
-        DeviceProfile(id: "iphone-13", name: "iPhone 13 / 14", kind: .phone,
-                      width: 390, height: 844, pixelRatio: 3, year: 2021, isCommon: true),
-        DeviceProfile(id: "iphone-13-pro-max", name: "iPhone 13 Pro Max", kind: .phone,
-                      width: 428, height: 926, pixelRatio: 3, year: 2021),
+        DeviceProfile(
+            id: "iphone-13-mini", name: "iPhone 13 mini", kind: .phone,
+            width: 375, height: 812, pixelRatio: 3, year: 2021),
+        DeviceProfile(
+            id: "iphone-13", name: "iPhone 13 / 14", kind: .phone,
+            width: 390, height: 844, pixelRatio: 3, year: 2021, isCommon: true),
+        DeviceProfile(
+            id: "iphone-13-pro-max", name: "iPhone 13 Pro Max", kind: .phone,
+            width: 428, height: 926, pixelRatio: 3, year: 2021),
         // iPhone 14 (2022)
-        DeviceProfile(id: "iphone-14-plus", name: "iPhone 14 Plus", kind: .phone,
-                      width: 428, height: 926, pixelRatio: 3, year: 2022),
-        DeviceProfile(id: "iphone-14-pro", name: "iPhone 14 Pro", kind: .phone,
-                      width: 393, height: 852, pixelRatio: 3, year: 2022),
-        DeviceProfile(id: "iphone-14-pro-max", name: "iPhone 14 Pro Max", kind: .phone,
-                      width: 430, height: 932, pixelRatio: 3, year: 2022),
+        DeviceProfile(
+            id: "iphone-14-plus", name: "iPhone 14 Plus", kind: .phone,
+            width: 428, height: 926, pixelRatio: 3, year: 2022),
+        DeviceProfile(
+            id: "iphone-14-pro", name: "iPhone 14 Pro", kind: .phone,
+            width: 393, height: 852, pixelRatio: 3, year: 2022),
+        DeviceProfile(
+            id: "iphone-14-pro-max", name: "iPhone 14 Pro Max", kind: .phone,
+            width: 430, height: 932, pixelRatio: 3, year: 2022),
         // iPhone 15 (2023)
-        DeviceProfile(id: "iphone-15", name: "iPhone 15 / 16", kind: .phone,
-                      width: 393, height: 852, pixelRatio: 3, year: 2023, isCommon: true),
-        DeviceProfile(id: "iphone-15-plus", name: "iPhone 15 Plus / 16 Plus", kind: .phone,
-                      width: 430, height: 932, pixelRatio: 3, year: 2023),
-        DeviceProfile(id: "iphone-15-pro", name: "iPhone 15 Pro", kind: .phone,
-                      width: 393, height: 852, pixelRatio: 3, year: 2023),
-        DeviceProfile(id: "iphone-15-pro-max", name: "iPhone 15 Pro Max / 16 Pro Max", kind: .phone,
-                      width: 430, height: 932, pixelRatio: 3, year: 2023),
+        DeviceProfile(
+            id: "iphone-15", name: "iPhone 15 / 16", kind: .phone,
+            width: 393, height: 852, pixelRatio: 3, year: 2023, isCommon: true),
+        DeviceProfile(
+            id: "iphone-15-plus", name: "iPhone 15 Plus / 16 Plus", kind: .phone,
+            width: 430, height: 932, pixelRatio: 3, year: 2023),
+        DeviceProfile(
+            id: "iphone-15-pro", name: "iPhone 15 Pro", kind: .phone,
+            width: 393, height: 852, pixelRatio: 3, year: 2023),
+        DeviceProfile(
+            id: "iphone-15-pro-max", name: "iPhone 15 Pro Max / 16 Pro Max", kind: .phone,
+            width: 430, height: 932, pixelRatio: 3, year: 2023),
         // iPhone 16 (2024)
-        DeviceProfile(id: "iphone-16-pro", name: "iPhone 16 Pro", kind: .phone,
-                      width: 402, height: 874, pixelRatio: 3, year: 2024, isCommon: true),
+        DeviceProfile(
+            id: "iphone-16-pro", name: "iPhone 16 Pro", kind: .phone,
+            width: 402, height: 874, pixelRatio: 3, year: 2024, isCommon: true),
         // The small-screen baseline, kept because it is still the narrowest thing in use.
-        DeviceProfile(id: "iphone-se", name: "iPhone SE (2nd/3rd gen)", kind: .phone,
-                      width: 375, height: 667, pixelRatio: 2, year: 2020),
+        DeviceProfile(
+            id: "iphone-se", name: "iPhone SE (2nd/3rd gen)", kind: .phone,
+            width: 375, height: 667, pixelRatio: 2, year: 2020),
     ]
 
     // MARK: - Samsung Galaxy, entry level to flagship, last five years
 
     public static let samsung: [DeviceProfile] = [
         // Entry level — the A-series is where narrow viewports actually appear in the wild.
-        DeviceProfile(id: "galaxy-a13", name: "Galaxy A13", kind: .phone,
-                      width: 360, height: 800, pixelRatio: 3, year: 2022, isCommon: true),
-        DeviceProfile(id: "galaxy-a14", name: "Galaxy A14 / A15", kind: .phone,
-                      width: 360, height: 800, pixelRatio: 3, year: 2023, isCommon: true),
-        DeviceProfile(id: "galaxy-a23", name: "Galaxy A23", kind: .phone,
-                      width: 360, height: 800, pixelRatio: 3, year: 2022),
-        DeviceProfile(id: "galaxy-a33", name: "Galaxy A33 / A34", kind: .phone,
-                      width: 385, height: 854, pixelRatio: 3, year: 2022),
-        DeviceProfile(id: "galaxy-a53", name: "Galaxy A53 / A54", kind: .phone,
-                      width: 412, height: 915, pixelRatio: 2.625, year: 2022, isCommon: true),
-        DeviceProfile(id: "galaxy-a73", name: "Galaxy A73", kind: .phone,
-                      width: 412, height: 915, pixelRatio: 2.625, year: 2022),
+        DeviceProfile(
+            id: "galaxy-a13", name: "Galaxy A13", kind: .phone,
+            width: 360, height: 800, pixelRatio: 3, year: 2022, isCommon: true),
+        DeviceProfile(
+            id: "galaxy-a14", name: "Galaxy A14 / A15", kind: .phone,
+            width: 360, height: 800, pixelRatio: 3, year: 2023, isCommon: true),
+        DeviceProfile(
+            id: "galaxy-a23", name: "Galaxy A23", kind: .phone,
+            width: 360, height: 800, pixelRatio: 3, year: 2022),
+        DeviceProfile(
+            id: "galaxy-a33", name: "Galaxy A33 / A34", kind: .phone,
+            width: 385, height: 854, pixelRatio: 3, year: 2022),
+        DeviceProfile(
+            id: "galaxy-a53", name: "Galaxy A53 / A54", kind: .phone,
+            width: 412, height: 915, pixelRatio: 2.625, year: 2022, isCommon: true),
+        DeviceProfile(
+            id: "galaxy-a73", name: "Galaxy A73", kind: .phone,
+            width: 412, height: 915, pixelRatio: 2.625, year: 2022),
         // Mid range
-        DeviceProfile(id: "galaxy-s20-fe", name: "Galaxy S20 FE", kind: .phone,
-                      width: 412, height: 915, pixelRatio: 2.625, year: 2020),
-        DeviceProfile(id: "galaxy-s21", name: "Galaxy S21 / S22", kind: .phone,
-                      width: 360, height: 800, pixelRatio: 3, year: 2021),
-        DeviceProfile(id: "galaxy-s21-ultra", name: "Galaxy S21 Ultra", kind: .phone,
-                      width: 384, height: 854, pixelRatio: 3.5, year: 2021),
+        DeviceProfile(
+            id: "galaxy-s20-fe", name: "Galaxy S20 FE", kind: .phone,
+            width: 412, height: 915, pixelRatio: 2.625, year: 2020),
+        DeviceProfile(
+            id: "galaxy-s21", name: "Galaxy S21 / S22", kind: .phone,
+            width: 360, height: 800, pixelRatio: 3, year: 2021),
+        DeviceProfile(
+            id: "galaxy-s21-ultra", name: "Galaxy S21 Ultra", kind: .phone,
+            width: 384, height: 854, pixelRatio: 3.5, year: 2021),
         // Flagship
-        DeviceProfile(id: "galaxy-s22-ultra", name: "Galaxy S22 Ultra", kind: .phone,
-                      width: 384, height: 854, pixelRatio: 3.5, year: 2022),
-        DeviceProfile(id: "galaxy-s23", name: "Galaxy S23 / S24", kind: .phone,
-                      width: 360, height: 780, pixelRatio: 3, year: 2023, isCommon: true),
-        DeviceProfile(id: "galaxy-s23-ultra", name: "Galaxy S23 Ultra / S24 Ultra", kind: .phone,
-                      width: 384, height: 854, pixelRatio: 3.5, year: 2023, isCommon: true),
-        DeviceProfile(id: "galaxy-z-flip", name: "Galaxy Z Flip 5", kind: .phone,
-                      width: 360, height: 880, pixelRatio: 3, year: 2023),
-        DeviceProfile(id: "galaxy-note20", name: "Galaxy Note 20 Ultra", kind: .phone,
-                      width: 412, height: 915, pixelRatio: 3.5, year: 2020),
+        DeviceProfile(
+            id: "galaxy-s22-ultra", name: "Galaxy S22 Ultra", kind: .phone,
+            width: 384, height: 854, pixelRatio: 3.5, year: 2022),
+        DeviceProfile(
+            id: "galaxy-s23", name: "Galaxy S23 / S24", kind: .phone,
+            width: 360, height: 780, pixelRatio: 3, year: 2023, isCommon: true),
+        DeviceProfile(
+            id: "galaxy-s23-ultra", name: "Galaxy S23 Ultra / S24 Ultra", kind: .phone,
+            width: 384, height: 854, pixelRatio: 3.5, year: 2023, isCommon: true),
+        DeviceProfile(
+            id: "galaxy-z-flip", name: "Galaxy Z Flip 5", kind: .phone,
+            width: 360, height: 880, pixelRatio: 3, year: 2023),
+        DeviceProfile(
+            id: "galaxy-note20", name: "Galaxy Note 20 Ultra", kind: .phone,
+            width: 412, height: 915, pixelRatio: 3.5, year: 2020),
     ]
 
     // MARK: - iPad, last eight years
 
     public static let tablets: [DeviceProfile] = [
-        DeviceProfile(id: "ipad-mini-5", name: "iPad mini 5", kind: .tablet,
-                      width: 768, height: 1024, pixelRatio: 2, year: 2019),
-        DeviceProfile(id: "ipad-9-7", name: "iPad 9.7\" (5th/6th gen)", kind: .tablet,
-                      width: 768, height: 1024, pixelRatio: 2, year: 2018),
-        DeviceProfile(id: "ipad-10-2", name: "iPad 10.2\" (7th–9th gen)", kind: .tablet,
-                      width: 810, height: 1080, pixelRatio: 2, year: 2019, isCommon: true),
-        DeviceProfile(id: "ipad-mini-6", name: "iPad mini 6", kind: .tablet,
-                      width: 744, height: 1133, pixelRatio: 2, year: 2021),
-        DeviceProfile(id: "ipad-air-10-5", name: "iPad Air 10.5\" (3rd gen)", kind: .tablet,
-                      width: 834, height: 1112, pixelRatio: 2, year: 2019),
-        DeviceProfile(id: "ipad-air-10-9", name: "iPad Air 10.9\" (4th/5th gen)", kind: .tablet,
-                      width: 820, height: 1180, pixelRatio: 2, year: 2020, isCommon: true),
-        DeviceProfile(id: "ipad-10-9", name: "iPad 10.9\" (10th gen)", kind: .tablet,
-                      width: 820, height: 1180, pixelRatio: 2, year: 2022),
-        DeviceProfile(id: "ipad-pro-11", name: "iPad Pro 11\"", kind: .tablet,
-                      width: 834, height: 1194, pixelRatio: 2, year: 2018, isCommon: true),
-        DeviceProfile(id: "ipad-pro-12-9", name: "iPad Pro 12.9\"", kind: .tablet,
-                      width: 1024, height: 1366, pixelRatio: 2, year: 2018, isCommon: true),
-        DeviceProfile(id: "ipad-air-13", name: "iPad Air 13\" / Pro 13\"", kind: .tablet,
-                      width: 1024, height: 1366, pixelRatio: 2, year: 2024),
+        DeviceProfile(
+            id: "ipad-mini-5", name: "iPad mini 5", kind: .tablet,
+            width: 768, height: 1024, pixelRatio: 2, year: 2019),
+        DeviceProfile(
+            id: "ipad-9-7", name: "iPad 9.7\" (5th/6th gen)", kind: .tablet,
+            width: 768, height: 1024, pixelRatio: 2, year: 2018),
+        DeviceProfile(
+            id: "ipad-10-2", name: "iPad 10.2\" (7th–9th gen)", kind: .tablet,
+            width: 810, height: 1080, pixelRatio: 2, year: 2019, isCommon: true),
+        DeviceProfile(
+            id: "ipad-mini-6", name: "iPad mini 6", kind: .tablet,
+            width: 744, height: 1133, pixelRatio: 2, year: 2021),
+        DeviceProfile(
+            id: "ipad-air-10-5", name: "iPad Air 10.5\" (3rd gen)", kind: .tablet,
+            width: 834, height: 1112, pixelRatio: 2, year: 2019),
+        DeviceProfile(
+            id: "ipad-air-10-9", name: "iPad Air 10.9\" (4th/5th gen)", kind: .tablet,
+            width: 820, height: 1180, pixelRatio: 2, year: 2020, isCommon: true),
+        DeviceProfile(
+            id: "ipad-10-9", name: "iPad 10.9\" (10th gen)", kind: .tablet,
+            width: 820, height: 1180, pixelRatio: 2, year: 2022),
+        DeviceProfile(
+            id: "ipad-pro-11", name: "iPad Pro 11\"", kind: .tablet,
+            width: 834, height: 1194, pixelRatio: 2, year: 2018, isCommon: true),
+        DeviceProfile(
+            id: "ipad-pro-12-9", name: "iPad Pro 12.9\"", kind: .tablet,
+            width: 1024, height: 1366, pixelRatio: 2, year: 2018, isCommon: true),
+        DeviceProfile(
+            id: "ipad-air-13", name: "iPad Air 13\" / Pro 13\"", kind: .tablet,
+            width: 1024, height: 1366, pixelRatio: 2, year: 2024),
     ]
 
     // MARK: - Top Android tablets only, as asked
 
     public static let androidTablets: [DeviceProfile] = [
-        DeviceProfile(id: "galaxy-tab-s6-lite", name: "Galaxy Tab S6 Lite", kind: .tablet,
-                      width: 800, height: 1280, pixelRatio: 2, year: 2020),
-        DeviceProfile(id: "galaxy-tab-s7", name: "Galaxy Tab S7", kind: .tablet,
-                      width: 800, height: 1280, pixelRatio: 2, year: 2020),
-        DeviceProfile(id: "galaxy-tab-s8", name: "Galaxy Tab S8", kind: .tablet,
-                      width: 800, height: 1280, pixelRatio: 2, year: 2022),
-        DeviceProfile(id: "galaxy-tab-s9", name: "Galaxy Tab S9", kind: .tablet,
-                      width: 800, height: 1280, pixelRatio: 2, year: 2023, isCommon: true),
-        DeviceProfile(id: "galaxy-tab-s9-ultra", name: "Galaxy Tab S9 Ultra", kind: .tablet,
-                      width: 848, height: 1360, pixelRatio: 2, year: 2023),
-        DeviceProfile(id: "pixel-tablet", name: "Pixel Tablet", kind: .tablet,
-                      width: 800, height: 1280, pixelRatio: 2, year: 2023),
+        DeviceProfile(
+            id: "galaxy-tab-s6-lite", name: "Galaxy Tab S6 Lite", kind: .tablet,
+            width: 800, height: 1280, pixelRatio: 2, year: 2020),
+        DeviceProfile(
+            id: "galaxy-tab-s7", name: "Galaxy Tab S7", kind: .tablet,
+            width: 800, height: 1280, pixelRatio: 2, year: 2020),
+        DeviceProfile(
+            id: "galaxy-tab-s8", name: "Galaxy Tab S8", kind: .tablet,
+            width: 800, height: 1280, pixelRatio: 2, year: 2022),
+        DeviceProfile(
+            id: "galaxy-tab-s9", name: "Galaxy Tab S9", kind: .tablet,
+            width: 800, height: 1280, pixelRatio: 2, year: 2023, isCommon: true),
+        DeviceProfile(
+            id: "galaxy-tab-s9-ultra", name: "Galaxy Tab S9 Ultra", kind: .tablet,
+            width: 848, height: 1360, pixelRatio: 2, year: 2023),
+        DeviceProfile(
+            id: "pixel-tablet", name: "Pixel Tablet", kind: .tablet,
+            width: 800, height: 1280, pixelRatio: 2, year: 2023),
+    ]
+
+    // MARK: - Desktops
+
+    /// A desktop window is a screen this interface is used on, and `nearest` selects `.desktop`
+    /// for a wide or a non-mobile viewport. The list held only phones and tablets, so that branch
+    /// had no candidate at all and every desktop resolved to nil — the code said it would match a
+    /// desktop and could not. The CSS widths are the real viewport widths of these displays (a
+    /// Retina laptop reports half its pixel width as points).
+    public static let desktops: [DeviceProfile] = [
+        DeviceProfile(
+            id: "laptop-13", name: "13\" laptop", kind: .desktop,
+            width: 1440, height: 900, pixelRatio: 2, year: 2020, isCommon: true),
+        DeviceProfile(
+            id: "laptop-16", name: "16\" laptop", kind: .desktop,
+            width: 1728, height: 1117, pixelRatio: 2, year: 2021),
+        DeviceProfile(
+            id: "display-1080p", name: "1920×1080 display", kind: .desktop,
+            width: 1920, height: 1080, pixelRatio: 1, year: 2019),
+        DeviceProfile(
+            id: "display-1440p", name: "2560×1440 display", kind: .desktop,
+            width: 2560, height: 1440, pixelRatio: 1, year: 2019),
     ]
 
     /// Everything, for a resolver or a capture run.
     public static let all: [DeviceProfile] =
-        phones + samsung + tablets + androidTablets
+        phones + samsung + tablets + androidTablets + desktops
 
     /// The set a capture run covers by default: one per distinct viewport shape, plus every
     /// device marked common. Testing two devices with identical dimensions proves nothing

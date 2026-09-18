@@ -45,6 +45,27 @@ extension AgentSpec {
         "deepseek-flash",
     ]
 
+    /// Whether a model id names one of the families known to accept images.
+    ///
+    /// Both sides are split into letter-and-digit tokens and the marker's tokens have to appear
+    /// consecutively. A plain `contains` was too eager for the two-character markers: "o3" matched
+    /// any id that happened to carry those characters — `llama-o3xyz`, `gpt-4o3` — so a text-only
+    /// model was declared able to see. Token equality still accepts `o3-mini` and `openai/o3`,
+    /// and `gpt-4o` no longer matches `gpt-40`.
+    private static func declaresVisionFamily(_ name: String) -> Bool {
+        let tokens = name.lowercased().split { !($0.isLetter || $0.isNumber) }.map(String.init)
+        guard !tokens.isEmpty else { return false }
+        return visionModelMarkers.contains { marker in
+            let wanted = marker.split { !($0.isLetter || $0.isNumber) }.map(String.init)
+            guard !wanted.isEmpty, wanted.count <= tokens.count else { return false }
+            for start in 0...(tokens.count - wanted.count)
+            where Array(tokens[start..<(start + wanted.count)]) == wanted {
+                return true
+            }
+            return false
+        }
+    }
+
     /// What this seat's model can accept.
     ///
     /// For a local checkpoint the answer comes from the checkpoint itself, which is
@@ -70,16 +91,14 @@ extension AgentSpec {
         // true for a seat pointed at a text-only server model, and images were offered on the
         // strength of weights that seat would never load.
         if !openAI.model.isEmpty {
-            let name = openAI.model.lowercased()
-            return Self.visionModelMarkers.contains { name.contains($0) } ? .supported : .unknown
+            return Self.declaresVisionFamily(openAI.model) ? .supported : .unknown
         }
 
         // No endpoint model named, so the checkpoint is the only thing left to go on.
         if let declared = ModelStore.declaresVision(for: modelID) {
             return declared ? .supported : .unsupported
         }
-        let name = modelID.lowercased()
-        return Self.visionModelMarkers.contains { name.contains($0) } ? .supported : .unknown
+        return Self.declaresVisionFamily(modelID) ? .supported : .unknown
     }
 }
 
