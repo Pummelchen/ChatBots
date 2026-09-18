@@ -73,8 +73,9 @@ primary host only, recorded in the ledger.
   three tool-script bounds, the SwiftUI app, and the signing/web pair). The remaining S3 work is
   the transport group (0034-0039, 0041, 0042, 0044, 0045, 0047 — double-close, missing reasons,
   the TLS key window, serial shutdown, the receive buffer, the installer banner, `fcntl`, the
-  stream writer, `unload`, the MLX gate, and the inherited environment) plus AUDIT-0082 (model
-  weights are verified by byte length, from a length the upstream supplies).
+  stream writer, `unload`, the MLX gate, and the inherited environment) AUDIT-0021 (a
+  Tavily key on the command line is visible in argv), and AUDIT-0082 (model weights are verified
+  by byte length, from a length the upstream supplies).
 - Every fix carries before/after evidence in `AUDIT/evidence-*.log`.
 - `bash tools/mac-checks.sh` is the gate after every batch — now **9 gates**, including
   eslint and prettier (`npm ci` first). Metrics must not regress: SwiftLint ≤ 217
