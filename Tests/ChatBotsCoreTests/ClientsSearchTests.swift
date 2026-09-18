@@ -279,4 +279,62 @@ struct WebSearchToolTests {
         #expect(outcome.text == "No results for \"a query with no answers\".")
         #expect(outcome.summary == "no results for \"a query with no answers\"")
     }
+
+    @Test("A redirect from the search endpoint is reported, not followed with the key")
+    func redirectsAreNotFollowed() async throws {
+        // The client used a bare `URLSession`, which follows a 302 by default while the
+        // Authorization header is attached. `NoRedirects` is shared with the OpenAI client now.
+        let target = try await ScriptedTavilyServer(
+            basicBody: Data(#"{"results":[]}"#.utf8),
+            advancedBody: Data(#"{"results":[]}"#.utf8))
+        defer { target.stop() }
+        let redirector = try await RedirectingTavilyServer(
+            target: "http://127.0.0.1:\(target.port)/search")
+        defer { redirector.stop() }
+        let client = TavilyClient(
+            apiKey: "tvly-test-key", baseURL: "http://127.0.0.1:\(redirector.port)")
+
+        var thrown: (any Error)?
+        do {
+            _ = try await client.search(query: "anything", maxResults: 1)
+        } catch {
+            thrown = error
+        }
+        #expect(thrown != nil, "a redirect is reported, not followed")
+        #expect(
+            target.attempts.isEmpty,
+            "the redirect target must never receive the request, or the key with it")
+    }
+}
+
+/// A loopback server that answers every request with a 302 to `target`.
+@MainActor
+private final class RedirectingTavilyServer {
+    private let server: HTTPServer
+    let port: UInt16
+
+    init(target: String) async throws {
+        var started: HTTPServer?
+        var chosenPort: UInt16 = 0
+        for _ in 0..<8 {
+            let candidate = allocateTestPort()
+            let server = HTTPServer(
+                port: candidate,
+                handler: { _ in
+                    HTTPResponse(status: 302, headers: ["Location": target])
+                })
+            try server.start()
+            if await server.waitUntilReady() {
+                started = server
+                chosenPort = candidate
+                break
+            }
+            server.stop()
+        }
+        guard let started else { throw ScriptedServerError.noPort }
+        self.server = started
+        self.port = chosenPort
+    }
+
+    func stop() { server.stop() }
 }

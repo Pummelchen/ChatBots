@@ -1,0 +1,172 @@
+Building for debugging...
+[Computing dependencies]
+[Provisioning 1 / 64]
+[Using on-disk description]
+[1 / 2] swift-transformers_Hub
+[1 / 58] HuggingFace
+[2 / 18] ChatBotsCore
+[6 / 22] ChatBotsCore
+[11 / 26] chatbots-cli-product
+[16 / 26] ChatBotsCore-product
+[16 / 26] chatbots-cli-product
+[16 / 27] chatbots-probe-product
+[16 / 26] ChatBots-product
+[18 / 28] ChatBots-product
+[21 / 27] ChatBotsAppTests-product
+[23 / 30] ChatBotsAppTests-product
+[26 / 31] chatbots-probe-product
+[27 / 32] ChatBotsCoreTests-product
+[29 / 34] ChatBotsCoreTests-product
+[35 / 39] ChatBotsCoreTests-product
+[37 / 39] ChatBotsCoreTests-product
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+Build complete! (9,75 secs)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine service" started.
+◇ Test "Steering an idle conversation starts it" started.
+◇ Test "Turn limit pauses the loop instead of running forever" started.
+◇ Suite "A research session end to end" started.
+◇ Suite "A finished research conversation is not reported twice" started.
+◇ Test "A conversation the store cannot save is reported instead of silently lost" started.
+◇ Suite "When a research session stops" started.
+◇ Suite "User-supplied text is bounded" started.
+◇ Test "Reset clears the log and the turn counters" started.
+◇ Test "A turn that produces no text still charges the research budget" started.
+◇ Test "Seat B reads seat A's message in its prompt" started.
+◇ Test "Web tools are offered only to seats that enable them" started.
+◇ Test "Other seats are named in a seat's system message, never itself as an other" started.
+◇ Test "Tool turns and thinking are kept out of the prompt log" started.
+◇ Test "Introduction names the topic and every participant" started.
+◇ Test "Seats alternate and both see the identical shared log" started.
+◇ Test "A turn prompt is a valid system+user pair carrying every tagged log entry" started.
+◇ Test "Mid-turn steering is queued, delivered once, and seen by both seats" started.
+◇ Test "The opening log is topic then introduction, numbered in order" started.
+◇ Test "Start is refused without a topic" started.
+◇ Test "fetchReport refuses politely before a session has run" started.
+◇ Test "A removable attachment can be removed by id, and an unknown id is harmless" started.
+◇ Test "The report says how far the investigation went and why it stopped" started.
+◇ Test "A seat change alters only the fields it names" started.
+◇ Test "The budget cannot be changed once the investigation has started" started.
+◇ Test "Each seat carries its own model id and sampling parameters" started.
+◇ Test "The mode is refused once the conversation has started" started.
+◇ Test "An unknown seat is refused rather than silently ignored" started.
+◇ Test "A topic is refused once the conversation has started, as a refusal not an error" started.
+◇ Test "The moderator writes the report, and is told it is organising rather than adding" started.
+◇ Test "A convergence stop produces a report too, and says why" started.
+◇ Test "A topic can be set before the conversation starts" started.
+◇ Test "Reset returns the engine to a fresh conversation" started.
+◇ Test "A budget can be chosen before the run" started.
+◇ Test "The mode switches and reseats the personas" started.
+◇ Test "Entertainment starts no session, because it has no end condition" started.
+◇ Test "The session starts with the configured budget" started.
+◇ Test "fetchState returns the current state" started.
+◇ Test "Steering with text is accepted and reaches the engine" started.
+◇ Test "The session stops at its round budget and a report is produced" started.
+◇ Test "Start, pause, resume and stop are all accepted and change the status" started.
+◇ Test "The report is logged as its own kind of turn, not as a contribution" started.
+◇ Test "The report reaches the API snapshot, with its warnings" started.
+◇ Test "Stop ends the loop and leaves loaded weights alone" started.
+◇ Test "A snapshot carries the personas the picker needs" started.
+◇ Test "Steering with empty text is refused" started.
+◇ Test "Pause stops new turns; resume continues the rotation" started.
+◇ Test "An attachment with a name that is not a document is refused, not crashed on" started.
+◇ Test "An empty topic is refused rather than blanking the question" started.
+◇ Test "The reasoning preference is held by the service" started.
+◇ Test "The research budget is set from the service" started.
+◇ Test "Attachments can be cleared" started.
+◇ Test "Every field of a seat change is applied" started.
+◇ Test "Reaching the round budget stops it" started.
+◇ Test "A blank name is refused rather than leaving a seat unnamed" started.
+◇ Test "One contribution that adds something resets the convergence count" started.
+◇ Test "A fresh session is running" started.
+◇ Test "The status line reports progress while running and the reason once finished" started.
+◇ Test "Reaching the time budget stops it, without any rounds" started.
+◇ Test "The moderator can stop it, and a finished session does not restart" started.
+◇ Test "A session survives a save and reload, keeping its clock and counters" started.
+◇ Test "Reaching the search budget stops it" started.
+◇ Test "A stopped session still counts as finished, so a report is written" started.
+◇ Test "A deeper session tolerates more quiet turns before giving up" started.
+◇ Test "A moderator name past the limit is shortened rather than refused" started.
+◇ Test "A topic within the limit is still accepted" started.
+◇ Test "A steering message past the limit is refused" started.
+◇ Test "Reopening a finished session and pressing Start writes no second report" started.
+◇ Test "A topic past the limit is refused, and the room keeps the topic it had" started.
+◇ Test "A run of contributions that add nothing is read as convergence" started.
+◇ Test "A steering message within the limit is still accepted" started.
+◇ Test "A session saved mid-run is still resumed rather than suppressed" started.
+✔ Test "One contribution that adds something resets the convergence count" passed after 0.001 seconds.
+✔ Test "Each seat carries its own model id and sampling parameters" passed after 0.002 seconds.
+✔ Test "Reaching the round budget stops it" passed after 0.001 seconds.
+✔ Test "A turn prompt is a valid system+user pair carrying every tagged log entry" passed after 0.002 seconds.
+✔ Test "The moderator can stop it, and a finished session does not restart" passed after 0.001 seconds.
+✔ Test "A fresh session is running" passed after 0.001 seconds.
+✔ Test "A deeper session tolerates more quiet turns before giving up" passed after 0.001 seconds.
+✔ Test "Reaching the search budget stops it" passed after 0.001 seconds.
+✔ Test "Tool turns and thinking are kept out of the prompt log" passed after 0.002 seconds.
+✔ Test "Other seats are named in a seat's system message, never itself as an other" passed after 0.002 seconds.
+✔ Test "The status line reports progress while running and the reason once finished" passed after 0.001 seconds.
+✔ Test "A session survives a save and reload, keeping its clock and counters" passed after 0.001 seconds.
+✔ Test "A run of contributions that add nothing is read as convergence" passed after 0.001 seconds.
+✔ Test "Reaching the time budget stops it, without any rounds" passed after 0.001 seconds.
+✔ Test "A stopped session still counts as finished, so a report is written" passed after 0.001 seconds.
+✔ Suite "When a research session stops" passed after 0.002 seconds.
+✔ Test "Introduction names the topic and every participant" passed after 0.002 seconds.
+✔ Test "A conversation the store cannot save is reported instead of silently lost" passed after 0.005 seconds.
+✔ Test "fetchReport refuses politely before a session has run" passed after 0.007 seconds.
+✔ Test "A removable attachment can be removed by id, and an unknown id is harmless" passed after 0.007 seconds.
+✔ Test "A seat change alters only the fields it names" passed after 0.012 seconds.
+✔ Test "The mode is refused once the conversation has started" passed after 0.015 seconds.
+✔ Test "An unknown seat is refused rather than silently ignored" passed after 0.015 seconds.
+✔ Test "A topic is refused once the conversation has started, as a refusal not an error" passed after 0.018 seconds.
+✔ Test "A topic can be set before the conversation starts" passed after 0.020 seconds.
+✔ Test "Reset returns the engine to a fresh conversation" passed after 0.022 seconds.
+✔ Test "The session starts with the configured budget" passed after 0.023 seconds.
+✔ Test "The mode switches and reseats the personas" passed after 0.023 seconds.
+✔ Test "Steering with text is accepted and reaches the engine" passed after 0.029 seconds.
+✔ Test "Start, pause, resume and stop are all accepted and change the status" passed after 0.035 seconds.
+✔ Test "Steering with empty text is refused" passed after 0.036 seconds.
+✔ Test "A snapshot carries the personas the picker needs" passed after 0.037 seconds.
+✔ Test "The research budget is set from the service" passed after 0.039 seconds.
+✔ Test "The reasoning preference is held by the service" passed after 0.042 seconds.
+✔ Test "A budget can be chosen before the run" passed after 0.042 seconds.
+✔ Test "Every field of a seat change is applied" passed after 0.043 seconds.
+✔ Test "A blank name is refused rather than leaving a seat unnamed" passed after 0.045 seconds.
+✔ Test "fetchState returns the current state" passed after 0.046 seconds.
+✔ Test "Attachments can be cleared" passed after 0.047 seconds.
+✔ Test "A moderator name past the limit is shortened rather than refused" passed after 0.048 seconds.
+✔ Test "A topic within the limit is still accepted" passed after 0.049 seconds.
+✔ Test "A steering message past the limit is refused" passed after 0.049 seconds.
+✔ Test "A topic past the limit is refused, and the room keeps the topic it had" passed after 0.050 seconds.
+✔ Test "A steering message within the limit is still accepted" passed after 0.053 seconds.
+✔ Suite "User-supplied text is bounded" passed after 0.055 seconds.
+✔ Test "An empty topic is refused rather than blanking the question" passed after 0.055 seconds.
+✔ Test "Stop ends the loop and leaves loaded weights alone" passed after 0.056 seconds.
+✔ Test "An attachment with a name that is not a document is refused, not crashed on" passed after 0.056 seconds.
+✔ Suite "Engine service" passed after 0.058 seconds.
+✔ Test "Start is refused without a topic" passed after 0.057 seconds.
+✔ Test "A turn that produces no text still charges the research budget" passed after 0.076 seconds.
+✔ Test "Entertainment starts no session, because it has no end condition" passed after 0.083 seconds.
+✔ Test "The report says how far the investigation went and why it stopped" passed after 0.086 seconds.
+✔ Test "The budget cannot be changed once the investigation has started" passed after 0.086 seconds.
+✔ Test "A convergence stop produces a report too, and says why" passed after 0.086 seconds.
+✔ Test "The session stops at its round budget and a report is produced" passed after 0.086 seconds.
+✔ Test "The report reaches the API snapshot, with its warnings" passed after 0.087 seconds.
+✔ Test "The report is logged as its own kind of turn, not as a contribution" passed after 0.087 seconds.
+✔ Test "Turn limit pauses the loop instead of running forever" passed after 0.088 seconds.
+✔ Test "The moderator writes the report, and is told it is organising rather than adding" passed after 0.087 seconds.
+✔ Suite "A research session end to end" passed after 0.088 seconds.
+✔ Test "Web tools are offered only to seats that enable them" passed after 0.089 seconds.
+✔ Test "Reopening a finished session and pressing Start writes no second report" passed after 0.089 seconds.
+✔ Test "Reset clears the log and the turn counters" passed after 0.095 seconds.
+✔ Test "The opening log is topic then introduction, numbered in order" passed after 0.094 seconds.
+✔ Test "Seat B reads seat A's message in its prompt" passed after 0.095 seconds.
+✔ Test "Steering an idle conversation starts it" passed after 0.095 seconds.
+✔ Test "Seats alternate and both see the identical shared log" passed after 0.095 seconds.
+✔ Test "A session saved mid-run is still resumed rather than suppressed" passed after 0.094 seconds.
+✔ Suite "A finished research conversation is not reported twice" passed after 0.096 seconds.
+✔ Test "Mid-turn steering is queued, delivered once, and seen by both seats" passed after 0.200 seconds.
+✔ Test "Pause stops new turns; resume continues the rotation" passed after 0.398 seconds.
+✔ Test run with 67 tests in 5 suites passed after 0.400 seconds.
+EXIT=0

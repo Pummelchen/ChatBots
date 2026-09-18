@@ -5,8 +5,25 @@
 
 import Foundation
 
-/// first is not. A struct cannot do anything when it is deallocated, so the session lives in a class
-/// whose `deinit` is the invalidate.
+/// A task delegate that refuses every redirect.
+///
+/// Stateless, and `Sendable` because of it — `URLSession` keeps it for the session's lifetime.
+///
+/// Shared by both outbound clients. The OpenAI client always had it; the Tavily client built a bare
+/// `URLSession(configuration:)`, which follows redirects by default, so a 302 from `api.tavily.com`
+/// was followed with `Authorization: Bearer <key>` attached. Following a redirect is how a URL that
+/// passed a host check reaches a host that never did.
+final class NoRedirects: NSObject, URLSessionTaskDelegate, Sendable {
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        completionHandler(nil)
+    }
+}
+
+/// The session a client keeps, invalidated when the last reference to it goes.
 final class ResponseSession: Sendable {
     let session: URLSession
 

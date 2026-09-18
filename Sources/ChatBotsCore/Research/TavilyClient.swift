@@ -58,7 +58,9 @@ public struct TavilyClient: Sendable {
 
     private let apiKey: String
     private let baseURL: String
-    private let session: URLSession
+    /// Held in the same wrapper the OpenAI client uses, so the session is invalidated when the
+    /// client is released and redirects are refused rather than followed with the key attached.
+    private let session: ResponseSession
 
     public init(apiKey: String? = nil) {
         self.init(apiKey: apiKey, baseURL: "https://api.tavily.com")
@@ -75,7 +77,10 @@ public struct TavilyClient: Sendable {
         configuration.timeoutIntervalForRequest = 60
         configuration.timeoutIntervalForResource = 120
         configuration.httpAdditionalHeaders = ["User-Agent": "ChatBots/1.0 (macOS)"]
-        self.session = URLSession(configuration: configuration)
+        // `NoRedirects`: this client used a bare `URLSession(configuration:)`, which follows a
+        // 302 by default while the Authorization header is attached. The OpenAI client already
+        // refused redirects for exactly that reason; the policy is shared now.
+        self.session = ResponseSession(configuration: configuration, delegate: NoRedirects())
     }
 
     /// Whether a key is available. False on a fresh clone, which has no `.secrets.env`.
@@ -236,7 +241,7 @@ public struct TavilyClient: Sendable {
 
         let (data, response): (Data, URLResponse)
         do {
-            (data, response) = try await session.data(for: request)
+            (data, response) = try await session.session.data(for: request)
         } catch {
             throw ChatBotsError.toolFailed("network error: \(error.localizedDescription)")
         }

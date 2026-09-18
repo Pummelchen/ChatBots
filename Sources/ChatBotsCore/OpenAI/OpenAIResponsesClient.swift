@@ -14,19 +14,6 @@
 
 import Foundation
 
-///
-/// Stateless, and `Sendable` because of it — `URLSession` keeps it for the session's lifetime and the
-/// client is sent between tasks.
-private final class NoRedirects: NSObject, URLSessionTaskDelegate, Sendable {
-    func urlSession(
-        _ session: URLSession, task: URLSessionTask,
-        willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
-        completionHandler: @escaping (URLRequest?) -> Void
-    ) {
-        completionHandler(nil)
-    }
-}
-
 /// The client's session, held by the one thing here that can clean up after itself.
 ///
 /// `URLSession` is not released when the last reference to it goes. It stays alive — with its delegate

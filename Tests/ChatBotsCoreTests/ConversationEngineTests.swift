@@ -436,3 +436,34 @@ func unsaveableConversationIsReported() throws {
         engine.notices.contains { $0.contains("could not be saved") },
         "a failed save must reach the notices the interface shows")
 }
+
+@MainActor
+@Test("A turn that produces no text still charges the research budget")
+func emptyTurnStillChargesTheBudget() async {
+    // The research `record` call sat in the non-empty branch of the turn handler, so a turn
+    // whose rounds emitted only tool calls spent billed searches for free: `searches` never
+    // moved, the `maxSearches` ceiling never dropped, and web tools stayed offered.
+    var specA = AgentSpec.seatA()
+    var specB = AgentSpec.seatB()
+    // No web tools: this is about the accounting, not the search.
+    specA.webSearchEnabled = false
+    specB.webSearchEnabled = false
+    let engineA = StubEngine(spec: specA, replies: [""])
+    let engineB = StubEngine(spec: specB, replies: [""])
+    var configuration = ConversationEngine.Configuration()
+    configuration.pace = .zero
+    configuration.maxTurns = 1
+    let engine = ConversationEngine(
+        seats: [
+            .init(spec: specA, engine: engineA),
+            .init(spec: specB, engine: engineB),
+        ],
+        configuration: configuration)
+    engine.setMode(.research)
+    engine.start(topic: "Eggs")
+    await engine.waitUntilFinished()
+
+    #expect(
+        (engine.conversation.research?.rounds ?? 0) >= 1,
+        "a turn that ran must advance the research accounting even with no answer text")
+}

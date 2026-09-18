@@ -1,0 +1,395 @@
+Building for debugging...
+[Computing dependencies]
+[Provisioning 4 / 64]
+[1 / 7] ChatBotsCore
+[2 / 18] ChatBotsCore
+[4 / 27]
+[11 / 27] ChatBotsCore
+[13 / 29] ChatBotsCore
+[15 / 31] ChatBotsCore
+[24 / 38] ChatBotsCore
+[28 / 46] ChatBotsCore-product
+[30 / 48] chatbots-probe-product
+[35 / 57] ChatBots
+[36 / 57] chatbots-probe-product
+[37 / 66] ChatBots-product
+[38 / 75] ChatBots
+[39 / 75] chatbots-cli-product
+[42 / 75] chatbots-cli-product
+[43 / 85] ChatBots
+[46 / 85] chatbots-cli-product
+[50 / 85] chatbots-cli-product
+[53 / 85] ChatBotsCoreTests-product
+[55 / 85] ChatBotsCoreTests-product
+[58 / 85] ChatBotsCoreTests-product
+[59 / 85] chatbots-cli-product
+[61 / 85] chatbots-cli-product
+[62 / 85] ChatBotsCoreTests-product
+[62 / 86] ChatBotsCoreTests-product
+[64 / 86] chatbots-cli-product
+[65 / 86] ChatBots-product
+[66 / 86] ChatBots-product
+[68 / 86] ChatBots-product
+[70 / 86] ChatBots-product
+[71 / 86] ChatBots-product
+[71 / 86] ChatBots
+[72 / 87] ChatBots
+[74 / 87] ChatBots-product
+[75 / 89]
+[75 / 89] ChatBots-product
+[75 / 89] ChatBots
+[76 / 88] ChatBots-product
+[78 / 90] ChatBots-product
+[79 / 90] ChatBots-product
+[81 / 89] ChatBotsAppTests-product
+[89 / 98] ChatBotsAppTests-product
+[90 / 98] ChatBotsAppTests-product
+[96 / 102] ChatBotsCoreTests-product
+[96 / 102] ChatBotsAppTests-product
+[98 / 105] ChatBotsAppTests-product
+[100 / 105] ChatBotsAppTests-product
+[101 / 105] chatbots-cli-product
+[103 / 106] chatbots-probe-product
+[106 / 110] ChatBotsCoreTests-product
+[108 / 110] ChatBotsCoreTests-product
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+Build complete! (24,35 secs)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine service" started.
+◇ Suite "Source material in the prompt" started.
+◇ Suite "An attachment command reports what it did" started.
+◇ Suite "Prompt shape" started.
+◇ Suite "The web_search tool's own branches" started.
+◇ Suite "Attachment intake bounds what it reads" started.
+◇ Suite "BMP and TIFF are converted, not sent as undocumented types" started.
+◇ Suite "Images in the API request" started.
+◇ Suite "An attachment in the snapshot" started.
+◇ Suite "An attachment can be removed while the conversation runs" started.
+◇ Suite "Length-prefixed framing" started.
+◇ Suite "Where an upload may be written" started.
+◇ Suite "Vision capability decides whether images are sent" started.
+◇ Suite "An image intake can convert" started.
+◇ Suite "File kinds" started.
+◇ Suite "Adding documents" started.
+◇ Suite "An image is measured before it is decoded" started.
+◇ Suite "Image attachments" started.
+◇ Suite "Attachment summary from the engine" started.
+◇ Suite "What fetch_page accepts as a URL" started.
+◇ Test "A blank name is refused rather than leaving a seat unnamed" started.
+◇ Test "A removable attachment can be removed by id, and an unknown id is harmless" started.
+◇ Test "Attachments can be cleared" started.
+◇ Test "The mode is refused once the conversation has started" started.
+◇ Test "Steering with text is accepted and reaches the engine" started.
+◇ Test "Reset returns the engine to a fresh conversation" started.
+◇ Test "A snapshot carries the personas the picker needs" started.
+◇ Test "The research budget is set from the service" started.
+◇ Test "An attachment with a name that is not a document is refused, not crashed on" started.
+◇ Test "An empty topic is refused rather than blanking the question" started.
+◇ Test "The reasoning preference is held by the service" started.
+◇ Test "Start, pause, resume and stop are all accepted and change the status" started.
+◇ Test "fetchState returns the current state" started.
+◇ Test "No attachments means no extra message" started.
+◇ Test "Removing an attachment that is there still works" started.
+◇ Test "An id that is not a file id at all is refused as such" started.
+◇ Test "fetchReport refuses politely before a session has run" started.
+◇ Test "A topic can be set before the conversation starts" started.
+◇ Test "The source material is data in the user turn, never the system message" started.
+◇ Test "Every field of a seat change is applied" started.
+◇ Test "A staged upload is created private to this user, and its bytes are all there" started.
+◇ Test "Attachments count towards the context estimate" started.
+◇ Test "A topic is refused once the conversation has started, as a refusal not an error" started.
+◇ Test "Attachments survive the context estimate being computed" started.
+◇ Test "A seat change alters only the fields it names" started.
+◇ Test "An upload into a room that is already full is refused before it is staged" started.
+◇ Test "An unknown seat is refused rather than silently ignored" started.
+◇ Test "Steering with empty text is refused" started.
+◇ Test "Removing an id that matches nothing is refused, not answered with the state" started.
+◇ Test "Attached text is given to the models, delimited and named" started.
+◇ Test "Two uploads that arrive together cannot both take the last place" started.
+◇ Test "An entertainment prompt with source material is template-compatible" started.
+◇ Test "A file over the cap is refused before it is converted" started.
+◇ Suite "The empty-result retry follows the blank filter" started.
+◇ Test "A conversation that has started refuses new material" started.
+◇ Test "A search that finds nothing says so instead of returning an empty list" started.
+◇ Test "The cap is enforced by the read, not by a size the file reported" started.
+◇ Suite "Turn-loop rules without a model" started.
+◇ Test "A FIFO is refused, and named as what it is" started.
+◇ Test "A directory is refused as a file" started.
+◇ Test "A symbolic link is not a regular file, whether or not it dangles" started.
+◇ Test "An empty query is refused before any request is made" started.
+◇ Test "A regular file is still converted, and its byte count is the bytes that were read" started.
+◇ Test "Hits become a numbered list with their URLs, and a summary that says how many" started.
+◇ Test "The accepted list is exactly the documented types" started.
+◇ Suite "User-supplied text is bounded" started.
+◇ Test "A PNG is passed through byte-identical" started.
+◇ Test "A TIFF is converted to a type the API accepts" started.
+◇ Test "A BMP is converted to a type the API accepts" started.
+◇ Test "With no image the input stays a plain string" started.
+◇ Test "Every type the sniffer can return is one the API accepts" started.
+◇ Test "Several images all travel with the one message" started.
+◇ Test "With an image the input becomes content blocks carrying the image" started.
+◇ Test "The snapshot carries an attachment's metadata and not its bytes" started.
+◇ Test "A path whose size cannot be read is refused, not read unbounded" started.
+◇ Test "A redirect from the search endpoint is reported, not followed with the key" started.
+◇ Test "Two maximum-size attachments still leave it inside the cap" started.
+◇ Test "The id is matched as a UUID, so a lowercased one still removes the file" started.
+◇ Test "Before the conversation starts, removing works and says so" started.
+◇ Test "Removing an attachment once the conversation has started is refused, not silently ignored" started.
+◇ Test "Clearing them once the conversation has started is refused the same way" started.
+◇ Test "An attachment at the engine's own size limit fits the wire cap" started.
+◇ Test "The three size limits are derived from one place" started.
+◇ Test "A relative traversal filename cannot write outside the staging directory" started.
+➜ Test "The shipped local checkpoint declares vision, so images are offered" skipped.
+◇ Test "An RTF file is rich text, not Word, and its chip says so" started.
+◇ Test "Every kind is reachable from the extensions it advertises" started.
+◇ Test "The bytes sniffer does not recognise HEIC" started.
+◇ Test "No extension belongs to two kinds" started.
+◇ Test "Images are distinguished from documents" started.
+◇ Test "Extensions map to the right kind" started.
+◇ Test "Each kind has a label and a symbol" started.
+◇ Test "A PDF with no text layer is reported as needing OCR, not as empty" started.
+◇ Test "A document is added with its text, name and size" started.
+◇ Test "An empty document is refused rather than attached as nothing" started.
+◇ Test "A long document is shortened and says so" started.
+◇ Test "A file over the size limit is refused before it is read" started.
+◇ Test "An image with no data is refused" started.
+◇ Test "An unsupported extension is refused with a clear reason" started.
+◇ Test "An image is added with its bytes and no text" started.
+◇ Test "An image whose metadata declares too many pixels is refused without being decoded" started.
+◇ Test "A file that is not an image at all is refused as that, not as an unmeasurable image" started.
+◇ Test "An image that will not report its dimensions is refused rather than decoded blind" started.
+◇ Test "The cap is the caller's, and an image under it is still converted" started.
+◇ Test "The media type comes from the bytes, not the filename" started.
+◇ Test "A document has no image media type" started.
+◇ Test "An image with no bytes reports nothing rather than an empty image" started.
+◇ Test "The data URL carries the real media type and base64 payload" started.
+◇ Test "A rebuilt image reports its real size rather than zero bytes" started.
+◇ Test "The engine's figures survive the settings round-trip" started.
+◇ Test "With no engine description the locally extracted figures are still used" started.
+◇ Test "A text-only API model is not sent images, even if files were added" started.
+◇ Test "A rebuilt document reports the engine's summary and token count, not zero" started.
+◇ Test "Settings written before the fields existed still decode" started.
+◇ Test "The scheme is matched exactly, and without regard to case" started.
+◇ Test "A URL with no host is refused" started.
+◇ Test "A loopback, private, link-local or integer host is refused" started.
+◇ Test "Whitespace is refused, and a relative reference with no scheme" started.
+◇ Test "An ordinary http or https URL is accepted" started.
+◇ Test "The tool refuses a URL it cannot read, before it asks the extractor anything" started.
+◇ Test "The picker still offers the formats intake converts" started.
+◇ Test "A research prompt with source material is template-compatible" started.
+◇ Test "The bytes the model is sent are still the engine's own copy" started.
+◇ Test "One maximum-size attachment leaves the snapshot inside the transport's cap" started.
+◇ Test "Adding a second file mid-run is refused too, which is why the flag gates both" started.
+◇ Test "The mode switches and reseats the personas" started.
+◇ Suite "A configured endpoint is checked before anything is sent to it" started.
+◇ Suite "Vision support" started.
+✔ Test "No attachments means no extra message" passed after 0.038 seconds.
+✔ Test "Attachments count towards the context estimate" passed after 0.037 seconds.
+✔ Test "The source material is data in the user turn, never the system message" passed after 0.038 seconds.
+◇ Test "An empty response retries at basic and stops at advanced" started.
+◇ Test "An advanced search does not retry again" started.
+◇ Test "A hit is only blank when it has neither title nor content" started.
+◇ Test "Blank hits are removed before the retry is decided" started.
+◇ Test "Three blank items retry at advanced and return the real hits" started.
+◇ Test "A usable basic response is not retried" started.
+◇ Test "The advanced retry keeps includeAnswer" started.
+✔ Test "Attached text is given to the models, delimited and named" passed after 0.038 seconds.
+◇ Test "Only decodable images reach the engine" started.
+✔ Test "The accepted list is exactly the documented types" passed after 0.037 seconds.
+✔ Test "An entertainment prompt with source material is template-compatible" passed after 0.038 seconds.
+◇ Test "A steering message within the limit is still accepted" started.
+◇ Test "A topic past the limit is refused, and the room keeps the topic it had" started.
+◇ Test "A topic within the limit is still accepted" started.
+◇ Test "A steering message past the limit is refused" started.
+◇ Test "A moderator name past the limit is shortened rather than refused" started.
+✔ Test "The cap is enforced by the read, not by a size the file reported" passed after 0.038 seconds.
+◇ Test "One usable hit among blanks is used, not retried" started.
+✔ Test "A symbolic link is not a regular file, whether or not it dangles" passed after 0.038 seconds.
+✔ Test "Every type the sniffer can return is one the API accepts" passed after 0.037 seconds.
+✔ Test "A directory is refused as a file" passed after 0.038 seconds.
+✔ Test "A file over the cap is refused before it is converted" passed after 0.038 seconds.
+✔ Test "A path whose size cannot be read is refused, not read unbounded" passed after 0.038 seconds.
+✔ Test "A regular file is still converted, and its byte count is the bytes that were read" passed after 0.038 seconds.
+✔ Test "The three size limits are derived from one place" passed after 0.037 seconds.
+✔ Test "An RTF file is rich text, not Word, and its chip says so" passed after 0.037 seconds.
+✔ Test "Every kind is reachable from the extensions it advertises" passed after 0.037 seconds.
+✔ Test "With no image the input stays a plain string" passed after 0.038 seconds.
+✔ Test "No extension belongs to two kinds" passed after 0.037 seconds.
+✔ Test "Images are distinguished from documents" passed after 0.037 seconds.
+✔ Test "Several images all travel with the one message" passed after 0.038 seconds.
+✔ Test "Each kind has a label and a symbol" passed after 0.037 seconds.
+✔ Test "Extensions map to the right kind" passed after 0.037 seconds.
+✔ Test "With an image the input becomes content blocks carrying the image" passed after 0.038 seconds.
+✔ Test "A PDF with no text layer is reported as needing OCR, not as empty" passed after 0.037 seconds.
+✔ Test "A document is added with its text, name and size" passed after 0.037 seconds.
+✔ Test "An empty document is refused rather than attached as nothing" passed after 0.037 seconds.
+✔ Test "A file over the size limit is refused before it is read" passed after 0.037 seconds.
+✔ Test "An image with no data is refused" passed after 0.037 seconds.
+✔ Test "A long document is shortened and says so" passed after 0.037 seconds.
+✔ Test "An unsupported extension is refused with a clear reason" passed after 0.037 seconds.
+✔ Test "An image is added with its bytes and no text" passed after 0.037 seconds.
+✔ Test "A file that is not an image at all is refused as that, not as an unmeasurable image" passed after 0.037 seconds.
+✔ Test "An image that will not report its dimensions is refused rather than decoded blind" passed after 0.037 seconds.
+✔ Test "The media type comes from the bytes, not the filename" passed after 0.037 seconds.
+✔ Test "A document has no image media type" passed after 0.037 seconds.
+✔ Test "An image with no bytes reports nothing rather than an empty image" passed after 0.037 seconds.
+✔ Test "The data URL carries the real media type and base64 payload" passed after 0.037 seconds.
+✔ Test "A rebuilt image reports its real size rather than zero bytes" passed after 0.037 seconds.
+✔ Test "The engine's figures survive the settings round-trip" passed after 0.036 seconds.
+✔ Test "A text-only API model is not sent images, even if files were added" passed after 0.036 seconds.
+✔ Test "With no engine description the locally extracted figures are still used" passed after 0.036 seconds.
+✔ Test "A rebuilt document reports the engine's summary and token count, not zero" passed after 0.036 seconds.
+✔ Test "Settings written before the fields existed still decode" passed after 0.036 seconds.
+✔ Test "The scheme is matched exactly, and without regard to case" passed after 0.036 seconds.
+✔ Test "A URL with no host is refused" passed after 0.036 seconds.
+✔ Test "A loopback, private, link-local or integer host is refused" passed after 0.036 seconds.
+✔ Test "An ordinary http or https URL is accepted" passed after 0.036 seconds.
+✔ Test "Whitespace is refused, and a relative reference with no scheme" passed after 0.036 seconds.
+✔ Test "The picker still offers the formats intake converts" passed after 0.036 seconds.
+✔ Test "A research prompt with source material is template-compatible" passed after 0.034 seconds.
+✔ Test "A PNG is passed through byte-identical" passed after 0.038 seconds.
+✔ Test "The tool refuses a URL it cannot read, before it asks the extractor anything" passed after 0.036 seconds.
+✔ Test "An image whose metadata declares too many pixels is refused without being decoded" passed after 0.037 seconds.
+◇ Test "A link-local address is refused" started.
+◇ Test "The endpoints this app is actually for are allowed" started.
+◇ Test "A base URL that is not http or https is refused" started.
+◇ Test "A refused endpoint fails as itself, and says which rule refused it" started.
+◇ Test "The models probe uses the same policy and the same redirect refusal as generation" started.
+◇ Test "A base URL's query or fragment does not swallow the API path" started.
+◇ Test "Parameter-set inference matches the host, not a substring" started.
+◇ Test "A redirect is not followed" started.
+◇ Test "A link-local address is refused however it is spelled" started.
+◇ Test "An override settles it for a model that cannot be recognised" started.
+◇ Test "A checkpoint whose config declares a vision tower is read as yes" started.
+◇ Test "Recognised API model families are supported" started.
+◇ Test "An unrecognised API model is unknown, so images are not offered" started.
+◇ Test "A local seat without vision weights is unsupported" started.
+◇ Test "A config with no vision tower is a definite no, not an unknown" started.
+➜ Test "The checkpoint downloaded on this machine declares vision" skipped.
+✔ Test "A blank name is refused rather than leaving a seat unnamed" passed after 0.039 seconds.
+✔ Test "A removable attachment can be removed by id, and an unknown id is harmless" passed after 0.039 seconds.
+✔ Test "Attachments can be cleared" passed after 0.039 seconds.
+✔ Test "The mode is refused once the conversation has started" passed after 0.039 seconds.
+✔ Test "Steering with text is accepted and reaches the engine" passed after 0.039 seconds.
+✔ Suite "Prompt shape" passed after 0.040 seconds.
+✔ Suite "File kinds" passed after 0.042 seconds.
+✔ Suite "Images in the API request" passed after 0.043 seconds.
+✔ Suite "Adding documents" passed after 0.043 seconds.
+✔ Suite "Image attachments" passed after 0.043 seconds.
+✔ Suite "Attachment summary from the engine" passed after 0.043 seconds.
+✔ Suite "Vision capability decides whether images are sent" passed after 0.043 seconds.
+✔ Suite "What fetch_page accepts as a URL" passed after 0.043 seconds.
+✔ Test "A link-local address is refused" passed after 0.003 seconds.
+✔ Test "A base URL that is not http or https is refused" passed after 0.003 seconds.
+✔ Test "The endpoints this app is actually for are allowed" passed after 0.003 seconds.
+✔ Test "A base URL's query or fragment does not swallow the API path" passed after 0.003 seconds.
+✔ Test "Parameter-set inference matches the host, not a substring" passed after 0.003 seconds.
+✔ Test "A link-local address is refused however it is spelled" passed after 0.003 seconds.
+✔ Test "An override settles it for a model that cannot be recognised" passed after 0.003 seconds.
+✔ Test "Recognised API model families are supported" passed after 0.003 seconds.
+✔ Test "An unrecognised API model is unknown, so images are not offered" passed after 0.003 seconds.
+✔ Test "A local seat without vision weights is unsupported" passed after 0.003 seconds.
+✔ Test "A checkpoint whose config declares a vision tower is read as yes" passed after 0.003 seconds.
+✔ Test "A config with no vision tower is a definite no, not an unknown" passed after 0.003 seconds.
+✔ Test "A TIFF is converted to a type the API accepts" passed after 0.042 seconds.
+✔ Test "Reset returns the engine to a fresh conversation" passed after 0.043 seconds.
+✔ Suite "Vision support" passed after 0.044 seconds.
+✔ Test "A refused endpoint fails as itself, and says which rule refused it" passed after 0.003 seconds.
+✔ Test "A BMP is converted to a type the API accepts" passed after 0.042 seconds.
+✔ Suite "BMP and TIFF are converted, not sent as undocumented types" passed after 0.044 seconds.
+✔ Test "The cap is the caller's, and an image under it is still converted" passed after 0.043 seconds.
+✔ Test "A snapshot carries the personas the picker needs" passed after 0.045 seconds.
+✔ Suite "An image is measured before it is decoded" passed after 0.046 seconds.
+✔ Test "The models probe uses the same policy and the same redirect refusal as generation" passed after 0.007 seconds.
+✔ Test "The research budget is set from the service" passed after 0.048 seconds.
+✔ Test "A redirect is not followed" passed after 0.009 seconds.
+✔ Suite "A configured endpoint is checked before anything is sent to it" passed after 0.042 seconds.
+✔ Test "An empty topic is refused rather than blanking the question" passed after 0.052 seconds.
+[ChatBots] Agent 1 could not read the attached image broken.png
+✔ Test "Only decodable images reach the engine" passed after 0.015 seconds.
+✔ Suite "Turn-loop rules without a model" passed after 0.055 seconds.
+✔ Test "The reasoning preference is held by the service" passed after 0.059 seconds.
+✔ Test "Start, pause, resume and stop are all accepted and change the status" passed after 0.068 seconds.
+✔ Test "fetchState returns the current state" passed after 0.070 seconds.
+✔ Test "An id that is not a file id at all is refused as such" passed after 0.070 seconds.
+✔ Test "fetchReport refuses politely before a session has run" passed after 0.070 seconds.
+✔ Test "Removing an attachment that is there still works" passed after 0.070 seconds.
+✔ Test "A topic can be set before the conversation starts" passed after 0.072 seconds.
+✔ Test "Every field of a seat change is applied" passed after 0.073 seconds.
+✔ Test "A topic is refused once the conversation has started, as a refusal not an error" passed after 0.076 seconds.
+✔ Test "Attachments survive the context estimate being computed" passed after 0.077 seconds.
+✔ Test "A seat change alters only the fields it names" passed after 0.078 seconds.
+✔ Test "An upload into a room that is already full is refused before it is staged" passed after 0.078 seconds.
+✔ Test "An unknown seat is refused rather than silently ignored" passed after 0.078 seconds.
+✔ Test "Steering with empty text is refused" passed after 0.078 seconds.
+✔ Test "Removing an id that matches nothing is refused, not answered with the state" passed after 0.078 seconds.
+✔ Test "The id is matched as a UUID, so a lowercased one still removes the file" passed after 0.081 seconds.
+✔ Test "Before the conversation starts, removing works and says so" passed after 0.084 seconds.
+✔ Test "The bytes the model is sent are still the engine's own copy" passed after 0.089 seconds.
+✔ Test "The mode switches and reseats the personas" passed after 0.086 seconds.
+✔ Test "A steering message within the limit is still accepted" passed after 0.057 seconds.
+✔ Test "A topic past the limit is refused, and the room keeps the topic it had" passed after 0.057 seconds.
+✔ Test "A topic within the limit is still accepted" passed after 0.058 seconds.
+✔ Test "A steering message past the limit is refused" passed after 0.058 seconds.
+✔ Test "A moderator name past the limit is shortened rather than refused" passed after 0.060 seconds.
+✔ Suite "User-supplied text is bounded" passed after 0.100 seconds.
+✔ Test "An attachment with a name that is not a document is refused, not crashed on" passed after 0.100 seconds.
+✔ Suite "Engine service" passed after 0.101 seconds.
+✔ Test "An empty query is refused before any request is made" passed after 0.101 seconds.
+✔ Test "A relative traversal filename cannot write outside the staging directory" passed after 0.189 seconds.
+◇ Test "The traversal from the audit is contained too" started.
+✔ Test "A staged upload is created private to this user, and its bytes are all there" passed after 0.203 seconds.
+✔ Test "Two maximum-size attachments still leave it inside the cap" passed after 0.203 seconds.
+✔ Test "The snapshot carries an attachment's metadata and not its bytes" passed after 0.203 seconds.
+✔ Test "An empty response retries at basic and stops at advanced" passed after 0.167 seconds.
+✔ Test "One maximum-size attachment leaves the snapshot inside the transport's cap" passed after 0.201 seconds.
+✔ Test "A hit is only blank when it has neither title nor content" passed after 0.167 seconds.
+✔ Test "One usable hit among blanks is used, not retried" passed after 0.167 seconds.
+✔ Test "Blank hits are removed before the retry is decided" passed after 0.167 seconds.
+✔ Suite "An attachment in the snapshot" passed after 0.207 seconds.
+✔ Test "The traversal from the audit is contained too" passed after 0.025 seconds.
+✔ Test "Two uploads that arrive together cannot both take the last place" passed after 0.215 seconds.
+✔ Suite "An attachment command reports what it did" passed after 0.217 seconds.
+◇ Test "An absolute filename is contained" started.
+✔ Test "The bytes sniffer does not recognise HEIC" passed after 0.220 seconds.
+✔ Test "A conversation that has started refuses new material" passed after 0.221 seconds.
+✔ Test "An absolute filename is contained" passed after 0.005 seconds.
+✔ Suite "Source material in the prompt" passed after 0.222 seconds.
+◇ Test "A HEIC photo is converted to a format the API accepts" started.
+◇ Test "A name that is still not usable after reduction is refused, not renamed" started.
+✔ Test "A name that is still not usable after reduction is refused, not renamed" passed after 0.002 seconds.
+◇ Test "A normal filename still works and still produces an attachment" started.
+✔ Test "An advanced search does not retry again" passed after 0.192 seconds.
+✔ Test "Hits become a numbered list with their URLs, and a summary that says how many" passed after 0.229 seconds.
+✔ Test "A usable basic response is not retried" passed after 0.192 seconds.
+✔ Test "A normal filename still works and still produces an attachment" passed after 0.009 seconds.
+◇ Test "Posting the traversal to the route the API serves is contained there too" started.
+✔ Test "A search that finds nothing says so instead of returning an empty list" passed after 0.240 seconds.
+✔ Test "Three blank items retry at advanced and return the real hits" passed after 0.204 seconds.
+✔ Test "A redirect from the search endpoint is reported, not followed with the key" passed after 0.242 seconds.
+✔ Suite "The web_search tool's own branches" passed after 0.244 seconds.
+✔ Test "The advanced retry keeps includeAnswer" passed after 0.204 seconds.
+✔ Suite "The empty-result retry follows the blank filter" passed after 0.244 seconds.
+✔ Test "Posting the traversal to the route the API serves is contained there too" passed after 0.095 seconds.
+✔ Suite "Where an upload may be written" passed after 0.330 seconds.
+✔ Test "A HEIC photo is converted to a format the API accepts" passed after 0.219 seconds.
+◇ Test "A photo's EXIF orientation is applied by the conversion" started.
+✔ Test "A photo's EXIF orientation is applied by the conversion" passed after 0.048 seconds.
+◇ Test "An image already in a supported format is passed through untouched" started.
+✔ Test "An image already in a supported format is passed through untouched" passed after 0.001 seconds.
+◇ Test "An image that cannot be decoded is refused with its name" started.
+✔ Test "An image that cannot be decoded is refused with its name" passed after 0.001 seconds.
+✔ Suite "An image intake can convert" passed after 0.493 seconds.
+✔ Test "Adding a second file mid-run is refused too, which is why the flag gates both" passed after 0.500 seconds.
+✔ Test "Removing an attachment once the conversation has started is refused, not silently ignored" passed after 0.505 seconds.
+✔ Test "Clearing them once the conversation has started is refused the same way" passed after 0.505 seconds.
+✔ Suite "An attachment can be removed while the conversation runs" passed after 0.507 seconds.
+✔ Test "An attachment at the engine's own size limit fits the wire cap" passed after 0.708 seconds.
+✔ Suite "Length-prefixed framing" passed after 0.711 seconds.
+✔ Test "A FIFO is refused, and named as what it is" passed after 1.062 seconds.
+✔ Suite "Attachment intake bounds what it reads" passed after 1.064 seconds.
+✔ Test run with 142 tests in 25 suites passed after 1.064 seconds.
+/bin/sh: /var/folders/7l/ry9rvd3d72z864w_jd2my37m0000gn/T/intake-E53DF11F-E3A1-4C14-BAB2-D48F3C322A34/pipe.txt: No such file or directory
+EXIT=0

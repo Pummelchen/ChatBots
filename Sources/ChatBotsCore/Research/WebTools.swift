@@ -99,9 +99,48 @@ public struct FetchPageTool: ToolProvider {
             let url = URL(string: raw),
             let scheme = url.scheme?.lowercased(),
             readableSchemes.contains(scheme),
-            let host = url.host(), !host.isEmpty
+            let host = url.host(), !host.isEmpty,
+            Self.hostRefusal(host) == nil
         else { return nil }
         return url
+    }
+
+    /// Why this tool will not ask for `host`, or nil.
+    ///
+    /// Tavily performs the fetch rather than this Mac, but the URL is chosen by the model —
+    /// which a fetched page can steer — so a request to loopback, a private range or a cloud
+    /// metadata endpoint is an SSRF attempt however it is made, and it is the model that reads
+    /// the answer. The model endpoints deliberately allow loopback and LAN addresses
+    /// (`OpenAIEndpoint.endpointRefusal`, because LM Studio lives there); this tool is for the
+    /// public web, so it refuses them as well as link-local. Decimal, hex and IPv4-mapped IPv6
+    /// spellings are parsed rather than prefix-matched.
+    static func hostRefusal(_ host: String) -> String? {
+        let lowered = host.lowercased()
+        if let value = OpenAIEndpoint.ipv4Integer(lowered) {
+            let first = UInt8((value >> 24) & 0xff)
+            let second = UInt8((value >> 16) & 0xff)
+            switch (first, second) {
+            case (0, _): return "it is not a routable address"
+            case (10, _), (127, _): return "it is a private or loopback address"
+            case (169, 254): return "it is link-local"
+            case (172, 16...31), (192, 168): return "it is a private address"
+            default: return nil
+            }
+        }
+        var bytes = [UInt8](repeating: 0, count: 16)
+        if lowered.contains(":"), inet_pton(AF_INET6, lowered, &bytes) == 1 {
+            if bytes[0..<15].allSatisfy({ $0 == 0 }), bytes[15] == 1 { return "it is loopback" }
+            if bytes[0] == 0xfe, (bytes[1] & 0xc0) == 0x80 { return "it is link-local" }
+            if (bytes[0] & 0xfe) == 0xfc { return "it is a private address" }
+            let mapped =
+                bytes[0..<10].allSatisfy { $0 == 0 } && bytes[10] == 0xff && bytes[11] == 0xff
+            if mapped {
+                return hostRefusal("\(bytes[12]).\(bytes[13]).\(bytes[14]).\(bytes[15])")
+            }
+            return nil
+        }
+        if lowered == "localhost" || lowered.hasSuffix(".localhost") { return "it is loopback" }
+        return nil
     }
 
     public func run(argument: String) async throws -> ToolOutcome {

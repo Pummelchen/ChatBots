@@ -245,6 +245,26 @@ extension ConversationEngine {
                     .reduce(0) { $0 + max(1, $1.content.count / 4) }
             }
             let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            // The handler is given an id, not the seat, so the mode is looked up here. Needed
+            // before the empty/non-empty split now, for the budget below.
+            let speakerMode = seats.first { $0.spec.id == id }?.spec.mode ?? .entertainment
+            if speakerMode == .research {
+                // A contribution that brought evidence, changed a position or answered a
+                // challenge is progress; one that restated a position is not. A run of those
+                // is what convergence means. An empty turn added nothing by definition.
+                let added =
+                    !clean.isEmpty
+                    && ConflictReader.signals(
+                        in: clean, from: id, others: seats.map(\.spec.id), addressing: nil
+                    ).contains { $0.kind == .newEvidence || $0.kind == .positionChange }
+                // What this turn actually spent, counted at the tool call, recorded whether or
+                // not the turn produced text. It used to be recorded only in the non-empty
+                // branch, so a turn that emitted nothing but tool calls spent billed searches
+                // for free: `searches` never moved, the `maxSearches` ceiling never dropped,
+                // and web tools stayed offered on every later turn.
+                conversation.research?.record(
+                    searchCount: toolCallsThisTurn, addedSomething: added)
+            }
             if clean.isEmpty {
                 note("\(id) produced no text (stop: \(stats.stopReason)).")
             } else {
@@ -262,21 +282,6 @@ extension ConversationEngine {
                 // actually said rather than to a transcript it has to re-derive. Only in
                 // entertainment: a research seat is judged on method and evidence, and
                 // importing grudges into it would be the modes sharing a philosophy.
-                // The handler is given an id, not the seat, so the mode is looked up here.
-                let speakerMode = seats.first { $0.spec.id == id }?.spec.mode ?? .entertainment
-                if speakerMode == .research {
-                    // A contribution that brought evidence, changed a position or answered a
-                    // challenge is progress; one that restated a position is not. A run of
-                    // those is what convergence means.
-                    let added = ConflictReader.signals(
-                        in: clean, from: id, others: seats.map(\.spec.id), addressing: nil
-                    ).contains { $0.kind == .newEvidence || $0.kind == .positionChange }
-                    // What this turn actually spent, counted at the tool call. The old
-                    // sequence-window guess counted a multi-call turn as one and could charge a
-                    // seat for its own previous turn's search.
-                    conversation.research?.record(
-                        searchCount: toolCallsThisTurn, addedSomething: added)
-                }
                 if speakerMode == .entertainment {
                     let everyone = seats.map(\.spec.id)
                     let signals = ConflictReader.signals(

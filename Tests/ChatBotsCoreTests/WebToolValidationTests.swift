@@ -27,11 +27,33 @@ struct WebToolURLValidationTests {
             "https://example.com/article",
             "http://example.com",
             "https://example.com:8443/x?q=1#f",
-            "http://127.0.0.1:1/x",
-            "http://[::1]:1/x",
             "https://sub.example.co.uk/a/b/c.html",
         ] {
             #expect(FetchPageTool.readableURL(raw) != nil, "\(raw) was refused")
+        }
+    }
+
+    @Test("A loopback, private, link-local or integer host is refused")
+    func localHostsAreRefused() throws {
+        // The fetch runs on Tavily's network, not this Mac, but the URL is model-chosen and the
+        // model reads the reply, so a metadata endpoint or a LAN address is an SSRF attempt
+        // however it is made. These were accepted before: only the scheme was checked.
+        for raw in [
+            "http://127.0.0.1:1/x",
+            "http://[::1]:1/x",
+            "http://localhost/x",
+            "http://10.0.0.5/",
+            "http://172.16.4.1/",
+            "http://192.168.1.1/",
+            "http://169.254.169.254/latest/meta-data/",
+            "http://[fe80::1]/",
+            "http://[fc00::1]/",
+            "http://[::ffff:169.254.169.254]/",
+            "http://2852039166/",
+            "http://0xA9FEA9FE/",
+            "http://0.0.0.0/",
+        ] {
+            #expect(FetchPageTool.readableURL(raw) == nil, "\(raw) was accepted")
         }
     }
 

@@ -29,6 +29,14 @@ extension EngineService {
     /// arrived at once.
     static let maximumAttachments = 24
 
+    /// The total size one conversation's attachments may hold.
+    ///
+    /// The per-file cap never bounded the total: 24 files at the 64 MB ceiling is 1.5 GB of
+    /// source material, and the whole set is re-sent to the engine on every turn and, on the
+    /// OpenAI path, base64-encoded into data URLs — several copies of it live at once on an
+    /// 8 GB machine. This is the bound the per-file limit implies but does not enforce.
+    static let maximumTotalAttachmentBytes = 256 * 1024 * 1024
+
     /// Stage an upload and read it.
     ///
     /// Written to a temporary file because the extractors take a URL — the same path the app
@@ -115,6 +123,16 @@ extension EngineService {
             // before the conversion, so uploads arriving together all passed it.
             guard engine.attachments.count < Self.maximumAttachments else {
                 return .refused("too many attached files")
+            }
+            // The aggregate bound, checked on the main actor with the append for the same
+            // reason the count is: the top-of-method guard ran before the conversion, so
+            // uploads arriving together all saw the same total.
+            let attachedBytes = engine.attachments.reduce(0) { $0 + $1.byteCount }
+            let (total, overflow) = attachedBytes.addingReportingOverflow(document.byteCount)
+            guard !overflow, total <= Self.maximumTotalAttachmentBytes else {
+                return .refused(
+                    "the attached files total more than "
+                        + "\(Self.maximumTotalAttachmentBytes / (1024 * 1024)) MB")
             }
             guard engine.setAttachments(engine.attachments + [document]) else {
                 return .refused(Self.sourceMaterialIsFixed)

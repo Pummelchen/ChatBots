@@ -237,8 +237,6 @@ public struct ImageExtractor: DocumentExtracting {
     static func wireRepresentation(
         of data: Data, filename: String, limits: AttachmentLimits
     ) throws -> Data {
-        if AttachedDocument.mediaType(of: data) != nil { return data }
-
         let name = filename.isEmpty ? "the image" : filename
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
             throw DocumentError.unreadable(
@@ -247,7 +245,15 @@ public struct ImageExtractor: DocumentExtracting {
         }
 
         let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        // Measured for *every* image, including a format the API accepts. The pass-through
+        // formats are decoded later — `CIImage(data:)` on the MLX path — so this is the one
+        // place that can refuse a decompression bomb, and the 64 MB byte cap does not bound a
+        // decode. The guard used to sit after the pass-through `return`, so a PNG declaring
+        // 100000x100000 was never measured at all.
         try validateImage(source, properties: properties, name: name, limits: limits)
+
+        // Recognised bytes travel untouched, so a PNG stays the PNG the moderator chose.
+        if AttachedDocument.mediaType(of: data) != nil { return data }
 
         guard let decoded = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
             throw DocumentError.unreadable(
