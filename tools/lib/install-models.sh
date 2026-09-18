@@ -209,6 +209,16 @@ Any other Hugging Face repository id also works, written in full (owner/name)."
 install_checkpoint() {
   local MODEL_ID="$1"
   local MODEL_DIR_NAME="${MODEL_ID##*/}"
+  # Only the last component of a repository id becomes a directory name, and it has to be one
+  # ordinary component. `--model 'x/..'` resolved to the checkout root and would have downloaded
+  # into it; `model-target-path.sh` refuses `..` and absolute names for hub-supplied files, and
+  # this is the same rule applied to the value the caller supplied.
+  case "$MODEL_DIR_NAME" in
+    "" | "." | "..")
+      warn "refusing the model id '$MODEL_ID': '$MODEL_DIR_NAME' is not a directory name"
+      return 1
+      ;;
+  esac
   local MODEL_DIR="$MODELS_DIR/$MODEL_DIR_NAME"
   local FILE_LIST="$MODELS_DIR/.hf-file-list-$MODEL_DIR_NAME.txt"
   local API_URL="https://huggingface.co/api/models/$MODEL_ID"

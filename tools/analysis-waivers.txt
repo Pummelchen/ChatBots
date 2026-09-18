@@ -26,8 +26,10 @@ swift-format waiver: 307
 
 # `tools/cdp.py` and `tools/cdp_protocol.py` drive a headless Chrome on loopback and nothing else.
 # `require_loopback_host` refuses any endpoint that is not 127.0.0.1, localhost or ::1 before a socket
-# is opened, the URL scheme is pinned to `http` and built only from validated values, and the reply is
-# read with a bound — so the two findings below describe what the scanner cannot see, and each site in
-# those files says what it cannot.
+# is opened, the URL scheme is pinned to `http` and built only from validated values, the target list is
+# read to `MAX_TARGET_LIST_BYTES`, and a websocket frame — and the total of a fragmented message — is
+# refused past `MAX_FRAME_BYTES`. So the two findings below describe what the scanner cannot see, and
+# each site in those files says what it cannot. (This note used to claim "the reply is read with a
+# bound" while the frame length was unbounded, which overstated the control; AUDIT-0087 added the cap.)
 semgrep waiver: javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket tools/cdp_protocol.py
 semgrep waiver: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected tools/cdp.py

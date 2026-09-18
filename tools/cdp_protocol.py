@@ -35,6 +35,12 @@ DEVTOOLS_HOST: str = "127.0.0.1"
 # keeps a stuck or hostile local service from making this client allocate without limit.
 MAX_TARGET_LIST_BYTES: int = 1 << 20
 
+# One websocket frame carries a CDP message: a screenshot is the largest, and even a full-page
+# capture is a few megabytes. The declared length is a 64-bit number from the peer, so without a
+# cap a hostile or broken local service could make this client read and hold an arbitrary amount.
+# Every frame, and the total of a fragmented message, is counted against the same ceiling.
+MAX_FRAME_BYTES: int = 32 << 20
+
 
 def require_loopback_host(host: str) -> str:
     """Return `host` when it names the loopback interface, and refuse anything else.
@@ -181,6 +187,7 @@ class WebSocket:
     def receive(self) -> str:
         """One text message, skipping control frames and joining fragments."""
         pieces: list[bytes] = []
+        total = 0
         while True:
             first, second = self._read_exactly(2)
             fin = first & 0x80
@@ -190,6 +197,10 @@ class WebSocket:
                 length = struct.unpack(">H", self._read_exactly(2))[0]
             elif length == 127:
                 length = struct.unpack(">Q", self._read_exactly(8))[0]
+            if length > MAX_FRAME_BYTES:
+                raise DevToolsError(
+                    f"websocket frame of {length} bytes exceeds the {MAX_FRAME_BYTES}-byte cap"
+                )
             payload = self._read_exactly(length)
 
             if opcode == 0x8:  # close
@@ -199,6 +210,9 @@ class WebSocket:
                 continue
             if opcode == 0xA:  # pong
                 continue
+            total += len(payload)
+            if total > MAX_FRAME_BYTES:
+                raise DevToolsError("a fragmented websocket message exceeds the frame cap")
             pieces.append(payload)
             if fin:
                 return b"".join(pieces).decode()

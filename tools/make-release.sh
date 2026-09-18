@@ -83,6 +83,14 @@ CHECKSUM="$ARCHIVE.sha256"
 NOTES="docs/release-notes-v$VERSION.md"
 RECORD="$STAGE/release-record.txt"
 SCRATCH="${SCRATCH:-$ROOT/.build/release-scratch-$VERSION}"
+# A caller-supplied `--scratch` is `rm -rf`-ed below, so it has to be a path this script owns:
+# a subdirectory of the checkout's own `.build`. `--scratch .`, `--scratch "$ROOT"` and
+# `--scratch /` were accepted and would have deleted the tree or the filesystem, after the
+# clean-tree check that is supposed to protect them.
+case "$SCRATCH" in
+    "$ROOT"/.build/*) ;;
+    *) die "--scratch must be a subdirectory of $ROOT/.build (got '$SCRATCH')" ;;
+esac
 SLUG="$(git remote get-url origin | sed -E 's#(git@|https://)github\.com[:/]##; s#\.git$##')"
 
 mkdir -p "$STAGE"
