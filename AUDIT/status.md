@@ -27,12 +27,15 @@ record — not narrowed — into:
 - **AUDIT-0097** (DONE): `force_unwrapping` enabled in `.swiftlint.yml` and its 32 sites removed.
   The waivers were tightened with it, from 217/444 to 208/307.
 - **AUDIT-0098** (DONE): `line_length` — all 88 lines wrapped.
-- **AUDIT-0099** the only thing left: 22 `cyclomatic_complexity` and 10 `function_body_length`
-  refactors, largely the same functions. Biggest first: `CommandLine.parse` (61), `EngineService.handle`
-  (57), `APIServer+Commands.translate` (41), `ConflictState.apply` (22), `ServeCommand.run` (20),
-  `OpenAIStreamReading.readEventStream` (19), `WebTransportClientReader.read` (18), `TransportCheck.run`
-  (18), `ResearchReading.read` (17) and `TurnLoop.runTurn` (17). Then AUDIT-0102 switches both gates to
-  `--strict` and deletes the waiver counts.
+- **AUDIT-0099** the only thing left: 20 findings — 12 `cyclomatic_complexity` and 8
+  `function_body_length` — across 14 files. Done so far: the CLI (CommandLine, ServeCommand,
+  HeadlessRun, CLI, Probe) and the HTTP/OpenAI group (APIServer+Commands, APIServer,
+  OpenAIStreamReading, OpenAIResponsesClient). Left: Engine (`EngineService.handle` 57,
+  `EngineServiceAttachments` 13, `SystemProcess` 11, `TurnLoop`, `EngineServiceSnapshot`),
+  Conversation (`ConflictState.apply` 22, `ConflictReader`), Research (`ResearchReading.read` 17),
+  Room (`SocialPersonas` 14), Transport (`TransportCheck.run` 18, `WebTransportClientReader` 18
+  and 13, `WebTransportServerSession` 14) and App (`ChatController` 15, `APIEndpointsSheet`).
+  Then AUDIT-0102 switches both gates to `--strict` and deletes the waiver counts.
 - **AUDIT-0100** (DONE): the mechanical rule classes.
 - **AUDIT-0101** (DONE): the swift-format sweep — 444 → 0.
 - **AUDIT-0102** switch both gates to `--strict`, delete the two waiver counts, and delete the
@@ -59,7 +62,7 @@ verified on the primary host only, recorded in the ledger.
 
 - Branch `audit/2026-09-18` only; no force-push, no history rewrite.
 - `bash tools/mac-checks.sh` is the gate after every batch — **9 gates**, including eslint and
-  prettier (`npm ci` first). Metrics must not regress: SwiftLint ≤ 34 (measured 32),
+  prettier (`npm ci` first). Metrics must not regress: SwiftLint ≤ 22 (measured 20),
   swift-format ≤ 2 (measured 0), no file over 500 lines.
 - Every fix carries before/after evidence in `AUDIT/evidence-*.log`, and the closed record —
   what was found, what was changed, which commit — is in `AUDIT/ledger.json`.
