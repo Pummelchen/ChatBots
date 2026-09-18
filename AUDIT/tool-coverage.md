@@ -39,11 +39,18 @@ implies complete concurrency checking, and the proof above is that the mode is i
 
 ### Swift — force-unwrap must fail SwiftLint `--strict`
 
-**Status: proof pending the AUDIT-0029 fix.** `.swiftlint.yml` has no `opt_in_rules`, so
-`force_unwrapping` is not enabled today and SwiftLint is silent on a force unwrap.
-Measured with a scratch config that enables it: **32 findings** in the authored
-`Sources`/`Tests`. The rule will be enabled and the site fixed under AUDIT-0029, and this
-section will carry the failing output once it is.
+The rule is enabled in `.swiftlint.yml` and reports zero in the authored `Sources`/`Tests`,
+and the gate that enforces it is `swiftlint lint --strict` against zero rather than against
+a recorded count. The proof that it is in force is a probe with one force unwrap:
+
+```
+$ swiftlint lint --strict --quiet --config .swiftlint.yml /tmp/fwprobe/Probe.swift; echo "exit=$?"
+/tmp/fwprobe/Probe.swift:2:12: error: Force Unwrapping Violation: Force unwrapping should be avoided (force_unwrapping)
+exit=2
+```
+
+Both figures this section used to quote are history: 32 findings when the rule was enabled
+by a scratch config, and 206 SwiftLint findings overall. The authored tree now reports none.
 
 ### C — strict C99
 
@@ -101,10 +108,23 @@ recorded in `AUDIT/environment.md`.
 
 ### Shell — shellcheck
 
-`git ls-files -z '*.sh' | xargs -0 shellcheck -S style` is clean at baseline and is part
-of CI. No separate proof is needed: the check is scoped by `-S style` and the baseline run
-above is its output. A no-op script with an unquoted variable was used to confirm the gate
-can fail (see `AUDIT/probes/shellcheck-probe.sh` and below).
+`git ls-files -z '*.sh' | xargs -0 shellcheck -S style` is clean and is part of CI. No
+separate proof is needed: the check is scoped by `-S style` and the run above is its output.
+A no-op script with an unquoted variable was used to confirm the gate can fail:
+
+```
+$ shellcheck -S style AUDIT/probes/shellcheck-probe.sh.txt; echo "exit=$?"
+In AUDIT/probes/shellcheck-probe.sh.txt line 4:
+rm -rf $file
+       ^---^ SC2086 (info): Double quote to prevent globbing and word splitting.
+exit=1
+```
+
+The probe carries a `.txt` suffix on purpose. It was `shellcheck-probe.sh`, and because CI
+lists its inputs with `git ls-files '*.sh'` — deliberately, so a script in a new directory
+cannot escape the gate — a tracked probe that is *meant* to fail made the real gate red.
+Prefixing `.txt` keeps it a runnable proof without weakening the sweep: the gate still
+covers every tracked `.sh`, and the probe is invoked here by name.
 
 ## Checks a tool does not cover (kept as human checks)
 

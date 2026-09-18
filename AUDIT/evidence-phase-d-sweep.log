@@ -1,0 +1,157 @@
+=== Phase D convergence sweep over 1169477 ===
+PASS  embed-web: the generated bundle is in step with web/
+PASS  embed-names: the generated lists are in step with names/
+the third-party notices cover all 14 resolved packages
+PASS  third-party notices
+PASS  bash -n over every tracked script
+PASS  py_compile over tools/*.py
+PASS  file sizes: every code file is within 500 lines
+PASS  file sizes: no code file over 500 lines
+PASS  identity: VERSION is the semantic version 1.0
+PASS  identity: tools/make-app.sh derives the version from VERSION
+PASS  identity: docs/release-notes-v1.0.md exists
+PASS  identity: 1.0 is stated once and agrees everywhere
+PASS  identity: VERSION and its mirrors agree
+
+In AUDIT/probes/shellcheck-probe.sh line 4:
+rm -rf $file
+       ^---^ SC2086 (info): Double quote to prevent globbing and word splitting.
+
+Did you mean:
+rm -rf "$file"
+
+For more information:
+  https://www.shellcheck.net/wiki/SC2086 -- Double quote to prevent globbing ...
+FAIL  shellcheck
+All checks passed!
+PASS  ruff check
+unformatted: File would be reformatted
+   --> tools/cdp_protocol.py:215:37
+    |
+214 |             if total > MAX_FRAME_BYTES:
+    -                 raise DevToolsError("a fragmented websocket message exceeds the frame cap")
+215 +                 raise DevToolsError(
+216 +                     "a fragmented websocket message exceeds the frame cap"
+217 +                 )
+218 |             pieces.append(payload)
+    |
+
+unformatted: File would be reformatted
+  --> tools/hf-file-list.py:54:15
+   |
+53 |     if len(sys.argv) not in (2, 3):
+   -         print("usage: hf-file-list.py <api-response.json> [hashes-file]", file=sys.stderr)
+54 +         print(
+55 +             "usage: hf-file-list.py <api-response.json> [hashes-file]", file=sys.stderr
+56 +         )
+57 |         return 2
+   |
+
+2 files would be reformatted, 8 files already formatted
+FAIL  ruff format --check
+0 errors, 0 warnings, 0 informations
+PASS  pyright
+6:56PM INF 593 commits scanned.
+6:56PM INF scanned ~33847727 bytes (33.85 MB) in 3.62s
+6:56PM INF no leaks found
+PASS  gitleaks over the full history
+--- semgrep ---
+               
+               
+┌─────────────┐
+│ Scan Status │
+└─────────────┘
+  Scanning 196 files tracked by git with 1074 Code rules:
+                                                                                                                        
+  Language      Rules   Files          Origin      Rules                                                                
+ ─────────────────────────────        ───────────────────                                                               
+  <multilang>      60     196          Community    1074                                                                
+  swift             2     149                                                                                           
+  bash              4      20                                                                                           
+  js              153      11                                                                                           
+  python          243      10                                                                                           
+  html              1       1                                                                                           
+                                                                                                                        
+                
+                
+┌──────────────┐
+│ Scan Summary │
+└──────────────┘
+✅ Scan completed successfully.
+ • Findings: 3 (3 blocking)
+ • Rules run: 461
+ • Targets scanned: 196
+ • Parsed lines: ~99.1%
+ • Scan skipped: 
+   ◦ Files larger than  files 1.0 MB: 1
+ • Scan was limited to files tracked by git
+ • For a detailed list of skipped files and lines, run semgrep with the --verbose flag
+Ran 461 rules on 196 files: 3 findings.
+
+A new version of Semgrep is available. See https://semgrep.dev/docs/upgrading
+semgrep scan warning: Syntax error at line tools/lib/install-models.sh:96:
+ `() {
+  local want entry_id entry_name entry_bytes entry_aliases
+  want="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  while IFS=$'\t' read -r entry_id entry_name entry_bytes entry_aliases; do
+    [ -n "$entry_id" ] || continue
+    local lower_id lower_aliases
+    lower_id="$(printf '%s' "$entry_id" | tr '[:upper:]' '[:lower:]')"
+    lower_aliases="$(printf '%s' "$entry_aliases" | tr '[:upper:]' '[:lower:]')"
+    if [ "$lower_id" = "$want" ]; then printf '%s\n' "$entry_id"; return 0; fi
+    case " $lower_aliases " in *" $want "*) printf '%s\n' "$entry_id"; return 0 ;; esac
+    case "$lower_id" in */"$want") printf '%s\n' "$entry_id"; return 0 ;; esac
+  done < <(catalogue_entries)
+  # Any repository id works — the catalogue is a set of known-good names, not an allow-list — so a
+  # value with a namespace in it is taken as written.
+  case "$1" in
+    */*) printf '%s\n' "$1"; return 0 ;;
+  esac
+  return 1
+}
+
+catalogue_ids() {
+  catalogue_entries | awk -F'\t' 'NF { print $1 }'
+}
+
+# The checkpoints to install: the shipped one plus whatever was asked for, in the order asked.
+choose_checkpoints() {
+  local chosen="$DEFAULT_CHECKPOINT"
+  local item entry_id entry_name entry_bytes entry_aliases answer index stable
+
+  if [ "${MODELS_ALL:-0}" -eq 1 ]; then
+    while IFS= read -r entry_id; do
+      [ -n "$entry_id" ] && chosen="$chosen $entry_id"
+    done < <(catalogue_ids)
+  fi
+
+  for item in ${MODEL_REQUEST:-}; do
+    if ! stable="$(resolve_checkpoint "$item")"; then
+      die "There is no checkpoint called '$item'.
+
+Known names: $(catalogue_ids | tr '\n' ' ')
+Any other Hugging Face repository id also works, written in full (owner/name)."
+    fi
+    chosen="$chosen $stable"
+  done
+
+  # The menu, only when nothing was asked for, the run is attached to a terminal, and `--yes` was
+  # not given. Anything else — a pipe, a script, a repeat run from the launcher — installs the
+  # shipped checkpoint and nothing else, which is what this installer has always done.
+  if [ -z "${MODEL_REQUEST:-}" ] && [ "${MODELS_ALL:-... (truncated 13713 more characters)
+waived:   python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected  tools/cdp.py
+waived:   javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket  tools/cdp_protocol.py
+waived:   javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket  tools/cdp_protocol.py
+semgrep: 3 finding(s), all covered by a recorded waiver, with 1 scan warning(s) printed above
+PASS  semgrep, except the findings waived in writing
+Starting filesystem walk for root: /
+Scanned /Users/node1/Downloads/ChatBots/Package.resolved file and found 14 packages
+End status: 0 dirs visited, 1 inodes visited, 1 Extract calls, 2.760916ms elapsed, 2.761ms wall time
+
+No issues found
+PASS  osv-scanner over Package.resolved
+=== summary ===
+17
+FAIL  shellcheck
+FAIL  ruff format --check
+DONE

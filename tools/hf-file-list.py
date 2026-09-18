@@ -51,7 +51,9 @@ SKIP: frozenset[str] = frozenset(
 
 def main() -> int:
     if len(sys.argv) not in (2, 3):
-        print("usage: hf-file-list.py <api-response.json> [hashes-file]", file=sys.stderr)
+        print(
+            "usage: hf-file-list.py <api-response.json> [hashes-file]", file=sys.stderr
+        )
         return 2
     try:
         with open(sys.argv[1], encoding="utf-8") as handle:

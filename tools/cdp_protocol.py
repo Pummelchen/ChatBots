@@ -212,7 +212,9 @@ class WebSocket:
                 continue
             total += len(payload)
             if total > MAX_FRAME_BYTES:
-                raise DevToolsError("a fragmented websocket message exceeds the frame cap")
+                raise DevToolsError(
+                    "a fragmented websocket message exceeds the frame cap"
+                )
             pieces.append(payload)
             if fin:
                 return b"".join(pieces).decode()

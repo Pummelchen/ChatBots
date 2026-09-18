@@ -1753,13 +1753,13 @@
     "file_line": "Sources/; Tests/; web/; tools/",
     "title": "Phase D: the convergence sweep \u2014 re-run every scanner over the frozen tree and record what it finds",
     "category": "process/phase-d",
-    "status": "OPEN",
+    "status": "DONE",
     "host": "Node1.local",
     "discovered_by": "audit-brief-phase-d",
     "evidence_before": "Phase B/C drained the ledger, but the brief's Phase D is a separate requirement: the whole tree is swept again, after the remediation, to show that the changes did not introduce findings and that the earlier passes did not miss any. No sweep has been run since the tree was last modified.",
-    "fix_summary": "",
-    "evidence_after": "",
-    "commit": ""
+    "fix_summary": "Ran every scanner CI runs, by hand, over the frozen tree: the two embed checks, third-party notices, `bash -n` over every tracked shell script, `py_compile`, the file-size rule, the identity check, shellcheck, ruff check and format, pyright, gitleaks over the full history, semgrep through its waiver file, and osv-scanner \u2014 plus the nine Mac gates. Two findings came out of it and are recorded as AUDIT-0106 (ruff format was red on two Python tools) and AUDIT-0107 (the audit's own shellcheck probe was a tracked `.sh` and made the CI gate red); both are fixed. Nothing else regressed: the remediation itself introduced no finding.",
+    "evidence_after": "AUDIT/evidence-phase-d-sweep.log \u2014 16 passes, 2 failures, both now fixed and re-run clean (ruff format `10 files already formatted`, shellcheck over the tracked scripts exits 0). The nine Mac gates pass in AUDIT/evidence-strict-final-mac-checks.log.",
+    "commit": "audit(AUDIT-0104): the Phase D sweep, and the two findings it made"
   },
   {
     "id": "AUDIT-0105",
@@ -1777,5 +1777,37 @@
     "evidence_after": "",
     "commit": "",
     "note": "OWNER: the repository owner. REASON: a second macOS 26 / Apple-Silicon machine with Xcode 27 cannot be provisioned from inside this session, and no hosted runner meets the floor \u2014 the repository's own AGENTS.md records that as the reason it has no Swift CI job. The work itself is done and verified on Node1.local. OPTIONS FOR A HUMAN: (a) provide a second Mac and authorise a fresh clone plus `bash tools/mac-checks.sh` there; (b) sign a waiver that Phase E is verified on the primary host only, recorded here."
+  },
+  {
+    "id": "AUDIT-0106",
+    "severity": "S2",
+    "tier": "A",
+    "project": "tools",
+    "file_line": "tools/cdp_protocol.py:215; tools/hf-file-list.py:54",
+    "title": "ruff format --check fails on two Python tools, so CI's static-analysis job is red",
+    "category": "ci/format",
+    "status": "DONE",
+    "host": "Node1.local",
+    "discovered_by": "audit-phase-d-sweep",
+    "evidence_before": "The Phase D sweep ran the CI commands by hand. `ruff format --check tools/` reported `2 files would be reformatted, 8 files already formatted`: a `raise DevToolsError(...)` in `tools/cdp_protocol.py` and a `print(..., file=sys.stderr)` in `tools/hf-file-list.py` both exceed the recorded line length and were not wrapped. The workflow runs exactly this command in its `static-analysis` job, so the job fails on the audited commit. Earlier passes ran `ruff check` but not `ruff format --check`.",
+    "fix_summary": "Ran `ruff format tools/`, which is the tool CI compares against: it wrapped the two calls at the recorded line length and left the other eight files untouched. No logic changed.",
+    "evidence_after": "`ruff format --check tools/` reports `10 files already formatted` and `ruff check tools/` reports `All checks passed!` \u2014 AUDIT/evidence-phase-d-sweep.log.",
+    "commit": "audit(AUDIT-0104): the Phase D sweep, and the two findings it made"
+  },
+  {
+    "id": "AUDIT-0107",
+    "severity": "S2",
+    "tier": "A",
+    "project": "AUDIT",
+    "file_line": "AUDIT/probes/shellcheck-probe.sh",
+    "title": "The audit's own shellcheck probe is a tracked *.sh, so it makes the CI shellcheck gate red",
+    "category": "ci/gate",
+    "status": "DONE",
+    "host": "Node1.local",
+    "discovered_by": "audit-phase-d-sweep",
+    "evidence_before": "CI lists shellcheck's inputs with `git ls-files '*.sh'` \u2014 deliberately, so a script added in a new directory cannot escape the gate \u2014 and runs `shellcheck -S style` over them. `AUDIT/probes/shellcheck-probe.sh` is a tracked `.sh` whose whole purpose is to contain an unquoted variable, so the sweep reported SC2086 and the job would fail. The other three probes escape notice only because CI scopes ruff to `tools/`, not because anything excludes them.",
+    "fix_summary": "Renamed the probe to `AUDIT/probes/shellcheck-probe.sh.txt` and recorded the invocation by name in `AUDIT/tool-coverage.md`, together with why the suffix is `.txt`. The sweep was not narrowed: it still covers every tracked `.sh`, and the probe still fails when it is run, so the proof that the gate can fail survives. `AUDIT/tool-coverage.md` also gained the measured force-unwrap proof, which had been left as `proof pending the AUDIT-0029 fix`.",
+    "evidence_after": "`shellcheck -S style $(git ls-files '*.sh')` exits 0; `shellcheck -S style AUDIT/probes/shellcheck-probe.sh.txt` still reports SC2086 and exits 1 \u2014 AUDIT/evidence-phase-d-sweep.log and AUDIT/tool-coverage.md.",
+    "commit": "audit(AUDIT-0104): the Phase D sweep, and the two findings it made"
   }
 ]
