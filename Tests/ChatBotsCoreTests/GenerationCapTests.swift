@@ -65,4 +65,21 @@ struct GenerationCapTests {
             previous = spec.generationCap
         }
     }
+
+    @Test("A declared context window near Int.max cannot trap the cap arithmetic")
+    func hugeContextWindowDoesNotOverflow() {
+        // The context window comes from a `config.json` that travels with the checkpoint.
+        // `MLXEngine.contextWindow(of:)` bounds what it reads, and the addition is clamped, so
+        // neither path may trap — a trap here aborts the process on the first turn.
+        _ = MLXEngine.generationCap(
+            answerBudget: 4_096, thinking: .unlimited, contextWindow: Int.max)
+        _ = MLXEngine.generationCap(
+            answerBudget: Int.max, thinking: .high, contextWindow: Int.max)
+
+        var spec = AgentSpec.seatA()
+        spec.maxTokens = 4_096
+        spec.thinking = .unlimited
+        spec.contextWindow = Int.max
+        #expect(spec.generationCap > 0, "the cap is clamped, not trapped")
+    }
 }

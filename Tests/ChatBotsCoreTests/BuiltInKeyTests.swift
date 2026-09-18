@@ -124,4 +124,24 @@ struct BuiltInKeyTests {
         #expect(BuiltInKeys.deepSeekEnvironmentKey == "DEEPSEEK_API_KEY")
         #expect(BuiltInKeys.secretsFileName == ".secrets.env")
     }
+
+    @Test("A group- or world-readable secrets file is restricted to its owner on read")
+    func secretsFileIsRestricted() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "secrets-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let url = directory.appending(path: BuiltInKeys.secretsFileName)
+        try Data("DEEPSEEK_API_KEY=sk-test\n".utf8).write(to: url)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o644], ofItemAtPath: url.path)
+
+        let values = BuiltInKeys.secretsFile(in: directory)
+        #expect(values["DEEPSEEK_API_KEY"] == "sk-test", "the key is still read and repaired, not refused")
+
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        let permissions = (attributes[.posixPermissions] as? NSNumber)?.intValue ?? 0
+        #expect(permissions & 0o077 == 0, "a file holding API keys must end up owner-only")
+    }
 }

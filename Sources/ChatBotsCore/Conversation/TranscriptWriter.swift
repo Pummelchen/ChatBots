@@ -66,9 +66,9 @@ public enum TranscriptWriter {
     ) -> String {
         var out = ""
         out += "ChatBots — conversation log\n"
-        out += "Topic: \(topic.isEmpty ? "(none)" : topic)\n"
+        out += "Topic: \(topic.isEmpty ? "(none)" : oneLine(topic))\n"
         for spec in participants {
-            out += "Participant: \(spec.displayName) (\(spec.modelShortName))"
+            out += "Participant: \(oneLine(spec.displayName)) (\(oneLine(spec.modelShortName)))"
             out += spec.backend == .openAIResponses ? " [\(spec.backend.label)]" : ""
             out += "\n"
         }
@@ -82,11 +82,31 @@ public enum TranscriptWriter {
 
         out += "\n" + String(repeating: "-", count: 72) + "\n"
         for turn in logged {
-            out += "\n[\(timestamp(turn.timestamp))] \(label(for: turn))\n"
+            out += "\n[\(timestamp(turn.timestamp))] \(oneLine(label(for: turn)))\n"
             out += indent(turn.content)
         }
         out += "\n"
         return out
+    }
+
+    /// A value that can sit on one transcript line.
+    ///
+    /// The topic and a seat's display name are settable through the unauthenticated API and
+    /// were interpolated verbatim into a line-oriented format, so a value containing a newline
+    /// could forge a whole `[timestamp] NAME` entry in the exported log. Line breaks become
+    /// spaces and other control characters are dropped; the message body is left alone, since
+    /// a multi-line message is the point and `indent` already marks its continuations.
+    static func oneLine(_ value: String) -> String {
+        let flattened =
+            value
+            .replacingOccurrences(of: "\r\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+            .replacingOccurrences(of: "\n", with: " ")
+        var scalars = String.UnicodeScalarView()
+        for scalar in flattened.unicodeScalars where !CharacterSet.controlCharacters.contains(scalar) {
+            scalars.append(scalar)
+        }
+        return String(scalars)
     }
 
     /// Indent continuation lines so a multi-line message reads as one entry rather than as

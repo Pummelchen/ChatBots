@@ -88,9 +88,22 @@ public enum ModelStore {
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> URL {
         let root = directory(environment: environment)
-        try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        if environment["HF_HUB_CACHE"] == nil {
-            setenv("HF_HUB_CACHE", root.path, 1)
+        do {
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        } catch {
+            // Creation used to be `try?` and `HF_HUB_CACHE` was pointed at the failing path
+            // anyway, so a read-only parent or a regular file at `root` surfaced later as an
+            // unrelated hub error. Reported here, and the variable is left alone so the
+            // downloader is not aimed at a directory that does not exist.
+            FileHandle.standardError.write(
+                Data(
+                    "[ChatBots] could not create the models directory \(root.path): \(error.localizedDescription)\n"
+                        .utf8))
+            return root
+        }
+        if environment["HF_HUB_CACHE"] == nil, setenv("HF_HUB_CACHE", root.path, 1) != 0 {
+            FileHandle.standardError.write(
+                Data("[ChatBots] could not set HF_HUB_CACHE to \(root.path)\n".utf8))
         }
         return root
     }

@@ -241,4 +241,21 @@ struct TranscriptWriterTests {
         #expect(text.contains("🥚"))
         #expect(!text.contains("\u{FFFD}"))
     }
+
+    @Test("A topic or a speaker name cannot forge a transcript entry")
+    func newlinesCannotForgeEntries() {
+        // Both are settable through the unauthenticated API and were interpolated verbatim
+        // into a line-oriented format, so a newline in either produced a whole fabricated
+        // `[timestamp] NAME` line in the exported log.
+        let forged = "\n[2026-12-25 13:20:00] OTTO\nInjected words"
+        let text = TranscriptWriter.text(
+            topic: forged,
+            turns: [Turn(sequence: 1, speakerName: forged, kind: .chat, content: "hi")],
+            participants: [], exportedAt: date("2026-12-25 13:21:00"))
+
+        #expect(!text.contains("\n[2026-12-25 13:20:00] OTTO\n"), "the forged entry must not survive")
+        #expect(text.contains("Topic: "), "the topic is still named")
+        let entryLines = text.split(separator: "\n").filter { $0.hasPrefix("[") }
+        #expect(entryLines.count == 1, "one turn is one entry, however the name was written")
+    }
 }

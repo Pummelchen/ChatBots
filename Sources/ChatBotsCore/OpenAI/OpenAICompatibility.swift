@@ -174,6 +174,12 @@ public enum BuiltInKeys {
         let directory =
             root ?? ModelStore.projectRoot() ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         let url = directory.appending(path: secretsFileName)
+        // The file holds API keys, so the rule for it is the rule for the TLS key: owner-only.
+        // Nothing in this repository creates it, so it was whatever the user's umask made it —
+        // 0644 under the common 022. Restricted on read rather than refused: an unreadable
+        // secrets file is reported as "no key configured", which is a worse failure than a
+        // repaired mode.
+        restrictToThisUser(url)
         guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [:] }
 
         let normalised =
@@ -197,6 +203,32 @@ public enum BuiltInKeys {
             if !name.isEmpty { values[name] = value }
         }
         return values
+    }
+
+    /// Make a credential file readable only by its owner, when it is not already.
+    ///
+    /// Silent when the file is absent or already owner-only. `attributesOfItem` follows a
+    /// symlink, so a symlinked secrets file has its target restricted, which is the file that
+    /// would actually be read.
+    static func restrictToThisUser(_ url: URL) {
+        let manager = FileManager.default
+        guard manager.fileExists(atPath: url.path),
+            let attributes = try? manager.attributesOfItem(atPath: url.path),
+            let permissions = attributes[.posixPermissions] as? NSNumber,
+            permissions.intValue & 0o077 != 0
+        else { return }
+        do {
+            try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+            FileHandle.standardError.write(
+                Data(
+                    "[ChatBots] restricted \(url.lastPathComponent) to owner-only (0600); it holds API keys\n"
+                        .utf8))
+        } catch {
+            FileHandle.standardError.write(
+                Data(
+                    "[ChatBots] \(url.lastPathComponent) is readable by other users and could not be restricted: \(error.localizedDescription)\n"
+                        .utf8))
+        }
     }
 
     /// The key for a base URL, or nil when this app has none to offer.

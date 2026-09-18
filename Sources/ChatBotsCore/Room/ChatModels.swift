@@ -171,12 +171,19 @@ extension ThinkingMode {
     /// engine-agnostic model can answer it, and `MLXEngine.generationCap` delegates so the
     /// engine's own cap and `AgentSpec.generationCap` cannot disagree.
     public func generationCap(answerBudget: Int, contextWindow: Int?) -> Int {
+        // `answerBudget` and every headroom are `Int`, and a checkpoint's own declared context
+        // window is untrusted input. `MLXEngine.contextWindow(of:)` bounds that value, and this
+        // clamps the addition as well, so no pair of numbers can trap the process here.
+        func capped(_ headroom: Int) -> Int {
+            let (sum, overflow) = answerBudget.addingReportingOverflow(headroom)
+            return overflow ? Int.max : sum
+        }
         if let ceiling = reasoningTokenBudget {
-            return answerBudget + ceiling
+            return capped(ceiling)
         }
         let highHeadroom = ThinkingMode.high.reasoningTokenBudget ?? 0
-        guard let contextWindow, contextWindow > 0 else { return answerBudget + highHeadroom }
-        return answerBudget + max(highHeadroom, contextWindow)
+        guard let contextWindow, contextWindow > 0 else { return capped(highHeadroom) }
+        return capped(max(highHeadroom, contextWindow))
     }
 }
 

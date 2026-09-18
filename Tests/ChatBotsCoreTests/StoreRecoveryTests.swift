@@ -70,4 +70,54 @@ struct StoreRecoveryTests {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         #expect(ConversationStore(directory: directory).load().isEmpty)
     }
+
+    @Test("deleteAll removes a stranded temporary too, so deleted conversations do not return")
+    func deleteAllRemovesTheTemporary() throws {
+        let directory = freshDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode([storedRecord(topic: "deleted")])
+            .write(to: directory.appending(path: "conversations.json.tmp"))
+
+        let store = ConversationStore(directory: directory)
+        store.deleteAll()
+        // `readAll()` falls back to the temporary when the index is absent, so leaving it
+        // behind resurrected exactly what the caller deleted.
+        #expect(store.load().isEmpty, "a deleted conversation must not be resurrected")
+    }
+
+    @Test("A damaged temporary is reported as unreadable and is not overwritten")
+    func damagedTemporaryIsUnreadable() throws {
+        let directory = freshDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data("not json".utf8).write(to: directory.appending(path: "conversations.json.tmp"))
+
+        let store = ConversationStore(directory: directory)
+        #expect(store.load().isEmpty)
+        #expect(
+            store.isUnreadable,
+            "a temporary that cannot be decoded is damage, not an empty history")
+        #expect(
+            !store.save(storedRecord(topic: "x")),
+            "save must refuse rather than overwrite bytes it could not read")
+    }
+
+    @Test("A kept conversation and its directory are owner-only")
+    func historyIsOwnerOnly() throws {
+        let directory = freshDirectory()
+        let store = ConversationStore(directory: directory)
+        #expect(store.save(storedRecord(topic: "private")))
+
+        func permissions(_ path: String) -> Int {
+            let attributes = try? FileManager.default.attributesOfItem(atPath: path)
+            return (attributes?[.posixPermissions] as? NSNumber)?.intValue ?? 0
+        }
+        #expect(
+            permissions(directory.path) & 0o077 == 0,
+            "the history directory must not be group- or world-accessible")
+        #expect(
+            permissions(directory.appending(path: "conversations.json").path) & 0o077 == 0,
+            "a kept conversation is private and must be owner-only")
+    }
 }

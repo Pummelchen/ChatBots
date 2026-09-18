@@ -134,7 +134,8 @@ public struct ConversationStore: Sendable {
 
         do {
             try FileManager.default.createDirectory(
-                at: directory, withIntermediateDirectories: true)
+                at: directory, withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700])
             // The read-modify-write rebuilds the file from every record, so it must see the
             // records `load()` refuses to hand out. Reading through `load()` here dropped
             // anything from a newer format (and treated a corrupt file as empty) and then
@@ -187,6 +188,11 @@ public struct ConversationStore: Sendable {
         // truncated file where a conversation used to be.
         let temporary = directory.appending(path: "conversations.json.tmp")
         try data.write(to: temporary, options: .atomic)
+        // A kept conversation is a private transcript — the topic and everything said in it —
+        // so it is written owner-only, the same rule the TLS key follows. `Data.write` has no
+        // mode argument, so the mode is set immediately after.
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o600], ofItemAtPath: temporary.path)
         // One atomic step. This used to remove the index and then move the replacement into its
         // place, which left a window in which there was no index at all: a crash or a failed move
         // there lost every kept conversation, and the complete `.tmp` was never read back — so the
@@ -263,9 +269,10 @@ public struct ConversationStore: Sendable {
     /// `nil` means there is nothing usable there, which is the same as there being no file.
     private func readTemporary() -> [StoredConversation]? {
         let temporary = directory.appending(path: "conversations.json.tmp")
-        guard FileManager.default.fileExists(atPath: temporary.path),
-            let data = readIndex(temporary)
-        else { return [] }
+        guard FileManager.default.fileExists(atPath: temporary.path) else { return [] }
+        // A file that exists but cannot be read is damage, not an empty history: returning
+        // `[]` for it let `save` treat it as empty and overwrite the only copy.
+        guard let data = readIndex(temporary) else { return nil }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return try? decoder.decode([StoredConversation].self, from: data)
@@ -275,7 +282,12 @@ public struct ConversationStore: Sendable {
     ///
     /// A caller that cares about losing work can tell this apart from an empty history.
     public var isUnreadable: Bool {
-        guard FileManager.default.fileExists(atPath: indexURL.path) else { return false }
+        guard FileManager.default.fileExists(atPath: indexURL.path) else {
+            // The state `readTemporary()` exists for: no index, and a temporary that may be
+            // damaged. Without this the answer was `false` for exactly that case.
+            let temporary = directory.appending(path: "conversations.json.tmp")
+            return FileManager.default.fileExists(atPath: temporary.path) && readTemporary() == nil
+        }
         return readAll() == nil
     }
 
@@ -301,7 +313,20 @@ public struct ConversationStore: Sendable {
     }
 
     public func deleteAll() {
-        try? FileManager.default.removeItem(at: indexURL)
+        // Both files. `readAll()` falls back to the temporary when the index is absent, so
+        // removing only the index resurrected the conversations the caller deleted after an
+        // interrupted save. A failed removal is reported rather than swallowed.
+        let temporary = directory.appending(path: "conversations.json.tmp")
+        for url in [indexURL, temporary] where FileManager.default.fileExists(atPath: url.path) {
+            do {
+                try FileManager.default.removeItem(at: url)
+            } catch {
+                FileHandle.standardError.write(
+                    Data(
+                        "[ChatBots] could not remove \(url.lastPathComponent): \(error.localizedDescription)\n"
+                            .utf8))
+            }
+        }
     }
 }
 

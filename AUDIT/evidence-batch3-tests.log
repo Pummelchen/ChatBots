@@ -1,0 +1,153 @@
+Building for debugging...
+[Computing dependencies]
+[Using on-disk description]
+[1 / 2] swift-transformers_Hub
+[1 / 35] MLXOptimizers
+[2 / 17] ChatBotsCore
+[4 / 26]
+[11 / 26] ChatBotsCore
+[13 / 28] ChatBotsCore
+[19 / 34] ChatBotsCore
+[28 / 42] ChatBotsCore
+[32 / 49] ChatBotsCore-product
+[34 / 49] ChatBots
+[37 / 52] ChatBots
+[37 / 52] chatbots-cli-product
+[43 / 66] chatbots-probe-product
+[49 / 66] chatbots-cli-product
+[50 / 66] chatbots-cli-product
+[54 / 75] ChatBotsCoreTests-product
+[56 / 75] ChatBots
+[60 / 75] ChatBotsCoreTests-product
+[61 / 75] ChatBotsCoreTests-product
+[62 / 75] chatbots-cli-product
+[64 / 75] chatbots-cli-product
+[67 / 75] ChatBots
+[69 / 81] ChatBots-product
+[70 / 81] ChatBotsCoreTests-product
+[72 / 80] ChatBotsAppTests-product
+[75 / 81] ChatBotsCoreTests-product
+[75 / 81] ChatBotsAppTests-product
+[77 / 86] ChatBotsAppTests-product
+[79 / 86] ChatBotsAppTests-product
+[80 / 86] chatbots-cli-product
+[82 / 87] chatbots-probe-product
+[83 / 88] ChatBotsCoreTests-product
+[89 / 93] ChatBotsCoreTests-product
+[91 / 93] ChatBotsCoreTests-product
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+Build complete! (11,70 secs)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "The generation cap agrees with the engine" started.
+◇ Suite "Transcript export" started.
+◇ Test "Unlimited is never below high, whatever the context window" started.
+◇ Suite "Built-in keys" started.
+◇ Suite "Compaction follows the engine's context window" started.
+◇ Test "A condensation is recorded as replacing the history" started.
+◇ Test "A declared context window near Int.max cannot trap the cap arithmetic" started.
+◇ Suite "Saved conversations" started.
+◇ Test "Each message is stamped and attributed" started.
+◇ Test "A very long topic does not produce an unusable filename" started.
+◇ Test "The suggested filename is usable and carries the topic and a timestamp" started.
+◇ Test "An empty conversation still produces a readable file" started.
+◇ Test "The format does not follow the machine's region" started.
+◇ Test "A multi-line message stays one entry" started.
+◇ Test "The property is monotone across every level" started.
+◇ Suite "The store writes atomically and recovers a stranded temporary" started.
+◇ Test "The property and the engine helper are the same function" started.
+◇ Test "An empty topic still yields a filename" started.
+◇ Test "Timestamps use the requested format" started.
+◇ Test "A topic or a speaker name cannot forge a transcript entry" started.
+◇ Test "The setup brief is left out; it is not something anyone said" started.
+◇ Test "Every message appears exactly once, merged in one log" started.
+◇ Test "Tool traffic is kept, since it is part of what happened" started.
+◇ Test "Messages are in chronological order" started.
+◇ Test "The header names the topic and the participants" started.
+◇ Test "The export is valid UTF-8 that round-trips" started.
+◇ Test "With neither window set, the shared default is used" started.
+◇ Test "A missing secrets file is not an error" started.
+◇ Test "The threshold fires against the engine's window, not the spec's" started.
+➜ Test "A DeepSeek endpoint picks up a configured key without anyone typing one" skipped.
+◇ Test "The environment can override it, on a machine that sets one" started.
+◇ Test "A strict endpoint with no key is still reported as missing one" started.
+◇ Test "An empty stored key falls back rather than being sent as blank" started.
+◇ Test "The key is not sent anywhere else" started.
+◇ Test "A group- or world-readable secrets file is restricted to its owner on read" started.
+◇ Test "An engine that reports no window falls back to the spec's" started.
+◇ Test "A key the user typed always wins" started.
+◇ Test "The key is read from the gitignored file, not from the source" started.
+◇ Test "The key survives a settings round trip without being written in" started.
+◇ Test "A conversation is written and read back whole" started.
+◇ Test "Several conversations are listed newest first" started.
+◇ Test "Long conversations are kept, not truncated" started.
+◇ Test "A summary describes the conversation in one line" started.
+◇ Test "A corrupt file is reported as unreadable rather than as an empty history" started.
+◇ Test "An empty store reads as empty, not as broken" started.
+◇ Test "A conversation can be found by id and deleted" started.
+◇ Test "A record from a newer format is not handed back as if it were understood" started.
+◇ Test "Saving the same conversation twice updates it rather than duplicating" started.
+✔ Test "A declared context window near Int.max cannot trap the cap arithmetic" passed after 0.007 seconds.
+✔ Test "Unlimited is never below high, whatever the context window" passed after 0.007 seconds.
+◇ Test "deleteAll removes a stranded temporary too, so deleted conversations do not return" started.
+◇ Test "A damaged temporary is reported as unreadable and is not overwritten" started.
+◇ Test "A kept conversation and its directory are owner-only" started.
+◇ Test "A store a crash left with only its temporary file still loads" started.
+◇ Test "An empty directory is still an empty history, not a recovery" started.
+✔ Test "The property and the engine helper are the same function" passed after 0.007 seconds.
+✔ Test "The property is monotone across every level" passed after 0.007 seconds.
+◇ Test "A save leaves the index in place and no temporary file behind" started.
+✔ Test "Timestamps use the requested format" passed after 0.007 seconds.
+✔ Test "The format does not follow the machine's region" passed after 0.007 seconds.
+✔ Test "An empty conversation still produces a readable file" passed after 0.007 seconds.
+✔ Test "The suggested filename is usable and carries the topic and a timestamp" passed after 0.007 seconds.
+✔ Test "A very long topic does not produce an unusable filename" passed after 0.007 seconds.
+✔ Test "A topic or a speaker name cannot forge a transcript entry" passed after 0.007 seconds.
+✔ Test "An empty topic still yields a filename" passed after 0.007 seconds.
+✔ Test "A multi-line message stays one entry" passed after 0.007 seconds.
+✔ Test "The setup brief is left out; it is not something anyone said" passed after 0.009 seconds.
+[ChatBots] restricted .secrets.env to owner-only (0600); it holds API keys
+[ChatBots] restricted .secrets.env to owner-only (0600); it holds API keys
+✔ Test "A condensation is recorded as replacing the history" passed after 0.011 seconds.
+✔ Test "The environment can override it, on a machine that sets one" passed after 0.009 seconds.
+✔ Test "A missing secrets file is not an error" passed after 0.009 seconds.
+✔ Test "A strict endpoint with no key is still reported as missing one" passed after 0.009 seconds.
+✔ Test "The key is not sent anywhere else" passed after 0.009 seconds.
+✔ Test "An empty stored key falls back rather than being sent as blank" passed after 0.009 seconds.
+✔ Test "A key the user typed always wins" passed after 0.008 seconds.
+✔ Test "Every message appears exactly once, merged in one log" passed after 0.012 seconds.
+✔ Test "The key survives a settings round trip without being written in" passed after 0.008 seconds.
+✔ Test "Each message is stamped and attributed" passed after 0.012 seconds.
+✔ Test "The header names the topic and the participants" passed after 0.012 seconds.
+✔ Test "Messages are in chronological order" passed after 0.012 seconds.
+✔ Test "A summary describes the conversation in one line" passed after 0.005 seconds.
+✔ Test "A conversation is written and read back whole" passed after 0.008 seconds.
+✔ Test "A corrupt file is reported as unreadable rather than as an empty history" passed after 0.005 seconds.
+✔ Test "An empty store reads as empty, not as broken" passed after 0.005 seconds.
+✔ Test "Tool traffic is kept, since it is part of what happened" passed after 0.012 seconds.
+✔ Test "The export is valid UTF-8 that round-trips" passed after 0.012 seconds.
+✔ Suite "The generation cap agrees with the engine" passed after 0.012 seconds.
+✔ Test "A record from a newer format is not handed back as if it were understood" passed after 0.005 seconds.
+✔ Test "The key is read from the gitignored file, not from the source" passed after 0.009 seconds.
+✔ Test "deleteAll removes a stranded temporary too, so deleted conversations do not return" passed after 0.005 seconds.
+✔ Test "A damaged temporary is reported as unreadable and is not overwritten" passed after 0.005 seconds.
+✔ Test "An empty directory is still an empty history, not a recovery" passed after 0.005 seconds.
+✔ Test "A store a crash left with only its temporary file still loads" passed after 0.005 seconds.
+✔ Test "With neither window set, the shared default is used" passed after 0.009 seconds.
+✔ Test "A group- or world-readable secrets file is restricted to its owner on read" passed after 0.009 seconds.
+✔ Suite "Transcript export" passed after 0.012 seconds.
+✔ Suite "Built-in keys" passed after 0.012 seconds.
+✔ Test "A kept conversation and its directory are owner-only" passed after 0.005 seconds.
+✔ Test "Long conversations are kept, not truncated" passed after 0.006 seconds.
+✔ Test "A save leaves the index in place and no temporary file behind" passed after 0.009 seconds.
+✔ Suite "The store writes atomically and recovers a stranded temporary" passed after 0.017 seconds.
+✔ Test "Several conversations are listed newest first" passed after 0.010 seconds.
+✔ Test "Saving the same conversation twice updates it rather than duplicating" passed after 0.011 seconds.
+✔ Test "A conversation can be found by id and deleted" passed after 0.011 seconds.
+✔ Suite "Saved conversations" passed after 0.018 seconds.
+✔ Test "An engine that reports no window falls back to the spec's" passed after 0.066 seconds.
+✔ Test "The threshold fires against the engine's window, not the spec's" passed after 0.067 seconds.
+✔ Suite "Compaction follows the engine's context window" passed after 0.070 seconds.
+✔ Test run with 48 tests in 6 suites passed after 0.070 seconds.
+EXIT=0

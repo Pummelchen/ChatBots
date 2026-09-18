@@ -254,11 +254,19 @@ public actor MLXEngine: LLMEngine {
             let nested = (textConfig?[key] as? NSNumber)?.intValue
             let flat = (root[key] as? NSNumber)?.intValue
             if let value = nested ?? flat, value > 0 {
-                return value
+                // Bounded where it is read. The value travels with the checkpoint, and it
+                // flows into `ThinkingMode.generationCap` as an `Int` addition; a config
+                // declaring a value near `Int.max` overflowed it and trapped on the first
+                // turn. A million tokens is past anything this app can run, so the bound
+                // costs nothing real.
+                return min(value, Self.maximumContextWindow)
             }
         }
         return nil
     }
+
+    /// The largest context window a checkpoint's `config.json` may declare.
+    public static let maximumContextWindow = 1_048_576
 
     // MARK: - Generation
 
