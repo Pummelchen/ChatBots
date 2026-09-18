@@ -70,6 +70,22 @@ accepted because the alternative is no encrypted local channel at all, and becau
 that can run as you can read the engine's files directly. See the comment at the top of
 `Sources/ChatBotsCore/Transport/WebTransportClient.swift`.
 
+**What answers that gap is a per-run session token.** The engine writes 32 random bytes to
+`session-token` in its run directory — mode 0600, written before either transport accepts a
+connection — and answers a transport-only `identify` request with them. Before the app connects, and
+before it sends a single seat's API key from the Keychain, it reads that file and requires the engine
+to echo what it read. An engine that cannot is not adopted and is sent no key; the window shows why.
+The token deliberately does not exist on the HTTP API: there is no route that asks for it and no
+snapshot carries it, so the unauthenticated web surface cannot learn it even by asking — which is what
+makes the control usable on a build whose web side is LAN-reachable by design.
+
+**What the token does not do.** The file is 0600 but readable by anything running as you, so this
+closes the window in which a process takes the port *before* the engine starts — it does not make a
+same-user attacker impossible, and it should not be read as doing so. A token also survives an engine
+killed with SIGKILL, because only the graceful shutdown path removes it; the app does not clear it
+before launching, since that would race a second instance mid-start. Both limits were recorded with
+the finding (AUDIT-0058) rather than left implicit.
+
 ## Keys
 
 * **No key is compiled into this repository, and none may be.** A key in the source is a key in
