@@ -55,3 +55,31 @@ different object set, and this log does not claim otherwise.
 
 The clone (`/tmp/chatbots-phase-e`), the bundle and the gate log were removed from the host after the
 log was copied back. Nothing outside `/tmp` was written.
+
+## Re-run at the final commit
+
+The tree changed after the first run — `SECURITY.md`, the audit records, and the AUDIT-0058 session
+token — so the gate was run again rather than leaving the earlier pass as the last word. Same method,
+same host:
+
+```
+cloned HEAD: aa7a942bcc125f3cdecea1f057bb93b291bbbd16   (git rev-parse HEAD, local, matched)
+npm ci: ok
+...
+PASS  file sizes: every code file is within 500 lines
+PASS  build: swift build --build-tests
+PASS  tests: 1102 tests in 201 suites
+PASS  swiftlint: no findings under --strict
+PASS  swift-format: no diagnostics under --strict
+PASS  web: deltas merge (34 cases)
+PASS  web: the verdict rule (12 cases)
+PASS  eslint: web/ and the web check scripts
+PASS  prettier: web/ and the web check scripts
+PASS  identity: 1.0 is stated once and agrees everywhere
+All 9 Mac-only gates passed.  GATE_EXIT=0
+```
+
+`1102 tests in 201 suites` is the same count the primary host reports for this commit, so the session
+token and its 16 new tests behave identically on the second machine. The raw log is
+`AUDIT/evidence-phase-e-final-macbook-ab.log`. The clone, the bundle and the logs were removed from
+the host again, and the credential file was removed locally.
