@@ -67,7 +67,11 @@ that can run as you can read the engine's files directly. See the comment at the
   `TavilyKeyTests` now fails if a key appears in `TavilyClient.swift` again.
 * Keys are read from the environment (`TAVILY_API_KEY`, `DEEPSEEK_API_KEY`) or from
   `.secrets.env` at the project root. That file is gitignored and must never be committed.
-* The engine's TLS private key lives in `.run/`, which is also gitignored.
+* The engine's TLS private key lives in the runtime directory: `.run/` in a checkout, and
+  `~/Library/Application Support/ChatBots/` for an installed build, which is where the released
+  app runs from. Both are private to the user and neither is committed. `RunDirectory.resolve`
+  is the one answer to which one applies, and it chooses `.run` only when the directory really
+  holds a `Package.swift` — so this bullet used to be wrong for exactly the shipped case.
 
 ## Supported versions
 

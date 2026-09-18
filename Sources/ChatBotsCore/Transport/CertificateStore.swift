@@ -104,9 +104,11 @@ public enum CertificateStore {
 
     /// Load the identity, generating it if this is the first run.
     ///
-    /// - Parameter directory: where to keep it. Defaults to the project's `.run`, which is
-    ///   gitignored, so a developer's identity is never committed and two checkouts do not
-    ///   fight over one file.
+    /// - Parameter directory: where to keep it. Required rather than defaulted: the caller is the
+    ///   only thing that knows whether this process is a checkout, which uses `.run`, or an
+    ///   installed build, which uses `~/Library/Application Support/ChatBots`. `RunDirectory` is
+    ///   that one answer. Either way the directory is private to the user, so a developer's
+    ///   identity is never committed and two checkouts do not fight over one file.
     public static func loadOrCreate(
         in directory: URL,
         hostnames: [String] = ["localhost", "127.0.0.1", "::1"],
