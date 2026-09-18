@@ -327,7 +327,15 @@ public struct OpenAIResponsesClient: Sendable {
             guard
                 let event = try? JSONSerialization.jsonObject(with: Data(payload.utf8))
                     as? [String: Any]
-            else { continue }
+            else {
+                // The Responses API's `data:` payloads are JSON. A line that is not is a
+                // protocol violation, and dropping it silently meant a stream could lose
+                // events and still finish with a well-formed `response.completed`, so a
+                // partial answer was indistinguishable from a whole one.
+                sawFailure = true
+                continuation.yield(.failed("the stream carried an event that could not be read"))
+                break readLoop
+            }
 
             let type = event["type"] as? String ?? ""
             switch type {

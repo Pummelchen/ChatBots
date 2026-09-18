@@ -136,6 +136,9 @@ extension MLXEngine {
         /// the Qwen tool protocol below correct.
         var round = 0
         let maxToolRounds = 3
+        /// Tool calls already dispatched this turn, across every round, so the per-turn cap is
+        /// enforced cumulatively rather than per round.
+        var dispatchedToolCalls = 0
 
         // Nested functions capture their context by reference, which the compiler
         // correctly refuses to send across `await`. Returning the segment and folding
@@ -246,9 +249,13 @@ extension MLXEngine {
             round += 1
 
             // Every call is run first and the prompt entries are framed once they all have an
-            // outcome, so the framing cannot be left half-built if one of them throws.
+            // outcome, so the framing cannot be left half-built if one of them throws. Only the
+            // calls inside the per-turn cap run: `roundAdvance` bounds the rounds, not the calls
+            // a round may carry, and the search budget is checked once before the turn.
             var dispatched: [DispatchedCall] = []
-            for call in toolCalls {
+            let selection = Self.toolCallsWithinBudget(
+                toolCalls, alreadyDispatched: dispatchedToolCalls)
+            for call in selection.run {
                 let name = call.function.name
                 let argument = Self.argumentString(of: call)
                 await reportToolCall(name, argument)
@@ -260,7 +267,11 @@ extension MLXEngine {
                 )
                 dispatched.append(DispatchedCall(call: call, outcome: outcome))
             }
+            dispatchedToolCalls += selection.run.count
             Self.appendToolRound(&entries, dispatched: dispatched)
+            // A model that asked for more calls than the cap allows gets no further round: the
+            // cap exists to bound the spend, and the excess calls are dropped, not queued.
+            if selection.truncated { break rounds }
         }
 
         let scrubbed = Self.stripFabricatedToolSyntax(answer)

@@ -1,0 +1,149 @@
+Building for debugging...
+[Computing dependencies]
+[Using on-disk description]
+[1 / 1]
+[1 / 7] ChatBotsCore
+[1 / 40] mlx-swift_Cmlx
+[2 / 18] ChatBotsCore
+[7 / 23] ChatBotsCore
+[9 / 25] ChatBotsCore
+[18 / 32] ChatBotsCore
+[22 / 40] chatbots-probe-product
+[24 / 40] ChatBots
+[26 / 41] ChatBots
+[26 / 41] chatbots-probe-product
+[27 / 43] chatbots-probe-product
+[32 / 43] ChatBots
+[35 / 44] ChatBotsCoreTests-product
+[35 / 45] ChatBotsCoreTests-product
+[42 / 52] chatbots-cli-product
+[42 / 54] chatbots-cli-product
+[43 / 54] ChatBots-product
+[45 / 56] ChatBotsCoreTests-product
+[47 / 55] ChatBotsCoreTests-product
+[49 / 56] ChatBotsAppTests-product
+[50 / 56] ChatBotsAppTests-product
+[52 / 61] ChatBotsCoreTests-product
+[54 / 61] ChatBotsAppTests-product
+[57 / 62] chatbots-probe-product
+[58 / 63] ChatBotsCoreTests-product
+[64 / 68] ChatBotsCoreTests-product
+[66 / 68] ChatBotsCoreTests-product
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+Build complete! (11,04 secs)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "A turn runs only the tools its caller offered" started.
+◇ Suite "The turn loop runs on a stubbed model" started.
+◇ Suite "A restarted conversation keeps its new loop" started.
+◇ Suite "An unloaded seat still behaves" started.
+◇ Suite "Turn-loop rules without a model" started.
+◇ Test "The registry chooses the instance for an offered name" started.
+◇ Test "A caller-supplied tool runs even when the registry has never heard of it" started.
+◇ Suite "A research session end to end" started.
+◇ Suite "The MLX gate serialises access" started.
+◇ Test "A failing offered tool is reported to the model rather than thrown" started.
+◇ Test "An empty offer is empty, which is what suppresses the tool specs" started.
+◇ Test "A fresh seat reports its spec and is not loaded" started.
+◇ Test "An offered tool runs" started.
+◇ Test "Offering one tool does not make another reachable" started.
+◇ Test "Unloading an unloaded seat reports idle" started.
+◇ Test "Attachments keep only what the engine can actually use" started.
+◇ Test "A tool the caller did not offer is refused, even when the registry holds it" started.
+◇ Test "Live changes move currentSpec and leave spec alone" started.
+◇ Test "Engine state reports readiness only for ready" started.
+◇ Test "A seat built with one engine answers on either backend" started.
+◇ Test "Tool rounds are bounded, whatever the model keeps asking for" started.
+◇ Test "The reasoning ceiling ends the turn and fails it with no answer" started.
+◇ Test "Prompt assembly sends the opening messages unchanged, in order" started.
+◇ Test "A call for a tool the turn did not offer is refused, not run" started.
+◇ Test "A round with no info event still reports honest statistics" started.
+◇ Test "The round's parameters mirror the turn's settings" started.
+◇ Test "Fabricated tool syntax is stripped and the speaker tag removed" started.
+◇ Test "A cancelled predecessor does not clear the replacement's task reference" started.
+◇ Test "Reasoning with no answer is reported as having spent the budget" started.
+◇ Test "Stop after a restart stops the loop that is actually running" started.
+◇ Test "The reported stats come from the round's info event" started.
+◇ Test "A tool round is framed as the template requires, and callable again" started.
+◇ Test "The session starts with the configured budget" started.
+◇ Test "Images ride on the last user entry of the first round only" started.
+◇ Test "A budget can be chosen before the run" started.
+◇ Test "The moderator writes the report, and is told it is organising rather than adding" started.
+◇ Test "The session stops at its round budget and a report is produced" started.
+◇ Test "A convergence stop produces a report too, and says why" started.
+◇ Test "The report is logged as its own kind of turn, not as a contribution" started.
+◇ Test "The budget cannot be changed once the investigation has started" started.
+◇ Test "The report reaches the API snapshot, with its warnings" started.
+◇ Test "Entertainment starts no session, because it has no end condition" started.
+◇ Test "The report says how far the investigation went and why it stopped" started.
+✔ Test "The registry chooses the instance for an offered name" passed after 0.001 seconds.
+✔ Test "A caller-supplied tool runs even when the registry has never heard of it" passed after 0.001 seconds.
+[ChatBots] Agent 1 stripped 2 line(s) of fabricated tool syntax from the answer
+◇ Test "Only decodable images reach the engine" started.
+◇ Test "A finished turn reports at most the failures it earned, in order" started.
+◇ Test "The model's tool spec carries the provider's own description" started.
+◇ Test "Statistics are derived from the info event" started.
+◇ Test "A stray delimiter or echoed speaker tag is removed from the answer" started.
+◇ Test "The stop reason is reported as the template's own word" started.
+◇ Test "One turn dispatches at most the per-turn tool-call cap" started.
+◇ Test "Two exclusive bodies never overlap" started.
+◇ Test "A throwing body still releases the gate" started.
+◇ Test "Exclusive access returns what the body returned" started.
+✔ Test "Offering one tool does not make another reachable" passed after 0.001 seconds.
+✔ Test "An offered tool runs" passed after 0.001 seconds.
+✔ Test "A tool the caller did not offer is refused, even when the registry holds it" passed after 0.001 seconds.
+✔ Test "Unloading an unloaded seat reports idle" passed after 0.001 seconds.
+✔ Test "An empty offer is empty, which is what suppresses the tool specs" passed after 0.001 seconds.
+✔ Test "The round's parameters mirror the turn's settings" passed after 0.001 seconds.
+✔ Test "Engine state reports readiness only for ready" passed after 0.001 seconds.
+✔ Test "A failing offered tool is reported to the model rather than thrown" passed after 0.001 seconds.
+✔ Test "A round with no info event still reports honest statistics" passed after 0.001 seconds.
+◇ Test "The tool round is framed as assistant calls, results, then a user turn" started.
+✔ Test "Prompt assembly sends the opening messages unchanged, in order" passed after 0.001 seconds.
+✔ Test "A call for a tool the turn did not offer is refused, not run" passed after 0.001 seconds.
+✔ Test "Fabricated tool syntax is stripped and the speaker tag removed" passed after 0.001 seconds.
+✔ Test "Reasoning with no answer is reported as having spent the budget" passed after 0.001 seconds.
+✔ Test "Tool rounds are bounded, whatever the model keeps asking for" passed after 0.001 seconds.
+✔ Test "The reasoning ceiling ends the turn and fails it with no answer" passed after 0.001 seconds.
+✔ Test "A fresh seat reports its spec and is not loaded" passed after 0.002 seconds.
+✔ Test "Live changes move currentSpec and leave spec alone" passed after 0.001 seconds.
+✔ Test "A seat built with one engine answers on either backend" passed after 0.002 seconds.
+✔ Test "The reported stats come from the round's info event" passed after 0.001 seconds.
+✔ Test "A tool round is framed as the template requires, and callable again" passed after 0.001 seconds.
+✔ Test "Images ride on the last user entry of the first round only" passed after 0.001 seconds.
+✔ Test "A stray delimiter or echoed speaker tag is removed from the answer" passed after 0.001 seconds.
+✔ Test "The model's tool spec carries the provider's own description" passed after 0.001 seconds.
+✔ Test "Statistics are derived from the info event" passed after 0.001 seconds.
+✔ Test "A finished turn reports at most the failures it earned, in order" passed after 0.001 seconds.
+✔ Test "The stop reason is reported as the template's own word" passed after 0.001 seconds.
+✔ Suite "A turn runs only the tools its caller offered" passed after 0.002 seconds.
+✔ Test "One turn dispatches at most the per-turn tool-call cap" passed after 0.001 seconds.
+✔ Test "The tool round is framed as assistant calls, results, then a user turn" passed after 0.001 seconds.
+✔ Test "A throwing body still releases the gate" passed after 0.001 seconds.
+✔ Test "Exclusive access returns what the body returned" passed after 0.001 seconds.
+✔ Suite "The turn loop runs on a stubbed model" passed after 0.002 seconds.
+✔ Test "A budget can be chosen before the run" passed after 0.003 seconds.
+✔ Test "The session starts with the configured budget" passed after 0.003 seconds.
+[ChatBots] Agent 1 could not read the attached image broken.png
+✔ Test "Only decodable images reach the engine" passed after 0.009 seconds.
+✔ Suite "Turn-loop rules without a model" passed after 0.011 seconds.
+[ChatBots] Agent 1 could not read the attached image broken.png
+✔ Test "Attachments keep only what the engine can actually use" passed after 0.011 seconds.
+✔ Suite "An unloaded seat still behaves" passed after 0.011 seconds.
+✔ Test "Two exclusive bodies never overlap" passed after 0.024 seconds.
+✔ Suite "The MLX gate serialises access" passed after 0.026 seconds.
+✔ Test "Entertainment starts no session, because it has no end condition" passed after 0.027 seconds.
+✔ Test "The report is logged as its own kind of turn, not as a contribution" passed after 0.028 seconds.
+✔ Test "A convergence stop produces a report too, and says why" passed after 0.028 seconds.
+✔ Test "The session stops at its round budget and a report is produced" passed after 0.028 seconds.
+✔ Test "The report says how far the investigation went and why it stopped" passed after 0.028 seconds.
+✔ Test "The budget cannot be changed once the investigation has started" passed after 0.032 seconds.
+✔ Test "The report reaches the API snapshot, with its warnings" passed after 0.032 seconds.
+✔ Test "The moderator writes the report, and is told it is organising rather than adding" passed after 0.032 seconds.
+✔ Suite "A research session end to end" passed after 0.032 seconds.
+✔ Test "A cancelled predecessor does not clear the replacement's task reference" passed after 0.235 seconds.
+✔ Test "Stop after a restart stops the loop that is actually running" passed after 0.438 seconds.
+✔ Suite "A restarted conversation keeps its new loop" passed after 0.438 seconds.
+✔ Test run with 47 tests in 7 suites passed after 0.439 seconds.
+EXIT=0

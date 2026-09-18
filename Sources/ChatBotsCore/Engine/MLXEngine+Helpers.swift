@@ -36,6 +36,27 @@ extension MLXEngine {
         case endTurn
     }
 
+    /// The most tool calls one turn may dispatch, across every round.
+    ///
+    /// `roundAdvance`'s `maxToolRounds` bounds the *rounds*, not the calls: one round dispatches
+    /// every call the model emitted in that round, so a model that emits a hundred
+    /// `<tool_call>` blocks while search budget remains spends a hundred billed calls in a
+    /// single turn. The budget is only consulted before a turn starts, so this is the missing
+    /// half of the bound. Eight is more than any legitimate research turn has needed (the
+    /// offered tool set has two entries and three rounds).
+    public static let maximumToolCallsPerTurn = 8
+
+    /// The calls one round may dispatch, given how many this turn has already run.
+    ///
+    /// Pure so the per-turn bound is testable without weights, like the other turn-loop rules.
+    public static func toolCallsWithinBudget<C: Collection>(
+        _ calls: C, alreadyDispatched: Int
+    ) -> (run: [C.Element], truncated: Bool) {
+        let room = max(0, maximumToolCallsPerTurn - alreadyDispatched)
+        let run = Array(calls.prefix(room))
+        return (run, run.count < calls.count)
+    }
+
     /// Whether a finished round may run the tool calls it collected.
     ///
     /// A round the reasoning ceiling abandoned ends the turn whatever fragments arrived: a

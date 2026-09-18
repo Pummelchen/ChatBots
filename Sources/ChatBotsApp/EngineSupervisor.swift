@@ -110,6 +110,11 @@ public final class EngineSupervisor: ObservableObject {
         // can take a while and giving up early would look like a failure.
         let deadline = ContinuousClock.now.advanced(by: configuration.startupTimeout)
         while ContinuousClock.now < deadline {
+            // A cancelled window must stop the loop, not become a hot spin: `try?` discarded
+            // the CancellationError, `Task.sleep` then returned immediately, and the 400 ms
+            // pacing was gone — a continuous probe for the whole startup budget that finished
+            // by overwriting the `.idle` that shutdown() had set.
+            if Task.isCancelled { return }
             if await isEngineAnswering() {
                 state = .running(owned: true)
                 return
@@ -123,7 +128,11 @@ public final class EngineSupervisor: ObservableObject {
                     """)
                 return
             }
-            try? await Task.sleep(for: .milliseconds(400))
+            do {
+                try await Task.sleep(for: .milliseconds(400))
+            } catch {
+                return
+            }
         }
 
         // Stop the child, then report the failure — in that order.
@@ -201,8 +210,11 @@ public final class EngineSupervisor: ObservableObject {
             }
         }
 
-        candidates.append(URL(fileURLWithPath: "/usr/local/bin/chatbots-cli"))
-
+        // The fixed-path fallback was removed. `/usr/local/bin` is writable by an administrator
+        // and by anything running as one, and the app execs whatever it finds there with the
+        // user's whole environment — including any exported API keys — and then sends it every
+        // seat key over the wire. The bundled helper is the supported path; a hand-assembled
+        // copy gets the "could not be found" message, which names `tools/make-app.sh`.
         return candidates.first { manager.isExecutableFile(atPath: $0.path) }
     }
 
@@ -271,8 +283,15 @@ public final class EngineSupervisor: ObservableObject {
     /// different processes. Three seconds of patience is cheaper than that.
     private func isEngineAnswering(attempts: Int = 3) async -> Bool {
         for attempt in 0..<attempts {
+            if Task.isCancelled { return false }
             if await probeEngine() { return true }
-            if attempt < attempts - 1 { try? await Task.sleep(for: .milliseconds(500)) }
+            if attempt < attempts - 1 {
+                do {
+                    try await Task.sleep(for: .milliseconds(500))
+                } catch {
+                    return false
+                }
+            }
         }
         return false
     }

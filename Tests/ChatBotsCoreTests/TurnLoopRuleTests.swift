@@ -141,6 +141,30 @@ struct TurnLoopRuleTests {
         let images = MLXEngine.usableImages(from: [good, text, undecodable], specID: seat.id)
         #expect(images == [TurnLoopHarness.tinyPNG], "the document is ignored and the broken image is dropped")
     }
+
+    @Test("One turn dispatches at most the per-turn tool-call cap")
+    func toolCallsAreCappedPerTurn() {
+        // `roundAdvance` bounds the rounds, not the calls a round may carry, and the search
+        // budget is checked once before the turn — so one model response could spend an
+        // unbounded number of billed calls. The cap is enforced across the whole turn.
+        let many = Array(1...20)
+        let first = MLXEngine.toolCallsWithinBudget(many, alreadyDispatched: 0)
+        #expect(first.run.count == MLXEngine.maximumToolCallsPerTurn)
+        #expect(first.truncated)
+
+        let partway = MLXEngine.toolCallsWithinBudget(many, alreadyDispatched: 6)
+        #expect(partway.run.count == 2)
+        #expect(partway.truncated)
+
+        let spent = MLXEngine.toolCallsWithinBudget(
+            many, alreadyDispatched: MLXEngine.maximumToolCallsPerTurn)
+        #expect(spent.run.isEmpty)
+        #expect(spent.truncated, "a turn that has spent the cap is refused another call")
+
+        let roomy = MLXEngine.toolCallsWithinBudget([1, 2], alreadyDispatched: 0)
+        #expect(roomy.run == [1, 2])
+        #expect(!roomy.truncated, "a turn inside the cap is not truncated")
+    }
 }
 
 // MARK: - The seat's own surface

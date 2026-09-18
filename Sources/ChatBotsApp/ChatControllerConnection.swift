@@ -34,9 +34,18 @@ extension ChatController {
                 break
             } catch {
                 lastError = error.localizedDescription
-                try? await Task.sleep(for: .milliseconds(400 * (attempt + 1)))
+                // Cancellation stops the retry: `try?` swallowed it, so the remaining attempts
+                // ran back to back with no delay and could still install the client — and start
+                // its pumps — after the view was gone.
+                if Task.isCancelled { return }
+                do {
+                    try await Task.sleep(for: .milliseconds(400 * (attempt + 1)))
+                } catch {
+                    return
+                }
             }
         }
+        guard !Task.isCancelled else { return }
         guard client.isConnected else {
             // A client that never connected is not a connection, so it is not stored: `client != nil`
             // has to keep meaning "there is an engine to talk to". Storing it meant the seat endpoints

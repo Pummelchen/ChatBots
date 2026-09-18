@@ -98,11 +98,31 @@ extension ChatController {
             return false
         }
         do {
-            _ = try await client.send(request)
+            let reply = try await client.send(request)
+            // A refusal is a normal reply, not a thrown error — only `.failed` throws — so
+            // returning `true` here reported a rejected command as accepted: the moderator's
+            // draft was cleared and a refused checkpoint was shown as applied, and the reason
+            // was discarded. The reason is surfaced instead, and the caller keeps its state.
+            if let refusal = Self.refusalReason(in: reply) {
+                engineConnection = refusal
+                return false
+            }
             return true
         } catch {
             engineConnection = error.localizedDescription
             return false
+        }
+    }
+
+    /// The reason a reply means the command was not carried out, or nil when it was.
+    ///
+    /// `.refused` is a well-formed command the engine chose not to perform, and `.failed` is the
+    /// engine saying why it could not answer; both must leave the caller's state alone. Pure, so
+    /// the rule is testable without a transport.
+    static func refusalReason(in reply: EngineReply) -> String? {
+        switch reply {
+        case .refused(let reason), .failed(let reason): return reason
+        default: return nil
         }
     }
 

@@ -126,6 +126,31 @@ struct ClientsStreamTests {
         #expect(failures == ["the model crashed"])
     }
 
+    @Test("An unreadable event fails the stream instead of being skipped")
+    func unreadableEventFailsTheStream() async throws {
+        // `data:` payloads are JSON. A line that is not used to be dropped with `continue`, so
+        // a stream could lose events and still finish on a well-formed `response.completed`,
+        // making a partial answer indistinguishable from a whole one.
+        let server = try await ScriptedOpenAIServer(
+            responsesBody: sse([
+                "not json at all",
+                sseTextDelta("partial"),
+                sseCompleted(inputTokens: 1, outputTokens: 1),
+                "[DONE]",
+            ]))
+        defer { server.stop() }
+        let client = OpenAIResponsesClient(endpoint: scriptedEndpoint(port: server.port))
+
+        var failures: [String] = []
+        for try await event in client.stream(request()) {
+            if case .failed(let message) = event { failures.append(message) }
+        }
+        #expect(failures.count == 1, "an unreadable event is reported, not skipped")
+        #expect(
+            failures.first?.contains("could not be read") == true,
+            "and it says what was wrong: \(failures)")
+    }
+
     /// An empty answer must fail the turn rather than finish it.
     ///
     /// The engine emitted `turnFailed` and then `turnFinished` unconditionally, and the orchestrator
