@@ -199,6 +199,23 @@ public final class EngineService {
                 return .refused("no seat called \(change.seatID)")
             }
             var spec = engine.specs[index]
+            // The checkpoint is decided first, because it is the one field that replaces an engine
+            // rather than editing one and the only field that can be refused: `setModel` holds the
+            // rule about when that is allowed. Applying the other fields first and returning
+            // `.refused` afterwards left the seat renamed by a request that reported it had changed
+            // nothing — against this method's own rule that a change which could not be made is
+            // never reported as one that was.
+            if let modelID = change.modelID {
+                let resolved = ModelCatalog.resolve(modelID)
+                guard !resolved.isEmpty else { return .refused("a model is required") }
+                if resolved != spec.modelID, !engine.setModel(resolved, for: spec.id) {
+                    return .refused("the model cannot be changed while a turn is in flight")
+                }
+                // `setModel` rewrites the seat's own spec — the short name and the sampling
+                // parameters are derived from the checkpoint — so the local copy is re-read
+                // rather than kept, which would write the pre-change values back.
+                spec = engine.specs[index]
+            }
             // Only what was asked for. A nil field means "leave it", so renaming a seat
             // cannot reset its persona.
             if let name = change.name, !name.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -211,17 +228,6 @@ public final class EngineService {
             if let model = change.apiModel { spec.openAI.model = model }
             if let key = change.apiKey { spec.openAI.apiKey = key }
             engine.updateSeat(spec)
-            // The checkpoint last, because it is the one field that replaces an engine rather than
-            // editing one: `setModel` holds the rule about when that is allowed, so it is stated
-            // once. A refusal here is an answer — a change that could not be made is never reported
-            // as one that was.
-            if let modelID = change.modelID {
-                let resolved = ModelCatalog.resolve(modelID)
-                guard !resolved.isEmpty else { return .refused("a model is required") }
-                if resolved != spec.modelID, !engine.setModel(resolved, for: spec.id) {
-                    return .refused("the model cannot be changed while a turn is in flight")
-                }
-            }
             return .state(snapshot())
 
         // ── Attachments ──────────────────────────────────────────────────────────────

@@ -35,6 +35,11 @@ struct Options {
     /// Whether `--transport` was actually given, so a value that cannot take effect is refused
     /// rather than silently accepted.
     var transportSpecified = false
+    /// Whether `--port` was actually given, so a value no listener will use is refused rather than
+    /// silently accepted.
+    var portSpecified = false
+    /// Whether `--share-base` was actually given, for the same reason.
+    var shareBaseSpecified = false
     var transportPort: UInt16 = 7790
     var serve = false
     var mode = DiscussionMode.entertainment
@@ -169,7 +174,16 @@ struct Options {
                 }
                 options.transportPort = value
             case "--serve": options.serve = true
-            case "--attach": options.attachments.append(next() ?? "")
+            case "--attach":
+                // A missing value used to append an empty path, which then failed at read time with
+                // a message about a file nobody had named; a following flag was taken as the path.
+                // Refused here, where the cause is known. A path that really begins with `--` can
+                // be written `./--name`.
+                let attachRaw = next() ?? ""
+                guard !attachRaw.isEmpty, !attachRaw.hasPrefix("--") else {
+                    reject("invalid attachment path", attachRaw, expected: "a file path")
+                }
+                options.attachments.append(attachRaw)
             case "--seed": options.seed = true
             case "--research":
                 let raw = next() ?? ""
@@ -202,6 +216,7 @@ struct Options {
                     reject("invalid port", portRaw, expected: "1–65535")
                 }
                 options.port = value
+                options.portSpecified = true
             case "--share-base":
                 // Where a share link should point. The engine can only know its own loopback port,
                 // and the phone the share feature exists for needs the address the website is
@@ -213,6 +228,7 @@ struct Options {
                     reject("invalid share base", baseRaw, expected: "a URL like http://192.168.1.5:7788")
                 }
                 options.shareBase = baseRaw
+                options.shareBaseSpecified = true
             case "--compact-threshold":
                 // A nil here left the engine's own 0.7 in place, silently. The value is a
                 // fraction of the context window, so anything outside (0, 1] is not a threshold.
@@ -268,6 +284,24 @@ struct Options {
         if options.transportSpecified, !options.serve {
             FileHandle.standardError.write(
                 Data("--transport only applies with --serve; without it the flag does nothing\n".utf8))
+            exit(2)
+        }
+        // The same rule for the rest. `--port` and `--share-base` describe the listener only
+        // `--serve` opens, and `--solo` describes the benchmark; every other mode accepted them and
+        // did nothing, so `chatbots-cli --port 9999 --turns 2` never bound anything and exited 0.
+        if options.portSpecified, !options.serve {
+            FileHandle.standardError.write(
+                Data("--port only applies with --serve; without it the flag does nothing\n".utf8))
+            exit(2)
+        }
+        if options.shareBaseSpecified, !options.serve {
+            FileHandle.standardError.write(
+                Data("--share-base only applies with --serve; without it the flag does nothing\n".utf8))
+            exit(2)
+        }
+        if options.solo, !options.benchmark {
+            FileHandle.standardError.write(
+                Data("--solo only applies with --benchmark; without it the flag does nothing\n".utf8))
             exit(2)
         }
         return options

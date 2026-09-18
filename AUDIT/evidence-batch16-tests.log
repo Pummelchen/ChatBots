@@ -1,0 +1,113 @@
+Building for debugging...
+[Computing dependencies]
+[Provisioning 1 / 64]
+[1 / 7] ChatBotsCoreTests-product
+[2 / 7] ChatBotsCoreTests-product
+[6 / 11] ChatBotsCoreTests-product
+[11 / 15] ChatBotsCoreTests-product
+[13 / 15] ChatBotsCoreTests-product
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+Build complete! (6,58 secs)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "HTTP parsing" started.
+◇ Suite "A body the server cannot read does not change the room" started.
+◇ Suite "HTTP responses" started.
+◇ Suite "The status line's reason phrase" started.
+◇ Suite "Web assets" started.
+◇ Test "The method is normalised to upper case" started.
+◇ Test "A body with a multi-byte character counts bytes, not characters" started.
+◇ Suite "Sharing over HTTP" started.
+◇ Test "A body is read up to its content length, and no further" started.
+◇ Suite "Kept conversations over HTTP" started.
+◇ Test "A Content-Length too large to be an Int is refused, not crashed on" started.
+◇ Test "Repeated headers are joined rather than overwriting each other" started.
+◇ Test "A request that has not fully arrived reports that it is incomplete" started.
+◇ Test "A minimal request is parsed" started.
+◇ Test "A query string is split and decoded" started.
+◇ Test "A non-numeric Content-Length is refused" started.
+◇ Test "An oversized body is refused before it is read" started.
+◇ Test "A malformed request line is rejected, not guessed at" started.
+◇ Test "A negative Content-Length is refused rather than used as a slice offset" started.
+◇ Test "Non-ASCII and emoji survive percent-decoding in a URL" started.
+◇ Test "A refused model change does not rename the seat on its way to the refusal" started.
+◇ Test "A duplicated Content-Length is refused, not joined and misread as zero" started.
+◇ Test "An unknown mode is a 400, and the mode is untouched" started.
+◇ Test "A request with no body still means what it meant: the field was not sent" started.
+◇ Test "An unknown research depth is a 400, and the depth is untouched" started.
+◇ Test "A body that is not a JSON object at all is refused" started.
+◇ Test "A body that is not JSON is a 400, and the topic is untouched" started.
+◇ Test "An unknown thinking or backend on a seat is a 400, not a silent no-op" started.
+◇ Test "A status with no phrase of its own gets its class, not a lie" started.
+◇ Test "Every status this server emits has a reason of its own" started.
+◇ Test "The page references only assets that exist" started.
+◇ Test "The page is UTF-8 and declares it" started.
+◇ Test "An unknown path is not served as an asset" started.
+◇ Test "The page and its assets are served, at the paths the page asks for" started.
+◇ Test "Content-Length counts bytes for multi-byte text" started.
+◇ Test "Error responses carry a status and a message a client can show" started.
+◇ Test "A client is told where to build a share link" started.
+◇ Test "The body is appended after the blank line, with nothing lost" started.
+◇ Test "Every status the server uses has a reason phrase" started.
+◇ Test "A page carries no origin, whatever Host it was reached on" started.
+◇ Test "A kept conversation can be opened from its link" started.
+◇ Test "The status line and length are correct" started.
+◇ Test "A link that names nothing says so, rather than opening an empty conversation" started.
+◇ Test "Deleting removes it from disk, and says so by returning the shorter list" started.
+◇ Test "The reply accessors the front ends use agree with the wire format" started.
+◇ Test "A malformed id is refused rather than deleting something at random" started.
+◇ Test "A conversation links a running engine to the store it is written into" started.
+◇ Test "A kept conversation comes back with its transcript and its topic" started.
+◇ Test "Opening something that is not there is refused, not answered with a blank conversation" started.
+✔ Test "The method is normalised to upper case" passed after 0.001 seconds.
+✔ Test "A minimal request is parsed" passed after 0.001 seconds.
+✔ Test "Repeated headers are joined rather than overwriting each other" passed after 0.001 seconds.
+✔ Test "A request that has not fully arrived reports that it is incomplete" passed after 0.001 seconds.
+✔ Test "A query string is split and decoded" passed after 0.001 seconds.
+✔ Test "An oversized body is refused before it is read" passed after 0.001 seconds.
+✔ Test "A Content-Length too large to be an Int is refused, not crashed on" passed after 0.001 seconds.
+✔ Test "A malformed request line is rejected, not guessed at" passed after 0.001 seconds.
+✔ Test "A body with a multi-byte character counts bytes, not characters" passed after 0.001 seconds.
+✔ Test "A duplicated Content-Length is refused, not joined and misread as zero" passed after 0.001 seconds.
+✔ Test "A negative Content-Length is refused rather than used as a slice offset" passed after 0.001 seconds.
+✔ Test "A body is read up to its content length, and no further" passed after 0.001 seconds.
+✔ Test "A status with no phrase of its own gets its class, not a lie" passed after 0.001 seconds.
+✔ Test "Non-ASCII and emoji survive percent-decoding in a URL" passed after 0.001 seconds.
+✔ Test "The page is UTF-8 and declares it" passed after 0.001 seconds.
+✔ Test "Content-Length counts bytes for multi-byte text" passed after 0.001 seconds.
+✔ Test "An unknown path is not served as an asset" passed after 0.001 seconds.
+✔ Test "A non-numeric Content-Length is refused" passed after 0.001 seconds.
+✔ Test "The page and its assets are served, at the paths the page asks for" passed after 0.001 seconds.
+✔ Test "The status line and length are correct" passed after 0.001 seconds.
+✔ Test "Error responses carry a status and a message a client can show" passed after 0.001 seconds.
+✔ Test "The page references only assets that exist" passed after 0.001 seconds.
+✔ Test "Every status the server uses has a reason phrase" passed after 0.001 seconds.
+✔ Test "Every status this server emits has a reason of its own" passed after 0.001 seconds.
+✔ Test "The body is appended after the blank line, with nothing lost" passed after 0.001 seconds.
+✔ Suite "Web assets" passed after 0.001 seconds.
+✔ Suite "HTTP parsing" passed after 0.001 seconds.
+✔ Suite "The status line's reason phrase" passed after 0.001 seconds.
+✔ Suite "HTTP responses" passed after 0.001 seconds.
+✔ Test "The reply accessors the front ends use agree with the wire format" passed after 0.015 seconds.
+✔ Test "A body that is not a JSON object at all is refused" passed after 0.054 seconds.
+✔ Test "A request with no body still means what it meant: the field was not sent" passed after 0.054 seconds.
+✔ Test "A client is told where to build a share link" passed after 0.055 seconds.
+✔ Test "A malformed id is refused rather than deleting something at random" passed after 0.056 seconds.
+✔ Test "An unknown research depth is a 400, and the depth is untouched" passed after 0.056 seconds.
+✔ Test "Opening something that is not there is refused, not answered with a blank conversation" passed after 0.058 seconds.
+✔ Test "An unknown thinking or backend on a seat is a 400, not a silent no-op" passed after 0.063 seconds.
+✔ Test "A link that names nothing says so, rather than opening an empty conversation" passed after 0.073 seconds.
+✔ Test "A refused model change does not rename the seat on its way to the refusal" passed after 0.075 seconds.
+✔ Test "An unknown mode is a 400, and the mode is untouched" passed after 0.086 seconds.
+✔ Test "A body that is not JSON is a 400, and the topic is untouched" passed after 0.090 seconds.
+✔ Suite "A body the server cannot read does not change the room" passed after 0.091 seconds.
+✔ Test "A conversation links a running engine to the store it is written into" passed after 0.095 seconds.
+✔ Test "A kept conversation can be opened from its link" passed after 0.099 seconds.
+✔ Test "A page carries no origin, whatever Host it was reached on" passed after 0.105 seconds.
+✔ Test "Deleting removes it from disk, and says so by returning the shorter list" passed after 0.105 seconds.
+✔ Suite "Sharing over HTTP" passed after 0.106 seconds.
+✔ Test "A kept conversation comes back with its transcript and its topic" passed after 0.105 seconds.
+✔ Suite "Kept conversations over HTTP" passed after 0.106 seconds.
+✔ Test run with 42 tests in 7 suites passed after 0.106 seconds.
+EXIT=0

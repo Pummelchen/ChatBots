@@ -29,11 +29,18 @@ extension APIServer {
         feedTask?.cancel()
         feedTask = Task { [weak self] in
             guard let self else { return }
-            var seen = Set<UUID>()
+            // The high-water mark of the sequence numbers already sent, not every id ever seen: the
+            // set that used to be here kept one UUID per turn for the life of the process, and
+            // `transcriptUpdates` hands over the whole log each time, so the sequence that is
+            // already the transcript's own ordering is enough. A log whose highest sequence is
+            // below the mark belongs to a new conversation — `reset` and `newConversation` clear
+            // the transcript and numbering starts again — so the mark restarts with it.
+            var lastSequence = 0
             for await turns in self.engine.transcriptUpdates {
                 if Task.isCancelled { return }
-                for turn in turns where !seen.contains(turn.id) {
-                    seen.insert(turn.id)
+                if (turns.map(\.sequence).max() ?? 0) < lastSequence { lastSequence = 0 }
+                for turn in turns where turn.sequence > lastSequence {
+                    lastSequence = max(lastSequence, turn.sequence)
                     self.broadcast(
                         self.encode(MessageEnvelope(turn: turn)) ?? "{}", event: "turn")
                 }

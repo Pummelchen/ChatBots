@@ -49,11 +49,26 @@ extension APIServer {
     ///
     /// Pulled out of `translate` because the case that used to build it inline put that function over
     /// its `function_body_length` budget, and a named value reads better than a nested `.init` anyway.
-    private func seatChange(from body: APICommand, seatID: String) -> EngineRequest.SeatChange {
-        EngineRequest.SeatChange(
+    private func seatChange(from body: APICommand, seatID: String) throws -> EngineRequest.SeatChange {
+        // An unknown value used to be flattened to nil, which the engine reads as "leave it", so a
+        // misspelling answered 200 with the seat unchanged. Every sibling route refuses it with 400
+        // and the list of what was expected; this one does now too.
+        let thinking = try body.thinking.map { raw in
+            guard let mode = ThinkingMode(rawValue: raw) else {
+                throw unknownValue("thinking", raw, ThinkingMode.allCases.map(\.rawValue))
+            }
+            return mode
+        }
+        let backend = try body.backend.map { raw in
+            guard let value = AgentSpec.Backend(rawValue: raw) else {
+                throw unknownValue("backend", raw, AgentSpec.Backend.allCases.map(\.rawValue))
+            }
+            return value
+        }
+        return EngineRequest.SeatChange(
             seatID: seatID, name: body.name, personaID: body.personaID,
-            thinking: body.thinking.flatMap(ThinkingMode.init(rawValue:)),
-            backend: body.backend.flatMap(AgentSpec.Backend.init(rawValue:)),
+            thinking: thinking,
+            backend: backend,
             modelID: body.modelID,
             baseURL: body.baseURL, apiModel: body.apiModel, apiKey: body.apiKey)
     }
@@ -146,7 +161,7 @@ extension APIServer {
             guard let body = try command(from: request), let seatID = body.seat else {
                 return nil
             }
-            return .updateSeat(seatChange(from: body, seatID: seatID))
+            return .updateSeat(try seatChange(from: body, seatID: seatID))
 
         case ("POST", "/api/attachments"):
             guard let body = try command(from: request), let filename = body.filename,

@@ -98,4 +98,41 @@ struct MalformedBodyTests {
         #expect(response.status != 400, "an absent field is the engine's business, not a parse error")
         _ = response
     }
+
+    @Test("An unknown thinking or backend on a seat is a 400, not a silent no-op")
+    func unknownSeatValueIsRefused() async throws {
+        let fixture = try await makeAPIServerFixture()
+        defer { fixture.server.stop() }
+
+        // Both were flattened to nil by `flatMap`, which the engine reads as "leave it", so a
+        // misspelling answered 200 with the seat unchanged — the same silent default the mode and
+        // research-depth routes were fixed for.
+        for field in ["thinking", "backend"] {
+            let response = try await send(
+                fixture.session, "\(fixture.base)/api/seat",
+                body: Data(#"{"seat": "Agent 1", "\#(field)": "definitely-not-a-value"}"#.utf8))
+            #expect(
+                response.status == 400,
+                "an unknown \(field) answered \(response.status) instead of refusing")
+        }
+    }
+
+    @Test("A refused model change does not rename the seat on its way to the refusal")
+    func refusedModelChangeChangesNothing() async throws {
+        let fixture = try await makeAPIServerFixture()
+        defer { fixture.server.stop() }
+
+        // The other fields were applied before the checkpoint was checked, so this answered 409 and
+        // had already renamed the seat: a change reported as not made, made.
+        let before = try await seatName(fixture.session, fixture.base, id: "Agent 1")
+        #expect(before != nil, "the fixture must have a seat called Agent 1")
+
+        let response = try await send(
+            fixture.session, "\(fixture.base)/api/seat",
+            body: Data(#"{"seat": "Agent 1", "name": "Renamed", "modelID": ""}"#.utf8))
+        #expect(response.status == 409, "an empty model id is refused")
+
+        let after = try await seatName(fixture.session, fixture.base, id: "Agent 1")
+        #expect(after == before, "a refusal must leave the seat exactly as it was")
+    }
 }

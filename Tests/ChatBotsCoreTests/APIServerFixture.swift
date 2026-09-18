@@ -76,3 +76,13 @@ func stateField(_ session: URLSession, _ base: String, _ key: String) async thro
     let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
     return object?[key] as? String
 }
+
+/// One seat's display name from the snapshot, for the tests about a change that was refused.
+@MainActor
+func seatName(_ session: URLSession, _ base: String, id: String) async throws -> String? {
+    let url = try #require(URL(string: "\(base)/api/state"))
+    let (data, _) = try await session.data(from: url)
+    let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    let seats = object?["seats"] as? [[String: Any]]
+    return seats?.first { $0["id"] as? String == id }?["name"] as? String
+}
