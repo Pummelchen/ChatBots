@@ -218,6 +218,23 @@ Leave previous releases' notes and performance tables alone.
   the preconditions, the gate output, the clean-build log and the notes as published; like every
   build artefact it is not committed. An earlier `1.0.0` release of the same commit was
   withdrawn unpublished-in-practice and re-cut as `1.0` at the owner's request; its tag is gone.
+- **The second release**, `1.1`, was published on 2026-09-18 from `9dffd25` (tag `v1.1`,
+  https://github.com/Pummelchen/ChatBots/releases/tag/v1.1):
+  `ChatBots-1.1-macos-arm64.tar.gz`, 63,117,703 bytes, sha256
+  `0ca450b4d8db03455e2580ce5800f165393f1b99661acfce64177036dba99309`, with its `.sha256` beside
+  it. §1.9 was checked by downloading both assets again and verifying the digest, and the
+  published notes quote it. The bundle reports `1.1` from both plist keys and all five Mach-O
+  files in the archive report `arm64`. It is the release that follows the September 2026
+  pre-production audit: `AUDIT/ledger.json` records 107 findings, all closed or accepted, and the
+  headline change is the per-run session token that stops the app handing a seat's Keychain key to
+  a process that merely took port 7790 (AUDIT-0058). Both style gates now run `--strict` against
+  zero — SwiftLint from 206 findings and swift-format from 306 diagnostics — with the waiver caps
+  deleted. The tree was verified a second time on an independent host (`AUDIT/evidence-phase-e-host.md`);
+  the 1.0 release is unchanged, and the dry run's archive differed from the published one by 22 bytes,
+  which is the rebuild §1.8 warns about. Named in the notes as not checked: notarisation (ad-hoc
+  signing only), a Swift job in CI (deliberate), semgrep's rule set (fetched at scan time),
+  ThreadSanitizer (named as a check but never run in this audit) and a Python dependency audit
+  (there is no requirements or lock file to scan).
 - **Code scanning** runs CodeQL **default setup** — there is no `codeql.yml` here —
   and AI Scan for pull requests is disabled. The Autofind job asks
   `api.individual.githubcopilot.com` for a model an individual Copilot plan does not
