@@ -194,6 +194,11 @@ public final class ConversationEngine {
     /// Where the conversation is kept between runs. Set by whoever creates the engine, so the
     /// engine itself does not decide where files live.
     public var conversationStore: ConversationStore?
+    /// Whether the last failed save has already produced a notice, so a store that cannot be
+    /// written does not append one on every turn. Cleared by the next successful save.
+    /// Internal rather than private: `saveConversation()` lives in
+    /// `ConversationEngine+Transcript.swift`, and `private` would be file-scoped.
+    var reportedSaveFailure = false
     /// Identifies this conversation across saves, so growing it updates one record rather than
     /// adding another every turn.
     public internal(set) var conversationID = UUID()

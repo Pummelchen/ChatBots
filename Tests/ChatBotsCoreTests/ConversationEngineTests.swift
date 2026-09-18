@@ -408,3 +408,31 @@ func seatsAreIndependent() {
     // Distinct seeds keep two copies of the same weights from converging.
     #expect(specA.samplingSeed != AgentSpec.seatB().samplingSeed)
 }
+
+// MARK: - A store that cannot be written is reported
+
+@MainActor
+@Test("A conversation the store cannot save is reported instead of silently lost")
+func unsaveableConversationIsReported() throws {
+    // A file where the store's directory must be makes `createDirectory` throw, which is one
+    // of the failures `save` returns false for. `saveConversation` used to discard that Bool,
+    // so the UI showed the conversation intact and it was gone at quit.
+    let blocker = FileManager.default.temporaryDirectory
+        .appending(path: "chatbots-store-blocker-\(UUID().uuidString)")
+    try Data("not a directory".utf8).write(to: blocker)
+    defer { try? FileManager.default.removeItem(at: blocker) }
+
+    let specA = AgentSpec.seatA()
+    let specB = AgentSpec.seatB()
+    let engine = ConversationEngine(
+        seats: [
+            .init(spec: specA, engine: StubEngine(spec: specA)),
+            .init(spec: specB, engine: StubEngine(spec: specB)),
+        ])
+    engine.conversationStore = ConversationStore(directory: blocker)
+    engine.seed([Turn(sequence: 1, speakerName: "A", kind: .chat, content: "hello")])
+
+    #expect(
+        engine.notices.contains { $0.contains("could not be saved") },
+        "a failed save must reach the notices the interface shows")
+}

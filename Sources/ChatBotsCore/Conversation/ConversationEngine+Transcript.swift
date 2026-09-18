@@ -76,7 +76,17 @@ extension ConversationEngine {
             seats: specs,
             startedAt: conversationStartedAt,
             endReason: status.isActive ? nil : status.label)
-        _ = store.save(record)
+        if store.save(record) {
+            reportedSaveFailure = false
+            return
+        }
+        // `save` returns false for a full disk, a permission failure, and an index the store
+        // cannot decode, and this is its only production caller — so without this the
+        // conversation is shown as intact all session and is gone at quit. Reported once per
+        // failing run rather than once per turn, and cleared by the next successful save.
+        guard !reportedSaveFailure else { return }
+        reportedSaveFailure = true
+        note("the conversation could not be saved to disk; it may be lost when the room closes")
     }
 
     /// Replace this conversation with a saved one.
