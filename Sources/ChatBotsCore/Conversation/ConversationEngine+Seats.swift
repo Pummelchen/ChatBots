@@ -82,10 +82,15 @@ extension ConversationEngine {
     /// seat's next turn rather than only being recorded.
     public func updateSeat(_ spec: AgentSpec) {
         guard let index = seats.firstIndex(where: { $0.spec.id == spec.id }) else { return }
-        let changedModel = seats[index].spec.modelID != spec.modelID
+        let previous = seats[index].spec
+        let changedModel = previous.modelID != spec.modelID
+        let changedEndpoint = previous.openAI != spec.openAI
         seats[index].spec = spec
         if changedModel {
             rebuildMLXEngine(at: index)
+        }
+        if changedEndpoint {
+            rebuildOpenAIEngine(at: index)
         }
         if let engine = seatEngine(for: spec.id) {
             Task {
@@ -94,6 +99,19 @@ extension ConversationEngine {
                 await engine.setThinking(spec.thinking)
             }
         }
+    }
+
+    /// Give a seat a new OpenAI engine for its new endpoint, when it has one.
+    ///
+    /// A seat's `spec` is immutable for an engine's life and an engine's cached client holds a
+    /// session for one endpoint — one connection pool and one TLS state. Writing a new base URL
+    /// or key into the seat's spec and reporting it in the snapshot, without this, is what made
+    /// the API sheet show an endpoint the requests were not going to. A seat that has no OpenAI
+    /// engine keeps none, so an MLX-only seat still falls back to its MLX engine.
+    private func rebuildOpenAIEngine(at index: Int) {
+        guard seats[index].openAI != nil else { return }
+        seats[index].openAI = configuration.makeOpenAIEngine(seats[index].spec)
+        modelLoadFailures[seats[index].spec.id] = nil
     }
 
     /// Whether a turn is in flight — generating, preparing, or parked by a pause.

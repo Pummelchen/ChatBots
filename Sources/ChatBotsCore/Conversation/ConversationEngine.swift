@@ -115,6 +115,16 @@ public final class ConversationEngine {
         /// the app reports it into a pane, and a test wants to see the swap without loading weights.
         public var makeMLXEngine: @Sendable (AgentSpec) -> any LLMEngine = { MLXEngine(spec: $0) }
 
+        /// How an OpenAI-backed engine is built for a seat.
+        ///
+        /// Injected for the same reason `makeMLXEngine` is, and it exists because an endpoint
+        /// change has to replace the engine: `spec` is immutable for an engine's life and the
+        /// cached client holds a session for one endpoint. A rebuild is cheap until a turn loads
+        /// or sends, so a change from the API sheet costs no connection.
+        public var makeOpenAIEngine: @Sendable (AgentSpec) -> any LLMEngine = {
+            OpenAIResponsesEngine(spec: $0)
+        }
+
         public init() {}
     }
 

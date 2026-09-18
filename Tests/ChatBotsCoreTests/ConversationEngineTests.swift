@@ -467,3 +467,30 @@ func emptyTurnStillChargesTheBudget() async {
         (engine.conversation.research?.rounds ?? 0) >= 1,
         "a turn that ran must advance the research accounting even with no answer text")
 }
+
+@MainActor
+@Test("An endpoint change replaces the OpenAI engine rather than only being stored")
+func endpointChangeReachesTheEngine() async {
+    // `updateSeat` wrote the new base URL into the seat's spec and the snapshot reported it,
+    // while the engine that sends the request kept the one it was built with — so the sheet
+    // showed an endpoint the requests never used. The engine has to be rebuilt, because its
+    // `spec` is immutable and its cached client holds a session for one endpoint.
+    let specA = AgentSpec.seatA()
+    let mlx = StubEngine(spec: specA)
+    let openAI = StubEngine(spec: specA)
+    var configuration = ConversationEngine.Configuration()
+    configuration.makeOpenAIEngine = { StubEngine(spec: $0) }
+    let engine = ConversationEngine(
+        seats: [.init(spec: specA, mlx: mlx, openAI: openAI)],
+        configuration: configuration)
+
+    var changed = specA
+    changed.openAI.baseURL = "https://example.test/v1"
+    engine.updateSeat(changed)
+
+    let live = engine.allSeats[0].openAI as? StubEngine
+    #expect(live !== openAI, "the OpenAI engine must be replaced, not left on the old endpoint")
+    #expect(
+        live?.spec.openAI.baseURL == "https://example.test/v1",
+        "the replacement carries the new endpoint")
+}

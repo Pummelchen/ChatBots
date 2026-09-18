@@ -23,16 +23,25 @@ extension WebTransportEngineClient {
     }
 
     /// Read frames until the stream ends, routing each to its destination.
+    ///
+    /// Every path checks the reader generation before touching shared state. A reader is
+    /// cancelled cooperatively, so one suspended in `receive()` can wake after `teardown()` has
+    /// installed the next session's continuations; without the check it would `failReader` the
+    /// new session with the old one's error.
     func read(from stream: WebTransportNetworkBidirectionalStream) async {
+        let generation = readerGeneration
         var buffer = Data()
-        while !Task.isCancelled {
+        while true {
+            if Task.isCancelled || generation != readerGeneration { return }
             let chunk: Data
             do {
                 chunk = try await stream.receive()
             } catch {
+                guard generation == readerGeneration else { return }
                 failReader(error.localizedDescription)
                 return
             }
+            guard generation == readerGeneration else { return }
             if chunk.isEmpty {
                 failReader(readerError ?? "the engine closed the stream")
                 return
@@ -40,6 +49,7 @@ extension WebTransportEngineClient {
             buffer.append(chunk)
 
             while true {
+                guard generation == readerGeneration else { return }
                 let result: LengthFraming.ReadResult
                 do {
                     result = try LengthFraming.read(from: buffer)
@@ -91,7 +101,6 @@ extension WebTransportEngineClient {
                 }
             }
         }
-        eventContinuation?.finish()
     }
 
     /// Whether `reply` can be the answer to `request`.

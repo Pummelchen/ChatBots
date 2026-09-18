@@ -1,0 +1,220 @@
+Building for debugging...
+[Computing dependencies]
+[Using on-disk description]
+[1 / 2] swift-transformers_Hub
+[1 / 29] MLX
+[2 / 21] ChatBotsCore
+[6 / 24] ChatBotsCore
+[12 / 20] ChatBotsAppTests-product
+[20 / 38] ChatBotsAppTests-product
+[23 / 38] ChatBotsCoreTests-product
+[28 / 38] ChatBotsCoreTests-product
+[30 / 38] ChatBotsCoreTests-product
+[31 / 38] ChatBotsAppTests-product
+[32 / 38] ChatBotsCoreTests-product
+[36 / 42] ChatBotsAppTests-product
+[38 / 45] ChatBotsCoreTests-product
+[38 / 45] ChatBotsAppTests-product
+[40 / 45] ChatBotsAppTests-product
+[41 / 45] chatbots-cli-product
+[43 / 46] ChatBotsCoreTests-product
+[43 / 46] chatbots-probe-product
+[44 / 48] ChatBotsCoreTests-product
+[46 / 48] ChatBotsCoreTests-product
+[48 / 50] ChatBotsCoreTests-product
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+Build complete! (20,15 secs)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Setters awaited on the concrete engine type" started.
+◇ Suite "The cloud client's lifetime" started.
+◇ Suite "The model catalogue" started.
+◇ Suite "A key read from a CRLF file is usable" started.
+◇ Suite "Pointing a seat at another checkpoint" started.
+◇ Suite "Engine service" started.
+◇ Test "Pause stops new turns; resume continues the rotation" started.
+◇ Test "An endpoint change replaces the OpenAI engine rather than only being stored" started.
+◇ Test "Turn limit pauses the loop instead of running forever" started.
+◇ Test "Each seat carries its own model id and sampling parameters" started.
+◇ Test "Stop ends the loop and leaves loaded weights alone" started.
+◇ Test "Seat B reads seat A's message in its prompt" started.
+◇ Test "Start is refused without a topic" started.
+◇ Suite "Engine transport" started.
+◇ Test "Seats alternate and both see the identical shared log" started.
+◇ Test "Reset clears the log and the turn counters" started.
+◇ Test "Web tools are offered only to seats that enable them" started.
+◇ Test "Introduction names the topic and every participant" started.
+◇ Test "Mid-turn steering is queued, delivered once, and seen by both seats" started.
+◇ Test "Tool turns and thinking are kept out of the prompt log" started.
+◇ Test "Steering an idle conversation starts it" started.
+◇ Suite "User-supplied text is bounded" started.
+◇ Test "A turn that produces no text still charges the research budget" started.
+◇ Test "A conversation the store cannot save is reported instead of silently lost" started.
+◇ Test "Other seats are named in a seat's system message, never itself as an other" started.
+◇ Test "A stub that leans on the protocol default still compiles and stays inert" started.
+◇ Test "A turn prompt is a valid system+user pair carrying every tagged log entry" started.
+◇ Test "MLXEngine: all three setters take effect when awaited on the concrete type" started.
+◇ Test "OpenAIResponsesEngine: all three setters take effect when awaited on the concrete type" started.
+◇ Test "The opening log is topic then introduction, numbered in order" started.
+◇ Test "Every entry is complete and identifiable" started.
+◇ Test "An alias and an id resolve to the same repository id" started.
+◇ Test "No alias or id is claimed twice" started.
+◇ Test "A CRLF environment variable is normalised too" started.
+◇ Test "Both key paths agree about the same CRLF file" started.
+◇ Test "The checkpoint the app ships with is in the list" started.
+◇ Test "Quoted values survive CRLF and are unquoted" started.
+◇ Test "An identifier that is not in the catalogue is passed through unchanged" started.
+◇ Test "A value that is only a line ending counts as no key" started.
+◇ Test "A CRLF file is split into its lines, comments included" started.
+◇ Test "The mode is refused once the conversation has started" started.
+◇ Test "A CRLF file yields values with no carriage return" started.
+◇ Test "The protocol refuses a swap in flight with a reason rather than ignoring it" started.
+◇ Test "An alias works as well as a repository id" started.
+◇ Test "The mode switches and reseats the personas" started.
+◇ Test "An empty topic is refused rather than blanking the question" started.
+◇ Test "Two turns through one engine build one client, so one session and one pool" started.
+◇ Test "The research budget is set from the service" started.
+◇ Test "The HTTP body carries the checkpoint under its own key" started.
+◇ Test "Lone carriage returns and a missing final newline still parse" started.
+◇ Test "The reasoning preference is held by the service" started.
+◇ Test "A topic can be set before the conversation starts" started.
+◇ Test "Naming the model a seat already runs changes nothing" started.
+◇ Test "A model cannot be swapped while a turn is in flight" started.
+◇ Test "An attachment with a name that is not a document is refused, not crashed on" started.
+◇ Test "Start, pause, resume and stop are all accepted and change the status" started.
+◇ Test "The state carries the catalogue, so a front end can offer it" started.
+◇ Test "Reset returns the engine to a fresh conversation" started.
+◇ Test "Steering with empty text is refused" started.
+◇ Test "Every field of a seat change is applied" started.
+◇ Test "A new checkpoint replaces the seat's engine, and the old one is released" started.
+◇ Test "fetchState returns the current state" started.
+◇ Test "Attachments can be cleared" started.
+◇ Test "A topic is refused once the conversation has started, as a refusal not an error" started.
+◇ Test "A removable attachment can be removed by id, and an unknown id is harmless" started.
+◇ Test "A stopped room takes the new checkpoint through the protocol" started.
+◇ Test "A snapshot carries the personas the picker needs" started.
+◇ Test "An unknown seat is refused rather than silently ignored" started.
+◇ Test "Steering with text is accepted and reaches the engine" started.
+◇ Test "A seat change alters only the fields it names" started.
+◇ Test "A blank name is refused rather than leaving a seat unnamed" started.
+◇ Test "A client can ask the engine for its state and get it" started.
+◇ Test "fetchReport refuses politely before a session has run" started.
+◇ Test "A topic within the limit is still accepted" started.
+◇ Test "A topic past the limit is refused, and the room keeps the topic it had" started.
+◇ Test "A steering message past the limit is refused" started.
+◇ Test "A steering message within the limit is still accepted" started.
+◇ Test "A moderator name past the limit is shortened rather than refused" started.
+✔ Test "Each seat carries its own model id and sampling parameters" passed after 0.002 seconds.
+✔ Test "A stub that leans on the protocol default still compiles and stays inert" passed after 0.002 seconds.
+✔ Test "MLXEngine: all three setters take effect when awaited on the concrete type" passed after 0.003 seconds.
+✔ Test "OpenAIResponsesEngine: all three setters take effect when awaited on the concrete type" passed after 0.003 seconds.
+✔ Test "A CRLF environment variable is normalised too" passed after 0.002 seconds.
+✔ Test "Every entry is complete and identifiable" passed after 0.003 seconds.
+✔ Test "No alias or id is claimed twice" passed after 0.003 seconds.
+✔ Test "The checkpoint the app ships with is in the list" passed after 0.003 seconds.
+✔ Test "An alias and an id resolve to the same repository id" passed after 0.003 seconds.
+✔ Test "A value that is only a line ending counts as no key" passed after 0.002 seconds.
+✔ Test "An identifier that is not in the catalogue is passed through unchanged" passed after 0.002 seconds.
+✔ Test "A turn prompt is a valid system+user pair carrying every tagged log entry" passed after 0.003 seconds.
+✔ Test "Tool turns and thinking are kept out of the prompt log" passed after 0.003 seconds.
+✔ Test "Other seats are named in a seat's system message, never itself as an other" passed after 0.003 seconds.
+✔ Test "Introduction names the topic and every participant" passed after 0.003 seconds.
+✔ Test "An endpoint change replaces the OpenAI engine rather than only being stored" passed after 0.003 seconds.
+✔ Suite "Setters awaited on the concrete engine type" passed after 0.003 seconds.
+✔ Suite "The model catalogue" passed after 0.003 seconds.
+[ChatBots] restricted .secrets.env to owner-only (0600); it holds API keys
+[ChatBots] restricted .secrets.env to owner-only (0600); it holds API keys
+[ChatBots] restricted .secrets.env to owner-only (0600); it holds API keys
+[ChatBots] restricted .secrets.env to owner-only (0600); it holds API keys
+[ChatBots] restricted .secrets.env to owner-only (0600); it holds API keys
+✔ Test "Both key paths agree about the same CRLF file" passed after 0.005 seconds.
+✔ Test "Lone carriage returns and a missing final newline still parse" passed after 0.005 seconds.
+✔ Test "A CRLF file is split into its lines, comments included" passed after 0.005 seconds.
+✔ Test "Quoted values survive CRLF and are unquoted" passed after 0.005 seconds.
+✔ Test "A CRLF file yields values with no carriage return" passed after 0.005 seconds.
+✔ Suite "A key read from a CRLF file is usable" passed after 0.006 seconds.
+✔ Test "A conversation the store cannot save is reported instead of silently lost" passed after 0.006 seconds.
+✔ Test "The mode is refused once the conversation has started" passed after 0.014 seconds.
+✔ Test "The protocol refuses a swap in flight with a reason rather than ignoring it" passed after 0.015 seconds.
+✔ Test "An empty topic is refused rather than blanking the question" passed after 0.017 seconds.
+✔ Test "The mode switches and reseats the personas" passed after 0.018 seconds.
+✔ Test "The research budget is set from the service" passed after 0.023 seconds.
+✔ Test "The reasoning preference is held by the service" passed after 0.026 seconds.
+✔ Test "A topic can be set before the conversation starts" passed after 0.027 seconds.
+✔ Test "A model cannot be swapped while a turn is in flight" passed after 0.027 seconds.
+✔ Test "Start, pause, resume and stop are all accepted and change the status" passed after 0.034 seconds.
+✔ Test "Steering with empty text is refused" passed after 0.035 seconds.
+✔ Test "Reset returns the engine to a fresh conversation" passed after 0.037 seconds.
+✔ Test "Every field of a seat change is applied" passed after 0.038 seconds.
+✔ Test "fetchState returns the current state" passed after 0.040 seconds.
+✔ Test "A topic is refused once the conversation has started, as a refusal not an error" passed after 0.042 seconds.
+✔ Test "A stopped room takes the new checkpoint through the protocol" passed after 0.043 seconds.
+✔ Test "Attachments can be cleared" passed after 0.044 seconds.
+✔ Test "A snapshot carries the personas the picker needs" passed after 0.046 seconds.
+✔ Test "An unknown seat is refused rather than silently ignored" passed after 0.046 seconds.
+✔ Test "A seat change alters only the fields it names" passed after 0.047 seconds.
+✔ Test "A blank name is refused rather than leaving a seat unnamed" passed after 0.048 seconds.
+✔ Test "A removable attachment can be removed by id, and an unknown id is harmless" passed after 0.048 seconds.
+✔ Test "fetchReport refuses politely before a session has run" passed after 0.684 seconds.
+✔ Test "Steering with text is accepted and reaches the engine" passed after 0.698 seconds.
+✔ Test "A topic within the limit is still accepted" passed after 0.699 seconds.
+✔ Test "A topic past the limit is refused, and the room keeps the topic it had" passed after 0.700 seconds.
+✔ Test "A steering message past the limit is refused" passed after 0.700 seconds.
+✔ Test "A steering message within the limit is still accepted" passed after 0.703 seconds.
+✔ Test "A moderator name past the limit is shortened rather than refused" passed after 0.704 seconds.
+✔ Suite "User-supplied text is bounded" passed after 0.705 seconds.
+✔ Test "Stop ends the loop and leaves loaded weights alone" passed after 0.706 seconds.
+✔ Test "An attachment with a name that is not a document is refused, not crashed on" passed after 0.705 seconds.
+✔ Suite "Engine service" passed after 0.706 seconds.
+✔ Test "A new checkpoint replaces the seat's engine, and the old one is released" passed after 0.707 seconds.
+✔ Test "The HTTP body carries the checkpoint under its own key" passed after 0.707 seconds.
+✔ Test "An alias works as well as a repository id" passed after 0.707 seconds.
+✔ Test "The state carries the catalogue, so a front end can offer it" passed after 0.707 seconds.
+✔ Test "Start is refused without a topic" passed after 0.708 seconds.
+✔ Test "Naming the model a seat already runs changes nothing" passed after 0.707 seconds.
+✔ Suite "Pointing a seat at another checkpoint" passed after 0.708 seconds.
+✔ Test "A turn that produces no text still charges the research budget" passed after 0.713 seconds.
+✔ Test "Turn limit pauses the loop instead of running forever" passed after 0.716 seconds.
+✔ Test "Web tools are offered only to seats that enable them" passed after 0.717 seconds.
+✔ Test "The opening log is topic then introduction, numbered in order" passed after 0.720 seconds.
+✔ Test "Seat B reads seat A's message in its prompt" passed after 0.720 seconds.
+✔ Test "Seats alternate and both see the identical shared log" passed after 0.720 seconds.
+✔ Test "Reset clears the log and the turn counters" passed after 0.720 seconds.
+✔ Test "Steering an idle conversation starts it" passed after 0.720 seconds.
+✔ Test "Two turns through one engine build one client, so one session and one pool" passed after 0.724 seconds.
+◇ Test "A client lets go of its session, and the session lets go of itself" started.
+✔ Test "A client can ask the engine for its state and get it" passed after 0.760 seconds.
+◇ Test "A client is still served after sitting idle on its connection" started.
+✔ Test "A client lets go of its session, and the session lets go of itself" passed after 0.582 seconds.
+◇ Test "The engine's client is made once even when a turn fails" started.
+✔ Test "The engine's client is made once even when a turn fails" passed after 0.026 seconds.
+✔ Suite "The cloud client's lifetime" passed after 1.334 seconds.
+✔ Test "Mid-turn steering is queued, delivered once, and seen by both seats" passed after 1.380 seconds.
+✔ Test "Pause stops new turns; resume continues the rotation" passed after 1.580 seconds.
+✔ Test "A client is still served after sitting idle on its connection" passed after 1.594 seconds.
+◇ Test "After probing, the real client still reaches the engine" started.
+✔ Test "After probing, the real client still reaches the engine" passed after 0.694 seconds.
+◇ Test "The engine serves a new client after the previous one has gone" started.
+✔ Test "The engine serves a new client after the previous one has gone" passed after 0.928 seconds.
+◇ Test "A command over the transport changes the engine state" started.
+✔ Test "A command over the transport changes the engine state" passed after 0.611 seconds.
+◇ Test "A change is pushed to an attached client" started.
+✔ Test "A change is pushed to an attached client" passed after 0.626 seconds.
+◇ Test "A request too large to frame fails at the sender and leaves the session usable" started.
+✔ Test "A request too large to frame fails at the sender and leaves the session usable" passed after 1.012 seconds.
+✔ Suite "Engine transport" passed after 6.229 seconds.
+◇ Suite "A session accepted during stop() does not survive it" started.
+◇ Test "A client that connects while the server is stopping is not left being served" started.
+✔ Test "A client that connects while the server is stopping is not left being served" passed after 0.674 seconds.
+✔ Suite "A session accepted during stop() does not survive it" passed after 0.674 seconds.
+◇ Suite "Stopping the engine stops its sessions" started.
+◇ Test "A connected client is no longer served after the server stops" started.
+✔ Test "A connected client is no longer served after the server stops" passed after 0.661 seconds.
+✔ Suite "Stopping the engine stops its sessions" passed after 0.661 seconds.
+◇ Suite "A failed connect leaves no session behind" started.
+◇ Test "A client whose retry fails does not report itself connected" started.
+✔ Test "A client whose retry fails does not report itself connected" passed after 2.629 seconds.
+✔ Suite "A failed connect leaves no session behind" passed after 2.630 seconds.
+✔ Test run with 81 tests in 11 suites passed after 10.204 seconds.
+EXIT=0

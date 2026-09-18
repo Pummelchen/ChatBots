@@ -106,6 +106,15 @@ public final class WebTransportEngineClient {
     var pendingReplies: [PendingRequest] = []
     private var readerTask: Task<Void, Never>?
 
+    /// Which reader owns the shared reply and event state.
+    ///
+    /// A reader is cancelled cooperatively, so one suspended in `stream.receive()` can wake after
+    /// `teardown()` has already installed the next session's continuations and then `failReader`
+    /// them — a reconnect that fails on the *old* session's error. Every reader captures this
+    /// value and returns before touching shared state once it has changed. Internal rather than
+    /// private because the read loop lives in `WebTransportClientReader.swift`.
+    var readerGeneration = 0
+
     /// One request waiting for its reply.
     ///
     /// A class rather than a bare continuation because a send that gives up waiting has to be
@@ -256,6 +265,10 @@ public final class WebTransportEngineClient {
     /// reconnect all leave the client in the same state: `session` nil, which is what
     /// `isConnected` reports, and no server-side session to serve or hold a slot for.
     private func teardown() async {
+        // Bumped before the cancel: a reader that wakes between here and the next connect sees a
+        // generation that is not its own and returns without touching the state this teardown
+        // (and the connect after it) is about to replace.
+        readerGeneration += 1
         readerTask?.cancel()
         readerTask = nil
         eventContinuation?.finish()
