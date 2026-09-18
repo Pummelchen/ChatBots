@@ -98,6 +98,43 @@ struct EndpointPolicyTests {
         }
         #expect(status == 302, "the redirect response is the answer, not an invitation")
     }
+
+    @Test("The models probe uses the same policy and the same redirect refusal as generation")
+    func modelsProbeHonoursBothControls() async throws {
+        // The reachability probe used to build its own URL and call `URLSession.shared`, which
+        // skipped `endpointRefusal` and followed redirects while the Authorization header was
+        // attached — a link-local or `file://` base URL was fetched and a 302 was followed to a
+        // host the check never saw.
+        #expect(
+            OpenAIEndpoint(baseURL: "http://169.254.169.254").modelsURL == nil,
+            "the probe URL must be refused exactly as the generation URL is")
+        #expect(
+            OpenAIEndpoint(baseURL: "file:///etc").modelsURL == nil,
+            "a file:// base URL must produce no probe URL")
+        #expect(
+            OpenAIEndpoint(baseURL: "http://localhost:1234").modelsURL?.absoluteString
+                == "http://localhost:1234/v1/models")
+        #expect(
+            OpenAIEndpoint(baseURL: "https://api.deepseek.com/v1").modelsURL?.absoluteString
+                == "https://api.deepseek.com/v1/models")
+
+        let server = try RedirectingServer(target: "http://169.254.169.254/latest/meta-data/")
+        defer { server.stop() }
+        let client = OpenAIResponsesClient(endpoint: OpenAIEndpoint(baseURL: server.base))
+
+        var thrown: (any Error)?
+        do {
+            _ = try await client.modelsBody()
+        } catch {
+            thrown = error
+        }
+        guard case .http(let status, _)? = thrown as? OpenAIResponsesError else {
+            Issue.record(
+                "the probe must report the 302, not follow it; got \(String(describing: thrown))")
+            return
+        }
+        #expect(status == 302, "the redirect response is the answer, not an invitation")
+    }
 }
 
 /// A minimal HTTP server that answers every request with a redirect.

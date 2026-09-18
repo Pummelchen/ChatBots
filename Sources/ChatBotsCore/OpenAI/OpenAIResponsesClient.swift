@@ -214,6 +214,37 @@ public struct OpenAIResponsesClient: Sendable {
         return url
     }
 
+    /// The body of the endpoint's `/v1/models` listing.
+    ///
+    /// Through `modelsURL`, which applies `endpointRefusal`, and through this client's own
+    /// session, which refuses redirects — the same two controls the generation path uses. The
+    /// engine's reachability probe used to build its own URL and call `URLSession.shared`, so
+    /// a `file://` or link-local base URL was fetched and a 302 was followed with the API key
+    /// attached, and up to 300 bytes of the response were echoed into the snapshot the LAN
+    /// front ends display.
+    public func modelsBody() async throws -> Data {
+        guard let url = endpoint.modelsURL else {
+            if let parsed = URL(string: endpoint.baseURL),
+                let reason = OpenAIEndpoint.endpointRefusal(parsed)
+            {
+                throw OpenAIResponsesError.refusedEndpoint(endpoint.baseURL, reason: reason)
+            }
+            throw OpenAIResponsesError.badURL(endpoint.baseURL)
+        }
+        var request = URLRequest(url: url)
+        if let key = endpoint.effectiveAPIKey, !key.isEmpty {
+            request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        }
+        let (data, response) = try await responseSession.session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw OpenAIResponsesError.http(
+                status: status,
+                body: UTF8Text.decodeTruncated(UTF8Text.bytePrefix(data, 300)) ?? "")
+        }
+        return data
+    }
+
     /// Write the request to standard error, when the trace switch is on.
     ///
     /// Its own function because `run` is at its `function_body_length` budget, and because this is the

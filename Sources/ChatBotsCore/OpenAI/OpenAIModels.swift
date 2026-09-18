@@ -85,6 +85,23 @@ public struct OpenAIEndpoint: Sendable, Hashable, Codable {
         return url
     }
 
+    /// The models endpoint, under the same endpoint policy `responsesURL` applies.
+    ///
+    /// The reachability probe used to build this URL itself and fetch it with
+    /// `URLSession.shared`, which skipped `endpointRefusal` and followed redirects while the
+    /// Authorization header was attached — so a `file://` or link-local base URL was fetched
+    /// and a 302 was followed to a host the check never saw. Derived here so both paths share
+    /// one rule rather than one path carrying it and the other not.
+    public var modelsURL: URL? {
+        var trimmed = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        while trimmed.hasSuffix("/") { trimmed.removeLast() }
+        guard !trimmed.isEmpty else { return nil }
+        let path = trimmed.hasSuffix("/v1") ? "/models" : "/v1/models"
+        guard let url = URL(string: trimmed + path) else { return nil }
+        guard Self.endpointRefusal(url) == nil else { return nil }
+        return url
+    }
+
     /// Why this client will not send a request to `url`, or nil when it will.
     ///
     /// Two rules, both about an address that arrives from configuration a user — or, in an earlier build, any

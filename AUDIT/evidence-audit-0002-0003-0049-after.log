@@ -1,0 +1,127 @@
+Building for debugging...
+[Computing dependencies]
+[Using on-disk description]
+[1 / 2] swift-transformers_Hub
+[1 / 49] encuda-product
+[2 / 21] ChatBotsCore
+[4 / 30]
+[11 / 30] ChatBotsCore
+[15 / 46] ChatBotsCore
+[18 / 48] ChatBotsCore
+[20 / 48] ChatBotsCore
+[21 / 48] ChatBotsCore
+[23 / 48] ChatBotsCore
+[25 / 48] ChatBotsCore
+[27 / 48] ChatBotsCore
+[29 / 48] ChatBotsCore
+[37 / 56] ChatBotsCore
+[38 / 56] ChatBotsCore
+[41 / 60] ChatBotsCoreTests-product
+[42 / 60] ChatBotsCore-product
+[42 / 60] chatbots-probe-product
+[49 / 70] ChatBots
+[50 / 78] ChatBots
+[51 / 78] chatbots-cli-product
+[56 / 87] ChatBots-product
+[57 / 87] ChatBots-product
+[58 / 89] chatbots-cli-product
+[59 / 89] chatbots-probe-product
+[60 / 89] ChatBots
+[62 / 89] ChatBotsCoreTests-product
+[64 / 98] ChatBots-product
+[70 / 98] ChatBotsCoreTests-product
+[71 / 98] ChatBotsCoreTests-product
+[72 / 98] ChatBotsCoreTests-product
+[74 / 98] ChatBotsCoreTests-product
+[76 / 98] ChatBotsCoreTests-product
+[78 / 98] ChatBots-product
+[78 / 99] ChatBotsCoreTests-product
+[80 / 99] ChatBots-product
+[82 / 99] ChatBots
+[83 / 99] ChatBots
+[83 / 99] ChatBotsCoreTests-product
+[87 / 100] ChatBots
+[89 / 102] ChatBots
+[90 / 102]
+[90 / 102] ChatBots
+[92 / 103] ChatBots-product
+[94 / 102] ChatBotsAppTests-product
+[98 / 106] ChatBotsAppTests-product
+[104 / 110] ChatBotsAppTests-product
+[106 / 113] ChatBotsAppTests-product
+[108 / 113] ChatBotsAppTests-product
+[111 / 114] chatbots-probe-product
+[112 / 115] ChatBotsCoreTests-product
+[114 / 118] ChatBotsCoreTests-product
+[116 / 118] ChatBotsCoreTests-product
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+Build complete! (20,07 secs)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "A configured endpoint is checked before anything is sent to it" started.
+◇ Suite "A sharded checkpoint is complete only with its shards" started.
+◇ Test "A conversation the store cannot save is reported instead of silently lost" started.
+◇ Test "Seats alternate and both see the identical shared log" started.
+◇ Test "The opening log is topic then introduction, numbered in order" started.
+◇ Test "Other seats are named in a seat's system message, never itself as an other" started.
+◇ Test "Stop ends the loop and leaves loaded weights alone" started.
+◇ Test "Each seat carries its own model id and sampling parameters" started.
+◇ Test "Steering an idle conversation starts it" started.
+◇ Test "Start is refused without a topic" started.
+◇ Test "Pause stops new turns; resume continues the rotation" started.
+◇ Test "Turn limit pauses the loop instead of running forever" started.
+◇ Test "Reset clears the log and the turn counters" started.
+◇ Test "Introduction names the topic and every participant" started.
+◇ Test "Web tools are offered only to seats that enable them" started.
+◇ Test "Tool turns and thinking are kept out of the prompt log" started.
+◇ Test "Seat B reads seat A's message in its prompt" started.
+◇ Test "A turn prompt is a valid system+user pair carrying every tagged log entry" started.
+◇ Test "Mid-turn steering is queued, delivered once, and seen by both seats" started.
+◇ Test "The endpoints this app is actually for are allowed" started.
+◇ Test "A redirect is not followed" started.
+◇ Test "An index with none of its shards is not a usable checkpoint" started.
+◇ Test "A link-local address is refused" started.
+◇ Test "The models probe uses the same policy and the same redirect refusal as generation" started.
+◇ Test "A refused endpoint fails as itself, and says which rule refused it" started.
+◇ Test "A base URL that is not http or https is refused" started.
+✔ Test "The endpoints this app is actually for are allowed" passed after 0.001 seconds.
+✔ Test "A link-local address is refused" passed after 0.001 seconds.
+✔ Test "Each seat carries its own model id and sampling parameters" passed after 0.001 seconds.
+✔ Test "Other seats are named in a seat's system message, never itself as an other" passed after 0.001 seconds.
+✔ Test "A base URL that is not http or https is refused" passed after 0.001 seconds.
+✔ Test "A turn prompt is a valid system+user pair carrying every tagged log entry" passed after 0.002 seconds.
+✔ Test "Tool turns and thinking are kept out of the prompt log" passed after 0.002 seconds.
+✔ Test "Introduction names the topic and every participant" passed after 0.002 seconds.
+✔ Test "A conversation the store cannot save is reported instead of silently lost" passed after 0.003 seconds.
+✔ Test "An index with none of its shards is not a usable checkpoint" passed after 0.003 seconds.
+◇ Test "A model id is a name, not a path, so it cannot escape the models root" started.
+✔ Test "Stop ends the loop and leaves loaded weights alone" passed after 0.006 seconds.
+✔ Test "A model id is a name, not a path, so it cannot escape the models root" passed after 0.002 seconds.
+◇ Test "An index missing one of its shards is not a usable checkpoint" started.
+✔ Test "Start is refused without a topic" passed after 0.006 seconds.
+✔ Test "A refused endpoint fails as itself, and says which rule refused it" passed after 0.007 seconds.
+✔ Test "An index missing one of its shards is not a usable checkpoint" passed after 0.001 seconds.
+◇ Test "An index with every shard beside it is a usable checkpoint" started.
+✔ Test "An index with every shard beside it is a usable checkpoint" passed after 0.001 seconds.
+◇ Test "An index that cannot be read proves nothing" started.
+✔ Test "An index that cannot be read proves nothing" passed after 0.001 seconds.
+◇ Test "An index naming a shard outside the directory is not complete" started.
+✔ Test "An index naming a shard outside the directory is not complete" passed after 0.001 seconds.
+◇ Test "A single-blob checkpoint is still complete without an index" started.
+✔ Test "A single-blob checkpoint is still complete without an index" passed after 0.001 seconds.
+✔ Suite "A sharded checkpoint is complete only with its shards" passed after 0.012 seconds.
+✔ Test "Turn limit pauses the loop instead of running forever" passed after 0.014 seconds.
+✔ Test "Web tools are offered only to seats that enable them" passed after 0.015 seconds.
+✔ Test "The models probe uses the same policy and the same redirect refusal as generation" passed after 0.016 seconds.
+✔ Test "A redirect is not followed" passed after 0.017 seconds.
+✔ Suite "A configured endpoint is checked before anything is sent to it" passed after 0.018 seconds.
+✔ Test "Reset clears the log and the turn counters" passed after 0.018 seconds.
+✔ Test "The opening log is topic then introduction, numbered in order" passed after 0.018 seconds.
+✔ Test "Seat B reads seat A's message in its prompt" passed after 0.018 seconds.
+✔ Test "Seats alternate and both see the identical shared log" passed after 0.018 seconds.
+✔ Test "Steering an idle conversation starts it" passed after 0.018 seconds.
+✔ Test "Mid-turn steering is queued, delivered once, and seen by both seats" passed after 0.139 seconds.
+✔ Test "Pause stops new turns; resume continues the rotation" passed after 0.332 seconds.
+✔ Test run with 30 tests in 2 suites passed after 0.333 seconds.
+EXIT=0

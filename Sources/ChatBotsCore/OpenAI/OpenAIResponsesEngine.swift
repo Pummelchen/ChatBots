@@ -159,22 +159,12 @@ public actor OpenAIResponsesEngine: LLMEngine {
     }
 
     private func availableModels() async throws -> [String] {
-        guard let url = endpointURL(path: "/v1/models") else {
-            throw OpenAIResponsesError.badURL(spec.openAI.baseURL)
-        }
-        var request = URLRequest(url: url)
-        // The reachability probe must authenticate the same way the real request does,
-        // including the built-in key, or a working endpoint would look unreachable.
-        if let key = spec.openAI.effectiveAPIKey, !key.isEmpty {
-            request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
-        }
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
-            throw OpenAIResponsesError.http(
-                status: status,
-                body: UTF8Text.decodeTruncated(UTF8Text.bytePrefix(data, 300)) ?? "")
-        }
+        // Through the client, so the probe goes to the endpoint the generation path will use,
+        // under the same `endpointRefusal` rule and the same redirect-refusing session, and
+        // authenticates the same way including the built-in key. It used to build its own URL
+        // and call `URLSession.shared`, which skipped all three: a `file://` or link-local base
+        // URL was fetched and a 302 was followed with the key attached.
+        let data = try await responsesClient().modelsBody()
         return try Self.modelIDs(fromModelsBody: data)
     }
 
@@ -203,14 +193,6 @@ public actor OpenAIResponsesEngine: LLMEngine {
                 "the server's /v1/models response did not contain a model list")
         }
         return entries.compactMap { $0["id"] as? String }
-    }
-
-    private func endpointURL(path: String) -> URL? {
-        var base = spec.openAI.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        while base.hasSuffix("/") { base.removeLast() }
-        guard !base.isEmpty else { return nil }
-        if base.hasSuffix("/v1") { base.removeLast(3) }
-        return URL(string: base + path)
     }
 
     // MARK: - Generation
