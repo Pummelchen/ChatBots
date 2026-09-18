@@ -27,10 +27,11 @@ record — not narrowed — into:
 - **AUDIT-0097** (DONE): `force_unwrapping` enabled in `.swiftlint.yml` and its 32 sites removed.
   The waivers were tightened with it, from 217/444 to 208/307.
 - **AUDIT-0098** (DONE): `line_length` — all 88 lines wrapped.
-- **AUDIT-0099** the complexity refactors — 22 `cyclomatic_complexity`, 10 `function_body_length`.
-- **AUDIT-0100** the remaining rule classes — done except 3 `large_tuple`, 3
-  `function_parameter_count` and 1 `type_body_length` (the last three blocks).
+- **AUDIT-0099** the complexity refactors — 22 `cyclomatic_complexity` (`EngineService.handle` 57,
+  `CommandLine.parse` 61, `APIServer+Commands.translate` 41, …) and 10 `function_body_length`.
+- **AUDIT-0100** (DONE): the mechanical rule classes.
 - **AUDIT-0101** (DONE): the swift-format sweep — 444 → 0.
+- **AUDIT-0103** `type_body_length` — `SocialLibrary`'s 432-line enum body (limit 400).
 - **AUDIT-0102** switch both gates to `--strict`, delete the two waiver counts, and delete the
   waiver file if nothing else needs it.
 
@@ -55,7 +56,7 @@ verified on the primary host only, recorded in the ledger.
 
 - Branch `audit/2026-09-18` only; no force-push, no history rewrite.
 - `bash tools/mac-checks.sh` is the gate after every batch — **9 gates**, including eslint and
-  prettier (`npm ci` first). Metrics must not regress: SwiftLint ≤ 38 (measured 36),
+  prettier (`npm ci` first). Metrics must not regress: SwiftLint ≤ 35 (measured 33),
   swift-format ≤ 2 (measured 0), no file over 500 lines.
 - Every fix carries before/after evidence in `AUDIT/evidence-*.log`, and the closed record —
   what was found, what was changed, which commit — is in `AUDIT/ledger.json`.
