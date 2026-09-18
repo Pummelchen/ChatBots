@@ -296,14 +296,14 @@
     "file_line": "Sources/ChatBotsCore/HTTP/APIServer.swift:77-101; Caddyfile",
     "title": "The whole /api surface is unauthenticated and, through Caddy, reachable from the LAN by design",
     "category": "authz",
-    "status": "OPEN",
+    "status": "BLOCKED",
     "host": "Node1.local",
     "discovered_by": "human",
     "evidence_before": "crossOriginRefusal (APIServer.swift:77-101) blocks cross-origin browser requests and requires application/json, but there is no authentication or authorization anywhere on the routes: any client that can reach the port can read every conversation, drive every control and upload attachments. SECURITY.md documents this as deliberate (the LAN phone use case) and AGENTS.md repeats it; Caddyfile carries no host so it listens on every interface. This is recorded so the risk is explicit rather than hidden, not as an unnoticed defect.",
     "fix_summary": "",
     "evidence_after": "",
     "commit": "",
-    "blocked_reason": ""
+    "blocked_reason": "OWNER: repository owner (Pummelchen). REASON: /api has no authentication and the shipped Caddy default binds every interface; SECURITY.md and AGENTS.md both state this is deliberate for the phone-on-the-LAN use case, so removing it is a product decision rather than a code defect the audit can resolve alone. TRIED: read SECURITY.md, AGENTS.md, Caddyfile and tools/start.sh; confirmed crossOriginRefusal blocks cross-origin browser requests and requires application/json, confirmed there is no authn on any route, and confirmed --local-only inserts `bind 127.0.0.1`. OPTIONS FOR A HUMAN: (1) sign off the documented LAN-trust model and record it as an accepted risk; (2) add a shared-secret bearer token (or password) to state-changing routes and make loopback the default bind, updating the web page, the SwiftUI app, the CLI and the probe to send it \u2014 a cross-project contract change with four consumers."
   },
   {
     "id": "AUDIT-0019",
@@ -891,13 +891,13 @@
     "file_line": "Sources/ChatBotsCore/OpenAI/OpenAIResponsesClient.swift:268-271,287-294",
     "title": "SSE response size is unbounded; the 600-character cap is applied after the line is buffered",
     "category": "resource-exhaustion",
-    "status": "OPEN",
+    "status": "DONE",
     "host": "Node1.local",
     "discovered_by": "subagent-openai",
     "evidence_before": "`for try await line in bytes.lines { detail += line; if detail.count > 600 { break } }` buffers a full line before the cap runs, and the success path feeds an unbounded data: payload to JSONSerialization.jsonObject (line 292). There is no byte cap and no Content-Length check; timeouts are 600 s/3600 s.",
-    "fix_summary": "",
-    "evidence_after": "",
-    "commit": "",
+    "fix_summary": "The response stream is read byte by byte with a bound on the accumulated line (OpenAIResponsesClient.maximumEventLineBytes, 1 MB) instead of `bytes.lines`, which buffered a whole line before the 600-character cap could apply; a line past the bound, and a line that is not UTF-8, now fail the stream with a reason. The non-2xx body is read with a byte cap too (maximumErrorBodyBytes, 4 KB). The SSE reading was split into OpenAIStreamReading.swift because the client had grown past the repository's 500-line rule.",
+    "evidence_after": "New test 'An event line past the cap fails the stream instead of being buffered' sends a line one byte past the cap and asserts the failure; the existing SSE tests still pass. Evidence: AUDIT/evidence-batch11-tests.log (39 tests in 5 suites) and AUDIT/evidence-batch11-mac-checks.log (all 8 Mac gates passed, EXIT=0: 1074 tests, swiftlint 215/217, swift-format 439/444, no file over 500 lines). ",
+    "commit": "audit(AUDIT-0053): bound the SSE line, and split the stream reader out",
     "blocked_reason": ""
   },
   {
@@ -976,14 +976,14 @@
     "file_line": "Sources/ChatBotsApp/EngineSupervisor.swift:87-90,280-309; ChatControllerSeatConfiguration.swift:118-129",
     "title": "The app adopts any process answering on 7790 without verifying it, then hands it every Keychain API key",
     "category": "secret-handling",
-    "status": "OPEN",
+    "status": "BLOCKED",
     "host": "Node1.local",
     "discovered_by": "subagent-app",
     "evidence_before": "start() does `if await isEngineAnswering() { state = .running(owned: false); return }`; the probe uses WebTransportEngineClient with .localDevelopmentSelfSigned, which does not verify the peer. ChatBotsApp.swift:115 then calls controller.applyAPIEndpoints, and APIEndpointStore.swift:53-58 fills apiKey from the Keychain and sends it via .updateSeat. A same-user process that binds 127.0.0.1:7790 receives the user's cloud keys and can inject snapshot.error/notices into the UI. Precondition is local code execution as the user, which is exactly what the Keychain boundary is meant to contain.",
     "fix_summary": "",
     "evidence_after": "",
     "commit": "",
-    "blocked_reason": ""
+    "blocked_reason": "OWNER: repository owner (Pummelchen). REASON: the app adopts any process answering on 127.0.0.1:7790 and then sends it every Keychain API key; the client transport accepts a self-signed loopback peer without fingerprint enforcement, so a same-user process can impersonate the engine. Fixing it needs a trust mechanism between the app and the engine, which is a new cross-project contract (two products, one secret). TRIED: reviewed EngineSupervisor, WebTransportClient and SECURITY.md; confirmed the probe uses .localDevelopmentSelfSigned and that applyAPIEndpoints sends the keys. OPTIONS FOR A HUMAN: (1) the engine writes a random session token to .run/ (0600) at startup and the app must see it echoed before it sends any key; (2) the app never adopts an existing engine and always launches its own, refusing to start when the port is taken. Both change the app/engine contract and need the owner's choice."
   },
   {
     "id": "AUDIT-0059",
@@ -1299,14 +1299,14 @@
     "file_line": "Caddyfile:40-42; tools/start.sh:53,289-303",
     "title": "The shipped default publishes the unauthenticated site and API on every interface over plaintext HTTP",
     "category": "authz",
-    "status": "OPEN",
+    "status": "BLOCKED",
     "host": "Node1.local",
     "discovered_by": "subagent-tools",
     "evidence_before": "Caddyfile:40 `http://:7788 {` carries no bind, so the site listens on every interface; bind 127.0.0.1 is only generated when --local-only is passed (start.sh:53 defaults LOCAL_ONLY=0). /api/* and /s/* proxy to loopback with no authentication or TLS, so anyone on the LAN can read and steer conversations and an on-path reader can also write. SECURITY.md documents the exposure as deliberate and start.sh prints it; recorded as a sign-off item because the shipped default is the exposed one.",
     "fix_summary": "",
     "evidence_after": "",
     "commit": "",
-    "blocked_reason": ""
+    "blocked_reason": "OWNER: repository owner (Pummelchen). REASON: the same deliberate LAN-trust decision as AUDIT-0018, seen from the Caddy side \u2014 Caddyfile:40 carries no bind, so the unauthenticated site and API are published on every interface, over plaintext HTTP, unless --local-only is passed. TRIED: read the Caddyfile, tools/start.sh (default LOCAL_ONLY=0) and SECURITY.md; start.sh already prints the exposure. OPTIONS FOR A HUMAN: (1) accept and sign off; (2) make the default Caddyfile bind 127.0.0.1 and require an explicit --lan flag to publish, adding TLS for the LAN case."
   },
   {
     "id": "AUDIT-0078",

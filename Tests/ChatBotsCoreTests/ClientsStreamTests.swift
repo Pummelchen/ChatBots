@@ -10,9 +10,10 @@
 // stream ends where the test says it does, so "the connection stopped early" is produced by the
 // transport rather than simulated.
 
-import ChatBotsCore
 import Foundation
 import Testing
+
+@testable import ChatBotsCore
 
 @MainActor
 @Suite("A truncated stream is not a finished turn")
@@ -149,6 +150,29 @@ struct ClientsStreamTests {
         #expect(
             failures.first?.contains("could not be read") == true,
             "and it says what was wrong: \(failures)")
+    }
+
+    @Test("An event line past the cap fails the stream instead of being buffered")
+    func oversizedEventLineFailsTheStream() async throws {
+        // `bytes.lines` buffers a whole line before yielding it, so one enormous line grew this
+        // client's memory without limit. The cap is applied while accumulating.
+        let oversized = Data(
+            repeating: UInt8(ascii: "A"),
+            count: OpenAIResponsesClient.maximumEventLineBytes + 1)
+        var body = Data("data: ".utf8)
+        body.append(oversized)
+        body.append(Data("\n\n".utf8))
+
+        let server = try await ScriptedOpenAIServer(responsesBody: body)
+        defer { server.stop() }
+        let client = OpenAIResponsesClient(endpoint: scriptedEndpoint(port: server.port))
+
+        var failures: [String] = []
+        for try await event in client.stream(request()) {
+            if case .failed(let message) = event { failures.append(message) }
+        }
+        #expect(failures.count == 1, "an oversized line is reported, not buffered")
+        #expect(failures.first?.contains("too long") == true)
     }
 
     /// An empty answer must fail the turn rather than finish it.

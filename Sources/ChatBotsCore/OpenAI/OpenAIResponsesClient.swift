@@ -207,6 +207,17 @@ public struct OpenAIResponsesClient: Sendable {
         return components?.string ?? "\(url.scheme ?? "?")://\(url.host ?? "?")\(url.path)"
     }
 
+    /// The largest SSE line this client will buffer.
+    ///
+    /// `AsyncBytes.lines` buffers a whole line before yielding it, so a hostile or broken
+    /// endpoint sending one enormous line (with no newline) grew this client's memory without
+    /// limit — the 600-character cap on the error body was applied only after the line was
+    /// already in memory. One megabyte is far past any real event: a delta is a few characters.
+    static let maximumEventLineBytes = 1_048_576
+
+    /// The most of a non-2xx body this client reads before reporting the status.
+    static let maximumErrorBodyBytes = 4_096
+
     private func endpointURL() throws -> URL {
         guard let url = endpoint.responsesURL else {
             if let parsed = URL(string: endpoint.baseURL),
@@ -299,100 +310,19 @@ public struct OpenAIResponsesClient: Sendable {
             throw OpenAIResponsesError.streamFailed("no HTTP response")
         }
         guard (200..<300).contains(http.statusCode) else {
-            // The body carries the server's explanation; read a little of it.
-            var detail = ""
-            for try await line in bytes.lines {
-                detail += line
-                if detail.count > 600 { break }
+            // The body carries the server's explanation; read a little of it, by bytes rather
+            // than by lines: `bytes.lines` buffers a whole line first, so one enormous line
+            // would be in memory before the cap could stop it.
+            var detailBytes = Data()
+            for try await byte in bytes {
+                detailBytes.append(byte)
+                if detailBytes.count >= Self.maximumErrorBodyBytes { break }
             }
+            let detail = String(bytes: detailBytes, encoding: .utf8) ?? ""
             throw OpenAIResponsesError.http(status: http.statusCode, body: detail)
         }
 
-        // A completed response is the only thing that counts as success (see the header). The
-        // loop can end at EOF or at `data: [DONE]`, and either can happen mid-stream when a
-        // connection drops, a proxy truncates, or a server is killed — so "the bytes stopped"
-        // is not evidence that the turn finished. `sawCompleted` is what separates the two.
-        var sawCompleted = false
-        // An explicit failure is already the answer; it is reported as `.failed` and the caller
-        // turns it into the thrown error. It must not also produce the truncation error below,
-        // which would replace the server's own reason with a less useful one.
-        var sawFailure = false
-        var utf8 = UTF8StreamBuffer()
-        // Labelled so a terminal event can end the read, not merely the `switch` it is decoded
-        // in. A `break` inside a case only leaves the case.
-        readLoop: for try await line in bytes.lines {
-            try Task.checkCancellation()
-            guard let payload = Self.dataPayload(from: line) else { continue }
-            if payload == "[DONE]" { break }
-            guard
-                let event = try? JSONSerialization.jsonObject(with: Data(payload.utf8))
-                    as? [String: Any]
-            else {
-                // The Responses API's `data:` payloads are JSON. A line that is not is a
-                // protocol violation, and dropping it silently meant a stream could lose
-                // events and still finish with a well-formed `response.completed`, so a
-                // partial answer was indistinguishable from a whole one.
-                sawFailure = true
-                continuation.yield(.failed("the stream carried an event that could not be read"))
-                break readLoop
-            }
-
-            let type = event["type"] as? String ?? ""
-            switch type {
-            case "response.output_text.delta":
-                if let delta = event["delta"] as? String, !delta.isEmpty {
-                    // Through the buffer: a chunk may end mid-character.
-                    let safe = utf8.append(delta)
-                    if !safe.isEmpty {
-                        continuation.yield(.text(safe))
-                    }
-                }
-
-            case "response.reasoning_text.delta", "response.reasoning_summary_text.delta":
-                if let delta = event["delta"] as? String, !delta.isEmpty {
-                    continuation.yield(.reasoning(delta))
-                }
-
-            case "response.completed", "response.done":
-                // A response can complete having produced no text at all when the model
-                // only reasoned or only called a tool; the caller decides what that means.
-                sawCompleted = true
-                continuation.yield(.completed(Self.usage(from: event)))
-
-            case "response.failed", "response.incomplete":
-                let message = Self.failureMessage(from: event)
-                sawFailure = true
-                continuation.yield(.failed(message))
-                // The server has already given its answer, so the read ends here. Without this
-                // the loop went back to `bytes.lines` for a connection a server may hold open,
-                // and the turn stayed alive until the 600-second request timeout — ten minutes
-                // of waiting for a failure that was reported at once. It is also what concludes
-                // a stream that reports failure and then sends nothing: a missing
-                // terminal event is a failure the reader must act on rather than wait out.
-                break readLoop
-
-            case "error":
-                sawFailure = true
-                continuation.yield(.failed(Self.failureMessage(from: event)))
-                break readLoop
-
-            default:
-                break
-            }
-        }
-
-        let tail = utf8.flush()
-        if !tail.isEmpty { continuation.yield(.text(tail)) }
-
-        // Truncated: the stream ended without the server ever saying it completed. Whatever
-        // text arrived is a fragment, and reporting it as a finished turn would record a
-        // `stop` with zero usage — the token statistics silently become 0, and a half answer is
-        // indistinguishable from a whole one. Throwing is what makes the caller's normal
-        // error handling report the turn as failed instead.
-        if !sawCompleted, !sawFailure {
-            throw OpenAIResponsesError.streamFailed(
-                "the connection ended before the response completed, so the reply is incomplete")
-        }
+        try await readEventStream(bytes, into: continuation)
     }
 
     /// `data: {...}` → `{...}`, or nil for comments, blank lines and other SSE fields.

@@ -1,0 +1,342 @@
+Building for debugging...
+[Computing dependencies]
+[Pre-planning 1 / 1362]
+[Planning 1016 / 1362]
+[Planning deferred tasks]
+[Constructing 1720 / 3228]
+[1 / 4] mlx-swift_Cmlx
+[1 / 275] MLXVLM
+[21 / 307] yyjson
+[22 / 310] RealModule
+[28 / 320] RealModule
+[31 / 344] WebTransportQUICCore
+[35 / 344] ArgumentParserToolInfo
+[42 / 354] _NumericsShims
+[54 / 358] Crypto
+[60 / 366] WebTransportCryptoApple
+[61 / 384] WebTransportQUICCore
+[66 / 387] WebTransportUDPApple
+[75 / 390] WebTransportTLSCore
+[77 / 390] WebTransportQUICCore
+[79 / 390] WebTransportTLSCore
+[82 / 390] WebTransportQUICCore
+[86 / 391] WebTransportQUICCore
+[89 / 391] WebTransportHTTP3Core
+[94 / 391] WebTransportCryptoApple
+[94 / 391] WebTransportQUICCore
+[98 / 395] WebTransportHTTP3Core
+[105 / 406] ComplexModule
+[109 / 412]
+[113 / 412] WebTransportNetworkRuntime
+[116 / 412] RealModule
+[126 / 417] WebTransport
+[127 / 417] WebTransport
+[128 / 417] InternalCollectionsUtilities
+[132 / 421] WebTransport
+[134 / 430] WebTransportHTTP3Core
+[141 / 431] OrderedCollections
+[143 / 431] OrderedCollections
+[147 / 431] InternalCollectionsUtilities
+[149 / 431] EventSource
+[152 / 431] EventSource
+[157 / 433] Crypto
+[160 / 433] Crypto
+[162 / 442] Crypto
+[166 / 442] HuggingFace
+[166 / 442] OrderedCollections
+[168 / 442] HuggingFace
+[171 / 444] WebTransportNetworkRuntime
+[174 / 444] HuggingFace
+[176 / 446] HuggingFace
+[180 / 446] Crypto
+[182 / 455] Jinja
+[184 / 455] Jinja
+[185 / 455] HuggingFace
+[189 / 456] Jinja
+[191 / 456] Jinja
+[192 / 456] Jinja
+[192 / 456] HuggingFace
+[193 / 456] ComplexModule
+[199 / 459] Numerics
+[204 / 463] ComplexModule
+[213 / 467] Crypto
+[222 / 467] OrderedCollections
+[224 / 467] ArgumentParser
+[231 / 484] ArgumentParserToolInfo
+[233 / 484]
+[236 / 484] ArgumentParser
+[239 / 484] Hub
+[246 / 488] Tokenizers
+[249 / 488] ArgumentParserToolInfo
+[252 / 490] ArgumentParserToolInfo
+[256 / 505] Tokenizers
+[256 / 505] Hub
+[258 / 505] Hub
+[263 / 506] encuda-product
+[266 / 506] Tokenizers
+[270 / 506] Tokenizers
+[271 / 506] Tokenizers
+[275 / 506] ArgumentParser
+[276 / 507] Tokenizers
+[276 / 507] encuda-product
+[280 / 508]
+[291 / 510] Cmlx
+[292 / 510] Cmlx
+[292 / 519] Cmlx
+[293 / 519] Cmlx
+[294 / 519] Cmlx
+[298 / 519] Cmlx
+[300 / 519] Cmlx
+[302 / 519] MLX
+[305 / 521] Cmlx
+[310 / 521] Cmlx
+[311 / 521] Cmlx
+[312 / 521] Cmlx
+[317 / 521] Cmlx
+[325 / 521] Cmlx
+[329 / 521] Cmlx
+[332 / 521] Cmlx
+[333 / 521] Cmlx
+[336 / 521] Cmlx
+[340 / 521] Cmlx
+[343 / 521] Cmlx
+[345 / 521] Cmlx
+[349 / 521] Cmlx
+[350 / 521] Cmlx
+[351 / 521] Cmlx
+[353 / 521] Cmlx
+[357 / 521] Cmlx
+[358 / 521] Cmlx
+[359 / 521] Cmlx
+[360 / 521] Cmlx
+[361 / 521] Cmlx
+[362 / 521] Cmlx
+[363 / 521] Cmlx
+[364 / 521] Cmlx
+[367 / 521] Cmlx
+[368 / 521] Cmlx
+[369 / 521] Cmlx
+[371 / 521] Cmlx
+[373 / 521] Cmlx
+[375 / 521] Cmlx
+[376 / 521] Cmlx
+[377 / 521] Cmlx
+[379 / 521] Cmlx
+[381 / 521] Cmlx
+[383 / 521] Cmlx
+[384 / 521] Cmlx
+[387 / 521] Cmlx
+[388 / 521] Cmlx
+[390 / 521] Cmlx
+[392 / 521] Cmlx
+[393 / 521] Cmlx
+[395 / 521] Cmlx
+[397 / 521] Cmlx
+[399 / 521] Cmlx
+[403 / 521] Cmlx
+[407 / 521] Cmlx
+[411 / 521] Cmlx
+[413 / 521] Cmlx
+[414 / 521] Cmlx
+[418 / 521] Cmlx
+[419 / 521] Cmlx
+[421 / 521] Cmlx
+[424 / 521] Cmlx
+[426 / 521] Cmlx
+[427 / 521] Cmlx
+[428 / 521] Cmlx
+[431 / 521] Cmlx
+[434 / 521] Cmlx
+[436 / 521] Cmlx
+[437 / 521] Cmlx
+[439 / 521] Cmlx
+[441 / 521] Cmlx
+[442 / 521] Cmlx
+[444 / 521] Cmlx
+[446 / 521] Cmlx
+[449 / 521] Cmlx
+[450 / 521] Cmlx
+[451 / 521] Cmlx
+[452 / 521] Cmlx
+[454 / 521] Cmlx
+[458 / 521] Cmlx
+[462 / 521] Cmlx
+[463 / 521] Cmlx
+[464 / 521] Cmlx
+[466 / 521] Cmlx
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+[472 / 520] Tokenizers
+[474 / 520] MLX
+[476 / 522] MLXNN
+[477 / 522] MLXNN
+[478 / 531] MLX
+[480 / 531] MLXNN
+[480 / 531] MLX
+[483 / 531] MLXNN
+[485 / 533] MLXNN
+[491 / 535] MLXOptimizers
+[492 / 535]
+[494 / 538] Tokenizers
+[498 / 541] MLXNN
+[498 / 541] MLX
+[504 / 550] MLXOptimizers
+[507 / 550] MLXLMCommon
+[508 / 550] MLXLMCommon
+[515 / 557]
+[518 / 560] MLXVLM
+[520 / 569] MLXVLM
+[522 / 580] MLXLLM
+[522 / 580] MLXLMCommon
+[524 / 581] MLXLMCommon
+[526 / 581] MLXLMCommon
+[527 / 581] MLXVLM
+[530 / 583] MLXLMCommon
+[533 / 583] MLXVLM
+[534 / 583] MLXLLM
+[537 / 585] MLXVLM
+[540 / 585] MLXVLM
+[542 / 585] MLXLLM
+[542 / 585] MLXVLM
+[543 / 585] MLXVLM
+[545 / 585] MLXLLM
+[547 / 585] MLXLLM
+[550 / 586] Cmlx
+[554 / 586] MLXOptimizers
+[557 / 586] MLXVLM
+[557 / 586] ChatBotsCore
+[559 / 597]
+[562 / 597] ChatBotsCore
+[563 / 597] ChatBotsCore
+[565 / 597] ChatBotsCore
+[567 / 596] MLXLLM
+[572 / 596] ChatBotsCore
+[575 / 605] chatbots-cli-product
+[576 / 605] ChatBots-product
+[577 / 607] chatbots-probe-product
+[578 / 616] chatbots-cli-product
+[579 / 616] ChatBots
+[580 / 625] chatbots-probe-product
+[583 / 634] ChatBots
+[584 / 634] chatbots-probe-product
+[585 / 634] ChatBotsCore
+[589 / 634] chatbots-cli-product
+[591 / 634] chatbots-cli-product
+[595 / 634] ChatBots-product
+[597 / 634] ChatBots
+[600 / 634] ChatBotsCore
+[602 / 634] ChatBots-product
+[603 / 634] ChatBotsCore
+[604 / 634] ChatBots-product
+[606 / 634] chatbots-cli-product
+[607 / 635] ChatBots
+[611 / 635] ChatBots-product
+[613 / 641] ChatBots
+[615 / 641] ChatBotsCore
+[618 / 638] ChatBotsCoreTests-product
+[622 / 640] ChatBotsCore-product
+[622 / 640] ChatBots-product
+[624 / 640] ChatBots
+[624 / 640] ChatBots-product
+[632 / 649] ChatBotsCoreTests-product
+[633 / 649] ChatBotsCoreTests-product
+[635 / 649] ChatBots
+[636 / 651] ChatBots-product
+[639 / 647] ChatBotsCoreTests-product
+[639 / 647] ChatBotsAppTests-product
+[643 / 656] ChatBotsAppTests-product
+[647 / 656] ChatBotsAppTests-product
+[648 / 656] ChatBotsAppTests-product
+[649 / 656] ChatBotsAppTests-product
+[654 / 660] ChatBotsAppTests-product
+[654 / 660] ChatBotsCoreTests-product
+[654 / 660] ChatBotsAppTests-product
+[656 / 663] ChatBotsCoreTests-product
+[656 / 663] ChatBotsAppTests-product
+[658 / 663] ChatBotsAppTests-product
+[659 / 663] chatbots-cli-product
+[661 / 664] chatbots-probe-product
+[662 / 666] ChatBotsCoreTests-product
+[664 / 666] ChatBotsCoreTests-product
+[666 / 668] ChatBotsCoreTests-product
+Build complete! (88,72 secs)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "The API trace switch" started.
+◇ Suite "A truncated stream is not a finished turn" started.
+◇ Suite "Responses API requests" started.
+◇ Suite "The readiness probe runs when it is needed" started.
+◇ Test "Only a value that means 'on' turns the trace on" started.
+◇ Suite "OpenAI Responses request" started.
+◇ Test "An unreadable event fails the stream instead of being skipped" started.
+◇ Test "The engine does not record a truncated stream as a finished turn" started.
+◇ Test "A stream that completes yields its text, its usage and no error" started.
+◇ Test "`data: [DONE]` alone is not a completed response" started.
+◇ Test "An explicit failure keeps the server's own reason" started.
+◇ Test "An event line past the cap fails the stream instead of being buffered" started.
+◇ Test "A stream that ends mid-reply throws instead of finishing" started.
+◇ Test "An empty answer fails the turn instead of finishing it" started.
+◇ Test "Asking for reasoning text also asks for the effort" started.
+◇ Test "Every thinking level maps to an effort the server understands" started.
+◇ Test "A generous answer budget is not lowered" started.
+◇ Test "Thinking off keeps a smaller floor, since nothing is being reasoned" started.
+◇ Test "The effort is sent even when the reasoning text is not wanted" started.
+◇ Test "The output ceiling leaves room for reasoning, which shares it" started.
+◇ Test "A body that is not JSON is an error, not an empty list" started.
+◇ Test "A later probe failure cannot fail an otherwise good turn" started.
+◇ Test "An unloaded engine probes again on the next turn" started.
+◇ Test "SSE lines are parsed only when they carry data" started.
+◇ Test "An empty model list is still reported as no model loaded" started.
+◇ Test "A body of the wrong shape is an error, not an empty list" started.
+◇ Test "Reasoning is only requested when thinking is on" started.
+◇ Test "A valid model list is read" started.
+◇ Test "A strict endpoint without a key is flagged before a request is attempted" started.
+◇ Test "Only the first turn probes /v1/models" started.
+◇ Test "An unreadable /v1/models body is not reported as a missing model" started.
+◇ Test "An entry without an id is dropped rather than faked" started.
+◇ Test "A model is named through the table, or tidied up when it is unknown" started.
+◇ Test "An extended endpoint also receives the local-only parameters" started.
+◇ Test "Saved settings from before the compatibility field still decode" started.
+◇ Test "A strict endpoint receives only parameters in OpenAI's schema" started.
+◇ Test "The presence penalty is flipped to OpenAI's sign convention" started.
+◇ Test "An empty model list is empty, not an error" started.
+◇ Test "Compatibility is inferred from the URL, defaulting to permissive for localhost" started.
+◇ Test "A /v1 URL and a bare URL both resolve to one responses endpoint" started.
+✔ Test "Every thinking level maps to an effort the server understands" passed after 0.001 seconds.
+✔ Test "Only a value that means 'on' turns the trace on" passed after 0.001 seconds.
+✔ Test "SSE lines are parsed only when they carry data" passed after 0.001 seconds.
+✔ Test "A generous answer budget is not lowered" passed after 0.001 seconds.
+✔ Test "Thinking off keeps a smaller floor, since nothing is being reasoned" passed after 0.001 seconds.
+✔ Test "A model is named through the table, or tidied up when it is unknown" passed after 0.001 seconds.
+✔ Test "A strict endpoint without a key is flagged before a request is attempted" passed after 0.001 seconds.
+✔ Test "The output ceiling leaves room for reasoning, which shares it" passed after 0.001 seconds.
+✔ Test "Compatibility is inferred from the URL, defaulting to permissive for localhost" passed after 0.001 seconds.
+✔ Test "Saved settings from before the compatibility field still decode" passed after 0.001 seconds.
+✔ Test "A /v1 URL and a bare URL both resolve to one responses endpoint" passed after 0.001 seconds.
+◇ Test "The trace names the destination without userinfo, query or fragment" started.
+✔ Test "The trace names the destination without userinfo, query or fragment" passed after 0.001 seconds.
+◇ Test "Switching it on prints a bounded body with the image payloads left out" started.
+✔ Test "A stream that completes yields its text, its usage and no error" passed after 0.037 seconds.
+✔ Test "Switching it on prints a bounded body with the image payloads left out" passed after 0.036 seconds.
+✔ Test "`data: [DONE]` alone is not a completed response" passed after 0.037 seconds.
+◇ Test "A body that fits is traced whole, so the switch still shows what was sent" started.
+✔ Test "An unreadable event fails the stream instead of being skipped" passed after 0.037 seconds.
+✔ Test "A stream that ends mid-reply throws instead of finishing" passed after 0.037 seconds.
+✔ Test "An explicit failure keeps the server's own reason" passed after 0.037 seconds.
+✔ Test "The engine does not record a truncated stream as a finished turn" passed after 0.040 seconds.
+[trace] POST http://127.0.0.1:7911/v1/responses (213 bytes)
+[trace] {"include":["reasoning.encrypted_content"],"input":"Say hello.","max_output_tokens":4096,"min_p":0,"model":"test-model","reasoning":{"effort":"medium"},"stream":true,"temperature":0.75,"top_p":0.94999999999999996}
+✔ Test "An empty answer fails the turn instead of finishing it" passed after 0.040 seconds.
+[trace] POST http://127.0.0.1:7908/v1/responses (213 bytes)
+[trace] {"include":["reasoning.encrypted_content"],"input":"Say hello.","max_output_tokens":4096,"min_p":0,"model":"test-model","reasoning":{"effort":"medium"},"stream":true,"temperature":0.75,"top_p":0.94999999999999996}
+[trace] POST http://127.0.0.1:7909/v1/responses (213 bytes)
+[trace] {"include":["reasoning.encrypted_content"],"input":"Say hello.","max_output_tokens":4096,"min_p":0,"model":"test-model","reasoning":{"effort":"medium"},"stream":true,"temperature":0.75,"top_p":0.94999999999999996}
+✔ Test "Only the first turn probes /v1/models" passed after 0.042 seconds.
+✔ Test "A body that fits is traced whole, so the switch still shows what was sent" passed after 0.008 seconds.
+◇ Test "Switching it off prints nothing at all" started.
+✔ Test "Switching it off prints nothing at all" passed after 0.003 seconds.
+✔ Suite "The API trace switch" passed after 0.050 seconds.
+✔ Test "An event line past the cap fails the stream instead of being buffered" passed after 0.160 seconds.
+✔ Suite "A truncated stream is not a finished turn" passed after 0.160 seconds.
+✔ Test run with 39 tests in 5 suites passed after 0.161 seconds.
+EXIT=0
