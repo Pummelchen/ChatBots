@@ -1689,12 +1689,12 @@
     "file_line": "Sources/ChatBotsCore/Room/SocialLibrary.swift:13",
     "title": "SocialLibrary's enum body spans 432 lines, over the configured type_body_length of 400",
     "category": "style/structure",
-    "status": "OPEN",
+    "status": "DONE",
     "host": "Node1.local",
     "discovered_by": "audit-0029",
     "evidence_before": "`swiftlint lint` reports `type_body_length`: the enum spans 432 lines against the recorded warning of 400. It is the one container type that does after the file-size splits. Splitting the file does not help \u2014 the limit is the type's body, not the file's.",
-    "fix_summary": "",
-    "evidence_after": "",
-    "commit": ""
+    "fix_summary": "The humour and ambition groups moved into `SocialLibraryAmbition.swift` as an `extension SocialLibrary`, which is what `SocialLibraryLookup.swift` already did for the lookups: the enum body is now 225 lines and SwiftLint measures each declaration separately, so the type is inside the 400-line limit. The characters are unchanged and `all` still names all 36.",
+    "evidence_after": "swiftlint no longer reports `type_body_length` (32 findings, down from 33). All 9 Mac gates pass: AUDIT/evidence-strict-body-mac-checks.log (1086 tests).",
+    "commit": "audit(AUDIT-0029/0103): move two character groups into an extension"
   }
 ]
