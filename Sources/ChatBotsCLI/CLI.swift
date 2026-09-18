@@ -49,10 +49,6 @@ enum CLI {
             ExportSample.run(options: options)
         }
 
-        if let key = options.tavilyKey {
-            setenv("TAVILY_API_KEY", key, 1)
-        }
-
         let context = RunContext(options: options, modelsRoot: modelsRoot, runDirectory: runDirectory)
 
         if options.benchmark {

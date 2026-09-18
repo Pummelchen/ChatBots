@@ -18,7 +18,6 @@ struct Options {
     var turnsSpecified = false
     var modelA = AgentSpec.defaultModelID
     var modelB = AgentSpec.defaultModelID
-    var tavilyKey: String?
     var benchmark = false
     var solo = false
     var memoryProbe = false
@@ -118,7 +117,20 @@ struct Options {
             // because any repository id is a legitimate value (ModelCatalog).
             case "--model-a": options.modelA = ModelCatalog.resolve(next() ?? options.modelA)
             case "--model-b": options.modelB = ModelCatalog.resolve(next() ?? options.modelB)
-            case "--key": options.tavilyKey = next()
+            case "--key":
+                // Refused rather than accepted. A value on the command line is readable by every
+                // process on the machine through `ps` and is kept in the shell's history file, so
+                // it is not a way to supply a secret. `TAVILY_API_KEY` in the environment and
+                // `.secrets.env` at the project root are both supported, and neither leaves the
+                // value behind.
+                FileHandle.standardError.write(
+                    Data(
+                        ("""
+                        --key is refused: the value would be visible to every process on this \
+                        machine and recorded in your shell history. Set TAVILY_API_KEY in the \
+                        environment, or put it in .secrets.env at the project root.
+                        """ + "\n").utf8))
+                exit(2)
             case "--max-tokens":
                 // The same silent-default class: a nil from `Int(...)` left the seat's own budget in
                 // place without saying so.
@@ -320,7 +332,7 @@ struct Options {
               --model-b <id>       MLX checkpoint for seat B
               --list-models        Print the checkpoints this app offers and exit
                                    (--model-a also takes any Hugging Face repository id)
-              --key <key>          Tavily API key (else env TAVILY_API_KEY or .secrets.env)
+              --key is refused      Set TAVILY_API_KEY or add the key to .secrets.env instead
               --max-tokens <n>     Cap answer tokens per turn
               --thinking <mode>    off | minimal | low | medium | high | unlimited
               --backend-a <mlx|openAIResponses>   Engine for seat A (default: mlx)

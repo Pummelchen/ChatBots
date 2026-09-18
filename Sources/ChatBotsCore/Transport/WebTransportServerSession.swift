@@ -39,7 +39,12 @@ extension WebTransportEngineServer {
             let seconds = Int(self.configuration.sessionStartupTimeout)
             let reason = "the session did not finish a frame within \(seconds) seconds"
             self.note(reason)
-            try? await session.close(reason: reason)
+            // The session is taken out of `sessions` before it is closed, exactly as the `defer`
+            // below does: the `defer` closes only what it still owns, and the library's `close()`
+            // must not be called twice.
+            if self.sessions.removeValue(forKey: id) != nil {
+                try? await session.close(reason: reason)
+            }
         }
         defer { watchdog.cancel() }
 
@@ -47,7 +52,17 @@ extension WebTransportEngineServer {
         // serialises stream operations on a session, and a second bidirectional stream does
         // not open. A single stream carrying tagged frames avoids both the deadlock and the
         // limitation. See EngineProtocol for the full account.
-        guard let stream = try? await session.acceptBidirectionalStream() else { return }
+        let stream: WebTransportBidirectionalStream
+        do {
+            stream = try await session.acceptBidirectionalStream()
+        } catch {
+            // The failure used to be discarded by `try?`, so a session that could never open its
+            // stream ended with no recorded reason — `recentSessionErrors` stayed empty and the
+            // end was indistinguishable from a clean close. Every neighbouring refusal records
+            // one.
+            note("the session could not open its stream: \(error.localizedDescription)")
+            return
+        }
 
         // This session is subscribed the moment its stream exists.
         //
@@ -97,7 +112,7 @@ extension WebTransportEngineServer {
                 } catch {
                     // A frame the framing refuses cannot be skipped, so this ends the session; the reasons
                     // are unwound in `refuseFraming` because this function is at its complexity budget.
-                    await refuseFraming(error, on: stream, session: session)
+                    await refuseFraming(error, on: stream, session: session, id: id)
                     return
                 }
                 guard case .message(let payload, let remainder) = result else { break }
@@ -153,14 +168,20 @@ extension WebTransportEngineServer {
     /// This was a `try?`, which discarded the error and left a session that answered nothing for the rest of
     /// its life — and the cap was low enough that a legitimate large attachment reached it.
     private func refuseFraming(
-        _ error: Error, on stream: WebTransportBidirectionalStream, session: WebTransportSession
+        _ error: Error, on stream: WebTransportBidirectionalStream, session: WebTransportSession,
+        id: UUID
     ) async {
         let reason =
             (error as? ProtocolError)?.errorDescription
             ?? "the frame could not be read: \(error.localizedDescription)"
         note(reason)
         await send(.reply(.failed(reason)), on: stream)
-        try? await session.close(reason: reason)
+        // Ownership is taken before the close, for the same reason the watchdog takes it: the
+        // `defer` in `serve` closes only what is still in `sessions`, and `close()` must not be
+        // called twice.
+        if sessions.removeValue(forKey: id) != nil {
+            try? await session.close(reason: reason)
+        }
     }
 
     /// Write one frame. Every write goes through here so there is one place that serialises

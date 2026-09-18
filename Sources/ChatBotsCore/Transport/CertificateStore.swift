@@ -327,9 +327,13 @@ public enum CertificateStore {
     }
 
     /// The mode of `url`, or `nil` if it cannot be read.
+    ///
+    /// `lstat` rather than `FileManager.attributesOfItem`, which follows a symbolic link: a link
+    /// pointing at a 0600 file would report 0600 while the thing being checked was something else.
     private static func permissions(of url: URL) -> Int? {
-        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
-        return (attributes?[.posixPermissions] as? NSNumber)?.intValue
+        var info = stat()
+        guard lstat(url.path, &info) == 0 else { return nil }
+        return Int(info.st_mode & 0o777)
     }
 
     private static func generate(
@@ -337,7 +341,13 @@ public enum CertificateStore {
         hostnames: [String], validityDays: Int
     ) throws -> EngineIdentity {
         let manager = FileManager.default
-        try? manager.createDirectory(at: directory, withIntermediateDirectories: true)
+        // 0700 from the moment it exists, and tightened when it already does. The directory used
+        // to be created under the process umask and never checked, so under a permissive umask
+        // the folder holding the private key was world-traversable.
+        try? manager.createDirectory(
+            at: directory, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700])
+        try? manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
 
         guard let openssl = whichOpenSSL() else { throw CertificateStoreError.opensslUnavailable }
 
@@ -349,12 +359,24 @@ public enum CertificateStore {
             alternatives.append("IP:\(host)")
         }
 
+        // The pair is generated inside a private staging directory and moved into place, rather
+        // than written straight to its final path. `-keyout` writes under the process umask, so
+        // the key existed as 0644 until the chmod below ran; inside this 0700 directory nothing
+        // outside the user can reach it at any point, and a rename keeps the 0600 mode.
+        let staging = directory.appending(path: ".staging-\(UUID().uuidString)")
+        try manager.createDirectory(
+            at: staging, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700])
+        defer { try? manager.removeItem(at: staging) }
+        let stagedKey = staging.appending(path: "privateKey.pem")
+        let stagedCertificate = staging.appending(path: "certificate.pem")
+
         let result = try run(
             openssl,
             [
                 "req", "-x509", "-newkey", "rsa:2048",
-                "-keyout", privateKey.path,
-                "-out", certificate.path,
+                "-keyout", stagedKey.path,
+                "-out", stagedCertificate.path,
                 "-days", String(validityDays),
                 // No passphrase on the key. It never leaves this folder and is read only by
                 // the engine on this machine; encrypting it would add a secret to manage
@@ -372,107 +394,15 @@ public enum CertificateStore {
         }
         // Readable only by this user. It is not a secret in the usual sense — it is local to
         // the machine — but there is no reason for it to be world-readable either, and the mode is
-        // now checked rather than assumed: `try?` here used to swallow a failed chmod.
-        try restrictToThisUser(privateKey)
+        // checked rather than assumed: `try?` here used to swallow a failed chmod.
+        try restrictToThisUser(stagedKey)
+        // Moved rather than copied, so the 0600 mode is the one that lands, and the previous pair
+        // is removed first because `moveItem` refuses an existing destination.
+        try? manager.removeItem(at: privateKey)
+        try? manager.removeItem(at: certificate)
+        try manager.moveItem(at: stagedCertificate, to: certificate)
+        try manager.moveItem(at: stagedKey, to: privateKey)
 
         return try existing(certificate: certificate, privateKey: privateKey, hostnames: hostnames)
     }
-
-    // MARK: - openssl
-
-    /// The `openssl` binaries this store will run, best first.
-    ///
-    /// `/usr/bin/openssl` is the one macOS ships and is owned by root. The Homebrew prefixes are kept as a
-    /// fallback — a machine can be without the system binary — but a candidate is only used when no other
-    /// user could have replaced it, because this program's argument list carries the path of the private
-    /// key it is about to write: a binary someone else can write is a binary that can read the key.
-    static let opensslSearchPaths = [
-        "/usr/bin/openssl", "/opt/homebrew/bin/openssl", "/usr/local/bin/openssl",
-    ]
-
-    static func whichOpenSSL(in paths: [String] = opensslSearchPaths) -> String? {
-        paths.first(where: isTrustworthyExecutable)
-    }
-
-    /// Whether `path` is executable by this user and cannot be written by any other user.
-    ///
-    /// Symlinks are followed — `/opt/homebrew/bin/openssl` is one — because the file that runs is the one at
-    /// the end of the chain, and group-write is refused along with other-write: on macOS an admin group can
-    /// write files its members cannot, which is the same exposure one step narrower.
-    static func isTrustworthyExecutable(_ path: String) -> Bool {
-        let manager = FileManager.default
-        guard manager.isExecutableFile(atPath: path),
-            let attributes = try? manager.attributesOfItem(
-                atPath: URL(fileURLWithPath: path).resolvingSymlinksInPath().path),
-            let mode = (attributes[.posixPermissions] as? NSNumber)?.intValue
-        else { return false }
-        return mode & 0o022 == 0
-    }
-
-    /// SHA-256 over the certificate's DER, which is the value in the certificate itself.
-    ///
-    /// Taken from the certificate rather than from the PKCS#12, because the fingerprint a
-    /// client reports is the certificate's, and the two must be comparable by eye.
-    private static func fingerprint(ofPEMCertificate certificate: URL) throws -> Data {
-        guard let openssl = whichOpenSSL() else { throw CertificateStoreError.opensslUnavailable }
-        let der = try run(openssl, ["x509", "-in", certificate.path, "-outform", "DER"])
-        guard der.status == 0, !der.output.isEmpty else {
-            throw CertificateStoreError.generationFailed("could not read the certificate")
-        }
-        return Data(SHA256.hash(data: der.output))
-    }
-
-    /// Convert a PEM file to DER.
-    ///
-    /// The certificate converts directly. The key converts to PKCS#1 (`RSAPrivateKey`), not
-    /// PKCS#8, and that distinction is the difference between working and not: the transport
-    /// hands the bytes to `SecKeyCreateWithData`, which for an RSA key expects PKCS#1 and
-    /// rejects PKCS#8 with a bare `OSStatus -50`. Measured both, since the error says nothing
-    /// about encoding.
-    private static func derFromPEM(_ file: URL, kind: String) throws -> Data {
-        guard let openssl = whichOpenSSL() else { throw CertificateStoreError.opensslUnavailable }
-        let arguments: [String]
-        switch kind {
-        case "certificate":
-            arguments = ["x509", "-in", file.path, "-outform", "DER"]
-        default:
-            arguments = ["rsa", "-in", file.path, "-outform", "DER"]
-        }
-        let result = try run(openssl, arguments)
-        guard result.status == 0, !result.output.isEmpty else {
-            throw CertificateStoreError.generationFailed(
-                "could not read the \(kind): \(result.error)")
-        }
-        return result.output
-    }
-
-    /// How long one `openssl` call may take.
-    ///
-    /// Shorter than the document converters' budget: this runs at engine start, and a certificate
-    /// operation that has not finished in twenty seconds is not going to.
-    static let opensslTimeout: TimeInterval = 20
-
-    /// Run `openssl`, collected by the project's own runner.
-    ///
-    /// This file had a runner of its own that read stdout to EOF before it looked at stderr, which is the
-    /// two-pipe deadlock `SystemProcess` was written to avoid: a child that fills the error pipe — a bad
-    /// argument list does it — blocks writing while this side blocks reading, and the engine never starts.
-    /// The shared runner polls both pipes against a deadline.
-    private static func run(_ executable: String, _ arguments: [String]) throws -> SystemProcess.Result {
-        do {
-            return try SystemProcess.run(
-                executable, arguments, timeout: opensslTimeout,
-                maximumOutputBytes: maximumOpenSSLOutputBytes)
-        } catch {
-            // `SystemProcess` reports its refusals as document errors; through this door they are a
-            // certificate that could not be read or made.
-            throw CertificateStoreError.generationFailed(error.localizedDescription)
-        }
-    }
-
-    /// A ceiling on what one `openssl` call may print.
-    ///
-    /// The certificate and key are kilobytes; the shared runner's default is the 64 MB an attachment may
-    /// be, which is a budget this path has no use for.
-    static let maximumOpenSSLOutputBytes = 4 * 1_024 * 1_024
 }

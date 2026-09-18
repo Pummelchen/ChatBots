@@ -1,0 +1,336 @@
+Building for debugging...
+[Computing dependencies]
+[Provisioning 1 / 64]
+[Using on-disk description]
+[1 / 2] swift-transformers_Hub
+[18 / 298] yyjson
+[22 / 311] RealModule
+[33 / 336] MLXHuggingFaceMacros
+[37 / 345] WebTransportUDPApple
+[48 / 349] WebTransportQUICCore
+[53 / 355] InternalCollectionsUtilities
+[64 / 363] WebTransportHTTP3Core
+[68 / 382] ComplexModule
+[74 / 392] WebTransportQUICCore
+[77 / 392] WebTransportTLSCore
+[82 / 393] WebTransportHTTP3Core
+[90 / 395] WebTransportHTTP3Core
+[91 / 395] WebTransportHTTP3Core
+[98 / 396] WebTransportTLSCore
+[101 / 397] WebTransportUDPApple
+[104 / 400] WebTransportNetworkRuntime
+[108 / 400] RealModule
+[112 / 406] InternalCollectionsUtilities
+[117 / 408] WebTransportNetworkRuntime
+[118 / 417] WebTransportNetworkRuntime
+[123 / 417] WebTransportNetworkRuntime
+[127 / 419] WebTransport
+[128 / 419] WebTransportHTTP3Core
+[133 / 421] OrderedCollections
+[136 / 422] WebTransport
+[139 / 422] InternalCollectionsUtilities
+[140 / 422] InternalCollectionsUtilities
+[144 / 422] InternalCollectionsUtilities
+[149 / 422] EventSource
+[154 / 424] OrderedCollections
+[160 / 428] Jinja
+[163 / 428] Crypto
+[166 / 437] HuggingFace
+[169 / 446] Jinja
+[172 / 446] Jinja
+[173 / 446] Jinja
+[177 / 446] Jinja
+[181 / 447] Jinja
+[183 / 447] HuggingFace
+[184 / 447] HuggingFace
+[185 / 447] HuggingFace
+[186 / 447] Jinja
+[190 / 447] ComplexModule
+[194 / 449] Numerics
+[200 / 452] Numerics
+[207 / 458] Numerics
+[209 / 458]
+[213 / 458] EventSource
+[218 / 475] WebTransportHTTP3Core
+[221 / 475]
+[224 / 475] Hub
+[227 / 475] ArgumentParser
+[231 / 477] Hub
+[235 / 480] Tokenizers
+[236 / 480] HuggingFace
+[240 / 482] encuda-product
+[242 / 491] Tokenizers
+[244 / 497] encuda-product
+[246 / 497] ArgumentParser
+[250 / 497] Tokenizers
+[253 / 497] Tokenizers
+[255 / 497] Tokenizers
+[259 / 497] Tokenizers
+[261 / 497] ArgumentParser
+[265 / 497] ComplexModule
+[268 / 497] OrderedCollections
+[272 / 497] Tokenizers
+[272 / 497] ArgumentParser
+[277 / 498] encuda-product
+[288 / 501] MLX
+[289 / 501] Cmlx
+[291 / 501] Cmlx
+[292 / 510] MLX
+[293 / 510] Cmlx
+[298 / 510] Cmlx
+[300 / 510] Cmlx
+[301 / 510] Cmlx
+[304 / 510] Cmlx
+[311 / 512] Cmlx
+[312 / 512] Cmlx
+[316 / 512] Cmlx
+[320 / 512] Cmlx
+[324 / 512] Cmlx
+[327 / 512] Cmlx
+[329 / 512] Cmlx
+[331 / 512] Cmlx
+[332 / 512] Cmlx
+[334 / 512] Cmlx
+[336 / 512] Cmlx
+[340 / 512] Cmlx
+[342 / 512] Cmlx
+[344 / 512] Cmlx
+[345 / 512] Cmlx
+[348 / 512] Cmlx
+[350 / 512] Cmlx
+[352 / 512] Cmlx
+[358 / 512] Cmlx
+[361 / 512] Cmlx
+[362 / 512] Cmlx
+[364 / 512] Cmlx
+[367 / 512] Cmlx
+[368 / 512] Cmlx
+[369 / 512] Cmlx
+[370 / 512] Cmlx
+[371 / 512] Cmlx
+[372 / 512] Cmlx
+[373 / 512] Cmlx
+[375 / 512] Cmlx
+[377 / 512] Cmlx
+[381 / 512] Cmlx
+[384 / 512] Cmlx
+[385 / 512] Cmlx
+[386 / 512] Cmlx
+[387 / 512] Cmlx
+[389 / 512] Cmlx
+[390 / 512] Cmlx
+[392 / 512] Cmlx
+[394 / 512] Cmlx
+[395 / 512] Cmlx
+[396 / 512] Cmlx
+[398 / 512] Cmlx
+[402 / 512] Cmlx
+[406 / 512] Cmlx
+[409 / 512] Cmlx
+[410 / 512] Cmlx
+[411 / 512] Cmlx
+[414 / 512] Cmlx
+[415 / 512] Cmlx
+[416 / 512] Cmlx
+[417 / 512] Cmlx
+[420 / 512] Cmlx
+[421 / 512] Cmlx
+[422 / 512] Cmlx
+[423 / 512] Cmlx
+[425 / 512] Cmlx
+[426 / 512] Cmlx
+[427 / 512] Cmlx
+[428 / 512] Cmlx
+[430 / 512] Cmlx
+[431 / 512] Cmlx
+[432 / 512] Cmlx
+[434 / 512] Cmlx
+[436 / 512] Cmlx
+[437 / 512] Cmlx
+[440 / 512] Cmlx
+[443 / 512] Cmlx
+[444 / 512] Cmlx
+[445 / 512] Cmlx
+[447 / 512] Cmlx
+[448 / 512] Cmlx
+[449 / 512] Cmlx
+[450 / 512] Cmlx
+[451 / 512] Cmlx
+[454 / 512] Cmlx
+[457 / 512] Cmlx
+[458 / 512] Cmlx
+[459 / 512] Cmlx
+[461 / 512] Cmlx
+[463 / 512] mlx-swift_Cmlx
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+[466 / 511] MLX
+[469 / 513] MLX
+[470 / 513] MLX
+[471 / 522] MLXNN
+[472 / 522] MLXNN
+[473 / 522] MLXNN
+[475 / 522] MLXNN
+[479 / 524] MLXNN
+[482 / 526] MLXOptimizers
+[485 / 526] MLX
+[488 / 529] Cmlx
+[492 / 529] MLXOptimizers
+[496 / 532] MLXOptimizers
+[496 / 532] MLXLMCommon
+[501 / 541] MLX
+[504 / 541] MLXLMCommon
+[506 / 541] MLXLMCommon
+[508 / 543] MLXLMCommon
+[512 / 548] MLXLLM
+[512 / 548]
+[513 / 557] MLXLMCommon
+[516 / 566] MLXLLM
+[517 / 566] MLXVLM
+[518 / 566] MLXVLM
+[519 / 566] MLXVLM
+[522 / 568] MLXVLM
+[524 / 568] MLXVLM
+[528 / 568] MLXLLM
+[529 / 568] MLXLLM
+[531 / 570] MLXLLM
+[533 / 570] MLXLLM
+[535 / 570] MLXLLM
+[536 / 570] MLXLLM
+[538 / 570] MLXLLM
+[539 / 570] Cmlx
+[543 / 573]
+[545 / 573] MLXOptimizers
+[547 / 574] MLXHuggingFace
+[549 / 575] MLXVLM
+[549 / 575] MLXLLM
+[549 / 575] MLXHuggingFace
+[554 / 579] ChatBotsCore
+[556 / 590]
+[561 / 590] ChatBotsCore
+[563 / 590] ChatBotsCore
+[564 / 590] ChatBotsCore
+[565 / 590] MLXLLM
+[568 / 590] ChatBotsCore
+[571 / 592] ChatBotsCore
+[572 / 601] chatbots-probe-product
+[573 / 601] chatbots-cli-product
+[575 / 601] ChatBots
+[576 / 603] chatbots-probe-product
+[577 / 612] chatbots-probe-product
+[581 / 621] ChatBots-product
+[583 / 630] ChatBots
+[584 / 630] chatbots-cli-product
+[587 / 630] chatbots-cli-product
+[588 / 630] chatbots-cli-product
+[589 / 630] MLXLLM
+[594 / 630] ChatBots-product
+[597 / 630] ChatBots
+[599 / 630] ChatBots-product
+[601 / 630] ChatBotsCore
+[603 / 630] ChatBotsCore
+[605 / 630] ChatBots
+[606 / 631] ChatBots-product
+[608 / 631] ChatBots-product
+[611 / 637] ChatBots
+[613 / 634] chatbots-cli-product
+[614 / 634] ChatBotsCoreTests-product
+[615 / 634] ChatBotsCore-product
+[615 / 635] chatbots-cli-product
+[618 / 636] ChatBots
+[618 / 636] ChatBotsCoreTests-product
+[624 / 645] ChatBots
+[626 / 645] ChatBotsCoreTests-product
+[627 / 645] ChatBotsCoreTests-product
+[631 / 645] ChatBots
+[631 / 645] ChatBots-product
+[632 / 647] ChatBots-product
+[635 / 643] ChatBotsAppTests-product
+[637 / 652] ChatBotsAppTests-product
+[639 / 652] ChatBotsAppTests-product
+[640 / 652] ChatBotsAppTests-product
+[644 / 652] ChatBotsAppTests-product
+[645 / 652] ChatBotsAppTests-product
+[646 / 652] chatbots-cli-product
+[648 / 654] ChatBotsAppTests-product
+[648 / 654] ChatBotsCoreTests-product
+[650 / 654] ChatBotsAppTests-product
+[650 / 657] ChatBotsCoreTests-product
+[650 / 657] ChatBotsAppTests-product
+[652 / 657] ChatBotsAppTests-product
+[653 / 657] chatbots-cli-product
+[655 / 658] chatbots-probe-product
+[656 / 659] ChatBotsCoreTests-product
+[658 / 662] ChatBotsCoreTests-product
+[660 / 662] ChatBotsCoreTests-product
+Build complete! (78,81 secs)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "The human moderator's identity" started.
+◇ Suite "Engine transport" started.
+◇ Suite "Engine certificate" started.
+◇ Test "A moderator can be renamed while a conversation is running" started.
+◇ Test "A very long name is trimmed rather than pasted into the log" started.
+◇ Test "The opening brief introduces the moderator" started.
+◇ Test "The prompt names the moderator, and only when there is something to say" started.
+◇ Test "A client can ask the engine for its state and get it" started.
+◇ Test "A name alone is enough to be introduced" started.
+◇ Test "Settings keep the moderator across a restart, and tolerate an older payload" started.
+◇ Test "Two separate stores have different identities" started.
+◇ Test "An unconfigured moderator says nothing to the room" started.
+◇ Test "The room is told who is asking, through the engine's own turn" started.
+◇ Test "The private key is in the encoding the transport accepts" started.
+◇ Test "The private key is not world-readable" started.
+◇ Test "A partial identity on disk is reported with a way out, not silently replaced" started.
+◇ Test "A persona describes how the moderator's interjections read" started.
+◇ Test "The same identity comes back on the next load, which is what a steady report needs" started.
+◇ Test "A key that is readable by others is made private again the next time it is loaded" started.
+◇ Test "A name that is only whitespace is treated as no name" started.
+◇ Test "An identity is generated and is usable" started.
+✔ Test "A very long name is trimmed rather than pasted into the log" passed after 0.002 seconds.
+✔ Test "A name alone is enough to be introduced" passed after 0.002 seconds.
+✔ Test "An unconfigured moderator says nothing to the room" passed after 0.002 seconds.
+✔ Test "A persona describes how the moderator's interjections read" passed after 0.002 seconds.
+✔ Test "Settings keep the moderator across a restart, and tolerate an older payload" passed after 0.002 seconds.
+✔ Test "The prompt names the moderator, and only when there is something to say" passed after 0.002 seconds.
+✔ Test "A name that is only whitespace is treated as no name" passed after 0.002 seconds.
+✔ Test "The opening brief introduces the moderator" passed after 0.002 seconds.
+✔ Test "The private key is in the encoding the transport accepts" passed after 0.638 seconds.
+✔ Test "An identity is generated and is usable" passed after 0.638 seconds.
+✔ Test "The private key is not world-readable" passed after 0.638 seconds.
+✔ Test "The room is told who is asking, through the engine's own turn" passed after 0.702 seconds.
+✔ Test "A partial identity on disk is reported with a way out, not silently replaced" passed after 0.731 seconds.
+✔ Test "A client can ask the engine for its state and get it" passed after 0.752 seconds.
+◇ Test "A client is still served after sitting idle on its connection" started.
+✔ Test "The same identity comes back on the next load, which is what a steady report needs" passed after 1.071 seconds.
+✔ Test "A key that is readable by others is made private again the next time it is loaded" passed after 1.071 seconds.
+✔ Test "Two separate stores have different identities" passed after 1.298 seconds.
+✔ Suite "Engine certificate" passed after 1.298 seconds.
+✔ Test "A moderator can be renamed while a conversation is running" passed after 1.443 seconds.
+✔ Suite "The human moderator's identity" passed after 1.443 seconds.
+✔ Test "A client is still served after sitting idle on its connection" passed after 1.723 seconds.
+◇ Test "After probing, the real client still reaches the engine" started.
+✔ Test "After probing, the real client still reaches the engine" passed after 0.823 seconds.
+◇ Test "The engine serves a new client after the previous one has gone" started.
+✔ Test "The engine serves a new client after the previous one has gone" passed after 0.972 seconds.
+◇ Test "A command over the transport changes the engine state" started.
+✔ Test "A command over the transport changes the engine state" passed after 0.713 seconds.
+◇ Test "A change is pushed to an attached client" started.
+✔ Test "A change is pushed to an attached client" passed after 0.736 seconds.
+◇ Test "A request too large to frame fails at the sender and leaves the session usable" started.
+✔ Test "A request too large to frame fails at the sender and leaves the session usable" passed after 1.020 seconds.
+✔ Suite "Engine transport" passed after 6.743 seconds.
+◇ Suite "Stopping the engine stops its sessions" started.
+◇ Test "A connected client is no longer served after the server stops" started.
+✔ Test "A connected client is no longer served after the server stops" passed after 0.644 seconds.
+✔ Suite "Stopping the engine stops its sessions" passed after 0.644 seconds.
+◇ Suite "A failed connect leaves no session behind" started.
+◇ Test "A client whose retry fails does not report itself connected" started.
+✔ Test "A client whose retry fails does not report itself connected" passed after 2.760 seconds.
+✔ Suite "A failed connect leaves no session behind" passed after 2.760 seconds.
+◇ Suite "A session accepted during stop() does not survive it" started.
+◇ Test "A client that connects while the server is stopping is not left being served" started.
+✔ Test "A client that connects while the server is stopping is not left being served" passed after 0.780 seconds.
+✔ Suite "A session accepted during stop() does not survive it" passed after 0.781 seconds.
+✔ Test run with 27 tests in 6 suites passed after 10.939 seconds.
+EXIT=0

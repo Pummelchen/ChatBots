@@ -68,7 +68,11 @@ warn() { printf "    %s!%s %s\n" "$YELLOW" "$OFF" "$*"; }
 fail() { printf "    %s✗%s %s\n" "$RED" "$OFF" "$*"; }
 dim()  { printf "    %s%s%s\n" "$DIM" "$*" "$OFF"; }
 
-mkdir -p "$ROOT/.run"
+# 0700, because this is where the engine's TLS private key and its logs live. `mkdir -p` under a
+# permissive umask would leave the folder world-traversable; `install -d` sets the mode at
+# creation, and an existing directory is tightened too.
+install -d -m 700 "$ROOT/.run"
+chmod 700 "$ROOT/.run"
 ENGINE_PID="$ROOT/.run/app-engine.pid"
 ENGINE_LOG="$ROOT/.run/app-engine.log"
 
