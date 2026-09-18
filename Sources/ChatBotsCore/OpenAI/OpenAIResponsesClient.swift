@@ -366,20 +366,7 @@ public struct OpenAIResponsesClient: Sendable {
         if let instructions = request.instructions, !instructions.isEmpty {
             body["instructions"] = instructions
         }
-        if let temperature = request.temperature { body["temperature"] = temperature }
-        if let topP = request.topP { body["top_p"] = topP }
-        // Extensions: harmless where understood, a 400 on OpenAI proper.
-        if endpoint.compatibility == .extended {
-            if let topK = request.topK, topK > 0 { body["top_k"] = topK }
-            if let minP = request.minP { body["min_p"] = minP }
-        }
-        // The Responses API uses OpenAI's sign convention for the presence penalty: a
-        // positive value discourages repetition. The seat stores MLX's signed value, so it
-        // is negated here — the mirror image of what MLXEngine does.
-        if let presencePenalty = request.presencePenalty { body["presence_penalty"] = -presencePenalty }
-        if endpoint.compatibility == .extended, let repetitionPenalty = request.repetitionPenalty {
-            body["repetition_penalty"] = repetitionPenalty
-        }
+        applySampling(to: &body, request: request)
         if let maxOutputTokens = request.maxOutputTokens {
             body["max_output_tokens"] = maxOutputTokens
         }
@@ -396,6 +383,28 @@ public struct OpenAIResponsesClient: Sendable {
             body["include"] = ["reasoning.encrypted_content"]
         }
         return body
+    }
+
+    /// The sampling parameters, inserted in the order the body has always written them.
+    ///
+    /// Pulled out of `body(for:)` to keep that function inside its `cyclomatic_complexity`
+    /// budget: the compatibility checks alone are four branches. The extended-only fields stay
+    /// exactly where they were, so nothing about the wire body moves.
+    private func applySampling(to body: inout [String: Any], request: Request) {
+        if let temperature = request.temperature { body["temperature"] = temperature }
+        if let topP = request.topP { body["top_p"] = topP }
+        // Extensions: harmless where understood, a 400 on OpenAI proper.
+        if endpoint.compatibility == .extended {
+            if let topK = request.topK, topK > 0 { body["top_k"] = topK }
+            if let minP = request.minP { body["min_p"] = minP }
+        }
+        // The Responses API uses OpenAI's sign convention for the presence penalty: a
+        // positive value discourages repetition. The seat stores MLX's signed value, so it
+        // is negated here — the mirror image of what MLXEngine does.
+        if let presencePenalty = request.presencePenalty { body["presence_penalty"] = -presencePenalty }
+        if endpoint.compatibility == .extended, let repetitionPenalty = request.repetitionPenalty {
+            body["repetition_penalty"] = repetitionPenalty
+        }
     }
 
     public static func usage(from event: [String: Any]) -> OpenAIUsage {

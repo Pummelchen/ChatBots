@@ -77,7 +77,25 @@ extension APIServer {
     ///
     /// Internal rather than private: `route` in `APIServer.swift` calls it for every route the
     /// transport-specific switch did not answer.
+    ///
+    /// The route table itself lives in the named helpers below, one per group. `translate` tries
+    /// them in turn because a single `switch` over every route had grown to a complexity of 41. The
+    /// groups are disjoint, so the first match is the only match and the order cannot change an
+    /// answer; every helper returning `nil` is the unknown route the caller answers with a 404.
     func translate(_ request: HTTPRequest) throws -> EngineRequest? {
+        if let command = try simpleRoute(request) { return command }
+        if let command = try conversationRoute(request) { return command }
+        if let command = try messageRoute(request) { return command }
+        if let command = try settingsRoute(request) { return command }
+        if let command = try rosterRoute(request) { return command }
+        if let command = try seatRoute(request) { return command }
+        if let command = try researchRoute(request) { return command }
+        if let command = try voteRoute(request) { return command }
+        return try attachmentRoute(request)
+    }
+
+    /// The routes with neither a body nor a value to validate: one method and path, one command.
+    private func simpleRoute(_ request: HTTPRequest) throws -> EngineRequest? {
         switch (request.method, request.path) {
         case ("GET", "/api/state"): return .fetchState
         case ("POST", "/api/start"): return .start
@@ -86,9 +104,18 @@ extension APIServer {
         case ("POST", "/api/stop"): return .stop
         case ("POST", "/api/reset"): return .reset
         case ("POST", "/api/compact"): return .compact
-        case ("POST", "/api/attachments/clear"): return .clearAttachments
-        case ("GET", "/api/conversations"): return .listSavedConversations
-        case ("POST", "/api/conversations/new"): return .newConversation
+        default: return nil
+        }
+    }
+
+    /// Listing, creating, loading and deleting saved conversations.
+    private func conversationRoute(_ request: HTTPRequest) throws -> EngineRequest? {
+        switch (request.method, request.path) {
+        case ("GET", "/api/conversations"):
+            return .listSavedConversations
+
+        case ("POST", "/api/conversations/new"):
+            return .newConversation
 
         case ("POST", "/api/conversations/load"):
             guard let id = try command(from: request)?.value else { return nil }
@@ -98,6 +125,14 @@ extension APIServer {
             guard let id = try command(from: request)?.value else { return nil }
             return .deleteSavedConversation(id: id)
 
+        default:
+            return nil
+        }
+    }
+
+    /// The topic, and one turn of steering text.
+    private func messageRoute(_ request: HTTPRequest) throws -> EngineRequest? {
+        switch (request.method, request.path) {
         case ("POST", "/api/topic"):
             guard let body = try command(from: request), let topic = body.topic,
                 !topic.isEmpty
@@ -110,6 +145,14 @@ extension APIServer {
             }
             return .steer(text)
 
+        default:
+            return nil
+        }
+    }
+
+    /// The routes that carry one string value from a known set, plus the reasoning toggle.
+    private func settingsRoute(_ request: HTTPRequest) throws -> EngineRequest? {
+        switch (request.method, request.path) {
         case ("POST", "/api/settings"):
             let body = try command(from: request)
             return .setShowReasoning(body?.showReasoning ?? service.showReasoning)
@@ -121,6 +164,14 @@ extension APIServer {
             }
             return .setMode(mode)
 
+        default:
+            return nil
+        }
+    }
+
+    /// Drawing and applying a roster, and applying a scenario.
+    private func rosterRoute(_ request: HTTPRequest) throws -> EngineRequest? {
+        switch (request.method, request.path) {
         case ("POST", "/api/roster"):
             guard let body = try command(from: request), let id = body.id else { return nil }
             // A seed the caller supplies reproduces a draw; one it does not supply is made
@@ -131,6 +182,48 @@ extension APIServer {
             guard let id = try command(from: request)?.id else { return nil }
             return .applyScenario(id: id)
 
+        default:
+            return nil
+        }
+    }
+
+    /// Changing a seat, or the moderator's identity.
+    ///
+    /// The seat case keeps `seatChange`, where an unknown thinking mode or backend is refused
+    /// before the engine is ever asked to apply the change.
+    private func seatRoute(_ request: HTTPRequest) throws -> EngineRequest? {
+        switch (request.method, request.path) {
+        case ("POST", "/api/seat"):
+            guard let body = try command(from: request), let seatID = body.seat else {
+                return nil
+            }
+            return .updateSeat(try seatChange(from: body, seatID: seatID))
+
+        case ("POST", "/api/moderator"):
+            guard let body = try command(from: request) else { return nil }
+            return .setModerator(
+                ModeratorIdentity(
+                    name: body.name ?? ModeratorIdentity.defaultName,
+                    personaID: body.personaID ?? PersonaLibrary.neutral.id))
+
+        default:
+            return nil
+        }
+    }
+
+    /// The research budget, whose depth must be one the library knows.
+    private func researchRoute(_ request: HTTPRequest) throws -> EngineRequest? {
+        guard request.method == "POST", request.path == "/api/research/budget" else { return nil }
+        guard let raw = try command(from: request)?.value else { return nil }
+        guard let depth = ResearchBudget.Depth(rawValue: raw) else {
+            throw unknownValue("research depth", raw, ResearchBudget.Depth.allCases.map(\.rawValue))
+        }
+        return .setResearchBudget(depth)
+    }
+
+    /// Casting and clearing audience votes.
+    private func voteRoute(_ request: HTTPRequest) throws -> EngineRequest? {
+        switch (request.method, request.path) {
         case ("POST", "/api/vote"):
             guard let body = try command(from: request), let turnID = body.id else { return nil }
             // No verdict withdraws the vote, so a mis-click does not have to be reversed by
@@ -142,26 +235,16 @@ extension APIServer {
         case ("POST", "/api/votes/clear"):
             return .clearVotes
 
-        case ("POST", "/api/moderator"):
-            guard let body = try command(from: request) else { return nil }
-            return .setModerator(
-                ModeratorIdentity(
-                    name: body.name ?? ModeratorIdentity.defaultName,
-                    personaID: body.personaID ?? PersonaLibrary.neutral.id))
+        default:
+            return nil
+        }
+    }
 
-        case ("POST", "/api/research/budget"):
-            guard let raw = try command(from: request)?.value else { return nil }
-            guard let depth = ResearchBudget.Depth(rawValue: raw) else {
-                throw unknownValue(
-                    "research depth", raw, ResearchBudget.Depth.allCases.map(\.rawValue))
-            }
-            return .setResearchBudget(depth)
-
-        case ("POST", "/api/seat"):
-            guard let body = try command(from: request), let seatID = body.seat else {
-                return nil
-            }
-            return .updateSeat(try seatChange(from: body, seatID: seatID))
+    /// Clearing, adding and removing attachments.
+    private func attachmentRoute(_ request: HTTPRequest) throws -> EngineRequest? {
+        switch (request.method, request.path) {
+        case ("POST", "/api/attachments/clear"):
+            return .clearAttachments
 
         case ("POST", "/api/attachments"):
             guard let body = try command(from: request), let filename = body.filename,

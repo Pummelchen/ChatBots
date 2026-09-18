@@ -174,88 +174,7 @@ public final class APIServer {
         }
 
         // Transport-specific, and none of it is the engine's business.
-        switch (request.method, request.path) {
-        case ("GET", "/api/health"):
-            // What the listener is doing, not just "ok". The counters existed and were reachable from no
-            // endpoint, and a dropped connection or a refused request left no trace anywhere, so
-            // diagnosing a running engine meant reading source. The strings are operational — a
-            // connection error, the listener's own failure, a request the parser refused — and carry no
-            // conversation data; `/api` is unauthenticated and LAN-reachable, which is why the history is
-            // bounded at the source rather than here.
-            //
-            // And the status code answers the other question: whether the engine behind the listener can
-            // serve a conversation at all. It used to be a hardcoded 200, so a client could not tell the
-            // two apart. 503 is what `tools/start.sh` already treats as "not ready" — it probes
-            // this route with `curl -sf` — and it is the answer an orchestrator needs.
-            let readiness = service.readiness
-            var response = HTTPResponse.json(
-                APIHealth(
-                    status: readiness.isReady ? "ok" : "unavailable",
-                    ready: readiness.isReady,
-                    seats: readiness.seats,
-                    reason: readiness.reason,
-                    failedSeats: readiness.failedSeats,
-                    port: Int(port),
-                    connections: server?.connectionCount ?? 0,
-                    openStreams: server?.openStreamCount ?? 0,
-                    refusedConnections: server?.refusedConnectionCount ?? 0,
-                    listenerError: server?.lastError,
-                    recentFailures: server?.recentFailures ?? []))
-            response.status = readiness.isReady ? 200 : 503
-            return response
-
-        case ("GET", "/api/devices"):
-            return .json(
-                DeviceList(
-                    profiles: DeviceProfiles.all.enumerated().map { index, profile in
-                        ListedProfile(profile: profile, common: profile.isCommon, index: index)
-                    },
-                    captureSet: DeviceProfiles.captureSet.map(\.id)))
-
-        case ("GET", "/api/device"):
-            // Identify the screen, so the interface can name it and support can ask what a
-            // report came from. An unknown device is a valid answer, not an error.
-            let width = request.int("w") ?? 0
-            let height = request.int("h") ?? 0
-            let isMobile = request.string("mobile") != "false"
-            guard width > 0 else { return .error("w is required", status: 400) }
-            if let match = DeviceProfiles.nearest(width: width, height: height, isMobile: isMobile) {
-                return .json(DeviceMatch(matched: true, profile: match, width: width, height: height))
-            }
-            return .json(DeviceMatch(matched: false, profile: nil, width: width, height: height))
-
-        case ("GET", "/api/personas"):
-            // Both libraries, so a picker can switch modes without a second request.
-            return .json(
-                DiscussionMode.allCases.map { mode in
-                    PersonaOption(
-                        mode: mode.rawValue,
-                        label: mode.label,
-                        summary: mode.summary,
-                        personas: PersonaCatalog.styles(for: mode).map {
-                            APIPersona(
-                                id: $0.id, name: $0.name, category: $0.group,
-                                summary: $0.summary, emoji: $0.emoji, isAnalyst: $0.isAnalyst)
-                        })
-                })
-
-        case ("GET", "/api/report"):
-            // Plain markdown rather than JSON, so it opens in a browser.
-            guard let report = service.snapshot().report else {
-                return .error("no report has been produced yet", status: 404)
-            }
-            return HTTPResponse(
-                contentType: "text/markdown; charset=utf-8", body: Data(report.markdown.utf8))
-
-        case ("GET", "/api/rosters"):
-            return .json(RosterLibrary.rosters(for: mode(from: request)))
-
-        case ("GET", "/api/scenarios"):
-            return .json(ScenarioLibrary.scenarios(for: mode(from: request)))
-
-        default:
-            break
-        }
+        if let response = transportRoute(request) { return response }
 
         // Everything else is the engine's, and goes through the same dispatch the
         // WebTransport server uses. A command that works on one channel therefore works on
@@ -277,6 +196,114 @@ public final class APIServer {
         }
         let reply = await service.handle(command)
         return respond(to: reply)
+    }
+
+    /// The routes that answer without the engine: health, device description and the libraries.
+    ///
+    /// `nil` means "not one of mine", and the request continues to the engine dispatch below. Split
+    /// out of `route` because the seven cases and their guards and defaults put that function over
+    /// its `cyclomatic_complexity` budget.
+    private func transportRoute(_ request: HTTPRequest) -> HTTPResponse? {
+        switch (request.method, request.path) {
+        case ("GET", "/api/health"):
+            return healthResponse()
+
+        case ("GET", "/api/devices"):
+            return .json(
+                DeviceList(
+                    profiles: DeviceProfiles.all.enumerated().map { index, profile in
+                        ListedProfile(profile: profile, common: profile.isCommon, index: index)
+                    },
+                    captureSet: DeviceProfiles.captureSet.map(\.id)))
+
+        case ("GET", "/api/device"):
+            return deviceResponse(request)
+
+        case ("GET", "/api/personas"):
+            return personasResponse()
+
+        case ("GET", "/api/report"):
+            return reportResponse()
+
+        case ("GET", "/api/rosters"):
+            return .json(RosterLibrary.rosters(for: mode(from: request)))
+
+        case ("GET", "/api/scenarios"):
+            return .json(ScenarioLibrary.scenarios(for: mode(from: request)))
+
+        default:
+            return nil
+        }
+    }
+
+    /// What the listener is doing, and whether the engine behind it can serve a conversation.
+    ///
+    /// The counters existed and were reachable from no endpoint, and a dropped connection or a
+    /// refused request left no trace anywhere, so diagnosing a running engine meant reading source.
+    /// The strings are operational — a connection error, the listener's own failure, a request the
+    /// parser refused — and carry no conversation data; `/api` is unauthenticated and LAN-reachable,
+    /// which is why the history is bounded at the source rather than here.
+    ///
+    /// And the status code answers the other question: it used to be a hardcoded 200, so a client
+    /// could not tell a healthy listener from a healthy *engine*. 503 is what `tools/start.sh`
+    /// already treats as "not ready" — it probes this route with `curl -sf` — and it is the answer an
+    /// orchestrator needs.
+    private func healthResponse() -> HTTPResponse {
+        let readiness = service.readiness
+        var response = HTTPResponse.json(
+            APIHealth(
+                status: readiness.isReady ? "ok" : "unavailable",
+                ready: readiness.isReady,
+                seats: readiness.seats,
+                reason: readiness.reason,
+                failedSeats: readiness.failedSeats,
+                port: Int(port),
+                connections: server?.connectionCount ?? 0,
+                openStreams: server?.openStreamCount ?? 0,
+                refusedConnections: server?.refusedConnectionCount ?? 0,
+                listenerError: server?.lastError,
+                recentFailures: server?.recentFailures ?? []))
+        response.status = readiness.isReady ? 200 : 503
+        return response
+    }
+
+    /// Identify the screen, so the interface can name it and support can ask what a report came from.
+    ///
+    /// An unknown device is a valid answer, not an error.
+    private func deviceResponse(_ request: HTTPRequest) -> HTTPResponse {
+        let width = request.int("w") ?? 0
+        let height = request.int("h") ?? 0
+        let isMobile = request.string("mobile") != "false"
+        guard width > 0 else { return .error("w is required", status: 400) }
+        if let match = DeviceProfiles.nearest(width: width, height: height, isMobile: isMobile) {
+            return .json(DeviceMatch(matched: true, profile: match, width: width, height: height))
+        }
+        return .json(DeviceMatch(matched: false, profile: nil, width: width, height: height))
+    }
+
+    /// Both persona libraries, so a picker can switch modes without a second request.
+    private func personasResponse() -> HTTPResponse {
+        .json(
+            DiscussionMode.allCases.map { mode in
+                PersonaOption(
+                    mode: mode.rawValue,
+                    label: mode.label,
+                    summary: mode.summary,
+                    personas: PersonaCatalog.styles(for: mode).map {
+                        APIPersona(
+                            id: $0.id, name: $0.name, category: $0.group,
+                            summary: $0.summary, emoji: $0.emoji, isAnalyst: $0.isAnalyst)
+                    })
+            })
+    }
+
+    /// The moderator's report as plain markdown, so it opens in a browser, or a 404 while there is none.
+    private func reportResponse() -> HTTPResponse {
+        guard let report = service.snapshot().report else {
+            return .error("no report has been produced yet", status: 404)
+        }
+        return HTTPResponse(
+            contentType: "text/markdown; charset=utf-8", body: Data(report.markdown.utf8))
     }
 
     /// The mode a query asks about, defaulting to entertainment.
