@@ -13,10 +13,11 @@ orientation note so a resumed run does not restart discovery.
 
 ## Ledger state at the last commit
 
-`done: 53, open: 40, blocked: 4` — S0 0, S1 0, S2 1, S3 39.
+`done: 62, open: 31, blocked: 4` — S0 0, S1 0, S2 1, S3 30.
 
 The closure invariant holds: non-terminal count has gone 96 → 90 → 83 → 76 → 71 → 66 →
-62 → 59 → 58 → 56 → 54 → 51 → 50 → 49 → 48 → 43 → 40 across the milestone reports.
+62 → 59 → 58 → 56 → 54 → 51 → 50 → 49 → 48 → 43 → 40 → 36 → 33 → 31 across the milestone
+reports.
 
 ## The one remaining S2
 
@@ -37,7 +38,7 @@ tightened the waivers from 217/444 to 211/413 (measured 209/411).
 Because this is much larger than one task, split it into sub-tasks the moment work starts,
 each with its own id, and note on AUDIT-0029 that its scope was split rather than narrowed.
 
-## The S3 sweep (39)
+## The S3 sweep (30)
 
 All are style/formatting/test-quality. They are resolved as rule-class sweeps through the
 formatter/linter, one commit per class, with no test and no cold re-read (§8). The
@@ -65,9 +66,11 @@ primary host only, recorded in the ledger.
 ## Conventions in force
 
 - Branch `audit/2026-09-18` only; no force-push, no history rewrite.
-- One commit per S0/S1 task; S2/S3 batch by class or coherent group (batches 10-15 done:
+- One commit per S0/S1 task; S2/S3 batch by class or coherent group (batches 10-18 done:
   endpoint rebuild, reader generation, SSE line cap, JS toolchain, force_unwrapping, HTTP
-  reasons and header CR/LF, shell traps, CLI exit codes).
+  reasons and header CR/LF, shell traps, CLI exit codes, /api/seat validation and ordering,
+  the event feed's high-water mark, CLI flag refusal, the Tavily answer/retry-cost/body cap,
+  and the runtime-directory docs).
 - Every fix carries before/after evidence in `AUDIT/evidence-*.log`.
 - `bash tools/mac-checks.sh` is the gate after every batch — now **9 gates**, including
   eslint and prettier (`npm ci` first). Metrics must not regress: SwiftLint ≤ 217
