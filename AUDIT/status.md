@@ -10,11 +10,13 @@ only the orientation a resumed run needs, so it does not repeat either.
   language-standard proofs, baseline, ledger opened.
 - **Phase B/C — drained except one S2.** All discovery passes have run (L0-L7 plus the facade
   sweep); every S0, S1 and S3 is closed. `AUDIT-0029` is the last open task.
-- **Phase D/E — not started.** Phase E needs a second host (below).
+- **Phase D — recorded as AUDIT-0104 and not yet run.** The tree is frozen; the sweep is the next step.
+- **Phase E — recorded as AUDIT-0105, BLOCKED with the repository owner as owner.** It needs a second host (below).
 
 ## Ledger state at the last commit
 
-`done: 95, open: 1, blocked: 4` — S0 0, S1 0, S2 1, S3 0.
+`done: 99, open: 1, blocked: 5` — S0 0, S1 0, S2 2, S3 0. The one open task is Phase D
+(AUDIT-0104); the five blocked are the four security decisions plus Phase E (AUDIT-0105).
 
 The closure invariant holds: the non-terminal count fell at every milestone report, from 96 at
 the start to 1 now.
@@ -59,7 +61,8 @@ verified on the primary host only, recorded in the ledger.
 
 - Branch `audit/2026-09-18` only; no force-push, no history rewrite.
 - `bash tools/mac-checks.sh` is the gate after every batch — **9 gates**, including eslint and
-  prettier (`npm ci` first). Metrics must not regress: SwiftLint ≤ 15 (measured 13),
+  prettier (`npm ci` first). Metrics must not regress: both style gates run `--strict` against zero (SwiftLint 0, swift-format 0);
+no waiver caps remain. Previously:
   swift-format ≤ 2 (measured 0), no file over 500 lines.
 - Every fix carries before/after evidence in `AUDIT/evidence-*.log`, and the closed record —
   what was found, what was changed, which commit — is in `AUDIT/ledger.json`.

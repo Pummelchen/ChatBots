@@ -1744,5 +1744,38 @@
     "fix_summary": "Both gates now run `--strict` and are judged against zero. The swiftlint gate fails on any finding and separately checks the exit status, so a run that reports nothing because it linted nothing cannot pass as clean; the swift-format gate does the same on its diagnostic lines. `waiver_for()` was deleted, both `waiver:` count lines were removed from `tools/analysis-waivers.txt`, and that file now carries only the three semgrep entries. `.swiftlint.yml`'s stale `line_length` comment and the gate descriptions in `AGENTS.md` and `docs/toolchain.md` were brought in line.",
     "evidence_after": "All 9 Mac gates pass with gate 5 reporting `no findings under --strict` and gate 6 `no diagnostics under --strict` \u2014 AUDIT/evidence-strict-final-mac-checks.log, 1086 tests.",
     "commit": "audit(AUDIT-0029/0102): run both style gates with --strict, and delete the waiver caps"
+  },
+  {
+    "id": "AUDIT-0104",
+    "severity": "S2",
+    "tier": "A",
+    "project": "repo",
+    "file_line": "Sources/; Tests/; web/; tools/",
+    "title": "Phase D: the convergence sweep \u2014 re-run every scanner over the frozen tree and record what it finds",
+    "category": "process/phase-d",
+    "status": "OPEN",
+    "host": "Node1.local",
+    "discovered_by": "audit-brief-phase-d",
+    "evidence_before": "Phase B/C drained the ledger, but the brief's Phase D is a separate requirement: the whole tree is swept again, after the remediation, to show that the changes did not introduce findings and that the earlier passes did not miss any. No sweep has been run since the tree was last modified.",
+    "fix_summary": "",
+    "evidence_after": "",
+    "commit": ""
+  },
+  {
+    "id": "AUDIT-0105",
+    "severity": "S2",
+    "tier": "A",
+    "project": "repo",
+    "file_line": "tools/mac-checks.sh",
+    "title": "Phase E: clean verification on an independent host",
+    "category": "process/phase-e",
+    "status": "BLOCKED",
+    "host": "Node1.local",
+    "discovered_by": "audit-brief-phase-e",
+    "evidence_before": "The brief's definition of complete requires the final `tools/mac-checks.sh` run to happen on one host independent of the machine the work was done on. Only `Node1.local` is available, and the package floor is macOS 26 on Apple Silicon with Xcode 27, which no hosted runner meets (this is also why the repository has no Swift CI job).",
+    "fix_summary": "",
+    "evidence_after": "",
+    "commit": "",
+    "note": "OWNER: the repository owner. REASON: a second macOS 26 / Apple-Silicon machine with Xcode 27 cannot be provisioned from inside this session, and no hosted runner meets the floor \u2014 the repository's own AGENTS.md records that as the reason it has no Swift CI job. The work itself is done and verified on Node1.local. OPTIONS FOR A HUMAN: (a) provide a second Mac and authorise a fresh clone plus `bash tools/mac-checks.sh` there; (b) sign a waiver that Phase E is verified on the primary host only, recorded here."
   }
 ]
