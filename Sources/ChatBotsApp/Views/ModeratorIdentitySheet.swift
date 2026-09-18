@@ -54,8 +54,10 @@ struct ModeratorIdentitySheet: View {
 
                     Text(
                         controller.mode == .research
-                            ? "In a research session the analysts work for this person, so how they approach the work is told to the room. It never writes their messages."
-                            : "The characters are told who is watching and how to read an interruption. It never writes the moderator's messages."
+                            ? "In a research session the analysts work for this person, so how they approach the work "
+                                + "is told to the room. It never writes their messages."
+                            : "The characters are told who is watching and how to read an interruption. It never "
+                                + "writes the moderator's messages."
                     )
                     .scaledFont(size: 11)
                     .foregroundStyle(palette.textSecondary)

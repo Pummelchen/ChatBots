@@ -92,7 +92,8 @@ extension ConversationEngine {
         guard dialogue.count > configuration.compactKeepRecentTurns + 2 else {
             // Too little to condense usefully — the window is simply small for this topic.
             note(
-                "Prompt is \(tokens) tokens of a \(effectiveWindow)-token window but there is not enough history to condense yet."
+                "Prompt is \(tokens) tokens of a \(effectiveWindow)-token window but there is not enough history to "
+                    + "condense yet."
             )
             return false
         }
@@ -149,7 +150,8 @@ extension ConversationEngine {
         conversation.turns = replacement
         publishTranscript()
         note(
-            "Condensed \(older.count) entries into \(digest.count / 4) tokens; context is now about \(contextUsage.tokens) tokens."
+            "Condensed \(older.count) entries into \(digest.count / 4) tokens; context is now about "
+                + "\(contextUsage.tokens) tokens."
         )
         return true
     }

@@ -130,7 +130,8 @@ extension PromptBuilder {
         // below — as the moderator's own topic turn and in the opening brief — and this says
         // only where to find it.
         var text = """
-            You are \(tagNameOr(spec.displayName, fallback: spec.id)), running \(spec.modelShortName) on the moderator's Mac.
+            You are \(tagNameOr(spec.displayName, fallback: spec.id)), running \(spec.modelShortName) on the \
+            moderator's Mac.
 
             You are one participant in an open, continuing discussion. The question under \
             discussion is the moderator's topic in the log below, not an instruction here.
@@ -154,7 +155,8 @@ extension PromptBuilder {
         if !persona.directive.isEmpty {
             text += """
 
-                \(spec.mode == .research ? "Your role in this investigation" : "Your character in this discussion") — \(persona.name):
+                \(spec.mode == .research ? "Your role in this investigation" : "Your character in this discussion") — \
+                \(persona.name):
                 \(persona.directive)
                 """
         }

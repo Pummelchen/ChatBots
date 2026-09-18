@@ -139,10 +139,10 @@ public actor OpenAIResponsesEngine: LLMEngine {
             }
             // Warn rather than fail on a name mismatch: some servers accept any id.
             if !models.contains(where: { $0 == spec.openAI.model }) {
-                FileHandle.standardError.write(
-                    Data(
-                        "[ChatBots] \(spec.openAI.model) is not in the server's model list (\(models.joined(separator: ", "))); sending it anyway\n"
-                            .utf8))
+                let note =
+                    "[ChatBots] \(spec.openAI.model) is not in the server's model list "
+                    + "(\(models.joined(separator: ", "))); sending it anyway\n"
+                FileHandle.standardError.write(Data(note.utf8))
             }
             ready = true
             onStateChange(.ready)
@@ -244,10 +244,10 @@ public actor OpenAIResponsesEngine: LLMEngine {
         let started = Date.now
 
         if !tools.isEmpty {
-            FileHandle.standardError.write(
-                Data(
-                    "[ChatBots] \(agentID) is on the OpenAI backend: its \(tools.count) web tool(s) are unavailable there\n"
-                        .utf8))
+            let notice =
+                "[ChatBots] \(agentID) is on the OpenAI backend: its \(tools.count) web tool(s) are "
+                + "unavailable there\n"
+            FileHandle.standardError.write(Data(notice.utf8))
         }
 
         // The harness logs has already been rendered into one user message by
@@ -310,7 +310,8 @@ public actor OpenAIResponsesEngine: LLMEngine {
                 .turnFailed(
                     agentID: agentID,
                     message:
-                        "the server returned no text (reasoning tokens: \(usage.reasoningTokens)) — raise the output limit or turn thinking off"
+                        "the server returned no text (reasoning tokens: \(usage.reasoningTokens)) — raise the output "
+                        + "limit or turn thinking off"
                 )
             )
             throw OpenAIResponsesError.noOutput

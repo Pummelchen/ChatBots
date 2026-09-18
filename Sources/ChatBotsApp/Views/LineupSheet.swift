@@ -89,7 +89,8 @@ struct LineupSheet: View {
         row(
             title: "Surprise me — a random room",
             note:
-                "Drawn from every participant in this mode. The seed is reported in the log, so the draw can be repeated and shared.",
+                "Drawn from every participant in this mode. The seed is reported in the log, so the draw can be "
+                + "repeated and shared.",
             who: "",
             action: {
                 controller.applyRoster(id: RosterLibrary.randomID)

@@ -202,10 +202,10 @@ public actor MLXEngine: LLMEngine {
                     return try await LLMModelFactory.shared.loadContainer(
                         from: local, using: tokenizerLoader)
                 }
-                FileHandle.standardError.write(
-                    Data(
-                        "[ChatBots] \(spec.id) \(spec.modelID) not found in \(ModelStore.directory().path); fetching it there\n"
-                            .utf8))
+                let notice =
+                    "[ChatBots] \(spec.id) \(spec.modelID) not found in \(ModelStore.directory().path); "
+                    + "fetching it there\n"
+                FileHandle.standardError.write(Data(notice.utf8))
 
                 return try await #huggingFaceLoadModelContainer(
                     configuration: ModelConfiguration(id: spec.modelID)
@@ -409,11 +409,11 @@ public actor MLXEngine: LLMEngine {
             settings.presencePenalty.map { String(format: "%.2f", $0) } ?? "off",
             settings.repetitionPenalty.map { String(format: "%.2f", $0) } ?? "off",
             settings.generationCap)
-        FileHandle.standardError.write(
-            Data(
-                "[ChatBots] \(settings.agentID) \(settings.modelID) ready — context \(context) tok, thinking \(settings.thinking.rawValue)\n[ChatBots] \(settings.agentID) sampler: \(sampler)\n"
-                    .utf8)
-        )
+        let notice =
+            "[ChatBots] \(settings.agentID) \(settings.modelID) ready — context \(context) tok, "
+            + "thinking \(settings.thinking.rawValue)\n"
+            + "[ChatBots] \(settings.agentID) sampler: \(sampler)\n"
+        FileHandle.standardError.write(Data(notice.utf8))
     }
 
 }

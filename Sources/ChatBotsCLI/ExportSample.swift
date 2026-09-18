@@ -36,7 +36,8 @@ enum ExportSample {
             Turn(
                 sequence: 2, speakerName: specA.displayName, kind: .chat,
                 content:
-                    "An ovoid resists a point load at the tip far better than a sphere does.\nThe shell thickens where curvature is highest.",
+                    "An ovoid resists a point load at the tip far better than a sphere does.\nThe shell thickens "
+                    + "where curvature is highest.",
                 timestamp: stamp("2026-12-25 13:15:41")),
             Turn(
                 sequence: 3, speakerName: specB.displayName, kind: .chat,

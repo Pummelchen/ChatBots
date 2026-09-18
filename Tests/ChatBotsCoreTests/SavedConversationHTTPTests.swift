@@ -9,9 +9,10 @@
 // The list is also the one reply that is an array rather than a snapshot, so a front end reading
 // it as `{seats: …}` would find nothing and draw an empty panel rather than an error.
 
-import ChatBotsCore
 import Foundation
 import Testing
+
+@testable import ChatBotsCore
 
 /// A seat that answers without a model, so a conversation can be run and kept in a test.
 private actor KeptStub: LLMEngine {
@@ -50,7 +51,7 @@ private actor KeptStub: LLMEngine {
 /// listening is a test that lies.
 @MainActor
 private func liveServer(topic: String = "A question worth keeping")
-    async throws -> (APIServer, ConversationEngine, URLSession, String)
+    async throws -> (APIServer, URLSession, String)
 {
     let specs = AgentSpec.makeSeats(count: 2)
     let stubs = specs.map { KeptStub(spec: $0) }
@@ -71,7 +72,7 @@ private func liveServer(topic: String = "A question worth keeping")
         // `start()` returning is not evidence that anything is listening; a taken port is
         // reported asynchronously. Asking is the only way to know.
         if await server.waitUntilReady() {
-            return (server, engine, session, "http://127.0.0.1:\(port)")
+            return (server, session, "http://127.0.0.1:\(port)")
         }
         server.stop()
     }
@@ -108,7 +109,8 @@ struct SavedConversationHTTPTests {
 
     @Test("A conversation links a running engine to the store it is written into")
     func aConversationIsKept() async throws {
-        let (server, engine, session, base) = try await liveServer()
+        let (server, session, base) = try await liveServer()
+        let engine = server.engine
         defer { server.stop() }
 
         engine.start()
@@ -126,7 +128,8 @@ struct SavedConversationHTTPTests {
 
     @Test("A kept conversation comes back with its transcript and its topic")
     func aConversationIsReopened() async throws {
-        let (server, engine, session, base) = try await liveServer()
+        let (server, session, base) = try await liveServer()
+        let engine = server.engine
         defer { server.stop() }
 
         engine.start()
@@ -155,7 +158,8 @@ struct SavedConversationHTTPTests {
 
     @Test("Deleting removes it from disk, and says so by returning the shorter list")
     func aConversationIsDeleted() async throws {
-        let (server, engine, session, base) = try await liveServer()
+        let (server, session, base) = try await liveServer()
+        let engine = server.engine
         defer { server.stop() }
 
         engine.start()
@@ -178,7 +182,7 @@ struct SavedConversationHTTPTests {
 
     @Test("Opening something that is not there is refused, not answered with a blank conversation")
     func openingAnUnknownIdIsRefused() async throws {
-        let (server, _, session, base) = try await liveServer()
+        let (server, session, base) = try await liveServer()
         defer { server.stop() }
 
         let (status, data) = try await post(
@@ -191,7 +195,7 @@ struct SavedConversationHTTPTests {
 
     @Test("A malformed id is refused rather than deleting something at random")
     func aMalformedIdIsRefused() async throws {
-        let (server, _, session, base) = try await liveServer()
+        let (server, session, base) = try await liveServer()
         defer { server.stop() }
 
         let (status, data) = try await post(

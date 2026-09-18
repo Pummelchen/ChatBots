@@ -300,7 +300,9 @@ struct DirectedEngineTests {
         // moderator has nothing left to ask and the session concludes rather than spending the
         // rest of its budget restating findings nobody disputes.
         let complete = """
-            According to the filings, the cost is 12 percent of a million units. Our competitors             are feasible, customers face regulation, and the forecast rests on one assumption             and a small sample.
+            According to the filings, the cost is 12 percent of a million units. Our competitors             are \
+            feasible, customers face regulation, and the forecast rests on one assumption             and a small \
+            sample.
             """
         let (engine, _) = directedEngine(contribution: complete, rounds: 20)
         engine.start(topic: "A question")

@@ -83,7 +83,8 @@ enum Probes {
             log(
                 String(
                     format:
-                        "  %-22@ active=%7.1f MiB  cache=%7.1f MiB  peak=%7.1f MiB  cacheLimit=%7.1f MiB  memLimit=%7.1f MiB",
+                        "  %-22@ active=%7.1f MiB  cache=%7.1f MiB  peak=%7.1f MiB  cacheLimit=%7.1f MiB  "
+                        + "memLimit=%7.1f MiB",
                     label as NSString,
                     Double(Memory.activeMemory) / mib,
                     Double(Memory.cacheMemory) / mib,

@@ -136,5 +136,6 @@ func sseTextDelta(_ text: String) -> String {
 
 /// A `response.completed` event carrying usage.
 func sseCompleted(inputTokens: Int = 0, outputTokens: Int = 0) -> String {
-    #"{"type":"response.completed","response":{"usage":{"input_tokens":\#(inputTokens),"output_tokens":\#(outputTokens)}}}"#
+    #"{"type":"response.completed","response":{"usage":{"input_tokens":\#(inputTokens),"#
+        + #""output_tokens":\#(outputTokens)}}}"#
 }

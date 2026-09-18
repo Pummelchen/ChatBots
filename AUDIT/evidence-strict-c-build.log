@@ -1,0 +1,29 @@
+Building for debugging...
+[Computing dependencies]
+[Using on-disk description]
+[1 / 1]
+[1 / 25] OrderedCollections
+[3 / 19] ChatBotsCoreTests-product
+[8 / 32]
+[16 / 32] ChatBotsCoreTests-product
+[18 / 32] ChatBots-product
+[20 / 28] ChatBotsAppTests-product
+[21 / 37] ChatBotsAppTests-product
+[22 / 37] ChatBotsAppTests-product
+[25 / 37] ChatBotsAppTests-product
+[26 / 37] ChatBotsCoreTests-product
+[27 / 37] chatbots-cli-product
+[29 / 39] ChatBotsCoreTests-product
+[34 / 41] ChatBotsCoreTests-product
+[35 / 41] ChatBotsAppTests-product
+[37 / 44] ChatBotsCoreTests-product
+[37 / 44] ChatBotsAppTests-product
+[39 / 44] ChatBotsCoreTests-product
+[40 / 44] chatbots-cli-product
+[42 / 45] chatbots-probe-product
+[43 / 46] ChatBotsCoreTests-product
+[45 / 49] ChatBotsCoreTests-product
+[47 / 49] ChatBotsCoreTests-product
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+Build complete! (18,61 secs)
+EXIT=0

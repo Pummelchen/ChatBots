@@ -45,7 +45,8 @@ struct SavedConversationsSheet: View {
             Button("Cancel", role: .cancel) { confirmingDelete = nil }
         } message: { item in
             Text(
-                "\"\(item.topic.isEmpty ? "Untitled" : item.topic)\" and its \(item.replies) messages will be removed from disk. This cannot be undone."
+                "\"\(item.topic.isEmpty ? "Untitled" : item.topic)\" and its \(item.replies) messages will be "
+                    + "removed from disk. This cannot be undone."
             )
         }
         .confirmationDialog(
@@ -60,7 +61,8 @@ struct SavedConversationsSheet: View {
             Button("Cancel", role: .cancel) { confirmingNew = false }
         } message: {
             Text(
-                "The current transcript is cleared from the screen. The engine has already kept it, so it stays in this list."
+                "The current transcript is cleared from the screen. The engine has already kept it, so it stays in "
+                    + "this list."
             )
         }
     }
@@ -73,7 +75,8 @@ struct SavedConversationsSheet: View {
                 Text("Kept conversations")
                     .scaledFont(size: 13, weight: .semibold)
                 Text(
-                    "Written to disk as the conversation runs. The most recent \(ConversationStore.maximumKept) are kept."
+                    "Written to disk as the conversation runs. The most recent \(ConversationStore.maximumKept) are "
+                        + "kept."
                 )
                 .scaledFont(size: 11)
                 .foregroundStyle(.secondary)

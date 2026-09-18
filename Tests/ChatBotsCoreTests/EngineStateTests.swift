@@ -118,10 +118,10 @@ struct EngineStateRestartTests {
         await stub.releaseFirst()
         try? await Task.sleep(for: .milliseconds(200))
 
-        #expect(
-            engine.isLoopRunning,
-            "the stale loop's tail cleared the replacement's generationTask, so Stop and Pause would have nothing to act on"
-        )
+        let why =
+            "the stale loop's tail cleared the replacement's generationTask, so Stop and Pause would "
+            + "have nothing to act on"
+        #expect(engine.isLoopRunning, Comment(rawValue: why))
 
         // Let the replacement finish so the test leaves nothing parked.
         await stub.releaseAll()

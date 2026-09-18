@@ -11,9 +11,10 @@
 // policy in its own response. These tests hold that line in both directions — the interface is
 // not given an inline grant, and the share page is not broken by the interface's policy.
 
-import ChatBotsCore
 import Foundation
 import Testing
+
+@testable import ChatBotsCore
 
 private actor HeaderStub: LLMEngine {
     nonisolated let spec: AgentSpec
@@ -41,7 +42,7 @@ private actor HeaderStub: LLMEngine {
 }
 
 @MainActor
-private func headerServer() async throws -> (APIServer, ConversationEngine, URLSession, String) {
+private func headerServer() async throws -> (APIServer, URLSession, String) {
     let specs = AgentSpec.makeSeats(count: 2)
     let stubs = specs.map { HeaderStub(spec: $0) }
     var configuration = ConversationEngine.Configuration()
@@ -59,7 +60,7 @@ private func headerServer() async throws -> (APIServer, ConversationEngine, URLS
         let server = APIServer(engine: engine, store: store, port: port)
         try server.start()
         if await server.waitUntilReady() {
-            return (server, engine, session, "http://127.0.0.1:\(port)")
+            return (server, session, "http://127.0.0.1:\(port)")
         }
         server.stop()
     }
@@ -160,7 +161,7 @@ struct SecurityHeaderTests {
 
     @Test("The live event stream answers with those headers")
     func theLiveStreamCarriesThem() async throws {
-        let (server, _, session, base) = try await headerServer()
+        let (server, session, base) = try await headerServer()
         defer { server.stop() }
 
         // A stream never finishes, so `data(for:)` waits for a body that will not end — the first
@@ -183,7 +184,7 @@ struct SecurityHeaderTests {
 
     @Test("The interface is served with the strict policy")
     func interfacePageIsStrictOverHTTP() async throws {
-        let (server, _, session, base) = try await headerServer()
+        let (server, session, base) = try await headerServer()
         defer { server.stop() }
 
         let (status, response, _) = try await get(session, "\(base)/")
@@ -201,7 +202,7 @@ struct SecurityHeaderTests {
 
     @Test("The API carries the policy too, with nothing to load")
     func apiCarriesTheDocumentPolicy() async throws {
-        let (server, _, session, base) = try await headerServer()
+        let (server, session, base) = try await headerServer()
         defer { server.stop() }
 
         let (status, response, _) = try await get(session, "\(base)/api/conversations")
@@ -214,7 +215,8 @@ struct SecurityHeaderTests {
 
     @Test("The share page keeps its inline stylesheet and script")
     func sharePageKeepsItsInlineMarkup() async throws {
-        let (server, engine, session, base) = try await headerServer()
+        let (server, session, base) = try await headerServer()
+        let engine = server.engine
         defer { server.stop() }
 
         engine.start()
@@ -238,7 +240,7 @@ struct SecurityHeaderTests {
 
     @Test("The missing-link page keeps its inline style and no script grant")
     func missingLinkPageKeepsItsInlineStyle() async throws {
-        let (server, _, session, base) = try await headerServer()
+        let (server, session, base) = try await headerServer()
         defer { server.stop() }
 
         let (status, response, _) = try await get(session, "\(base)/s/\(UUID().uuidString)")

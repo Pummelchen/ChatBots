@@ -50,7 +50,8 @@ final class UserSettingsStore: ObservableObject {
             } catch {
                 self.settings = .defaults(topic: fallbackTopic)
                 self.loadWarning =
-                    "Saved settings could not be read, so defaults were restored. The previous file is still at \(Self.storageDescription)."
+                    "Saved settings could not be read, so defaults were restored. The previous file is still at "
+                    + "\(Self.storageDescription)."
             }
         } else {
             self.settings = .defaults(topic: fallbackTopic)

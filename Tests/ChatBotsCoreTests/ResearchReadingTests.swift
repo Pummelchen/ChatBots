@@ -189,22 +189,31 @@ struct ResearchProseTests {
             line(
                 10, from: "eco",
                 """
-                According to the 2024 registrations data, the segment grew 18 percent year on                 year, but the unit economics are unattractive: capital cost per vehicle is                 estimated at 4,200 euros against a gross margin of 11 percent. My inference is                 that volume growth does not by itself produce a return at this capital intensity.
+                According to the 2024 registrations data, the segment grew 18 percent year on                 year, \
+                but the unit economics are unattractive: capital cost per vehicle is                 estimated at \
+                4,200 euros against a gross margin of 11 percent. My inference is                 that volume growth \
+                does not by itself produce a return at this capital intensity.
                 """),
             line(
                 20, from: "sta",
                 """
-                The method behind that 18 percent figure concerns me. It comes from a single                 registry with a small sample in the final quarter, and the confidence interval                 is wide enough to include flat growth. Correlation between registrations and                 demand is being treated as causation here.
+                The method behind that 18 percent figure concerns me. It comes from a single                 registry \
+                with a small sample in the final quarter, and the confidence interval                 is wide enough \
+                to include flat growth. Correlation between registrations and                 demand is being treated \
+                as causation here.
                 """),
             line(
                 30, from: "eco",
                 """
-                On the capital cost, the figure was measured directly from the audited filing,                 so I would defend that one. Obviously the whole market will collapse if nobody                 can fund the working capital.
+                On the capital cost, the figure was measured directly from the audited filing,                 so I \
+                would defend that one. Obviously the whole market will collapse if nobody                 can fund \
+                the working capital.
                 """),
             line(
                 40, from: "sta",
                 """
-                On the cost side, the audited filing puts capital cost per vehicle at 4,200                 euros, so I accept that figure.
+                On the cost side, the audited filing puts capital cost per vehicle at 4,200                 euros, so \
+                I accept that figure.
                 """),
         ]
     }
@@ -240,7 +249,10 @@ struct ResearchProseTests {
         #expect(
             ResearchDirector.subQuestions(
                 in: """
-                    The method behind that 18 percent figure concerns me. It comes from a single                     registry with a small sample in the final quarter, and the confidence interval                     is wide enough to include flat growth. Correlation between registrations and                     demand is being treated as causation here.
+                    The method behind that 18 percent figure concerns me. It comes from a single                     \
+                    registry with a small sample in the final quarter, and the confidence interval                    \
+                     is wide enough to include flat growth. Correlation between registrations and                     \
+                    demand is being treated as causation here.
                     """
             ).contains(.methodology),
             "the criticism is about method")

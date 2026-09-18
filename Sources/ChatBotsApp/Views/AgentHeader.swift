@@ -285,7 +285,8 @@ struct BackendControl: View {
                 ? "Backend is fixed once the conversation has started"
                 : spec.backend == .mlx
                     ? "Running \(spec.modelShortName) in the engine process, on this Mac's GPU with MLX"
-                    : "Talking to \(spec.openAI.baseURL) over the OpenAI Responses API. Web tools are MLX-only, so this seat has none."
+                    : "Talking to \(spec.openAI.baseURL) over the OpenAI Responses API. "
+                        + "Web tools are MLX-only, so this seat has none."
         )
     }
 

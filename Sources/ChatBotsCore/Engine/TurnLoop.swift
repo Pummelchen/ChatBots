@@ -277,10 +277,10 @@ extension MLXEngine {
 
         let scrubbed = Self.stripFabricatedToolSyntax(answer)
         if scrubbed.removedLines > 0 {
-            FileHandle.standardError.write(
-                Data(
-                    "[ChatBots] \(agentID) stripped \(scrubbed.removedLines) line(s) of fabricated tool syntax from the answer\n"
-                        .utf8))
+            let notice =
+                "[ChatBots] \(agentID) stripped \(scrubbed.removedLines) line(s) of fabricated "
+                + "tool syntax from the answer\n"
+            FileHandle.standardError.write(Data(notice.utf8))
         }
         let final = Self.clean(scrubbed.text, settings: settings)
         if stats.generationTokens == 0 {
@@ -405,7 +405,8 @@ extension MLXEngine {
                 TurnNotice(
                     name: "generation",
                     message:
-                        "spent the whole \(generationCap)-token budget thinking and produced no answer — raise the thinking level's headroom or turn thinking off"
+                        "spent the whole \(generationCap)-token budget thinking and produced no answer — raise the "
+                        + "thinking level's headroom or turn thinking off"
                 ))
         }
         if loopDetected {
@@ -413,7 +414,8 @@ extension MLXEngine {
                 TurnNotice(
                     name: "generation",
                     message:
-                        "the model fell into a repetition loop and the turn was ended — its sampler settings are too loose for this prompt"
+                        "the model fell into a repetition loop and the turn was ended — its sampler settings are too "
+                        + "loose for this prompt"
                 ))
         }
         if reasoningWasTruncated {

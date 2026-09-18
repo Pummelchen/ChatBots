@@ -36,7 +36,8 @@ enum Listings {
             print("\(group.rawValue):")
             for character in SocialLibrary.all where character.group == group {
                 print(
-                    "  \(character.emoji) \(character.name.padding(toLength: 24, withPad: " ", startingAt: 0)) \(character.summary)"
+                    "  \(character.emoji) \(character.name.padding(toLength: 24, withPad: " ", startingAt: 0)) "
+                        + "\(character.summary)"
                 )
             }
             print("")

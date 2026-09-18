@@ -8,7 +8,7 @@
 #
 # What the residual *is*, rule by rule, lives in `.swiftlint.yml` and `.swift-format`, which are the
 # configuration for those two tools. This file only says how much of it the gates accept. The caps sit
-# a couple of findings above the measured residual (127 and 0 against 129 and 2 after the audit enabled
+# a couple of findings above the measured residual (36 and 0 against 38 and 2 after the audit enabled
 # `force_unwrapping`, ran `swift-format format` over the tree, and removed the sites the rules found) because
 # the two formatters arrive through Homebrew and a patch release can word a diagnostic differently; the
 # slack is there for that drift, not for new code. A change that pushes either count past its cap fails
@@ -21,7 +21,7 @@
 #                                   rule id *and* path, because a count cannot tell a justified finding
 #                                   from a new one: fixing one and introducing another would leave the
 #                                   total unchanged.
-swiftlint waiver: 129
+swiftlint waiver: 38
 swift-format waiver: 2
 
 # `tools/cdp.py` and `tools/cdp_protocol.py` drive a headless Chrome on loopback and nothing else.

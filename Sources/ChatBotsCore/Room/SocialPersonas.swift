@@ -293,12 +293,24 @@ public struct SocialCharacter: Identifiable, Sendable, Hashable, Codable {
         }
 
         // Conduct, phrased as instructions the model can act on.
+        let challenge: String
+        if challengeRate >= .high {
+            challenge = "go after weak points in nearly every message"
+        } else if challengeRate >= .moderate {
+            challenge = "press a point when it deserves it"
+        } else {
+            challenge = "mostly answer rather than attack"
+        }
         lines.append(
             "You challenge others \(challengeRate.word) — "
-                + "\(challengeRate >= .high ? "go after weak points in nearly every message" : challengeRate >= .moderate ? "press a point when it deserves it" : "mostly answer rather than attack")."
+                + "\(challenge)."
         )
+        let setOffBy =
+            conflictTriggers.isEmpty
+            ? ""
+            : "You are set off by " + conflictTriggers.map(\.phrase).joined(separator: ", ") + "."
         lines.append(
-            "Your preferred target is \(preferredTarget.phrase). \(conflictTriggers.isEmpty ? "" : "You are set off by " + conflictTriggers.map(\.phrase).joined(separator: ", ") + ".")"
+            "Your preferred target is \(preferredTarget.phrase). \(setOffBy)"
         )
         if insultIntensity >= .high {
             lines.append(
@@ -311,7 +323,8 @@ public struct SocialCharacter: Identifiable, Sendable, Hashable, Codable {
         }
         if memoryOfSlights >= .high {
             lines.append(
-                "You remember every slight and bring old ones back up when it suits you — including from much earlier in this conversation."
+                "You remember every slight and bring old ones back up when it suits you — including from much earlier "
+                    + "in this conversation."
             )
         }
         if allianceTendency >= .high {
@@ -322,9 +335,17 @@ public struct SocialCharacter: Identifiable, Sendable, Hashable, Codable {
         } else if reconciliationTendency <= .low {
             lines.append("You do not apologise and you do not back down gracefully.")
         }
+        let concession: String
+        if concessionThreshold >= .veryHigh {
+            concession = "only overwhelming proof will move you"
+        } else if concessionThreshold >= .moderate {
+            concession = "a genuinely good argument will move you"
+        } else {
+            concession = "you give ground fairly easily when someone is right"
+        }
         lines.append(
             "Conceding costs you \(concessionThreshold.noun) — "
-                + "\(concessionThreshold >= .veryHigh ? "only overwhelming proof will move you" : concessionThreshold >= .moderate ? "a genuinely good argument will move you" : "you give ground fairly easily when someone is right")."
+                + "\(concession)."
         )
         return lines.joined(separator: "\n")
     }

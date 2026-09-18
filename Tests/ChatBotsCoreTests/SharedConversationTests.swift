@@ -5,9 +5,10 @@
 // one: a message containing a script tag must not be able to escape. The rest check that the
 // page is actually usable — that the replay is there and that every turn arrived.
 
-import ChatBotsCore
 import Foundation
 import Testing
+
+@testable import ChatBotsCore
 
 private func record(
     topic: String = "Why are eggs not round?",
@@ -172,7 +173,7 @@ struct SharedConversationPageTests {
 // MARK: - Over the wire
 
 @MainActor
-private func shareServer() async throws -> (APIServer, ConversationEngine, URLSession, String) {
+private func shareServer() async throws -> (APIServer, URLSession, String) {
     let specs = AgentSpec.makeSeats(count: 2)
     let stubs = specs.map { ShareStub(spec: $0) }
     var configuration = ConversationEngine.Configuration()
@@ -192,7 +193,7 @@ private func shareServer() async throws -> (APIServer, ConversationEngine, URLSe
         let server = APIServer(engine: engine, store: store, port: port)
         try server.start()
         if await server.waitUntilReady() {
-            return (server, engine, session, "http://127.0.0.1:\(port)")
+            return (server, session, "http://127.0.0.1:\(port)")
         }
         server.stop()
     }
@@ -230,7 +231,8 @@ struct SharedConversationHTTPTests {
 
     @Test("A kept conversation can be opened from its link")
     func linkServesThePage() async throws {
-        let (server, engine, session, base) = try await shareServer()
+        let (server, session, base) = try await shareServer()
+        let engine = server.engine
         defer { server.stop() }
         engine.start()
         await engine.waitUntilFinished()
@@ -253,7 +255,7 @@ struct SharedConversationHTTPTests {
 
     @Test("A link that names nothing says so, rather than opening an empty conversation")
     func unknownLinkIsHonest() async throws {
-        let (server, _, session, base) = try await shareServer()
+        let (server, session, base) = try await shareServer()
         defer { server.stop() }
 
         let unknownURL = try #require(URL(string: "\(base)/s/\(UUID().uuidString)"))
@@ -270,7 +272,7 @@ struct SharedConversationHTTPTests {
 
     @Test("A client is told where to build a share link")
     func shareBaseIsInTheSnapshot() async throws {
-        let (server, _, session, base) = try await shareServer()
+        let (server, session, base) = try await shareServer()
         defer { server.stop() }
         let data = try await fetch(session, "\(base)/api/state")
         let snapshot = try JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -279,7 +281,8 @@ struct SharedConversationHTTPTests {
 
     @Test("A page carries no origin, whatever Host it was reached on")
     func sharePageCarriesNoOrigin() async throws {
-        let (server, engine, session, base) = try await shareServer()
+        let (server, session, base) = try await shareServer()
+        let engine = server.engine
         defer { server.stop() }
         engine.start()
         await engine.waitUntilFinished()

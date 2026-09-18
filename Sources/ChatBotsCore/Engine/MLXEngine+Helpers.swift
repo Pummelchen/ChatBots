@@ -90,10 +90,12 @@ extension MLXEngine {
         let level = mode.label.lowercased()
         if producedAnswer {
             return
-                "thinking hit the \(level) ceiling (\(ceiling) reasoning tokens) and was cut off; the turn keeps the answer written so far — raise the thinking level to let the model finish before answering"
+                "thinking hit the \(level) ceiling (\(ceiling) reasoning tokens) and was cut off; the turn keeps the "
+                + "answer written so far — raise the thinking level to let the model finish before answering"
         }
         return
-            "thinking hit the \(level) ceiling (\(ceiling) reasoning tokens) and the turn ended before the model produced an answer — raise the thinking level or turn thinking off"
+            "thinking hit the \(level) ceiling (\(ceiling) reasoning tokens) and the turn ended before the model "
+            + "produced an answer — raise the thinking level or turn thinking off"
     }
 
     /// Text that closes a reasoning block the model would have kept writing.

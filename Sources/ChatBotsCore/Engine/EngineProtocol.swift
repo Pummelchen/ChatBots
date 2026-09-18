@@ -265,9 +265,9 @@ public enum ProtocolLimits {
     ///
     /// One number for every hop, deliberately. The engine's own stream, the transport server's per-session
     /// stream and the client's stream all carry the same event flow, and the cost of a bound that exists on
-    /// one side of a protocol and not the other is exactly the defect that used to exist: the server kept 256 and the client kept
-    /// everything, so a consumer that fell behind — a stalled interface, a paused window — turned the
-    /// client's stream into exactly the unbounded retention the bound was there to prevent.
+    /// one side of a protocol and not the other is exactly the defect that used to exist: the server kept 256
+    /// and the client kept everything, so a consumer that fell behind — a stalled interface, a paused window —
+    /// turned the client's stream into exactly the unbounded retention the bound was there to prevent.
     ///
     /// Newest rather than oldest: a consumer that is behind wants the state as it is now, not the backlog it
     /// missed. A `turnFinished` is followed by a whole fresh state, so dropping stale fragments cannot leave
