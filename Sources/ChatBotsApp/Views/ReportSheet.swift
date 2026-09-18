@@ -69,10 +69,11 @@ struct ReportSheet: View {
             } else if let report, !report.missingSections.isEmpty {
                 Label(
                     "Not covered: \(report.missingSections.joined(separator: ", "))",
-                    systemImage: "info.circle")
-                    .scaledFont(size: 10)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    systemImage: "info.circle"
+                )
+                .scaledFont(size: 10)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
             }
             Spacer(minLength: 0)
             Button {

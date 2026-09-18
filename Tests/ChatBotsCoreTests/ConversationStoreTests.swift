@@ -107,12 +107,16 @@ struct ConversationStoreTests {
         defer { try? FileManager.default.removeItem(at: directory) }
 
         let wanted = UUID()
-        #expect(store.save(StoredConversation(
-            id: wanted, conversation: sampleConversation(topic: "Keep me"),
-            seats: sampleSeats(), startedAt: .now)))
-        #expect(store.save(StoredConversation(
-            id: UUID(), conversation: sampleConversation(topic: "Other"),
-            seats: sampleSeats(), startedAt: .now)))
+        #expect(
+            store.save(
+                StoredConversation(
+                    id: wanted, conversation: sampleConversation(topic: "Keep me"),
+                    seats: sampleSeats(), startedAt: .now)))
+        #expect(
+            store.save(
+                StoredConversation(
+                    id: UUID(), conversation: sampleConversation(topic: "Other"),
+                    seats: sampleSeats(), startedAt: .now)))
 
         #expect(store.conversation(id: wanted)?.topic == "Keep me")
         #expect(store.delete(id: wanted))
@@ -137,9 +141,11 @@ struct ConversationStoreTests {
         // and the other means work has been lost.
         let (store, directory) = temporaryStore()
         defer { try? FileManager.default.removeItem(at: directory) }
-        #expect(store.save(StoredConversation(
-            id: UUID(), conversation: sampleConversation(topic: "Will be damaged"),
-            seats: sampleSeats(), startedAt: .now)))
+        #expect(
+            store.save(
+                StoredConversation(
+                    id: UUID(), conversation: sampleConversation(topic: "Will be damaged"),
+                    seats: sampleSeats(), startedAt: .now)))
 
         try Data("this is not json".utf8).write(to: directory.appending(path: "conversations.json"))
         #expect(store.load().isEmpty)
@@ -160,8 +166,9 @@ struct ConversationStoreTests {
 
         #expect(store.load().isEmpty, "a newer format should not be offered to this build")
         // And the file is still there, not deleted.
-        #expect(FileManager.default.fileExists(
-            atPath: directory.appending(path: "conversations.json").path))
+        #expect(
+            FileManager.default.fileExists(
+                atPath: directory.appending(path: "conversations.json").path))
     }
 
     @Test("A summary describes the conversation in one line")

@@ -29,7 +29,10 @@ struct LineupSheet: View {
                             title: roster.name,
                             note: roster.summary,
                             who: roster.personaIDs.joined(separator: " · "),
-                            action: { controller.applyRoster(id: roster.id); dismiss() })
+                            action: {
+                                controller.applyRoster(id: roster.id)
+                                dismiss()
+                            })
                     }
 
                     section("Scenarios")
@@ -38,7 +41,10 @@ struct LineupSheet: View {
                             title: scenario.topic,
                             note: scenario.note,
                             who: scenario.depth.map { "budget: \($0.label)" } ?? "",
-                            action: { controller.applyScenario(id: scenario.id); dismiss() })
+                            action: {
+                                controller.applyScenario(id: scenario.id)
+                                dismiss()
+                            })
                     }
                 }
                 .padding(.horizontal, 16)
@@ -61,9 +67,10 @@ struct LineupSheet: View {
                 Text(
                     controller.mode == .research
                         ? "Research panels. A scenario sets the question, the panel and the budget together."
-                        : "Character combinations. A scenario sets the question and the room together.")
-                    .scaledFont(size: 11)
-                    .foregroundStyle(.secondary)
+                        : "Character combinations. A scenario sets the question and the room together."
+                )
+                .scaledFont(size: 11)
+                .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
         }
@@ -81,9 +88,13 @@ struct LineupSheet: View {
     private var randomRow: some View {
         row(
             title: "Surprise me — a random room",
-            note: "Drawn from every participant in this mode. The seed is reported in the log, so the draw can be repeated and shared.",
+            note:
+                "Drawn from every participant in this mode. The seed is reported in the log, so the draw can be repeated and shared.",
             who: "",
-            action: { controller.applyRoster(id: RosterLibrary.randomID); dismiss() })
+            action: {
+                controller.applyRoster(id: RosterLibrary.randomID)
+                dismiss()
+            })
     }
 
     private func row(

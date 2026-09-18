@@ -56,7 +56,7 @@ struct RenameTests {
     func systemMessageUsesTheName() {
         var spec = AgentSpec.seat(index: 0)
         spec.displayName = "Mira"
-        let other = AgentSpec.seat(index: 1)   // "Agent 2"
+        let other = AgentSpec.seat(index: 1)  // "Agent 2"
 
         let message = PromptBuilder.systemMessage(for: spec, others: [other], topic: "Eggs")
         #expect(message.contains("You are Mira"))
@@ -112,7 +112,7 @@ struct RenameTests {
         let conversation = Conversation(
             topic: "Eggs",
             turns: [
-                Turn(sequence: 1, speakerName: "Agent 1", kind: .chat, content: "Earlier point."),
+                Turn(sequence: 1, speakerName: "Agent 1", kind: .chat, content: "Earlier point.")
             ])
         let prompt = PromptBuilder.prompt(
             for: spec, others: [AgentSpec.seat(index: 1)], conversation: conversation)

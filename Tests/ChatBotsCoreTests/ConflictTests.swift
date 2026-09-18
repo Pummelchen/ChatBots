@@ -11,9 +11,11 @@ import Testing
 @Suite("Reading a turn")
 struct ConflictReaderTests {
 
-    private func kinds(_ text: String, from: String = "Agent 1",
-                       others: [String] = ["Agent 1", "Agent 2"],
-                       addressing: String? = "Agent 2") -> [TurnSignal.Kind] {
+    private func kinds(
+        _ text: String, from: String = "Agent 1",
+        others: [String] = ["Agent 1", "Agent 2"],
+        addressing: String? = "Agent 2"
+    ) -> [TurnSignal.Kind] {
         ConflictReader.signals(in: text, from: from, others: others, addressing: addressing)
             .map(\.kind)
     }
@@ -39,10 +41,12 @@ struct ConflictReaderTests {
 
     @Test("A contradiction held up is read")
     func contradiction() {
-        #expect(kinds("You said earlier that shells are thin. That contradicts what you just said.")
-            .contains(.contradiction))
-        #expect(kinds("First you said it was structural, now it is adaptive. Which is it?")
-            .contains(.contradiction))
+        #expect(
+            kinds("You said earlier that shells are thin. That contradicts what you just said.")
+                .contains(.contradiction))
+        #expect(
+            kinds("First you said it was structural, now it is adaptive. Which is it?")
+                .contains(.contradiction))
     }
 
     @Test("A personal attack is a jab; an attack on an argument is a challenge")
@@ -69,8 +73,9 @@ struct ConflictReaderTests {
     @Test("Hedging prevents a claim being read as overconfident")
     func hedgingIsRespected() {
         let hedged = kinds("Clearly this is true, though I'm not sure and I could be wrong.")
-        #expect(!hedged.contains(.unsupportedClaim),
-                "a seat that admits uncertainty should not be penalised for confidence")
+        #expect(
+            !hedged.contains(.unsupportedClaim),
+            "a seat that admits uncertainty should not be penalised for confidence")
     }
 
     @Test("An ordinary message produces no signals at all")
@@ -136,12 +141,14 @@ struct ConflictStateTests {
     @Test("A concession earns respect and drops the grudge")
     func concessionEarnsRespect() {
         var conflict = state()
-        conflict.apply(signals: [TurnSignal(kind: .jab, confidence: 0.9, target: "Agent 2")],
-                       from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 1, summary: "x")
+        conflict.apply(
+            signals: [TurnSignal(kind: .jab, confidence: 0.9, target: "Agent 2")],
+            from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 1, summary: "x")
         #expect(conflict.relationship(from: "Agent 1", to: "Agent 2").grudge != nil)
 
-        conflict.apply(signals: [TurnSignal(kind: .concession, confidence: 0.9, target: "Agent 2")],
-                       from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 4, summary: "y")
+        conflict.apply(
+            signals: [TurnSignal(kind: .concession, confidence: 0.9, target: "Agent 2")],
+            from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 4, summary: "y")
         let after = conflict.relationship(from: "Agent 1", to: "Agent 2")
         #expect(after.respect > 0)
         #expect(after.grudge == nil, "conceding should settle a grudge, not deepen it")
@@ -156,20 +163,25 @@ struct ConflictStateTests {
         // One agreement is not an alliance. It warms both sides — the target is pleased to be
         // backed — but an alliance takes mutual goodwill, which is what makes it feel earned
         // rather than instantaneous.
-        conflict.apply(signals: [TurnSignal(kind: .agreement, confidence: 0.8, target: "Agent 2")],
-                       from: "Agent 1", others: both, sequence: 1, summary: nil)
+        conflict.apply(
+            signals: [TurnSignal(kind: .agreement, confidence: 0.8, target: "Agent 2")],
+            from: "Agent 1", others: both, sequence: 1, summary: nil)
         conflict.apply(signals: [], from: "Agent 2", others: both, sequence: 2, summary: nil)
-        #expect(conflict.relationship(from: "Agent 1", to: "Agent 2").alliance == nil,
-                "one seat agreeing does not ally them")
-        #expect(conflict.relationship(from: "Agent 1", to: "Agent 2").trust > 0,
-                "but it should still warm the relationship")
+        #expect(
+            conflict.relationship(from: "Agent 1", to: "Agent 2").alliance == nil,
+            "one seat agreeing does not ally them")
+        #expect(
+            conflict.relationship(from: "Agent 1", to: "Agent 2").trust > 0,
+            "but it should still warm the relationship")
 
         // Returned, it becomes one.
-        conflict.apply(signals: [TurnSignal(kind: .agreement, confidence: 0.8, target: "Agent 1")],
-                       from: "Agent 2", others: both, sequence: 3, summary: nil)
+        conflict.apply(
+            signals: [TurnSignal(kind: .agreement, confidence: 0.8, target: "Agent 1")],
+            from: "Agent 2", others: both, sequence: 3, summary: nil)
         #expect(conflict.relationship(from: "Agent 1", to: "Agent 2").alliance != nil)
-        #expect(conflict.relationship(from: "Agent 2", to: "Agent 1").alliance != nil,
-                "an alliance is mutual by definition")
+        #expect(
+            conflict.relationship(from: "Agent 2", to: "Agent 1").alliance != nil,
+            "an alliance is mutual by definition")
     }
 
     @Test("A jab ends an alliance")
@@ -177,23 +189,28 @@ struct ConflictStateTests {
         var conflict = state()
         let both = ["Agent 1", "Agent 2"]
         // Build the alliance first: agreeing, then agreeing back.
-        conflict.apply(signals: [TurnSignal(kind: .agreement, confidence: 0.9, target: "Agent 2")],
-                       from: "Agent 1", others: both, sequence: 1, summary: nil)
-        conflict.apply(signals: [TurnSignal(kind: .agreement, confidence: 0.9, target: "Agent 1")],
-                       from: "Agent 2", others: both, sequence: 2, summary: nil)
+        conflict.apply(
+            signals: [TurnSignal(kind: .agreement, confidence: 0.9, target: "Agent 2")],
+            from: "Agent 1", others: both, sequence: 1, summary: nil)
+        conflict.apply(
+            signals: [TurnSignal(kind: .agreement, confidence: 0.9, target: "Agent 1")],
+            from: "Agent 2", others: both, sequence: 2, summary: nil)
         #expect(conflict.relationship(from: "Agent 1", to: "Agent 2").alliance != nil)
 
-        conflict.apply(signals: [TurnSignal(kind: .jab, confidence: 0.9, target: "Agent 2")],
-                       from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 3, summary: "x")
-        #expect(conflict.relationship(from: "Agent 1", to: "Agent 2").alliance == nil,
-                "attacking someone you were allied with should end it")
+        conflict.apply(
+            signals: [TurnSignal(kind: .jab, confidence: 0.9, target: "Agent 2")],
+            from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 3, summary: "x")
+        #expect(
+            conflict.relationship(from: "Agent 1", to: "Agent 2").alliance == nil,
+            "attacking someone you were allied with should end it")
     }
 
     @Test("Peacemaking lowers hostility and clears the grudge")
     func reconciliationWorks() {
         var conflict = state()
-        conflict.apply(signals: [TurnSignal(kind: .jab, confidence: 1.0, target: "Agent 2")],
-                       from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 1, summary: "x")
+        conflict.apply(
+            signals: [TurnSignal(kind: .jab, confidence: 1.0, target: "Agent 2")],
+            from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 1, summary: "x")
         let before = conflict.relationship(from: "Agent 1", to: "Agent 2").annoyance
 
         conflict.apply(
@@ -219,10 +236,12 @@ struct ConflictStateTests {
     func threeSeatsArePairwise() {
         var conflict = state()
         let everyone = ["Agent 1", "Agent 2", "Agent 3"]
-        conflict.apply(signals: [TurnSignal(kind: .agreement, confidence: 0.9, target: "Agent 2")],
-                       from: "Agent 1", others: everyone, sequence: 1, summary: nil)
-        conflict.apply(signals: [TurnSignal(kind: .agreement, confidence: 0.9, target: "Agent 1")],
-                       from: "Agent 2", others: everyone, sequence: 2, summary: nil)
+        conflict.apply(
+            signals: [TurnSignal(kind: .agreement, confidence: 0.9, target: "Agent 2")],
+            from: "Agent 1", others: everyone, sequence: 1, summary: nil)
+        conflict.apply(
+            signals: [TurnSignal(kind: .agreement, confidence: 0.9, target: "Agent 1")],
+            from: "Agent 2", others: everyone, sequence: 2, summary: nil)
 
         // The alliance is between 1 and 2; the third seat is unaffected either way, which a
         // single per-seat score could not express.
@@ -234,14 +253,16 @@ struct ConflictStateTests {
     @Test("State decays, so one early exchange does not define the whole conversation")
     func stateDecays() {
         var conflict = state()
-        conflict.apply(signals: [TurnSignal(kind: .jab, confidence: 1.0, target: "Agent 2")],
-                       from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 1, summary: "x")
+        conflict.apply(
+            signals: [TurnSignal(kind: .jab, confidence: 1.0, target: "Agent 2")],
+            from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 1, summary: "x")
         let fresh = conflict.relationship(from: "Agent 1", to: "Agent 2").annoyance
 
         // Twenty quiet turns later, without a grudge keeping it alive.
         for sequence in 2...22 {
-            conflict.apply(signals: [], from: "Agent 2", others: ["Agent 1", "Agent 2"],
-                           sequence: sequence, summary: nil)
+            conflict.apply(
+                signals: [], from: "Agent 2", others: ["Agent 1", "Agent 2"],
+                sequence: sequence, summary: nil)
         }
         #expect(conflict.relationship(from: "Agent 1", to: "Agent 2").annoyance < fresh)
     }
@@ -252,8 +273,9 @@ struct ConflictStateTests {
         // No beats yet: a preferred target of "whoever is winning" must not pick at random.
         #expect(conflict.leadingSeat == nil)
 
-        conflict.apply(signals: [TurnSignal(kind: .concession, confidence: 1.0, target: "Agent 2")],
-                       from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 1, summary: nil)
+        conflict.apply(
+            signals: [TurnSignal(kind: .concession, confidence: 1.0, target: "Agent 2")],
+            from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 1, summary: nil)
         #expect(conflict.leadingSeat == "Agent 1")
     }
 
@@ -263,8 +285,9 @@ struct ConflictStateTests {
         let neutral = conflict.briefing(for: "Agent 1", others: ["Agent 1", "Agent 2"])
         #expect(neutral.isEmpty, "a fresh conversation has nothing to report")
 
-        conflict.apply(signals: [TurnSignal(kind: .jab, confidence: 1.0, target: "Agent 2")],
-                       from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 5, summary: "you are wrong about the shell")
+        conflict.apply(
+            signals: [TurnSignal(kind: .jab, confidence: 1.0, target: "Agent 2")],
+            from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 5, summary: "you are wrong about the shell")
         let briefing = conflict.briefing(for: "Agent 1", others: ["Agent 1", "Agent 2"])
         #expect(!briefing.isEmpty)
         #expect(briefing.relationships.contains { $0.contains("Agent 2") })
@@ -277,8 +300,9 @@ struct ConflictStateTests {
     func briefingHasNoNumbers() {
         // "annoyance: 0.62" means nothing to a model and produces behaviour nobody asked for.
         var conflict = state()
-        conflict.apply(signals: [TurnSignal(kind: .jab, confidence: 1.0, target: "Agent 2")],
-                       from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 1, summary: "x")
+        conflict.apply(
+            signals: [TurnSignal(kind: .jab, confidence: 1.0, target: "Agent 2")],
+            from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 1, summary: "x")
         let briefing = conflict.briefing(for: "Agent 1", others: ["Agent 1", "Agent 2"])
         for line in briefing.relationships + briefing.recentBeats {
             #expect(!line.contains("0."), "a decimal leaked into the prompt: \(line)")
@@ -303,10 +327,12 @@ struct ConflictStateTests {
         // be impossible to reason about when someone reports the characters went strange.
         func build() -> ConflictState {
             var conflict = ConflictState()
-            conflict.apply(signals: [TurnSignal(kind: .jab, confidence: 0.9, target: "Agent 2")],
-                           from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 1, summary: "a")
-            conflict.apply(signals: [TurnSignal(kind: .concession, confidence: 0.8, target: "Agent 1")],
-                           from: "Agent 2", others: ["Agent 1", "Agent 2"], sequence: 2, summary: "b")
+            conflict.apply(
+                signals: [TurnSignal(kind: .jab, confidence: 0.9, target: "Agent 2")],
+                from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 1, summary: "a")
+            conflict.apply(
+                signals: [TurnSignal(kind: .concession, confidence: 0.8, target: "Agent 1")],
+                from: "Agent 2", others: ["Agent 1", "Agent 2"], sequence: 2, summary: "b")
             return conflict
         }
         #expect(build() == build())
@@ -315,8 +341,9 @@ struct ConflictStateTests {
     @Test("State survives a save and reload, so a restarted app keeps the room")
     func stateIsCodable() throws {
         var conflict = state()
-        conflict.apply(signals: [TurnSignal(kind: .jab, confidence: 1.0, target: "Agent 2")],
-                       from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 3, summary: "x")
+        conflict.apply(
+            signals: [TurnSignal(kind: .jab, confidence: 1.0, target: "Agent 2")],
+            from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 3, summary: "x")
         let data = try JSONEncoder().encode(conflict)
         let restored = try JSONDecoder().decode(ConflictState.self, from: data)
         #expect(restored == conflict)
@@ -345,9 +372,10 @@ struct SocialPromptTests {
 
     private func conflictWithAJab() -> ConflictState {
         var conflict = ConflictState()
-        conflict.apply(signals: [TurnSignal(kind: .jab, confidence: 1.0, target: "Agent 2")],
-                       from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 1,
-                       summary: "that is a ridiculous claim")
+        conflict.apply(
+            signals: [TurnSignal(kind: .jab, confidence: 1.0, target: "Agent 2")],
+            from: "Agent 1", others: ["Agent 1", "Agent 2"], sequence: 1,
+            summary: "that is a ridiculous claim")
         return conflict
     }
 

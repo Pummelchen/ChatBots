@@ -118,7 +118,8 @@ public enum TranscriptWriter {
 
     /// A suggested filename, with the topic where it fits and a timestamp for uniqueness.
     public static func suggestedFilename(topic: String, at date: Date = Date.now) -> String {
-        var slug = topic
+        var slug =
+            topic
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .components(separatedBy: CharacterSet.alphanumerics.union(.whitespaces).inverted)
             .joined(separator: " ")

@@ -80,7 +80,9 @@ struct CompactionTests {
         let turns = [
             Turn(sequence: 1, speakerName: "Moderator", kind: .topic, content: "Why ovoid?"),
             Turn(sequence: 2, speakerID: "Agent 1", speakerName: "Agent 1", kind: .chat, content: "Pressure."),
-            Turn(sequence: 3, speakerID: "Agent 1", speakerName: "Agent 1", kind: .tool, content: "web_search: 5 results"),
+            Turn(
+                sequence: 3, speakerID: "Agent 1", speakerName: "Agent 1", kind: .tool, content: "web_search: 5 results"
+            ),
         ]
         let prompt = PromptBuilder.compactionPrompt(
             for: spec, turns: turns, topic: "Why ovoid?", previousSummary: "Earlier: shells are thin.",
@@ -245,7 +247,7 @@ struct CompactionTests {
     }
 }
 
-private extension SummarisingStub {
-    func setFail(_ value: Bool) { failCompaction = value }
-    func setSummary(_ value: String) { summary = value }
+extension SummarisingStub {
+    fileprivate func setFail(_ value: Bool) { failCompaction = value }
+    fileprivate func setSummary(_ value: String) { summary = value }
 }

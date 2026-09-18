@@ -104,7 +104,7 @@ struct ResearchEngineTests {
     @Test("Entertainment starts no session, because it has no end condition")
     @MainActor
     func entertainmentHasNoSession() async {
-        let specs = AgentSpec.makeSeats(count: 2)   // default mode is entertainment
+        let specs = AgentSpec.makeSeats(count: 2)  // default mode is entertainment
         let stubs = specs.map { ResearchStub(spec: $0) }
         var configuration = ConversationEngine.Configuration()
         configuration.pace = .zero

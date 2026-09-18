@@ -287,7 +287,7 @@ public enum PromptBuilder {
         // a pointer to it.
         var briefing = [
             systemMessage(
-                for: spec, others: others, topic: conversation.topic, moderator: moderator),
+                for: spec, others: others, topic: conversation.topic, moderator: moderator)
         ]
         // The moderator's source material is placed in the user turn with the log, fenced and
         // marked as data.

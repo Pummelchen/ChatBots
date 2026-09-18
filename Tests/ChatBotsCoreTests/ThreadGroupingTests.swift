@@ -93,9 +93,9 @@ struct ThreadGroupingTests {
         let flags = ThreadGrouping.flags(
             for: [
                 row(.theirs, "a", 0),
-                row(.theirs, "a", 60),                 // a minute later: no line
-                row(.theirs, "b", 60 + 21 * 60),       // 21 minutes later: a line
-                row(.theirs, "b", 60 + 22 * 60),       // and then not again
+                row(.theirs, "a", 60),  // a minute later: no line
+                row(.theirs, "b", 60 + 21 * 60),  // 21 minutes later: a line
+                row(.theirs, "b", 60 + 22 * 60),  // and then not again
             ],
             now: noon, locale: locale)
 

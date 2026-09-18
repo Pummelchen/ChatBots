@@ -15,7 +15,7 @@ struct StreamPacerTests {
     @Test("Nothing is released before any time passes")
     func noTimeNoText() {
         var pacer = StreamPacer()
-        pacer.enqueue("Hello world")   // 11 characters
+        pacer.enqueue("Hello world")  // 11 characters
         #expect(pacer.drain(elapsed: 0).isEmpty)
         #expect(pacer.backlog == 11, "nothing has been revealed yet, so all of it is queued")
     }
@@ -23,7 +23,7 @@ struct StreamPacerTests {
     @Test("Text is released at the configured rate, not in one burst")
     func releasesAtRate() {
         var pacer = StreamPacer()
-        pacer.revealRate = 100          // 100 characters per second
+        pacer.revealRate = 100  // 100 characters per second
         pacer.enqueue(String(repeating: "a", count: 500))
 
         // A tenth of a second should yield about ten characters, not five hundred.
@@ -87,7 +87,7 @@ struct StreamPacerTests {
         // One enormous token, no whitespace at all.
         pacer.enqueue(String(repeating: "a", count: 40))
 
-        let released = pacer.drain(elapsed: 1.0)   // 10 characters due
+        let released = pacer.drain(elapsed: 1.0)  // 10 characters due
         #expect(!released.isEmpty, "text must not be held indefinitely chasing a boundary")
     }
 
@@ -143,7 +143,7 @@ struct StreamPacerTests {
         // displaying just as the next finishes generating.
         var pacer = StreamPacer()
         for _ in 0..<100 {
-            pacer.enqueue(String(repeating: "a", count: 2))    // 2 characters every 50 ms
+            pacer.enqueue(String(repeating: "a", count: 2))  // 2 characters every 50 ms
             pacer.observeGeneration(charactersPerSecond: 40)
             _ = pacer.drain(elapsed: 0.05)
         }

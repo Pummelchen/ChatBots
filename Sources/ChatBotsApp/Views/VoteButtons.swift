@@ -41,7 +41,8 @@ struct VoteButtons: View {
                 )
                 .overlay(
                     Capsule().strokeBorder(
-                        cast ? AgentTheme.tint(for: turn.speakerID ?? "", palette: palette)
+                        cast
+                            ? AgentTheme.tint(for: turn.speakerID ?? "", palette: palette)
                             : palette.border,
                         lineWidth: 1)
                 )

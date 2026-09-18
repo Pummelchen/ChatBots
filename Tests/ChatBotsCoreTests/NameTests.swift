@@ -21,8 +21,10 @@ struct NameListTests {
     @Test("The languages the brief asked for")
     func requestedLanguages() {
         let labels = NameLanguage.allCases.map(\.label)
-        for expected in ["English", "French", "German", "Spanish (Latino)",
-                         "Brazilian Portuguese", "Italian"] {
+        for expected in [
+            "English", "French", "German", "Spanish (Latino)",
+            "Brazilian Portuguese", "Italian",
+        ] {
             #expect(labels.contains(expected), "missing \(expected)")
         }
     }
@@ -81,7 +83,10 @@ struct NameAssignmentTests {
     /// A generator that hands out a fixed sequence, so a test can predict the pick.
     private struct Counting: RandomNumberGenerator {
         var value: UInt64 = 0
-        mutating func next() -> UInt64 { value &+= 1; return value &* 6_364_136_223_846_793_005 }
+        mutating func next() -> UInt64 {
+            value &+= 1
+            return value &* 6_364_136_223_846_793_005
+        }
     }
 
     @Test("Agent 1 gets a female name and Agent 2 a male one")

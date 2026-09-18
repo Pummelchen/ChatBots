@@ -245,8 +245,9 @@ struct PersonaSummary: View {
                     .truncationMode(.tail)
             }
         }
-        .help(specs.map { "\($0.id) — \($0.persona.name): \($0.persona.summary)" }
-            .joined(separator: "\n"))
+        .help(
+            specs.map { "\($0.id) — \($0.persona.name): \($0.persona.summary)" }
+                .joined(separator: "\n"))
     }
 }
 

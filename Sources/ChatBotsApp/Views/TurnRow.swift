@@ -80,7 +80,7 @@ struct TurnRow: View {
                     Text(detail)
                         .scaledFont(size: 10.5, design: .monospaced)
                         .foregroundStyle(palette.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }

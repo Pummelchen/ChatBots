@@ -257,9 +257,11 @@ public enum ModelStore {
     /// The loaded checkpoints on disk, for display.
     public static func availableCheckpoints(in root: URL? = nil) -> [String] {
         let root = root ?? directory()
-        let entries = (try? FileManager.default.contentsOfDirectory(
-            at: root, includingPropertiesForKeys: [.isDirectoryKey])) ?? []
-        return entries
+        let entries =
+            (try? FileManager.default.contentsOfDirectory(
+                at: root, includingPropertiesForKeys: [.isDirectoryKey])) ?? []
+        return
+            entries
             .filter { isCompleteCheckpoint($0) }
             .map(\.lastPathComponent)
             .sorted()

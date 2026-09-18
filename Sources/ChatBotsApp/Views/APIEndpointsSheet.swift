@@ -70,10 +70,12 @@ struct APIEndpointsSheet: View {
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 8, verticalSpacing: 6) {
                 GridRow {
                     Text("URL").scaledFont(size: 11).foregroundStyle(.secondary)
-                    TextField("https://api.openai.com or http://localhost:1234",
-                              text: baseURLBinding(seat))
-                        .textFieldStyle(.roundedBorder)
-                        .scaledFont(size: 11.5, design: .monospaced)
+                    TextField(
+                        "https://api.openai.com or http://localhost:1234",
+                        text: baseURLBinding(seat)
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .scaledFont(size: 11.5, design: .monospaced)
                 }
                 GridRow {
                     Text("Model").scaledFont(size: 11).foregroundStyle(.secondary)
@@ -83,10 +85,12 @@ struct APIEndpointsSheet: View {
                 }
                 GridRow {
                     Text("API key").scaledFont(size: 11).foregroundStyle(.secondary)
-                    SecureField(store.keys[seat].isEmpty ? "not needed for a local server" : "",
-                                text: keyBinding(seat))
-                        .textFieldStyle(.roundedBorder)
-                        .scaledFont(size: 11.5, design: .monospaced)
+                    SecureField(
+                        store.keys[seat].isEmpty ? "not needed for a local server" : "",
+                        text: keyBinding(seat)
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .scaledFont(size: 11.5, design: .monospaced)
                 }
                 if let keyError = store.keyStoreError {
                     GridRow {
@@ -125,9 +129,10 @@ struct APIEndpointsSheet: View {
             if pane.spec.webSearchEnabled, usesAPI {
                 Label(
                     "Web tools are unavailable on the API backend",
-                    systemImage: "exclamationmark.triangle")
-                    .scaledFont(size: 10.5)
-                    .foregroundStyle(.orange)
+                    systemImage: "exclamationmark.triangle"
+                )
+                .scaledFont(size: 10.5)
+                .foregroundStyle(.orange)
             }
         }
         .padding(12)
@@ -152,8 +157,10 @@ struct APIEndpointsSheet: View {
 
     private func useAPIBinding(_ seat: Int) -> Binding<Bool> {
         Binding(
-            get: { controller.panes.indices.contains(seat)
-                && store.isAPI(controller.panes[seat].spec) },
+            get: {
+                controller.panes.indices.contains(seat)
+                    && store.isAPI(controller.panes[seat].spec)
+            },
             set: { useAPI in
                 let backend: AgentSpec.Backend = useAPI ? .openAIResponses : .mlx
                 controller.setBackend(backend, for: controller.panes[seat].id)

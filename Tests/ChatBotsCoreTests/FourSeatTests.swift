@@ -98,7 +98,9 @@ struct FourSeatTests {
         // Every window of four consecutive turns should be four different people.
         for start in 0..<max(0, speakers.count - 3) {
             let window = Set(speakers[start..<(start + 4)])
-            #expect(window.count == 4, "turns \(start)…\(start + 3) repeated a speaker: \(Array(speakers[start..<(start + 4)]))")
+            #expect(
+                window.count == 4,
+                "turns \(start)…\(start + 3) repeated a speaker: \(Array(speakers[start..<(start + 4)]))")
         }
     }
 
@@ -128,9 +130,12 @@ struct FourSeatTests {
     @Test("Four seats each keep their own persona")
     func personasAreIndependent() async {
         let engine = makeEngine(seats: 4, turns: 1)
-        engine.updateSeat({
-            var spec = engine.specs[2]; spec.personaID = "troll"; return spec
-        }())
+        engine.updateSeat(
+            {
+                var spec = engine.specs[2]
+                spec.personaID = "troll"
+                return spec
+            }())
         #expect(engine.specs[2].personaID == "troll")
         // And the others are untouched, which is the thing a shared roster would get wrong.
         #expect(engine.specs[0].personaID != "troll")

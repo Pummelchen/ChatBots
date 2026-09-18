@@ -1,7 +1,7 @@
 # ChatBots audit — open work
 
 Generated from `AUDIT/ledger.json` by `AUDIT/render-ledger.py`; edit the JSON, not this file.
-**97 recorded · 92 closed · 1 open · 4 awaiting a decision**
+**98 recorded · 93 closed · 1 open · 4 awaiting a decision**
 
 Closed tasks stay in the JSON as the audit record and are not repeated here.
 

@@ -42,10 +42,10 @@ struct BuiltInKeyTests {
         defer { try? FileManager.default.removeItem(at: temporary) }
 
         try """
-            # a comment
-            DEEPSEEK_API_KEY="sk-from-the-file"
-            OTHER_KEY=ignored
-            """.write(
+        # a comment
+        DEEPSEEK_API_KEY="sk-from-the-file"
+        OTHER_KEY=ignored
+        """.write(
             to: temporary.appending(path: BuiltInKeys.secretsFileName),
             atomically: true, encoding: .utf8)
 
@@ -65,9 +65,11 @@ struct BuiltInKeyTests {
     func keyStaysWithItsHost() {
         // A local server, a competitor, anything: no key, because sending it there would
         // disclose it to whoever runs that machine.
-        for host in ["http://localhost:1234/v1", "https://api.openai.com/v1",
-                     "https://example.test/v1", "https://notdeepseek.com/v1",
-                     "https://api.deepseek.com.evil.test/v1"] {
+        for host in [
+            "http://localhost:1234/v1", "https://api.openai.com/v1",
+            "https://example.test/v1", "https://notdeepseek.com/v1",
+            "https://api.deepseek.com.evil.test/v1",
+        ] {
             let endpoint = OpenAIEndpoint(baseURL: host, model: "some-model")
             #expect(endpoint.effectiveAPIKey == nil, "a key must not be sent to \(host)")
         }

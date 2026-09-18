@@ -126,7 +126,8 @@ public struct AudienceScorecard: Sendable, Hashable, Codable {
             }
             bySeat[vote.seatID] = entry
         }
-        return bySeat
+        return
+            bySeat
             .map { AudienceScore(seatID: $0.key, strong: $0.value.strong, weak: $0.value.weak) }
             .sorted { lhs, rhs in
                 if lhs.score != rhs.score { return lhs.score > rhs.score }

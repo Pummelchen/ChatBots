@@ -195,8 +195,9 @@ struct SeatRosterTests {
         let key = AgentSpec.SeatRoster.environmentKey
         #expect(AgentSpec.SeatRoster.count(environment: [key: "3"]) == 3)
         #expect(AgentSpec.SeatRoster.count(environment: [key: "4"]) == 4)
-        #expect(AgentSpec.SeatRoster.specs(environment: [key: "4"]).map(\.id)
-            == ["Agent 1", "Agent 2", "Agent 3", "Agent 4"])
+        #expect(
+            AgentSpec.SeatRoster.specs(environment: [key: "4"]).map(\.id)
+                == ["Agent 1", "Agent 2", "Agent 3", "Agent 4"])
     }
 
     @Test("A bad or oversized override falls back safely")

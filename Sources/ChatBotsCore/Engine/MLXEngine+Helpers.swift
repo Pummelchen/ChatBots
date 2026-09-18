@@ -165,7 +165,7 @@ extension MLXEngine {
                         tool.argumentName: [
                             "type": "string",
                             "description": tool.argumentDescription,
-                        ] as [String: any Sendable],
+                        ] as [String: any Sendable]
                     ] as [String: any Sendable],
                     "required": [tool.argumentName],
                 ] as [String: any Sendable],

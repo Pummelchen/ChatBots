@@ -1648,5 +1648,21 @@
     "fix_summary": "`.swiftlint.yml` gains `opt_in_rules: [force_unwrapping]`. The two production sites are gone: `setModel` looks the seat up with `firstIndex(where:)` and returns false instead of `first(where:)!`, and the turn loop's search-budget test is `budgetRemaining.map { $0 > 0 } ?? true` instead of `budgetRemaining == nil || budgetRemaining! > 0`. The 30 test sites became `try #require(...)` (26) or, where a stored/global constant cannot be `throws`, a closure initialiser that records an issue and returns an empty fixture (4). SwiftLint's autofix also cleared 6 other findings, so the recorded waiver was tightened from 217 to 211.",
     "evidence_after": "Repo-config SwiftLint over Sources and Tests reports 209 findings and 0 `force_unwrapping`; swift-format over authored Swift reports 411 (both better than the 215/439 baseline). `swift build --build-tests` EXIT=0 and all 9 Mac gates pass: see AUDIT/evidence-force-unwrap-mac-checks.log.",
     "commit": "audit(AUDIT-0029/0097): enable force_unwrapping, and remove the 32 sites"
+  },
+  {
+    "id": "AUDIT-0101",
+    "severity": "S3",
+    "tier": "A",
+    "project": "repo",
+    "file_line": "Sources/; Tests/",
+    "title": "The swift-format residual: 306 diagnostics that `--strict` would fail on",
+    "category": "style/formatting",
+    "status": "DONE",
+    "host": "Node1.local",
+    "discovered_by": "audit-0029",
+    "evidence_before": "`swift-format lint` over authored Swift reported 306 diagnostics, so the gate could only be enforced against the recorded waiver of 307 rather than `--strict`.",
+    "fix_summary": "`swift-format format --in-place` over `Sources` and `Tests`, excluding the two generated files \u2014 28 files changed. The sweep also removed 24 SwiftLint findings, so the waivers were tightened from 208/307 to 184/13 in the same commit.",
+    "evidence_after": "swift-format reports 11 diagnostics (the remaining `AlwaysUseLowerCamelCase` sites, AUDIT-0100) against a waiver of 13; SwiftLint reports 182. All 9 Mac gates pass: AUDIT/evidence-strict-format-mac-checks.log (1086 tests).",
+    "commit": "audit(AUDIT-0101): run swift-format over the tree"
   }
 ]

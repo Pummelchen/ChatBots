@@ -48,7 +48,7 @@ public enum SystemProcess {
     ) -> [String: String] {
         var child: [String: String] = [
             // A tool that shells out to a helper has to be able to find it.
-            "PATH": environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin",
+            "PATH": environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
         ]
         // `HOME` and `TMPDIR` because the system tools and Foundation use them, the locale
         // variables so the output does not depend on the caller's, and `OPENSSL_CONF` because a

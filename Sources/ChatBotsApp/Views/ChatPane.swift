@@ -217,7 +217,9 @@ struct ChatPane: View {
             .disabled(controller.isRunning || controller.turns.isEmpty)
             .help("Summarise the older turns now instead of waiting for the threshold")
             Label(contextLabel, systemImage: "text.book.closed")
-                .help("Prompt size against this seat's context window; the log is condensed when it crosses the threshold, so the beginning of the discussion is never silently dropped")
+                .help(
+                    "Prompt size against this seat's context window; the log is condensed when it crosses the threshold, so the beginning of the discussion is never silently dropped"
+                )
         }
         .scaledFont(size: 9.5, design: .rounded)
         .foregroundStyle(palette.textTertiary)
