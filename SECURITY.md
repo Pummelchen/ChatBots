@@ -52,8 +52,10 @@ Worth knowing before you report, because several things that look like leaks are
 
 The desktop app reaches the engine over WebTransport with the transport library's
 `.localDevelopmentSelfSigned` policy. That is a loopback-only bypass of platform certificate
-validation: **the engine's fingerprint is reported and logged but not enforced.** A malicious
-process already running as your user could present its own certificate and be accepted. It is
+validation: **the engine's fingerprint is reported and logged but not enforced, and the client
+cannot observe the peer certificate to check it.** A malicious process already running as your
+user could present its own certificate and be accepted — and the reported fingerprint, which is
+the engine's own claim about the file it loaded, would not reveal it. It is
 accepted because the alternative is no encrypted local channel at all, and because a process
 that can run as you can read the engine's files directly. See the comment at the top of
 `Sources/ChatBotsCore/Transport/WebTransportClient.swift`.

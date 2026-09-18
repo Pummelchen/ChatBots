@@ -12,8 +12,11 @@
 // running as the same user on this machine could present its own certificate and be accepted.
 // It is accepted here because the alternative is no encrypted local channel at all, and
 // because a process that can already run as this user can read the engine's files directly.
-// The fingerprint is still exposed, reported and logged, so a mismatch is visible even though
-// it is not enforced.
+// The fingerprint is still exposed, reported and logged *by the engine*, but the client has no
+// way to observe the peer certificate — the transport library exposes no accessor for it — so a
+// mismatch is not detectable from here. What is reported is the engine's claim about the file it
+// loaded, not a check the client made, and an impersonating loopback process would not be
+// revealed by it.
 //
 // If that trade is ever wrong, the fix is a trust callback that checks the certificate's
 // SHA-256 against the stored fingerprint — which the library would need to expose.

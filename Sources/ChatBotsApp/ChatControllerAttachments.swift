@@ -163,11 +163,12 @@ extension ChatController {
     ///
     /// The cost is that the whole file crosses the wire. On loopback, for a document a person
     /// chose by hand, that is nothing.
-    /// Returns how many files were accepted for upload.
+    /// Returns how many files were queued for upload.
     ///
     /// The upload runs in the background: reading a large PDF and sending it should not freeze
     /// the window, and the engine publishes the new attachment list when it is done, so there
-    /// is no local state to keep in step.
+    /// is no local state to keep in step. The read is in that background task too, so a file
+    /// that turns out to be unreadable is reported there rather than counted here.
     @discardableResult
     public func addFiles(_ urls: [URL], allowImages: Bool = true) -> Int {
         guard let client else {
@@ -176,8 +177,11 @@ extension ChatController {
         }
         let imagesAllowed = allowImages && allSeatsSupportVision
 
-        // Checked before reading, so an unreadable or unwanted file costs nothing.
-        var queued: [(name: String, data: Data)] = []
+        // Checked before reading, so an unwanted file costs nothing. The reads themselves happen
+        // inside the background task below: `addFiles` is @MainActor and `Data(contentsOf:)` is
+        // synchronous, so reading here blocked the window for however long the largest selected
+        // file took — the cost this method's own comment says is paid in the background.
+        var wanted: [URL] = []
         var failures: [String] = []
         for url in urls {
             let name = url.lastPathComponent
@@ -186,38 +190,42 @@ extension ChatController {
                     DocumentError.imageNotAllowed.errorDescription ?? "Images are unavailable.")
                 continue
             }
-            do {
-                queued.append((name, try Data(contentsOf: url)))
-            } catch {
-                failures.append("\(name): \(error.localizedDescription)")
-            }
+            wanted.append(url)
         }
 
-        guard !queued.isEmpty else {
+        guard !wanted.isEmpty else {
             errorBanner = failures.first
             return 0
         }
 
         errorBanner = nil
-        let pending = queued
+        let pending = wanted
         Task { [weak self] in
             var rejected: [String] = failures
-            for file in pending {
+            for url in pending {
+                let name = url.lastPathComponent
+                let data: Data
                 do {
-                    try await client.addAttachment(filename: file.name, contents: file.data)
+                    data = try Data(contentsOf: url)
+                } catch {
+                    rejected.append("\(name): \(error.localizedDescription)")
+                    continue
+                }
+                do {
+                    try await client.addAttachment(filename: name, contents: data)
                     // The engine now holds the real file, so a stored copy of the same name is
                     // no longer "restored but not loaded".
-                    self?.restoredAttachments.removeAll { $0.name == file.name }
+                    self?.restoredAttachments.removeAll { $0.name == name }
                 } catch {
                     // The engine's reason, which is what the user needs to read.
-                    rejected.append("\(file.name): \(error.localizedDescription)")
+                    rejected.append("\(name): \(error.localizedDescription)")
                 }
             }
             guard let self else { return }
             self.errorBanner = rejected.isEmpty ? nil : rejected.joined(separator: "\n")
             self.refreshAttachmentRestoreNotice()
         }
-        return queued.count
+        return wanted.count
     }
 
     /// Seed the attached material at launch, before any turn can run.

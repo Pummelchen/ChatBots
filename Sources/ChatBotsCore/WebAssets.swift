@@ -1548,8 +1548,22 @@ function listen() {
   source.onerror = () => toast("Lost the connection to the server — reconnecting…");
 }
 
+// Commit the topic, then start.
+//
+// The topic was posted only from the field's `change` event, and start was a separate request
+// with no ordering between them: a topic typed and then started raced the start, the engine
+// refused the late change ("the topic cannot be changed once the conversation has started"),
+// and the room ran the previous topic. Awaiting the topic first makes the order the user meant.
+async function startConversation() {
+  const value = $("topic").value.trim();
+  if (value && (!state.snapshot || value !== state.snapshot.topic)) {
+    await run(() => api.post("/api/topic", { topic: value }));
+  }
+  await run(() => api.post("/api/start"));
+}
+
 function wire() {
-  $("start").onclick = () => run(() => api.post("/api/start"));
+  $("start").onclick = () => startConversation();
   $("pause").onclick = () => run(() =>
     api.post(state.snapshot && state.snapshot.status === "Paused" ? "/api/resume" : "/api/pause"));
   $("stop").onclick = () => run(() => api.post("/api/stop"));
