@@ -26,6 +26,16 @@ Worth knowing before you report, because several things that look like leaks are
   controls and open a share page. That is deliberate — it is what lets a phone on the same Wi-Fi use
   the interface — and `tools/start.sh --local-only` inserts `bind 127.0.0.1`, which keeps all of it
   on this Mac.
+
+  **Accepted risk, signed off.** The audit recorded this exposure as AUDIT-0077 and the DNS-rebinding
+  gap in the same-origin check as AUDIT-0071, and the repository owner reviewed both and accepted
+  them on 2026-09-18, together with the unauthenticated `/api` surface as AUDIT-0018. The reasoning is
+  the one above: the LAN is the trust boundary, the phone-on-the-Wi-Fi case is the point of the
+  feature, and `--local-only` is the supported way to remove the exposure. The alternative on the
+  table was a shared-secret on state-changing routes plus a loopback default bind — a contract change
+  across four consumers — and it was declined. Anyone deploying this on an untrusted network should
+  pass `--local-only` or front it with their own authentication; the three findings stay in
+  `AUDIT/ledger.json` as accepted with this paragraph as the record.
 * **A share link is not uploaded and not hosted anywhere.** `/s/<id>` is a page the engine renders
   from the conversation it already holds, and the transcript stays on the machine that made it.
   What that does *not* mean is that the link is private: it is served through whatever serves the
