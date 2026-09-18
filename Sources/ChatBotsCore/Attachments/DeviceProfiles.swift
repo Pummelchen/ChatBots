@@ -226,7 +226,21 @@ public enum DeviceProfiles {
     /// anything else, and the caller only needs to know which side of the breakpoints it is
     /// on. Nil means genuinely unlike anything known, which is the signal to fall back to
     /// the width-based rules.
+    /// The largest viewport dimension the resolver will consider.
+    ///
+    /// The dimensions arrive from an unauthenticated query string (`GET /api/device?w=&h=`)
+    /// on the LAN-reachable API, and the distance arithmetic below is `Int`. A height near
+    /// `Int.max` overflows `abs(lhs.height - height) * 1000 + ...` and traps, which aborts
+    /// the whole engine process. A CSS viewport is a few thousand points at most, so a
+    /// value beyond this bound is "unlike anything known" rather than a number to compute
+    /// with — and bounding it here means no caller can reach the subtractions with an
+    /// arithmetic overflow however the input arrived.
+    public static let maximumViewportDimension = 100_000
+
     public static func nearest(width: Int, height: Int, isMobile: Bool) -> DeviceProfile? {
+        guard width > 0, height >= 0,
+            width <= maximumViewportDimension, height <= maximumViewportDimension
+        else { return nil }
         let candidateClass: DeviceClass = {
             if width >= 1000 { return .desktop }
             return isMobile ? (width >= 700 ? .tablet : .phone) : .desktop

@@ -134,6 +134,19 @@ struct DeviceResolutionTests {
         #expect(match?.kind == .tablet)
         #expect(match?.id == "ipad-10-2")
     }
+
+    @Test("An absurd viewport is admitted as unknown rather than trapping the process")
+    func extremeViewportsDoNotOverflow() {
+        // `GET /api/device?w=390&h=9223372036854775807` reaches the resolver from the
+        // unauthenticated LAN API. The distance arithmetic used to be
+        // `abs(height - candidate.height) * 1000 + ...`, which overflows Int for a value
+        // near Int.max and traps, aborting the whole engine process. No Int may trap here.
+        #expect(DeviceProfiles.nearest(width: 390, height: Int.max, isMobile: true) == nil)
+        #expect(DeviceProfiles.nearest(width: 390, height: Int.min, isMobile: true) == nil)
+        #expect(DeviceProfiles.nearest(width: Int.max, height: 844, isMobile: true) == nil)
+        #expect(DeviceProfiles.nearest(width: Int.min, height: 844, isMobile: true) == nil)
+        #expect(DeviceProfiles.nearest(width: Int.max, height: Int.max, isMobile: false) == nil)
+    }
 }
 
 @Suite("What the interface branches on")

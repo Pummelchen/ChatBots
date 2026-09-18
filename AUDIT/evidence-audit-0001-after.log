@@ -1,0 +1,53 @@
+Building for debugging...
+[Computing dependencies]
+[Using on-disk description]
+[1 / 1]
+[1 / 69] EventSource
+[2 / 17] ChatBotsCore
+[6 / 21] ChatBotsCore
+[7 / 22] ChatBotsCore
+[16 / 32] ChatBotsCore
+[20 / 37] ChatBotsCore-product
+[20 / 37] chatbots-probe-product
+[22 / 37] chatbots-cli-product
+[26 / 38] ChatBots
+[26 / 38] ChatBots-product
+[28 / 38] chatbots-probe-product
+[29 / 40] chatbots-cli-product
+[31 / 42] chatbots-cli-product
+[34 / 44] ChatBots
+[37 / 45] ChatBots-product
+[37 / 47] ChatBots-product
+[39 / 50] ChatBotsCoreTests-product
+[41 / 49] ChatBotsAppTests-product
+[44 / 50] ChatBotsAppTests-product
+[46 / 55] ChatBotsAppTests-product
+[48 / 55] ChatBotsAppTests-product
+[49 / 55] chatbots-cli-product
+[51 / 56] chatbots-probe-product
+[52 / 57] ChatBotsCoreTests-product
+[56 / 60] ChatBotsCoreTests-product
+[58 / 60] ChatBotsCoreTests-product
+warning: missing creator for mutated node: ('/Users/node1/Downloads/ChatBots/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+Build complete! (12,37 secs)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Resolving an unknown screen" started.
+◇ Test "An absurd viewport is admitted as unknown rather than trapping the process" started.
+◇ Test "A near miss resolves to the closest device of the same class" started.
+◇ Test "Tablets are matched as tablets, not as large phones" started.
+◇ Test "A desktop is not matched against phones, however narrow the window" started.
+◇ Test "A wide screen is treated as a desktop" started.
+◇ Test "A device unlike anything listed resolves to nothing, so width rules take over" started.
+◇ Test "An exact match is returned as itself" started.
+✔ Test "A desktop is not matched against phones, however narrow the window" passed after 0.001 seconds.
+✔ Test "An exact match is returned as itself" passed after 0.001 seconds.
+✔ Test "A near miss resolves to the closest device of the same class" passed after 0.001 seconds.
+✔ Test "Tablets are matched as tablets, not as large phones" passed after 0.001 seconds.
+✔ Test "An absurd viewport is admitted as unknown rather than trapping the process" passed after 0.001 seconds.
+✔ Test "A wide screen is treated as a desktop" passed after 0.001 seconds.
+✔ Test "A device unlike anything listed resolves to nothing, so width rules take over" passed after 0.001 seconds.
+✔ Suite "Resolving an unknown screen" passed after 0.001 seconds.
+✔ Test run with 7 tests in 1 suite passed after 0.001 seconds.
+EXIT=0
