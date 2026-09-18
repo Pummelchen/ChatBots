@@ -221,6 +221,10 @@ install_checkpoint() {
   esac
   local MODEL_DIR="$MODELS_DIR/$MODEL_DIR_NAME"
   local FILE_LIST="$MODELS_DIR/.hf-file-list-$MODEL_DIR_NAME.txt"
+  # The SHA-256 huggingface.co publishes per file, when it publishes one. Written beside the name
+  # list and consulted after a download, because a length cannot tell a substituted payload from
+  # the real file.
+  local HASH_LIST="$MODELS_DIR/.hf-sha256-$MODEL_DIR_NAME.txt"
   local API_URL="https://huggingface.co/api/models/$MODEL_ID"
 
   if [ -d "$MODEL_DIR" ]; then
@@ -237,6 +241,32 @@ install_checkpoint() {
   file_list_is_complete() {
     [ -s "$FILE_LIST" ] || return 1
     ! awk -F'\t' '$2 !~ /^[0-9]+$/ || $2 + 0 == 0 { bad = 1 } END { exit bad ? 0 : 1 }' "$FILE_LIST"
+  }
+
+  # The SHA-256 the repository published for this file, or empty when it publishes none.
+  published_sha() {
+    [ -s "$HASH_LIST" ] || return 0
+    awk -F'\t' -v want="$1" '$1 == want { print $2 }' "$HASH_LIST"
+  }
+
+  # Check a downloaded file's content against the published hash, when there is one.
+  #
+  # The size check alone cannot tell a same-length substitution from the real file, and the
+  # expected size comes from the same server; the hash is the per-file metadata this installer
+  # used to discard. A file that does not match is removed rather than left for a resume that
+  # would build on it.
+  verify_sha() {
+    local name="$1" target="$2" want actual
+    want="$(published_sha "$name")"
+    [ -n "$want" ] || return 0
+    actual="$(shasum -a 256 "$target" | awk '{print $1}')"
+    if [ "$actual" = "$want" ]; then
+      return 0
+    fi
+    fail "$name does not match the SHA-256 huggingface.co published for it"
+    rm -f "$target"
+    warn "the file was removed; run the installer again to download it"
+    return 1
   }
 
   # Reads the size of every listed file with a HEAD request. The size is what proves a download
@@ -281,7 +311,7 @@ install_checkpoint() {
         die "Could not look up the model files. The connection may have dropped."
       fi
 
-      if ! python3 "$SCRIPT_DIR/hf-file-list.py" "$MODELS_DIR/.hf-model.json" > "$FILE_LIST.names"; then
+      if ! python3 "$SCRIPT_DIR/hf-file-list.py" "$MODELS_DIR/.hf-model.json" "$HASH_LIST" > "$FILE_LIST.names"; then
         die "The checkpoint did not come back with a usable file list. This usually means the
 model name is wrong or the repository has moved."
       fi
@@ -330,7 +360,7 @@ against, and this installer will not record a model it cannot verify as complete
       # A file whose size matches is complete; one that is short was interrupted.
       local actual
       actual="$(stat -f%z "$target" 2>/dev/null || echo 0)"
-      if [ "$actual" = "$expected" ]; then
+      if [ "$actual" = "$expected" ] && verify_sha "$name" "$target"; then
         ok "$name (already downloaded)"
         return 0
       fi
@@ -342,7 +372,7 @@ against, and this installer will not record a model it cannot verify as complete
       if curl -fsSL -C - "${CURL_TRANSFER_OPTIONS[@]}" --retry 5 --retry-delay 3 --retry-all-errors \
           -o "$target" "$url"; then
         actual="$(stat -f%z "$target" 2>/dev/null || echo 0)"
-        if [ "$actual" = "$expected" ]; then
+        if [ "$actual" = "$expected" ] && verify_sha "$name" "$target"; then
           ok "$name (resumed)"
           return 0
         fi
@@ -371,6 +401,7 @@ against, and this installer will not record a model it cannot verify as complete
       rm -f "$target"
       return 1
     fi
+    verify_sha "$name" "$target" || return 1
     ok "$name"
     return 0
   }

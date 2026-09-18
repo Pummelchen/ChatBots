@@ -30,6 +30,13 @@ public actor MLXEngine: LLMEngine {
     // container at the seat's live thinking level. Nothing outside this module can see them.
     var container: ModelContainer?
     private var loadingTask: Task<ModelContainer, Error>?
+    /// Bumped by every load and every unload.
+    ///
+    /// A load body that resumes after its engine was unloaded — or after `setModel` rebuilt it —
+    /// used to install the container it was holding anyway, leaving a checkpoint resident on a
+    /// discarded engine and reporting `.ready` after the unload. The generation is what tells the
+    /// body that its work is no longer wanted.
+    private var loadGeneration = 0
     private var loadedContextWindow = 32_768
     private var didLogConfiguration = false
     /// Live thinking level. Starts from the seat's spec and is changed between turns by
@@ -167,6 +174,8 @@ public actor MLXEngine: LLMEngine {
 
         let spec = self.spec
         let onStateChange = self.onStateChange
+        loadGeneration += 1
+        let generation = loadGeneration
         let task = Task<ModelContainer, Error> {
             onStateChange(.loading(progress: 0))
             let progressBox = ProgressBox()
@@ -213,6 +222,10 @@ public actor MLXEngine: LLMEngine {
 
         do {
             let container = try await task.value
+            // The engine may have been unloaded or rebuilt while the loader was parked. The task
+            // was cancelled and the container cleared; installing this one would leave a
+            // checkpoint resident on an engine nobody holds, and announce `.ready` for it.
+            guard loadGeneration == generation else { return }
             self.container = container
             if let window = await Self.contextWindow(of: container) {
                 self.loadedContextWindow = window
@@ -227,6 +240,9 @@ public actor MLXEngine: LLMEngine {
     }
 
     public func unload() async {
+        // The generation moves first, so a load body that is already resuming cannot install
+        // anything after this point.
+        loadGeneration += 1
         loadingTask?.cancel()
         loadingTask = nil
         container = nil

@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """List the files a Hugging Face checkpoint offers, one per line.
 
-The API's `siblings` response does not include sizes, so they are read separately with a
-HEAD request by the installer. Files this installer does not download are skipped, each for
-the reason recorded on `SKIP` below — repository prose, and the vocabularies the app does
-not read — so no bandwidth is spent on them.
+The API's `siblings` response does not always include sizes, so they are read separately with a
+HEAD request by the installer when they are missing. Files this installer does not download are
+skipped, each for the reason recorded on `SKIP` below — repository prose, and the vocabularies the
+app does not read — so no bandwidth is spent on them.
+
+Given a second argument, the per-file SHA-256 the API publishes for a Git LFS object is written
+there as `name<TAB>sha256`. That is the one piece of per-file metadata this script used to
+discard, and it is what lets the installer check a downloaded file's *content* rather than only
+its length — a length cannot tell a substituted payload from the real one.
 
 Kept as its own file rather than an inline heredoc so the installer stays readable.
 """
@@ -45,8 +50,8 @@ SKIP: frozenset[str] = frozenset(
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
-        print("usage: hf-file-list.py <api-response.json>", file=sys.stderr)
+    if len(sys.argv) not in (2, 3):
+        print("usage: hf-file-list.py <api-response.json> [hashes-file]", file=sys.stderr)
         return 2
     try:
         with open(sys.argv[1], encoding="utf-8") as handle:
@@ -64,15 +69,33 @@ def main() -> int:
         siblings = raw_siblings
 
     names: list[str] = []
+    hashes: list[tuple[str, str]] = []
     for entry in siblings:
         if not isinstance(entry, dict):
             continue
         filename = entry.get("rfilename")
-        if isinstance(filename, str) and filename and filename not in SKIP:
-            names.append(filename)
+        if not isinstance(filename, str) or not filename or filename in SKIP:
+            continue
+        names.append(filename)
+        # A Git LFS object carries its own SHA-256; a file stored directly does not, and that is
+        # not an error — the installer falls back to its length check for those.
+        lfs = entry.get("lfs")
+        if isinstance(lfs, dict):
+            sha = lfs.get("sha256")
+            if isinstance(sha, str) and len(sha) == 64:
+                hashes.append((filename, sha.lower()))
     if not names:
         print("the checkpoint lists no files", file=sys.stderr)
         return 1
+
+    if len(sys.argv) == 3:
+        try:
+            with open(sys.argv[2], "w", encoding="utf-8") as handle:
+                for name, sha in hashes:
+                    handle.write(f"{name}\t{sha}\n")
+        except OSError as error:
+            print(f"could not write the hash list: {error}", file=sys.stderr)
+            return 1
 
     for name in names:
         print(name)

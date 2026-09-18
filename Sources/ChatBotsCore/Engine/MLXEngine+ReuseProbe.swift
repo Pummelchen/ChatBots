@@ -28,32 +28,43 @@ extension MLXEngine {
         let parameters = GenerateParameters(maxTokens: 24, temperature: 0, topP: 1.0, seed: 1)
         let context = thinking.templateContext
 
-        let results: [ReuseProbeStep] = try await container.perform {
-            (modelContext: ModelContext) async throws -> [ReuseProbeStep] in
-            let session = ChatSession(
-                modelContext, generateParameters: parameters, additionalContext: context)
-            var steps: [ReuseProbeStep] = []
-            for index in 1...3 {
-                // A long first prompt and short follow-ups: reuse shows up as the
-                // follow-ups prefilling only their own tokens, no reuse as prefilling
-                // the whole thing again.
-                // Deliberately long, so that reuse is unmistakable in the numbers.
-                let notes = String(repeating: "egg shell ovoid pressure membrane. ", count: 400)
-                let prompt =
-                    index == 1
-                    ? "Notes: \(notes)\n\nOne short sentence: what shape is an egg?"
-                    : "One sentence: what does that imply?"
-                var info: GenerateCompletionInfo?
-                for try await event in session.streamDetails(to: prompt) {
-                    if case .info(let value) = event { info = value }
+        // Through the gate, like every other Metal-touching call. This probe drives
+        // `container.perform` directly, and `MLXGate` is the process-wide serialisation that keeps
+        // two evaluations from overlapping — which aborts inside MLX with `EXC_BAD_ACCESS`.
+        await MLXGate.shared.acquire()
+        let results: [ReuseProbeStep]
+        do {
+            results = try await container.perform {
+                (modelContext: ModelContext) async throws -> [ReuseProbeStep] in
+                let session = ChatSession(
+                    modelContext, generateParameters: parameters, additionalContext: context)
+                var steps: [ReuseProbeStep] = []
+                for index in 1...3 {
+                    // A long first prompt and short follow-ups: reuse shows up as the
+                    // follow-ups prefilling only their own tokens, no reuse as prefilling
+                    // the whole thing again.
+                    // Deliberately long, so that reuse is unmistakable in the numbers.
+                    let notes = String(repeating: "egg shell ovoid pressure membrane. ", count: 400)
+                    let prompt =
+                        index == 1
+                        ? "Notes: \(notes)\n\nOne short sentence: what shape is an egg?"
+                        : "One sentence: what does that imply?"
+                    var info: GenerateCompletionInfo?
+                    for try await event in session.streamDetails(to: prompt) {
+                        if case .info(let value) = event { info = value }
+                    }
+                    await session.clear()
+                    steps.append(
+                        ReuseProbeStep(
+                            prefilled: info?.promptTokenCount ?? 0,
+                            prefillSeconds: info?.promptTime ?? 0))
                 }
-                await session.clear()
-                steps.append(
-                    ReuseProbeStep(
-                        prefilled: info?.promptTokenCount ?? 0,
-                        prefillSeconds: info?.promptTime ?? 0))
+                return steps
             }
-            return steps
+            await MLXGate.shared.release()
+        } catch {
+            await MLXGate.shared.release()
+            throw error
         }
         return results
     }

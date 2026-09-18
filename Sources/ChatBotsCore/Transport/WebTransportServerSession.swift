@@ -72,6 +72,8 @@ extension WebTransportEngineServer {
         // server waited forever while the client waited for events, and the only thing that
         // eventually moved the window was the polling safety net. Since replies and events are
         // told apart by their frame tag, no negotiation is needed at all.
+        // One queue per session: the writer task below and every reply path share it.
+        let writes = SendQueue()
         let (events, continuation) = AsyncStream<EngineEvent>.makeStream(
             bufferingPolicy: .bufferingNewest(ProtocolLimits.eventBufferDepth))
         subscribers[id] = continuation
@@ -79,7 +81,7 @@ extension WebTransportEngineServer {
             guard let self else { return }
             for await event in events {
                 if Task.isCancelled { return }
-                await self.send(.event(event), on: stream)
+                await self.send(.event(event), on: stream, through: writes)
             }
         }
         defer {
@@ -89,7 +91,7 @@ extension WebTransportEngineServer {
 
         // The current state first, so a client that has just connected can draw something
         // without waiting for a change.
-        await send(.event(.state(service.snapshot())), on: stream)
+        await send(.event(.state(service.snapshot())), on: stream, through: writes)
 
         var buffer = Data()
         // What this session holds from the server's buffered-frame budget. It is given back as the
@@ -122,7 +124,7 @@ extension WebTransportEngineServer {
                 } catch {
                     // A frame the framing refuses cannot be skipped, so this ends the session; the reasons
                     // are unwound in `refuseFraming` because this function is at its complexity budget.
-                    await refuseFraming(error, on: stream, session: session, id: id)
+                    await refuseFraming(error, on: stream, session: session, id: id, through: writes)
                     return
                 }
                 guard case .message(let payload, let remainder) = result else { break }
@@ -136,7 +138,7 @@ extension WebTransportEngineServer {
                 // state pushes — so the deadline has to cover the frame being finished, not the first byte
                 // arriving.
                 spokenSessions.insert(id)
-                await answer(payload, on: stream)
+                await answer(payload, on: stream, through: writes)
             }
         }
     }
@@ -145,17 +147,19 @@ extension WebTransportEngineServer {
     ///
     /// Extracted from `serve`, which is at its complexity and length budgets: three of its four branches are
     /// about a payload the server cannot read, and they read better together than inside the read loop.
-    private func answer(_ payload: Data, on stream: WebTransportBidirectionalStream) async {
+    private func answer(
+        _ payload: Data, on stream: WebTransportBidirectionalStream, through writes: SendQueue
+    ) async {
         do {
             let request = try ProtocolCodec.decodeRequest(payload)
             let reply = await service.handle(request)
-            await send(.reply(reply), on: stream)
+            await send(.reply(reply), on: stream, through: writes)
         } catch let error as ProtocolError {
             // A client may tag its frames too; accept both spellings so the encoder is not something a caller
             // has to get exactly right.
             if let request = (try? ProtocolCodec.decodeFrame(payload))?.asRequest {
                 let reply = await service.handle(request)
-                await send(.reply(reply), on: stream)
+                await send(.reply(reply), on: stream, through: writes)
                 return
             }
             // Neither spelling read it. Unlike the framing refusal above, the length prefix is intact, so
@@ -164,13 +168,13 @@ extension WebTransportEngineServer {
             // payload and said nothing at all.
             let reason = error.errorDescription ?? "the frame could not be read"
             note(reason)
-            await send(.reply(.failed(reason)), on: stream)
+            await send(.reply(.failed(reason)), on: stream, through: writes)
         } catch {
             // `decodeRequest` reports a refusal as `ProtocolError`; anything else is a defect, and it is named
             // rather than dropped, which is the whole of this branch's reason for existing.
             let reason = "the frame could not be read: \(error.localizedDescription)"
             note(reason)
-            await send(.reply(.failed(reason)), on: stream)
+            await send(.reply(.failed(reason)), on: stream, through: writes)
         }
     }
 
@@ -182,13 +186,13 @@ extension WebTransportEngineServer {
     /// its life — and the cap was low enough that a legitimate large attachment reached it.
     private func refuseFraming(
         _ error: Error, on stream: WebTransportBidirectionalStream, session: WebTransportSession,
-        id: UUID
+        id: UUID, through writes: SendQueue
     ) async {
         let reason =
             (error as? ProtocolError)?.errorDescription
             ?? "the frame could not be read: \(error.localizedDescription)"
         note(reason)
-        await send(.reply(.failed(reason)), on: stream)
+        await send(.reply(.failed(reason)), on: stream, through: writes)
         // Ownership is taken before the close, for the same reason the watchdog takes it: the
         // `defer` in `serve` closes only what is still in `sessions`, and `close()` must not be
         // called twice.
@@ -204,7 +208,9 @@ extension WebTransportEngineServer {
     /// A frame the receiver would refuse is not put on the wire at all: framing it would put a
     /// length prefix before bytes that will never be read as a message, and the error names the
     /// size where it was made instead. `lastSessionError` carries the reason.
-    private func send(_ frame: EngineFrame, on stream: WebTransportBidirectionalStream) async {
+    private func send(
+        _ frame: EngineFrame, on stream: WebTransportBidirectionalStream, through writes: SendQueue
+    ) async {
         let encoded: Data
         do {
             encoded = try ProtocolCodec.encode(frame)
@@ -219,10 +225,13 @@ extension WebTransportEngineServer {
             note("could not frame a reply: \(error.localizedDescription)")
             return
         }
-        do {
-            try await stream.send(framed)
-        } catch {
-            // The client is gone; the reader will notice and end the session.
+        // Through the queue, so this write and the next one cannot interleave their bytes.
+        await writes.run {
+            do {
+                try await stream.send(framed)
+            } catch {
+                // The client is gone; the reader will notice and end the session.
+            }
         }
     }
 }

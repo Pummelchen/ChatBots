@@ -32,6 +32,33 @@ public enum SystemProcess {
     /// not have.
     public static let defaultMaximumOutputBytes = AttachmentLimits.defaultMaximumFileBytes
 
+    /// The environment a child process is given.
+    ///
+    /// A child used to inherit this process's whole environment, which handed every converter the
+    /// keys the engine holds — `TAVILY_API_KEY`, `DEEPSEEK_API_KEY` — and `CHATBOTS_TRACE_API`,
+    /// for a `textutil` that reads none of them. The executable is a fixed absolute path and the
+    /// arguments are an array with no shell, so the environment was the only one of the three
+    /// channels that carried anything secret. What a command-line tool actually needs is here;
+    /// nothing else is passed on.
+    ///
+    /// The parameter is the environment to draw from, so a test can prove what a child is given
+    /// without running one.
+    public static func childEnvironment(
+        _ environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> [String: String] {
+        var child: [String: String] = [
+            // A tool that shells out to a helper has to be able to find it.
+            "PATH": environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin",
+        ]
+        // `HOME` and `TMPDIR` because the system tools and Foundation use them, the locale
+        // variables so the output does not depend on the caller's, and `OPENSSL_CONF` because a
+        // configured OpenSSL provider is a deliberate part of the system it runs on.
+        for name in ["HOME", "TMPDIR", "LANG", "LC_ALL", "USER", "LOGNAME", "OPENSSL_CONF"] {
+            if let value = environment[name] { child[name] = value }
+        }
+        return child
+    }
+
     public static func run(_ executable: String, _ arguments: [String]) throws -> Result {
         try run(executable, arguments, timeout: timeout)
     }
@@ -47,6 +74,7 @@ public enum SystemProcess {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
+        process.environment = Self.childEnvironment()
 
         let out = Pipe()
         let err = Pipe()
