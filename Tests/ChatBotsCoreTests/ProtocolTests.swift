@@ -212,6 +212,7 @@ struct ProtocolMessageTests {
             .addAttachment(filename: "paper.pdf", contents: Data([0x25, 0x50, 0x44, 0x46])),
             .removeAttachment(id: "5E3A"),
             .clearAttachments,
+            .identify,
         ]
         for request in requests {
             let data = try ProtocolCodec.encode(request)
@@ -246,6 +247,15 @@ struct ProtocolMessageTests {
         }
         #expect(reason.contains("cannot be changed"))
         #expect(decoded.snapshot == nil)
+    }
+
+    @Test("An identity reply round-trips with its token")
+    func identityRoundTrips() throws {
+        let decoded = try ProtocolCodec.decodeReply(
+            try ProtocolCodec.encode(EngineReply.identified("a-run-token")))
+        #expect(decoded.token == "a-run-token")
+        #expect(decoded.snapshot == nil, "an identity is not a state")
+        #expect(EngineReply.refused("no").token == nil)
     }
 
     @Test("An event round-trips, including a streamed fragment")

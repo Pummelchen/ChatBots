@@ -43,11 +43,12 @@ public final class APIServer {
 
     public init(
         engine: ConversationEngine, store: ConversationStore, port: UInt16 = 7788,
-        shareBase: String? = nil
+        shareBase: String? = nil, sessionToken: String? = nil
     ) {
         self.engine = engine
         self.port = port
-        self.service = EngineService(engine: engine, store: store)
+        self.service = EngineService(
+            engine: engine, store: store, sessionToken: sessionToken)
         // Where a share link should point.
         //
         // The default is this engine's own loopback address, which is right for a browser on this
@@ -331,6 +332,11 @@ public final class APIServer {
             return .json(list)
         case .scenarios(let list):
             return .json(list)
+        case .identified:
+            // Unreachable by construction: no route in `APIServer+Commands` produces `.identify`,
+            // so the token never reaches this surface. If it ever does, answering is a defect,
+            // not something to serve.
+            return .error("the session token is not served over HTTP", status: 500)
         case .refused(let reason):
             // A refusal is an answer, so it is 409 rather than 500 — the client shows the
             // reason and carries on.

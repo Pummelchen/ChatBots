@@ -27,6 +27,21 @@ enum ServeCommand {
         // defined there.)
         DocumentIngestorProvider.install(SystemDocumentExtractor.ingestor)
 
+        // The identity this run's engine proves itself with, written before either transport can
+        // accept a connection: the app must never reach an engine that has not yet proved itself.
+        // A run that cannot write the token fails to start rather than serving an identity it
+        // cannot prove. `SessionToken` owns the file's mode and the one path rule.
+        let sessionToken: String
+        do {
+            sessionToken = try SessionToken.issue(in: context.runDirectory)
+        } catch {
+            FileHandle.standardError.write(
+                Data(
+                    "could not issue the engine session token: \(error.localizedDescription)\n"
+                        .utf8))
+            exit(1)
+        }
+
         // Runtime state — the certificate, and the conversations this engine keeps — is the one
         // directory this run resolved at startup: `--run-directory` when it was given, otherwise
         // what `RunDirectory` answers for this process. Never the working directory, so an engine
@@ -36,7 +51,7 @@ enum ServeCommand {
         // it is always built. Only its HTTP listener is optional.
         let server = APIServer(
             engine: engine, store: ConversationStore(directory: context.runDirectory),
-            port: options.port, shareBase: options.shareBase)
+            port: options.port, shareBase: options.shareBase, sessionToken: sessionToken)
 
         await startHTTP(server: server, options: options)
         let transportServer = await startWebTransport(
@@ -55,6 +70,9 @@ enum ServeCommand {
         }
         await transportServer?.stop()
         server.stop()
+        // The run is over, so its identity is retired with it: a token left behind would let a
+        // later process on the port present an identity this engine is no longer using.
+        SessionToken.remove(from: context.runDirectory)
         exit(0)
     }
 

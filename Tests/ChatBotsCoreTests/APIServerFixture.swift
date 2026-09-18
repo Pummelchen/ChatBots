@@ -44,7 +44,7 @@ enum APIServerFixtureError: Error { case noPort }
 /// tests need, and the loop over candidate ports is because a port can be taken between the probe and
 /// the bind.
 @MainActor
-func makeAPIServerFixture(seats: Int = 1) async throws -> APIServerFixture {
+func makeAPIServerFixture(seats: Int = 1, sessionToken: String? = nil) async throws -> APIServerFixture {
     let specs = AgentSpec.makeSeats(count: seats)
     let made = specs.map { ConversationEngine.Seat(spec: $0, engine: SilentSeatStub(spec: $0)) }
     var configuration = ConversationEngine.Configuration()
@@ -56,7 +56,8 @@ func makeAPIServerFixture(seats: Int = 1) async throws -> APIServerFixture {
     let session = URLSession(configuration: .ephemeral)
     for _ in 0..<8 {
         let port = allocateTestPort()
-        let server = APIServer(engine: engine, store: store, port: port)
+        let server = APIServer(
+            engine: engine, store: store, port: port, sessionToken: sessionToken)
         try server.start()
         if await server.waitUntilReady() {
             return APIServerFixture(

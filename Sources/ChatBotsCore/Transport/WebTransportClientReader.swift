@@ -143,6 +143,8 @@ extension WebTransportEngineClient {
             return isRosterRequest(request)
         case .scenarios:
             return isScenarioRequest(request)
+        case .identified:
+            return isIdentifyRequest(request)
         }
     }
 
@@ -180,6 +182,11 @@ extension WebTransportEngineClient {
         return false
     }
 
+    private static func isIdentifyRequest(_ request: EngineRequest) -> Bool {
+        if case .identify = request { return true }
+        return false
+    }
+
     /// How a frame is named in a mismatch, so the failure says what crossed with what.
     private static func name(of request: EngineRequest) -> String {
         switch request {
@@ -200,6 +207,7 @@ extension WebTransportEngineClient {
         case .savedConversations: return "a saved-conversation list"
         case .rosters: return "a line-up list"
         case .scenarios: return "a scenario list"
+        case .identified: return "an identity token"
         case .refused: return "a refusal"
         case .failed: return "a failure"
         }

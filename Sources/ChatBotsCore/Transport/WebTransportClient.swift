@@ -390,6 +390,15 @@ public final class WebTransportEngineClient {
         try await send(.fetchState).snapshot
     }
 
+    /// Ask the engine to prove which run it is, by echoing its per-run session token.
+    ///
+    /// Nil means the engine answered `.identify` without a token — an engine started without one
+    /// refuses — and that is not proof of anything. The app's supervisor treats a nil or
+    /// non-matching echo exactly that way; see `EngineSupervisor`.
+    public func identify() async throws -> String? {
+        try await send(.identify).token
+    }
+
     // MARK: - Events
 
     /// Why the reader stopped, if it stopped rather than being cancelled. A reader that exits

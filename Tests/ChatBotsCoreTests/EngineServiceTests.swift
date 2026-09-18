@@ -29,7 +29,9 @@ private actor QuietStub: LLMEngine {
 }
 
 @MainActor
-private func makeService(personas: [String] = []) -> (EngineService, ConversationEngine) {
+private func makeService(
+    personas: [String] = [], sessionToken: String? = nil
+) -> (EngineService, ConversationEngine) {
     let specs = (0..<2).map { index -> AgentSpec in
         var spec = AgentSpec.seat(index: index)
         // A known name and persona, so the tests can assert on what a command changed.
@@ -53,7 +55,7 @@ private func makeService(personas: [String] = []) -> (EngineService, Conversatio
     // never ran, and the "refused because it is locked" assertions passed for the wrong
     // reason: the localisation check happened to match the "please enter a topic" message.
     engine.setTopic("A test topic")
-    return (EngineService(engine: engine, store: store), engine)
+    return (EngineService(engine: engine, store: store, sessionToken: sessionToken), engine)
 }
 
 @MainActor
@@ -93,6 +95,26 @@ struct EngineServiceTests {
             return
         }
         #expect(reason.contains("no report"))
+    }
+
+    // MARK: Identity
+
+    @Test("identify echoes the token the service was given")
+    func identifyEchoesTheToken() async {
+        let (service, _) = makeService(sessionToken: "a-token-of-its-own")
+        let reply = await service.handle(.identify)
+
+        #expect(reply.token == "a-token-of-its-own")
+        #expect(reply.snapshot == nil, "an identity is not a state")
+    }
+
+    @Test("An engine with no token refuses to identify itself")
+    func identifyWithoutATokenRefuses() async {
+        let (service, _) = makeService()
+        let reply = await service.handle(.identify)
+
+        #expect(reply.token == nil, "an empty answer must never be mistaken for a token")
+        #expect(reply.refusal?.contains("session token") == true)
     }
 
     // MARK: Topic

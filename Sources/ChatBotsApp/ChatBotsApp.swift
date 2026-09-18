@@ -70,7 +70,10 @@ struct ChatBotsApp: App {
         // and the engine together.
         let runDirectory = RunDirectory.current
         let engineSupervisor = EngineSupervisor(
-            logURL: runDirectory.appending(path: "app-engine.log"))
+            logURL: runDirectory.appending(path: "app-engine.log"),
+            // The one answer both processes use: this is where the engine is told to write its
+            // session token, and where the app reads it to check the engine's identity.
+            runDirectory: runDirectory)
         _supervisor = StateObject(wrappedValue: engineSupervisor)
 
         AppDelegate.flush = { [weak store] in
@@ -111,9 +114,18 @@ struct ChatBotsApp: App {
                 // the interface rather than a blank window.
                 .task {
                     await supervisor.start()
-                    await controller.connect(port: supervisor.configuration.port)
-                    controller.applyAPIEndpoints(endpoints)
-                    if case .failed(let reason) = supervisor.state {
+                    // Nothing talks to an engine that has not proved it is this run's engine — not
+                    // the state, and not the user's cloud API keys. A process that took the port
+                    // without echoing the token this run wrote is reported as `.failed` by the
+                    // supervisor; connecting to it anyway would let it paint the window through
+                    // `snapshot.error` and `notices`, which is half of the finding this closes.
+                    if supervisor.hasVerifiedEngine {
+                        await controller.connect(port: supervisor.configuration.port)
+                        // Only a verified engine is told the API endpoints, because each one
+                        // carries the seat's Keychain key. An unverified or failed engine is never
+                        // sent one.
+                        controller.applyAPIEndpoints(endpoints)
+                    } else if case .failed(let reason) = supervisor.state {
                         controller.errorBanner = reason
                     }
                 }

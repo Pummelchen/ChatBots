@@ -79,6 +79,7 @@ struct TransportFixture {
 @MainActor
 func makeTransportFixture(
     startupTimeout: TimeInterval = 30, maximumConnections: Int = 16, maximumTurns: Int = 40,
+    sessionToken: String? = nil,
     engines makeEngine: (AgentSpec) -> any LLMEngine = { QuietTransportStub(spec: $0) }
 ) async throws -> TransportFixture {
     let specs = AgentSpec.makeSeats(count: 1)
@@ -92,7 +93,9 @@ func makeTransportFixture(
     let directory = FileManager.default.temporaryDirectory
         .appending(path: "transport-rules-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    let service = EngineService(engine: engine, store: ConversationStore(directory: directory))
+    let service = EngineService(
+        engine: engine, store: ConversationStore(directory: directory),
+        sessionToken: sessionToken)
     let identity = try CertificateStore.loadOrCreate(in: directory)
 
     var serverConfiguration = WebTransportEngineServer.Configuration()

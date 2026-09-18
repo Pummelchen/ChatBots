@@ -80,6 +80,12 @@ public enum EngineRequest: Sendable, Hashable, Codable {
     case clearVotes
     /// Who the human moderator is: their name, and how their interjections should read.
     case setModerator(ModeratorIdentity)
+    /// Prove which engine is answering, by echoing the per-run token it was started with.
+    ///
+    /// Transport-only by construction: `APIServer+Commands.translate` deliberately has no route
+    /// that produces this case, so the unauthenticated HTTP API cannot ask for the token. See
+    /// `SessionToken`, and `EngineReply.identified` for the answer.
+    case identify
 
     /// A partial seat change, so the sender says what it means to alter rather than sending a
     /// whole seat back and relying on the receiver to notice what differs.
@@ -134,6 +140,9 @@ public enum EngineReply: Sendable, Codable {
     case rosters([Roster])
     /// The ready-made scenarios for a mode.
     case scenarios([Scenario])
+    /// The per-run token, in answer to `.identify`. Transport-only: never part of a snapshot and
+    /// never reachable over HTTP.
+    case identified(String)
     /// The command was understood and refused. Distinct from a transport failure: "the topic
     /// cannot be changed once the conversation has started" is an answer, not an error.
     case refused(String)
@@ -175,6 +184,13 @@ public enum EngineReply: Sendable, Codable {
 
     public var scenarios: [Scenario]? {
         if case .scenarios(let list) = self { return list }
+        return nil
+    }
+
+    /// The token the engine echoed, when the request was `.identify`. Nil for every other reply,
+    /// and for an engine that answered an identity request with something else.
+    public var token: String? {
+        if case .identified(let token) = self { return token }
         return nil
     }
 }
