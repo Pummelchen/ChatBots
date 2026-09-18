@@ -14,12 +14,12 @@ only the orientation a resumed run needs, so it does not repeat either.
 
 ## Ledger state at the last commit
 
-`done: 94, open: 2, blocked: 4` — S0 0, S1 0, S2 1, S3 1.
+`done: 95, open: 1, blocked: 4` — S0 0, S1 0, S2 1, S3 0.
 
 The closure invariant holds: the non-terminal count fell at every milestone report, from 96 at
-the start to 2 now.
+the start to 1 now.
 
-## The open tasks
+## The one open task: AUDIT-0029, now only AUDIT-0099
 
 Replace the recorded waivers in `tools/analysis-waivers.txt` with `--strict`. It was split on the
 record — not narrowed — into:
@@ -27,11 +27,14 @@ record — not narrowed — into:
 - **AUDIT-0097** (DONE): `force_unwrapping` enabled in `.swiftlint.yml` and its 32 sites removed.
   The waivers were tightened with it, from 217/444 to 208/307.
 - **AUDIT-0098** (DONE): `line_length` — all 88 lines wrapped.
-- **AUDIT-0099** the complexity refactors — 22 `cyclomatic_complexity` (`EngineService.handle` 57,
-  `CommandLine.parse` 61, `APIServer+Commands.translate` 41, …) and 10 `function_body_length`.
+- **AUDIT-0099** the only thing left: 22 `cyclomatic_complexity` and 10 `function_body_length`
+  refactors, largely the same functions. Biggest first: `CommandLine.parse` (61), `EngineService.handle`
+  (57), `APIServer+Commands.translate` (41), `ConflictState.apply` (22), `ServeCommand.run` (20),
+  `OpenAIStreamReading.readEventStream` (19), `WebTransportClientReader.read` (18), `TransportCheck.run`
+  (18), `ResearchReading.read` (17) and `TurnLoop.runTurn` (17). Then AUDIT-0102 switches both gates to
+  `--strict` and deletes the waiver counts.
 - **AUDIT-0100** (DONE): the mechanical rule classes.
 - **AUDIT-0101** (DONE): the swift-format sweep — 444 → 0.
-- **AUDIT-0103** `type_body_length` — `SocialLibrary`'s 432-line enum body (limit 400).
 - **AUDIT-0102** switch both gates to `--strict`, delete the two waiver counts, and delete the
   waiver file if nothing else needs it.
 
@@ -56,7 +59,7 @@ verified on the primary host only, recorded in the ledger.
 
 - Branch `audit/2026-09-18` only; no force-push, no history rewrite.
 - `bash tools/mac-checks.sh` is the gate after every batch — **9 gates**, including eslint and
-  prettier (`npm ci` first). Metrics must not regress: SwiftLint ≤ 35 (measured 33),
+  prettier (`npm ci` first). Metrics must not regress: SwiftLint ≤ 34 (measured 32),
   swift-format ≤ 2 (measured 0), no file over 500 lines.
 - Every fix carries before/after evidence in `AUDIT/evidence-*.log`, and the closed record —
   what was found, what was changed, which commit — is in `AUDIT/ledger.json`.
