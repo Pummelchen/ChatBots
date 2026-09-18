@@ -81,9 +81,8 @@ export function measureViewport() {
   // A forced phone view on a wide screen composes against a phone-sized width rather than
   // the browser's. Without this, "phone layout" on a 1400-point window is a very wide page
   // with the single-column layout — technically correct and nothing like a phone.
-  const composedWidth = (viewMode === "phone" && width > PHONE_VIEWPORT_MAX)
-    ? PHONE_VIEWPORT_MAX
-    : width;
+  const composedWidth =
+    viewMode === "phone" && width > PHONE_VIEWPORT_MAX ? PHONE_VIEWPORT_MAX : width;
 
   root.style.setProperty("--vw", composedWidth + "px");
   root.style.setProperty("--vh", height + "px");
@@ -137,7 +136,11 @@ function applyDevice() {
   const thread = $("thread");
   if (thread) thread.hidden = layout !== "thread";
 
-  for (const [id, mode] of [["view-auto", "auto"], ["view-phone", "phone"], ["view-desktop", "desktop"]]) {
+  for (const [id, mode] of [
+    ["view-auto", "auto"],
+    ["view-phone", "phone"],
+    ["view-desktop", "desktop"],
+  ]) {
     $(id)?.classList.toggle("on", viewMode === mode);
   }
 
@@ -169,7 +172,9 @@ export function chooseViewMode(mode) {
   if (urlViewMode()) history.replaceState(null, "", location.pathname);
   try {
     localStorage.setItem(VIEW_MODE_KEY, mode);
-  } catch { /* a private window with storage disabled: the choice just will not persist */ }
+  } catch {
+    /* a private window with storage disabled: the choice just will not persist */
+  }
   applyDevice();
 }
 
@@ -178,7 +183,8 @@ export async function identifyDevice() {
   try {
     const match = await api.get(
       `/api/device?w=${screenInfo.width}&h=${screenInfo.height}` +
-      `&mobile=${screenInfo.detected !== "desktop"}`);
+        `&mobile=${screenInfo.detected !== "desktop"}`
+    );
     screenInfo.matched = match && match.matched ? match : null;
   } catch {
     screenInfo.matched = null;
@@ -214,9 +220,10 @@ export function reportLayout() {
     const rect = el.getBoundingClientRect();
     if (rect.width > viewport + 1 || rect.right > viewport + 1) {
       const id = el.id ? `#${el.id}` : "";
-      const cls = el.className && typeof el.className === "string"
-        ? "." + el.className.trim().split(/\s+/).slice(0, 2).join(".")
-        : "";
+      const cls =
+        el.className && typeof el.className === "string"
+          ? "." + el.className.trim().split(/\s+/).slice(0, 2).join(".")
+          : "";
       overflowing.push(`${el.tagName.toLowerCase()}${id}${cls}(${Math.round(rect.width)})`);
     }
   }
@@ -240,6 +247,7 @@ export function reportLayout() {
     console.info(
       "elements wider than the viewport, worst first:",
       overflowing.length,
-      overflowing.slice(0, 6));
+      overflowing.slice(0, 6)
+    );
   }
 }

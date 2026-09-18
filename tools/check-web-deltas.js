@@ -48,8 +48,24 @@ function snapshot() {
   return {
     seats: [{ id: "Agent 1" }, { id: "Agent 2" }],
     live: [
-      { seatID: "Agent 1", isGenerating: false, text: "", reasoning: "", activity: null, toolLog: [], stats: null },
-      { seatID: "Agent 2", isGenerating: false, text: "", reasoning: "", activity: null, toolLog: [], stats: null },
+      {
+        seatID: "Agent 1",
+        isGenerating: false,
+        text: "",
+        reasoning: "",
+        activity: null,
+        toolLog: [],
+        stats: null,
+      },
+      {
+        seatID: "Agent 2",
+        isGenerating: false,
+        text: "",
+        reasoning: "",
+        activity: null,
+        toolLog: [],
+        stats: null,
+      },
     ],
   };
 }
@@ -62,9 +78,15 @@ console.log("web/deltas.js");
   const snap = snapshot();
   applyDelta(snap, { agentID: "Agent 1", kind: "token", text: "Hel" });
   applyDelta(snap, { agentID: "Agent 1", kind: "token", text: "lo" });
-  check("token fragments accumulate in order", liveOf(snap, "Agent 1").text === "Hello",
-    `got ${JSON.stringify(liveOf(snap, "Agent 1").text)}`);
-  check("a seat that is writing is marked as generating", liveOf(snap, "Agent 1").isGenerating === true);
+  check(
+    "token fragments accumulate in order",
+    liveOf(snap, "Agent 1").text === "Hello",
+    `got ${JSON.stringify(liveOf(snap, "Agent 1").text)}`
+  );
+  check(
+    "a seat that is writing is marked as generating",
+    liveOf(snap, "Agent 1").isGenerating === true
+  );
   check("the other seat is untouched", liveOf(snap, "Agent 2").text === "");
 }
 
@@ -73,9 +95,11 @@ console.log("web/deltas.js");
   applyDelta(snap, { agentID: "Agent 1", kind: "reasoning", text: "why " });
   applyDelta(snap, { agentID: "Agent 1", kind: "token", text: "answer" });
   applyDelta(snap, { agentID: "Agent 1", kind: "reasoning", text: "not" });
-  check("reasoning accumulates separately from the answer",
+  check(
+    "reasoning accumulates separately from the answer",
     liveOf(snap, "Agent 1").reasoning === "why not" && liveOf(snap, "Agent 1").text === "answer",
-    `reasoning=${JSON.stringify(liveOf(snap, "Agent 1").reasoning)} text=${JSON.stringify(liveOf(snap, "Agent 1").text)}`);
+    `reasoning=${JSON.stringify(liveOf(snap, "Agent 1").reasoning)} text=${JSON.stringify(liveOf(snap, "Agent 1").text)}`
+  );
 }
 
 {
@@ -83,9 +107,11 @@ console.log("web/deltas.js");
   applyDelta(snap, { agentID: "Agent 1", kind: "token", text: "from the last turn" });
   applyDelta(snap, { agentID: "Agent 1", kind: "reasoning", text: "old thinking" });
   applyDelta(snap, { agentID: "Agent 1", kind: "started", text: "" });
-  check("a new turn clears what the previous one left",
+  check(
+    "a new turn clears what the previous one left",
     liveOf(snap, "Agent 1").text === "" && liveOf(snap, "Agent 1").reasoning === "",
-    `text=${JSON.stringify(liveOf(snap, "Agent 1").text)}`);
+    `text=${JSON.stringify(liveOf(snap, "Agent 1").text)}`
+  );
   applyDelta(snap, { agentID: "Agent 1", kind: "token", text: "new" });
   check("and the new turn then accumulates from empty", liveOf(snap, "Agent 1").text === "new");
 }
@@ -95,9 +121,15 @@ console.log("web/deltas.js");
   const changed = applyDelta(snap, { agentID: "Agent 9", kind: "token", text: "ghost" });
   check("an agent that is not a seat is ignored", changed === false && snap.live.length === 2);
   const unknown = applyDelta(snap, { agentID: "Agent 1", kind: "something-new", text: "x" });
-  check("an unknown kind is ignored rather than guessed at", unknown === false,
-    "the snapshot that follows the turn carries it");
-  check("an empty delta is ignored", applyDelta(snap, null) === false && applyDelta(snap, { kind: "token" }) === false);
+  check(
+    "an unknown kind is ignored rather than guessed at",
+    unknown === false,
+    "the snapshot that follows the turn carries it"
+  );
+  check(
+    "an empty delta is ignored",
+    applyDelta(snap, null) === false && applyDelta(snap, { kind: "token" }) === false
+  );
 }
 
 {
@@ -105,23 +137,33 @@ console.log("web/deltas.js");
   snap.live = [];
   applyDelta(snap, { agentID: "Agent 2", kind: "token", text: "a" });
   const entry = liveOf(snap, "Agent 2");
-  check("a seat with no live entry gets one the renderer can read",
-    entry && emptyLive("Agent 2").toolLog.length === 0 && Array.isArray(entry.toolLog) && entry.stats === null,
-    JSON.stringify(entry));
+  check(
+    "a seat with no live entry gets one the renderer can read",
+    entry &&
+      emptyLive("Agent 2").toolLog.length === 0 &&
+      Array.isArray(entry.toolLog) &&
+      entry.stats === null,
+    JSON.stringify(entry)
+  );
 }
 
 {
   const snap = snapshot();
   snap.live = undefined;
   const changed = applyDelta(snap, { agentID: "Agent 1", kind: "token", text: "x" });
-  check("a snapshot with no live array is repaired rather than throwing",
-    changed === true && Array.isArray(snap.live) && liveOf(snap, "Agent 1").text === "x");
+  check(
+    "a snapshot with no live array is repaired rather than throwing",
+    changed === true && Array.isArray(snap.live) && liveOf(snap, "Agent 1").text === "x"
+  );
 }
 
 {
   const snap = snapshot();
   applyDelta(snap, { agentID: "Agent 1", kind: "token", text: "" });
-  check("an empty fragment leaves the text a string", typeof liveOf(snap, "Agent 1").text === "string");
+  check(
+    "an empty fragment leaves the text a string",
+    typeof liveOf(snap, "Agent 1").text === "string"
+  );
 }
 
 // ── which of two snapshots is newer ────────────────────────────────────────────────────────────────
@@ -146,7 +188,8 @@ console.log("web/deltas.js");
   check(
     "the revision orders two snapshots inside the same second",
     isStale(sameSecondOlder, sameSecondNewer) === true &&
-      isStale(sameSecondNewer, sameSecondOlder) === false);
+      isStale(sameSecondNewer, sameSecondOlder) === false
+  );
 
   // An older engine sends no revision, so the clock is the only ordering there is.
   const clockOlder = { serverTime: "2026-09-15T09:59:59Z" };
@@ -155,12 +198,14 @@ console.log("web/deltas.js");
   check("and it does not call a later clock stale", isStale(clockNewer, clockOlder) === false);
   check(
     "a revision on one side only falls back to the clock",
-    isStale(clockOlder, { revision: 3, serverTime: "2026-09-15T10:00:00Z" }) === true);
+    isStale(clockOlder, { revision: 3, serverTime: "2026-09-15T10:00:00Z" }) === true
+  );
 
   // The revision decides even when there is no clock to fall back to.
   check(
     "a revision orders without any serverTime",
-    isStale({ revision: 1 }, { revision: 2 }) === true);
+    isStale({ revision: 1 }, { revision: 2 }) === true
+  );
 
   // Neither orders: refuse rather than guess, so a malformed snapshot cannot blank the page.
   check("an unorderable pair is not treated as stale", isStale({}, {}) === false);
@@ -175,14 +220,18 @@ console.log("web/deltas.js");
 {
   check(
     "every snapshot the page applies goes through the guard",
-    /isStale\(next, state\.snapshot\)/.test(appJS));
+    /isStale\(next, state\.snapshot\)/.test(appJS)
+  );
 
   // The stylesheet documents the profile badge as "shown only when ?profile is in the URL", and
   // nothing implemented the condition — the text went into an element the stylesheet keeps hidden. The
   // browser behaviour is not exercised here (there is no headless browser in this check); what is
   // checked is that the page both reads `?profile` and applies it to the badge.
   check("the debug label reads ?profile", /has\("profile"\)/.test(appJS));
-  check("and the badge is shown only when it is asked for", /badge\.hidden = !profileRequested\(\)/.test(appJS));
+  check(
+    "and the badge is shown only when it is asked for",
+    /badge\.hidden = !profileRequested\(\)/.test(appJS)
+  );
 
   // The page disables removing an attachment on `canAttach`, which turned out to be *right* —
   // `ConversationEngine.setAttachments` refuses once `turnsCompleted > 0`, so the engine's rule is the
@@ -191,7 +240,8 @@ console.log("web/deltas.js");
   // of the agreement so a future edit cannot quietly disagree again.
   check(
     "the page gates removing an attachment on the same flag the engine uses",
-    /remove\.disabled = !state\.snapshot\.canAttach/.test(appJS));
+    /remove\.disabled = !state\.snapshot\.canAttach/.test(appJS)
+  );
 
   // The moderator's draft was emptied *before* the send, so a message the engine refused — or one
   // that never left the page because the engine could not be reached — silently discarded what had been
@@ -200,30 +250,51 @@ console.log("web/deltas.js");
   // be the emptied box is now explicit.
   const sendBody = appJS.slice(
     appJS.indexOf("async function send()"),
-    appJS.indexOf("function autosize(box)"));
+    appJS.indexOf("function autosize(box)")
+  );
   const runBody = appJS.slice(
     appJS.indexOf("async function run(fn)"),
-    appJS.indexOf("── Kept conversations"));
-  check("the command helper reports whether the engine took the command",
-    /return true;/.test(runBody) && /return false;/.test(runBody));
-  check("the page posts the message before it empties the box",
-    sendBody.indexOf('api.post("/api/message"') < sendBody.indexOf('box.value = ""'));
-  check("and it empties the box only when the send was accepted",
-    /if \(!\(await run\(\(\) => api\.post\("\/api\/message", \{ text \}\)\)\)\) return;/.test(sendBody));
-  check("so that what is typed during the request is not thrown away",
-    /box\.value\.trim\(\) === text/.test(sendBody));
-  check("and a second Return cannot post the same text twice",
-    /if \(!text \|\| sending\) return;/.test(sendBody));
+    appJS.indexOf("── Kept conversations")
+  );
+  check(
+    "the command helper reports whether the engine took the command",
+    /return true;/.test(runBody) && /return false;/.test(runBody)
+  );
+  check(
+    "the page posts the message before it empties the box",
+    sendBody.indexOf('api.post("/api/message"') < sendBody.indexOf('box.value = ""')
+  );
+  check(
+    "and it empties the box only when the send was accepted",
+    /if \(!\(await run\(\(\) => api\.post\("\/api\/message", \{ text \}\)\)\)\) return;/.test(
+      sendBody
+    )
+  );
+  check(
+    "so that what is typed during the request is not thrown away",
+    /box\.value\.trim\(\) === text/.test(sendBody)
+  );
+  check(
+    "and a second Return cannot post the same text twice",
+    /if \(!text \|\| sending\) return;/.test(sendBody)
+  );
 
   // The checkpoint picker. The page offers the list the engine sends rather than a copy of the
   // catalogue, posts the change to the same seat route the app uses, and locks the control on the same
   // flag the engine refuses on.
-  check("the page fills the model picker from the engine's catalogue",
-    /const models = s\.availableModels \|\| \[\];/.test(appJS) && /modelPicker\.append\(option\)/.test(appJS));
-  check("the page posts the chosen checkpoint to the seat route",
-    /api\.post\("\/api\/seat", \{ seat: seat\.id, modelID: modelPicker\.value \}\)/.test(appJS));
-  check("and locks it on the same flag the engine refuses on",
-    /modelPicker\.disabled = !s\.canAttach;/.test(appJS));
+  check(
+    "the page fills the model picker from the engine's catalogue",
+    /const models = s\.availableModels \|\| \[\];/.test(appJS) &&
+      /modelPicker\.append\(option\)/.test(appJS)
+  );
+  check(
+    "the page posts the chosen checkpoint to the seat route",
+    /api\.post\("\/api\/seat", \{ seat: seat\.id, modelID: modelPicker\.value \}\)/.test(appJS)
+  );
+  check(
+    "and locks it on the same flag the engine refuses on",
+    /modelPicker\.disabled = !s\.canAttach;/.test(appJS)
+  );
 }
 
 if (failures === 0) {

@@ -19,7 +19,8 @@
 #   5. swiftlint  swiftlint lint Sources Tests
 #   6. format     swift-format lint --recursive --strict Sources Tests
 #   7. web        the two Node checks for web/deltas.js and web/votes.js
-#   8. identity   VERSION, and every mirror of it that can be checked without building
+#   8. jstools    eslint and prettier over web/ and the web check scripts (`npm ci` first)
+#   9. identity   VERSION, and every mirror of it that can be checked without building
 #
 # Warnings-as-errors is not a flag this script adds: it lives in `Package.swift`
 # (`treatAllWarnings(as: .error)`), so `swift build`, `swift test` and Xcode all get it and
@@ -210,7 +211,31 @@ else
     fail "web: the verdict rule"
 fi
 
-printf '\n=== 8/8  identity: the version and its mirrors ===\n'
+# The JavaScript toolchain. Prettier owns formatting and ESLint the defects a reader misses. The
+# binaries come from `npm ci` against the committed lockfile; a missing install is a failure
+# rather than a skip, because a gate that silently does nothing is not a gate.
+printf '\n=== 8/9  web toolchain: eslint and prettier ===\n'
+if [ ! -x node_modules/.bin/eslint ] || [ ! -x node_modules/.bin/prettier ]; then
+    printf '      the JavaScript toolchain is not installed: run npm ci in the repository root\n'
+    fail "web toolchain: npm ci has not been run"
+else
+    if node_modules/.bin/eslint web tools/check-web-deltas.js tools/check-web-votes.js \
+        > "$logs/eslint.log" 2>&1; then
+        pass "eslint: web/ and the web check scripts"
+    else
+        tail -n 20 "$logs/eslint.log" | sed 's/^/      /'
+        fail "eslint: web/ and the web check scripts"
+    fi
+    if node_modules/.bin/prettier --check web/*.js tools/check-web-deltas.js tools/check-web-votes.js \
+        > "$logs/prettier.log" 2>&1; then
+        pass "prettier: web/ and the web check scripts"
+    else
+        tail -n 20 "$logs/prettier.log" | sed 's/^/      /'
+        fail "prettier: web/ and the web check scripts"
+    fi
+fi
+
+printf '\n=== 9/9  identity: the version and its mirrors ===\n'
 # `VERSION` at the repository root is the one authoritative value (RELEASE.md §1.3). A mirror
 # that disagrees is a release defect, so it fails here rather than at release time; the built
 # bundle's own copy is checked by `tools/make-release.sh`, which is the only place a built
@@ -225,8 +250,8 @@ fi
 printf '\n=== summary ===\n'
 cat "$summary"
 if [ "$failures" -eq 0 ]; then
-    printf '\nAll 8 Mac-only gates passed.\n'
+    printf '\nAll 9 Mac-only gates passed.\n'
     exit 0
 fi
-printf '\n%d of 8 Mac-only gates failed. Full output in %s/.\n' "$failures" "$logs"
+printf '\n%d of 9 Mac-only gates failed. Full output in %s/.\n' "$failures" "$logs"
 exit 1

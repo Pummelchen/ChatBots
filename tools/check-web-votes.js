@@ -50,40 +50,66 @@ function check(name, condition, detail) {
 
 // ── The decision ────────────────────────────────────────────────────────────────────
 
-check("clicking a verdict that is not on records it",
-  nextVerdict(null, "strong") === "strong" && nextVerdict(null, "weak") === "weak");
-check("clicking the other verdict replaces it",
-  nextVerdict("weak", "strong") === "strong" && nextVerdict("strong", "weak") === "weak");
-check("clicking the verdict already on withdraws it",
+check(
+  "clicking a verdict that is not on records it",
+  nextVerdict(null, "strong") === "strong" && nextVerdict(null, "weak") === "weak"
+);
+check(
+  "clicking the other verdict replaces it",
+  nextVerdict("weak", "strong") === "strong" && nextVerdict("strong", "weak") === "weak"
+);
+check(
+  "clicking the verdict already on withdraws it",
   nextVerdict("strong", "strong") === null && nextVerdict("weak", "weak") === null,
-  "this is the finding: the click re-cast instead of withdrawing");
+  "this is the finding: the click re-cast instead of withdrawing"
+);
 
 // ── The mark ────────────────────────────────────────────────────────────────────────
 
-check("the verdict on record is the one marked",
-  isOn("strong", "strong") === true && isOn("weak", "weak") === true);
-check("the other verdict is not marked",
-  isOn("strong", "weak") === false && isOn("weak", "strong") === false);
-check("nothing is marked when nothing is on record",
-  isOn(null, "strong") === false && isOn(null, "weak") === false);
+check(
+  "the verdict on record is the one marked",
+  isOn("strong", "strong") === true && isOn("weak", "weak") === true
+);
+check(
+  "the other verdict is not marked",
+  isOn("strong", "weak") === false && isOn("weak", "strong") === false
+);
+check(
+  "nothing is marked when nothing is on record",
+  isOn(null, "strong") === false && isOn(null, "weak") === false
+);
 
 // ── The page's use of the rule ──────────────────────────────────────────────────────
 
-check("the click handler reads the verdict on record at click time",
+check(
+  "the click handler reads the verdict on record at click time",
   /nextVerdict\(voteFor\(message\.id\), verdict\)/.test(appJS),
-  "the handler must call nextVerdict with the current verdict, not with a captured one");
-check("the handler no longer decides from the value captured at render time",
+  "the handler must call nextVerdict with the current verdict, not with a captured one"
+);
+check(
+  "the handler no longer decides from the value captured at render time",
   !/const next = cast === verdict/.test(appJS),
-  "a captured verdict is the bug: the row is built once and re-marked in place");
-check("the row marks a button through the shared rule",
-  /window\.ChatBotsVotes\.isOn\(cast, verdict\)/.test(appJS));
-check("the redraw marks a button through the same rule, from the button's own verdict",
-  /isOn\(cast, button\.dataset\.verdict\)/.test(appJS) && /button\.dataset\.verdict = verdict/.test(appJS));
-check("the chosen verdict is what is posted, withdrawal included",
-  /api\.post\("\/api\/vote", \{ id: message\.id, verdict: next \}\)/.test(appJS));
-check("the module is loaded before the page that uses it",
+  "a captured verdict is the bug: the row is built once and re-marked in place"
+);
+check(
+  "the row marks a button through the shared rule",
+  /window\.ChatBotsVotes\.isOn\(cast, verdict\)/.test(appJS)
+);
+check(
+  "the redraw marks a button through the same rule, from the button's own verdict",
+  /isOn\(cast, button\.dataset\.verdict\)/.test(appJS) &&
+    /button\.dataset\.verdict = verdict/.test(appJS)
+);
+check(
+  "the chosen verdict is what is posted, withdrawal included",
+  /api\.post\("\/api\/vote", \{ id: message\.id, verdict: next \}\)/.test(appJS)
+);
+check(
+  "the module is loaded before the page that uses it",
   /<script src="\/votes\.js"><\/script>\s*<script type="module" src="\/app\.js"><\/script>/.test(
-    fs.readFileSync(path.join(__dirname, "..", "web", "index.html"), "utf8")));
+    fs.readFileSync(path.join(__dirname, "..", "web", "index.html"), "utf8")
+  )
+);
 
 if (failures === 0) {
   console.log("all votes checks passed");

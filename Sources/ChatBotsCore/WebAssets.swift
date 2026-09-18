@@ -1366,17 +1366,38 @@ body[data-view="phone"] {
 
 import { $, api, state, containers, panes, bodyHTML, toast, debounce } from "./app-core.js";
 import {
-  measureViewport, identifyDevice, applyUrlViewMode, chooseViewMode, reportLayout,
+  measureViewport,
+  identifyDevice,
+  applyUrlViewMode,
+  chooseViewMode,
+  reportLayout,
 } from "./app-screen.js";
 import {
-  buildPanes, drawMessages, drawVotes, rebuildTranscripts, wirePaneControls,
+  buildPanes,
+  drawMessages,
+  drawVotes,
+  rebuildTranscripts,
+  wirePaneControls,
 } from "./app-transcript.js";
 import {
-  drawControls, drawSeats, drawMode, drawAttachments, drawContext, drawResearch, drawIdentity,
+  drawControls,
+  drawSeats,
+  drawMode,
+  drawAttachments,
+  drawContext,
+  drawResearch,
+  drawIdentity,
 } from "./app-controls.js";
 import { currentMode, refreshLineup } from "./app-lineup.js";
 import {
-  run, send, save, saveIdentity, setMode, setDepth, addFiles, refreshKept,
+  run,
+  send,
+  save,
+  saveIdentity,
+  setMode,
+  setDepth,
+  addFiles,
+  refreshKept,
 } from "./app-commands.js";
 
 // ── The reply being written ────────────────────────────────────────────────────────
@@ -1451,7 +1472,10 @@ const liveReply = (() => {
         const live = liveFor(seat.id);
         const existing = document.querySelector(`.msg.live[data-seat-id="${cssEscape(seat.id)}"]`);
         const active = live && (live.isGenerating || live.text || live.reasoning);
-        if (!active) { existing?.remove(); continue; }
+        if (!active) {
+          existing?.remove();
+          continue;
+        }
         const el = existing ?? createLiveElement(seat.id, seat.name, -1);
         $("thread").append(el);
         updateLiveElement(el, live);
@@ -1466,7 +1490,10 @@ const liveReply = (() => {
       const live = liveFor(seat.id);
       const existing = pane.transcript.querySelector(".msg.live");
       const active = live && (live.isGenerating || live.text || live.reasoning);
-      if (!active) { existing?.remove(); continue; }
+      if (!active) {
+        existing?.remove();
+        continue;
+      }
       const el = existing ?? createLiveElement(seat.id, seat.name, index);
       pane.transcript.append(el);
       updateLiveElement(el, live);
@@ -1535,7 +1562,9 @@ function listen() {
   if (isCapture) return;
   const source = new EventSource("/api/events");
   source.addEventListener("snapshot", (event) => apply(JSON.parse(event.data)));
-  source.addEventListener("turn", () => { /* the following snapshot carries it */ });
+  source.addEventListener("turn", () => {
+    /* the following snapshot carries it */
+  });
   // The engine's own per-token events. Listening only for `snapshot` meant a reply appeared in one
   // piece when the turn ended, so a long research turn looked frozen while it was working while
   // the engine was publishing the words as it wrote them. `applyDelta` merges a fragment
@@ -1564,8 +1593,10 @@ async function startConversation() {
 
 function wire() {
   $("start").onclick = () => startConversation();
-  $("pause").onclick = () => run(() =>
-    api.post(state.snapshot && state.snapshot.status === "Paused" ? "/api/resume" : "/api/pause"));
+  $("pause").onclick = () =>
+    run(() =>
+      api.post(state.snapshot && state.snapshot.status === "Paused" ? "/api/resume" : "/api/pause")
+    );
   $("stop").onclick = () => run(() => api.post("/api/stop"));
   $("clear").onclick = () => run(() => api.post("/api/reset"));
   $("condense").onclick = () => run(() => api.post("/api/compact"));
@@ -1607,17 +1638,23 @@ function wire() {
   $("depth-quick").onclick = () => setDepth("quick");
   $("depth-standard").onclick = () => setDepth("standard");
   $("depth-deep").onclick = () => setDepth("deep");
-  $("report-close").onclick = () => { $("report-panel").hidden = true; };
+  $("report-close").onclick = () => {
+    $("report-panel").hidden = true;
+  };
   $("kept").onclick = () => {
     $("kept-panel").hidden = false;
     refreshKept();
   };
-  $("kept-close").onclick = () => { $("kept-panel").hidden = true; };
+  $("kept-close").onclick = () => {
+    $("kept-panel").hidden = true;
+  };
   $("lineup").onclick = () => {
     $("lineup-panel").hidden = false;
     refreshLineup();
   };
-  $("lineup-close").onclick = () => { $("lineup-panel").hidden = true; };
+  $("lineup-close").onclick = () => {
+    $("lineup-panel").hidden = true;
+  };
   $("lineup-surprise").onclick = async () => {
     // A scenario rather than a line-up: it sets the question as well, which is the point of
     // asking to be surprised.
@@ -1648,8 +1685,11 @@ function wire() {
     const blob = new Blob([report.markdown], { type: "text/markdown;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    const slug = (report.question || "report").replace(/[^a-zA-Z0-9 ]/g, "").trim()
-      .replace(/\\s+/g, "-").slice(0, 60);
+    const slug = (report.question || "report")
+      .replace(/[^a-zA-Z0-9 ]/g, "")
+      .trim()
+      .replace(/\\s+/g, "-")
+      .slice(0, 60);
     a.download = `ChatBots report ${slug}.md`;
     a.click();
     URL.revokeObjectURL(a.href);
@@ -1666,20 +1706,30 @@ function wire() {
   // at start-up. Attaching then only ever saw #thread — which the split layout hides — so
   // `state.follow` was never set to false and every streaming delta pulled the pane to the
   // bottom, making it impossible to read back while a reply arrived.
-  document.addEventListener("scroll", (event) => {
-    const container = event.target;
-    const isTranscript =
-      container === $("thread") ||
-      (container.classList && container.classList.contains("transcript"));
-    if (!isTranscript) return;
-    const distance = container.scrollHeight - container.scrollTop - container.clientHeight;
-    state.follow = distance < 40;
-  }, { capture: true, passive: true });
+  document.addEventListener(
+    "scroll",
+    (event) => {
+      const container = event.target;
+      const isTranscript =
+        container === $("thread") ||
+        (container.classList && container.classList.contains("transcript"));
+      if (!isTranscript) return;
+      const distance = container.scrollHeight - container.scrollTop - container.clientHeight;
+      state.follow = distance < 40;
+    },
+    { capture: true, passive: true }
+  );
 
   window.addEventListener("keydown", (event) => {
     if (event.metaKey || event.ctrlKey) {
-      if (event.key === "s") { event.preventDefault(); save(); }
-      if (event.key === "Enter") { event.preventDefault(); $("start").click(); }
+      if (event.key === "s") {
+        event.preventDefault();
+        save();
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        $("start").click();
+      }
     }
   });
 
@@ -1696,7 +1746,9 @@ function wire() {
   // Keep the message box visible when the keyboard opens on a phone, which otherwise
   // pushes the footer under it.
   $("message").addEventListener("focus", () => {
-    setTimeout(() => { if (state.follow) liveReply.scrollToBottom(); }, 250);
+    setTimeout(() => {
+      if (state.follow) liveReply.scrollToBottom();
+    }, 250);
   });
 }
 
@@ -1706,7 +1758,10 @@ function wire() {
 applyUrlViewMode();
 measureViewport();
 wire();
-api.get("/api/state").then(apply).catch((error) => toast(error.message));
+api
+  .get("/api/state")
+  .then(apply)
+  .catch((error) => toast(error.message));
 identifyDevice().then(() => reportLayout());
 listen();
 
@@ -1753,10 +1808,7 @@ export const state = {
 
 /** Every element that holds a transcript: one per pane, plus the single-column thread. */
 export function containers() {
-  return [
-    ...document.querySelectorAll(".transcript"),
-    $("thread"),
-  ].filter(Boolean);
+  return [...document.querySelectorAll(".transcript"), $("thread")].filter(Boolean);
 }
 
 /** The panes, each with the transcript element it draws into. */
@@ -1770,7 +1822,8 @@ export function panes() {
 export function seatIndexOf(message) {
   if (!state.snapshot) return -1;
   return state.snapshot.seats.findIndex(
-    (s) => s.id === message.speakerID || s.name === message.speaker);
+    (s) => s.id === message.speakerID || s.name === message.speaker
+  );
 }
 
 export function voteFor(turnID) {
@@ -1785,14 +1838,15 @@ export function formatTime(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
-         `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  );
 }
 
 /** Escape first, then apply the little formatting worth having. */
 export function bodyHTML(text) {
-  const safe = String(text)
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const safe = String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return safe
     .split(/\\n{2,}/)
     .map((para) => `<p>${para.replace(/`([^`]+)`/g, "<code>$1</code>")}</p>`)
@@ -1801,18 +1855,26 @@ export function bodyHTML(text) {
 
 export function labelFor(message) {
   switch (message.kind) {
-    case "topic": return String(message.speaker || "Moderator").toUpperCase() + " · TOPIC";
-    case "steering": return String(message.speaker || "Moderator").toUpperCase();
-    case "direction": return "RESEARCH MODERATOR · ASSIGNMENT";
-    case "summary": return "CONDENSED EARLIER DISCUSSION";
-    case "tool": return "TOOL";
-    default: return String(message.speaker || "?").toUpperCase();
+    case "topic":
+      return String(message.speaker || "Moderator").toUpperCase() + " · TOPIC";
+    case "steering":
+      return String(message.speaker || "Moderator").toUpperCase();
+    case "direction":
+      return "RESEARCH MODERATOR · ASSIGNMENT";
+    case "summary":
+      return "CONDENSED EARLIER DISCUSSION";
+    case "tool":
+      return "TOOL";
+    default:
+      return String(message.speaker || "?").toUpperCase();
   }
 }
 
 export function escapeHTML(text) {
   return String(text ?? "")
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
 
@@ -1826,7 +1888,9 @@ export function toast(message, good = false) {
   el.className = "toast" + (good ? " good" : "");
   el.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.hidden = true; }, 6000);
+  toastTimer = setTimeout(() => {
+    el.hidden = true;
+  }, 6000);
 }
 
 export function debounce(fn, ms) {
@@ -1923,9 +1987,8 @@ export function measureViewport() {
   // A forced phone view on a wide screen composes against a phone-sized width rather than
   // the browser's. Without this, "phone layout" on a 1400-point window is a very wide page
   // with the single-column layout — technically correct and nothing like a phone.
-  const composedWidth = (viewMode === "phone" && width > PHONE_VIEWPORT_MAX)
-    ? PHONE_VIEWPORT_MAX
-    : width;
+  const composedWidth =
+    viewMode === "phone" && width > PHONE_VIEWPORT_MAX ? PHONE_VIEWPORT_MAX : width;
 
   root.style.setProperty("--vw", composedWidth + "px");
   root.style.setProperty("--vh", height + "px");
@@ -1979,7 +2042,11 @@ function applyDevice() {
   const thread = $("thread");
   if (thread) thread.hidden = layout !== "thread";
 
-  for (const [id, mode] of [["view-auto", "auto"], ["view-phone", "phone"], ["view-desktop", "desktop"]]) {
+  for (const [id, mode] of [
+    ["view-auto", "auto"],
+    ["view-phone", "phone"],
+    ["view-desktop", "desktop"],
+  ]) {
     $(id)?.classList.toggle("on", viewMode === mode);
   }
 
@@ -2011,7 +2078,9 @@ export function chooseViewMode(mode) {
   if (urlViewMode()) history.replaceState(null, "", location.pathname);
   try {
     localStorage.setItem(VIEW_MODE_KEY, mode);
-  } catch { /* a private window with storage disabled: the choice just will not persist */ }
+  } catch {
+    /* a private window with storage disabled: the choice just will not persist */
+  }
   applyDevice();
 }
 
@@ -2020,7 +2089,8 @@ export async function identifyDevice() {
   try {
     const match = await api.get(
       `/api/device?w=${screenInfo.width}&h=${screenInfo.height}` +
-      `&mobile=${screenInfo.detected !== "desktop"}`);
+        `&mobile=${screenInfo.detected !== "desktop"}`
+    );
     screenInfo.matched = match && match.matched ? match : null;
   } catch {
     screenInfo.matched = null;
@@ -2056,9 +2126,10 @@ export function reportLayout() {
     const rect = el.getBoundingClientRect();
     if (rect.width > viewport + 1 || rect.right > viewport + 1) {
       const id = el.id ? `#${el.id}` : "";
-      const cls = el.className && typeof el.className === "string"
-        ? "." + el.className.trim().split(/\\s+/).slice(0, 2).join(".")
-        : "";
+      const cls =
+        el.className && typeof el.className === "string"
+          ? "." + el.className.trim().split(/\\s+/).slice(0, 2).join(".")
+          : "";
       overflowing.push(`${el.tagName.toLowerCase()}${id}${cls}(${Math.round(rect.width)})`);
     }
   }
@@ -2082,7 +2153,8 @@ export function reportLayout() {
     console.info(
       "elements wider than the viewport, worst first:",
       overflowing.length,
-      overflowing.slice(0, 6));
+      overflowing.slice(0, 6)
+    );
   }
 }
 
@@ -2096,7 +2168,17 @@ export function reportLayout() {
 // exception — it is updated in place, and it lives in `app.js` with the other live drawing.
 
 import {
-  $, api, state, containers, panes, seatIndexOf, formatTime, bodyHTML, labelFor, voteFor, toast,
+  $,
+  api,
+  state,
+  containers,
+  panes,
+  seatIndexOf,
+  formatTime,
+  bodyHTML,
+  labelFor,
+  voteFor,
+  toast,
 } from "./app-core.js";
 import { run } from "./app-commands.js";
 
@@ -2225,7 +2307,10 @@ export function wirePaneControls() {
     button.dataset.wired = "1";
     button.addEventListener("dblclick", () => startRename(button));
     button.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") { event.preventDefault(); startRename(button); }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        startRename(button);
+      }
     });
   }
 }
@@ -2258,8 +2343,14 @@ function startRename(button) {
   };
   const onBlur = () => finish(true);
   const onKey = (event) => {
-    if (event.key === "Enter") { event.preventDefault(); finish(true); }
-    if (event.key === "Escape") { event.preventDefault(); finish(false); }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      finish(true);
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      finish(false);
+    }
   };
   button.addEventListener("blur", onBlur);
   button.addEventListener("keydown", onKey);
@@ -2278,8 +2369,11 @@ export function drawMessages() {
 
   for (const message of state.snapshot.messages) {
     const seat = seatIndexOf(message);
-    const shared = message.kind === "steering" || message.kind === "topic" ||
-                   message.kind === "summary" || message.kind === "direction";
+    const shared =
+      message.kind === "steering" ||
+      message.kind === "topic" ||
+      message.kind === "summary" ||
+      message.kind === "direction";
 
     // The single-column view holds everything once.
     if (inThread) {
@@ -2312,9 +2406,10 @@ function trimEmptyNotes() {
     if (!has && !note) {
       const empty = document.createElement("div");
       empty.className = "empty";
-      empty.textContent = document.body.dataset.layout === "thread"
-        ? "Nothing yet. Set a topic and press Start."
-        : "Nothing yet.";
+      empty.textContent =
+        document.body.dataset.layout === "thread"
+          ? "Nothing yet. Set a topic and press Start."
+          : "Nothing yet.";
       container.append(empty);
     }
   }
@@ -2354,9 +2449,15 @@ export function drawControls() {
 
   const pill = $("status");
   pill.textContent = s.status;
-  pill.className = "pill" +
-    (s.isRunning ? " running" : s.status === "Paused" ? " paused" :
-     String(s.status).startsWith("Failed") ? " failed" : "");
+  pill.className =
+    "pill" +
+    (s.isRunning
+      ? " running"
+      : s.status === "Paused"
+        ? " paused"
+        : String(s.status).startsWith("Failed")
+          ? " failed"
+          : "");
   $("counts").textContent = `${s.turnsCompleted} turn${s.turnsCompleted === 1 ? "" : "s"}`;
   if (s.error) toast(s.error);
 }
@@ -2371,9 +2472,9 @@ function drawAudience() {
     return;
   }
   el.hidden = false;
-  el.textContent = "Audience: " + entries
-    .map((entry) => `${entry.name} ${entry.score > 0 ? "+" : ""}${entry.score}`)
-    .join(" · ");
+  el.textContent =
+    "Audience: " +
+    entries.map((entry) => `${entry.name} ${entry.score > 0 ? "+" : ""}${entry.score}`).join(" · ");
 }
 
 /**
@@ -2438,7 +2539,9 @@ async function openPersonaPicker(seatIndex) {
   }
 
   sheet.querySelector("[data-close]").onclick = () => sheet.remove();
-  sheet.onclick = (event) => { if (event.target === sheet) sheet.remove(); };
+  sheet.onclick = (event) => {
+    if (event.target === sheet) sheet.remove();
+  };
   document.body.append(sheet);
 }
 
@@ -2472,7 +2575,9 @@ export function drawSeats() {
       picker.dataset.wiredPersona = picker.dataset.wiredPersona || "0";
       if (picker.dataset.wiredPersona !== "1") {
         picker.dataset.wiredPersona = "1";
-        picker.addEventListener("click", () => openPersonaPicker(Number(picker.dataset.personaSeat)));
+        picker.addEventListener("click", () =>
+          openPersonaPicker(Number(picker.dataset.personaSeat))
+        );
       }
     }
 
@@ -2501,7 +2606,8 @@ export function drawSeats() {
       if (modelPicker.dataset.wiredModel !== "1") {
         modelPicker.dataset.wiredModel = "1";
         modelPicker.addEventListener("change", () =>
-          run(() => api.post("/api/seat", { seat: seat.id, modelID: modelPicker.value })));
+          run(() => api.post("/api/seat", { seat: seat.id, modelID: modelPicker.value }))
+        );
       }
     }
 
@@ -2509,13 +2615,15 @@ export function drawSeats() {
     const busy = live && live.isGenerating;
     const stateEl = pane.root.querySelector(".state");
     stateEl.className = "state" + (busy ? " live" : "");
-    stateEl.textContent = busy ? (live.activity || "thinking…") : "ready";
+    stateEl.textContent = busy ? live.activity || "thinking…" : "ready";
     pane.root.querySelector(".params").textContent =
       `temp ${seat.temperature.toFixed(2)} · top-p ${seat.topP.toFixed(2)} · top-k ${seat.topK} · ` +
       `min-p ${seat.minP.toFixed(1)} · pres ${Math.abs(seat.presencePenalty ?? 0).toFixed(1)} · ` +
       `max ${Math.round(seat.maxTokens / 1024)}k${seat.webSearch ? " · web" : ""}`;
   }
-  $("persona-summary").textContent = s.seats.map((x) => `${x.name}: ${x.personaName}`).join("  ↔  ");
+  $("persona-summary").textContent = s.seats
+    .map((x) => `${x.name}: ${x.personaName}`)
+    .join("  ↔  ");
 
   const note = $("vision-note");
   if (s.imagesAllowed) {
@@ -2548,8 +2656,11 @@ export function drawAttachments() {
     remove.setAttribute("aria-label", `Remove ${doc.name}`);
     remove.disabled = !state.snapshot.canAttach;
     remove.onclick = async () => {
-      try { apply(await api.post("/api/attachments/remove", { value: doc.id })); }
-      catch (error) { toast(error.message); }
+      try {
+        apply(await api.post("/api/attachments/remove", { value: doc.id }));
+      } catch (error) {
+        toast(error.message);
+      }
     };
     chip.append(name, detail, remove);
     chips.append(chip);
@@ -2573,8 +2684,11 @@ export function drawResearch() {
   $("research-progress").textContent = research.statusLine;
   // The budget is only settable before the run, so the controls disable with it.
   const locked = !s.canAttach;
-  for (const [id, depth] of [["depth-quick", "quick"], ["depth-standard", "standard"],
-                             ["depth-deep", "deep"]]) {
+  for (const [id, depth] of [
+    ["depth-quick", "quick"],
+    ["depth-standard", "standard"],
+    ["depth-deep", "deep"],
+  ]) {
     const button = $(id);
     button.disabled = locked;
     button.classList.toggle("on", research.depth.toLowerCase() === depth);
@@ -2604,19 +2718,38 @@ function markdownToHTML(markdown) {
   const lines = escape(markdown).split("\\n");
   let out = "";
   let inList = false;
-  const closeList = () => { if (inList) { out += "</ul>"; inList = false; } };
+  const closeList = () => {
+    if (inList) {
+      out += "</ul>";
+      inList = false;
+    }
+  };
 
   for (const raw of lines) {
     const line = raw.trimEnd();
-    if (line.startsWith("## ")) { closeList(); out += `<h2>${line.slice(3)}</h2>`; continue; }
-    if (line.startsWith("# ")) { closeList(); out += `<h1>${line.slice(2)}</h1>`; continue; }
+    if (line.startsWith("## ")) {
+      closeList();
+      out += `<h2>${line.slice(3)}</h2>`;
+      continue;
+    }
+    if (line.startsWith("# ")) {
+      closeList();
+      out += `<h1>${line.slice(2)}</h1>`;
+      continue;
+    }
     if (line.startsWith("- ") || line.startsWith("* ")) {
-      if (!inList) { out += "<ul>"; inList = true; }
+      if (!inList) {
+        out += "<ul>";
+        inList = true;
+      }
       out += `<li>${line.slice(2).replace(/\\*\\*(.+?)\\*\\*/g, "<strong>$1</strong>")}</li>`;
       continue;
     }
     closeList();
-    if (line === "---") { out += "<hr>"; continue; }
+    if (line === "---") {
+      out += "<hr>";
+      continue;
+    }
     if (line.trim() === "") continue;
     out += `<p>${line.replace(/\\*\\*(.+?)\\*\\*/g, "<strong>$1</strong>")}</p>`;
   }
@@ -2663,7 +2796,11 @@ export function drawIdentity() {
   }
   // The engine reports the display name; the select needs the identifier.
   const style = s.availablePersonas.find((p) => p.name === s.moderatorPersona);
-  const identifier = s.moderatorPersona.startsWith("Neutral") ? "neutral" : (style ? style.id : "neutral");
+  const identifier = s.moderatorPersona.startsWith("Neutral")
+    ? "neutral"
+    : style
+      ? style.id
+      : "neutral";
   if (document.activeElement !== select) select.value = identifier;
 
   if (document.activeElement !== $("mod-name")) {
@@ -2757,24 +2894,28 @@ export async function refreshLineup() {
   });
   body.append(random);
   for (const roster of rosters) {
-    body.append(lineupRow({
-      title: roster.name,
-      note: roster.summary,
-      who: roster.personaIDs.join(" · "),
-      path: "/api/roster",
-      body: { id: roster.id },
-    }));
+    body.append(
+      lineupRow({
+        title: roster.name,
+        note: roster.summary,
+        who: roster.personaIDs.join(" · "),
+        path: "/api/roster",
+        body: { id: roster.id },
+      })
+    );
   }
 
   body.append(heading("Scenarios"));
   for (const scenario of scenarios) {
-    body.append(lineupRow({
-      title: scenario.topic,
-      note: scenario.note,
-      who: scenario.depth ? `budget: ${scenario.depth}` : "",
-      path: "/api/scenario",
-      body: { id: scenario.id },
-    }));
+    body.append(
+      lineupRow({
+        title: scenario.topic,
+        note: scenario.note,
+        who: scenario.depth ? `budget: ${scenario.depth}` : "",
+        path: "/api/scenario",
+        body: { id: scenario.id },
+      })
+    );
   }
 }
 
@@ -2829,9 +2970,7 @@ export async function refreshKept() {
     toast(error.message);
     return;
   }
-  $("kept-meta").textContent = list.length
-    ? `${list.length} kept`
-    : "";
+  $("kept-meta").textContent = list.length ? `${list.length} kept` : "";
 
   if (!list.length) {
     const empty = document.createElement("div");
@@ -2898,9 +3037,8 @@ export async function refreshKept() {
       // receiving the link needs. The snapshot's value is the fallback for an origin that is not
       // a usable base (`file:` pages report "null").
       const origin = window.location.origin;
-      const base = origin && origin !== "null"
-        ? origin
-        : (state.snapshot && state.snapshot.shareBase);
+      const base =
+        origin && origin !== "null" ? origin : state.snapshot && state.snapshot.shareBase;
       const url = `${base}/s/${item.id}`;
       try {
         await navigator.clipboard.writeText(url);
@@ -2921,10 +3059,12 @@ export async function refreshKept() {
 // ── Who the moderator is ─────────────────────────────────────────────────────────
 
 export function saveIdentity() {
-  run(() => api.post("/api/moderator", {
-    name: $("mod-name").value.trim() || "Moderator",
-    personaID: $("mod-persona").value,
-  }));
+  run(() =>
+    api.post("/api/moderator", {
+      name: $("mod-name").value.trim() || "Moderator",
+      personaID: $("mod-persona").value,
+    })
+  );
 }
 
 // ── Mode and the research budget ─────────────────────────────────────────────────
@@ -2986,10 +3126,12 @@ export async function addFiles(files) {
       for (let i = 0; i < bytes.length; i += chunk) {
         binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
       }
-      apply(await api.post("/api/attachments", {
-        filename: file.name,
-        content: btoa(binary),
-      }));
+      apply(
+        await api.post("/api/attachments", {
+          filename: file.name,
+          content: btoa(binary),
+        })
+      );
       toast(`Added ${file.name}`, true);
     } catch (error) {
       toast(`${file.name}: ${error.message}`);
@@ -3006,8 +3148,10 @@ export function save() {
   const pad = (n) => String(n).padStart(2, "0");
   const stamp = (iso) => {
     const d = new Date(iso);
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
-           `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    return (
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+      `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+    );
   };
   const now = new Date();
   let out = "ChatBots — conversation log\\n";
@@ -3017,12 +3161,19 @@ export function save() {
   for (const message of s.messages) {
     if (message.kind === "introduction") continue;
     out += `\\n[${stamp(message.timestamp)}] ${labelFor(message)}\\n`;
-    out += message.text.split("\\n").map((line) => "    " + line).join("\\n") + "\\n";
+    out +=
+      message.text
+        .split("\\n")
+        .map((line) => "    " + line)
+        .join("\\n") + "\\n";
   }
   const blob = new Blob([out], { type: "text/plain;charset=utf-8" });
   const a = document.createElement("a");
-  const slug = (s.topic || "conversation").replace(/[^a-zA-Z0-9 ]/g, "").trim()
-    .replace(/\\s+/g, "-").slice(0, 60);
+  const slug = (s.topic || "conversation")
+    .replace(/[^a-zA-Z0-9 ]/g, "")
+    .trim()
+    .replace(/\\s+/g, "-")
+    .slice(0, 60);
   a.href = URL.createObjectURL(blob);
   a.download = `ChatBots ${slug} ${stamp(now).replace(/:/g, "-")}.txt`;
   a.click();

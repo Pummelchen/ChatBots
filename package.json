@@ -1,0 +1,15 @@
+{
+  "name": "chatbots-web-toolchain",
+  "private": true,
+  "description": "The pinned formatter and linter for the browser front end and the Node check scripts. Python, shell and Swift toolchains live in docs/toolchain.md and tools/.",
+  "scripts": {
+    "lint": "eslint web tools/check-web-deltas.js tools/check-web-votes.js",
+    "format": "prettier --write web/*.js tools/check-web-deltas.js tools/check-web-votes.js",
+    "format:check": "prettier --check web/*.js tools/check-web-deltas.js tools/check-web-votes.js"
+  },
+  "devDependencies": {
+    "eslint": "10.10.0",
+    "globals": "17.12.0",
+    "prettier": "3.9.8"
+  }
+}

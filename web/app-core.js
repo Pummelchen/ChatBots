@@ -38,10 +38,7 @@ export const state = {
 
 /** Every element that holds a transcript: one per pane, plus the single-column thread. */
 export function containers() {
-  return [
-    ...document.querySelectorAll(".transcript"),
-    $("thread"),
-  ].filter(Boolean);
+  return [...document.querySelectorAll(".transcript"), $("thread")].filter(Boolean);
 }
 
 /** The panes, each with the transcript element it draws into. */
@@ -55,7 +52,8 @@ export function panes() {
 export function seatIndexOf(message) {
   if (!state.snapshot) return -1;
   return state.snapshot.seats.findIndex(
-    (s) => s.id === message.speakerID || s.name === message.speaker);
+    (s) => s.id === message.speakerID || s.name === message.speaker
+  );
 }
 
 export function voteFor(turnID) {
@@ -70,14 +68,15 @@ export function formatTime(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
-         `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  );
 }
 
 /** Escape first, then apply the little formatting worth having. */
 export function bodyHTML(text) {
-  const safe = String(text)
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const safe = String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return safe
     .split(/\n{2,}/)
     .map((para) => `<p>${para.replace(/`([^`]+)`/g, "<code>$1</code>")}</p>`)
@@ -86,18 +85,26 @@ export function bodyHTML(text) {
 
 export function labelFor(message) {
   switch (message.kind) {
-    case "topic": return String(message.speaker || "Moderator").toUpperCase() + " · TOPIC";
-    case "steering": return String(message.speaker || "Moderator").toUpperCase();
-    case "direction": return "RESEARCH MODERATOR · ASSIGNMENT";
-    case "summary": return "CONDENSED EARLIER DISCUSSION";
-    case "tool": return "TOOL";
-    default: return String(message.speaker || "?").toUpperCase();
+    case "topic":
+      return String(message.speaker || "Moderator").toUpperCase() + " · TOPIC";
+    case "steering":
+      return String(message.speaker || "Moderator").toUpperCase();
+    case "direction":
+      return "RESEARCH MODERATOR · ASSIGNMENT";
+    case "summary":
+      return "CONDENSED EARLIER DISCUSSION";
+    case "tool":
+      return "TOOL";
+    default:
+      return String(message.speaker || "?").toUpperCase();
   }
 }
 
 export function escapeHTML(text) {
   return String(text ?? "")
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
 
@@ -111,7 +118,9 @@ export function toast(message, good = false) {
   el.className = "toast" + (good ? " good" : "");
   el.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.hidden = true; }, 6000);
+  toastTimer = setTimeout(() => {
+    el.hidden = true;
+  }, 6000);
 }
 
 export function debounce(fn, ms) {

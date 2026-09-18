@@ -216,6 +216,15 @@ jobs:
         run: ruff format --check tools/
       - name: The Python type-checks
         run: pyright tools/
+      # The JavaScript toolchain, from the committed lockfile. `npm ci` is the pin: node_modules
+      # is rebuilt from `package-lock.json`, so the versions that run here are the versions the
+      # audit pinned, and a finding fails the job exactly as the Swift gates fail on the Mac.
+      - name: Install the pinned JavaScript toolchain
+        run: npm ci --no-audit --no-fund
+      - name: The JavaScript passes eslint
+        run: npx --no-install eslint web tools/check-web-deltas.js tools/check-web-votes.js
+      - name: The JavaScript is formatted as prettier would write it
+        run: npx --no-install prettier --check web/*.js tools/check-web-deltas.js tools/check-web-votes.js
       # `--redact` so a finding never echoes the value it found; only the rule and location
       # reach the log.
       - name: No secret in the full history

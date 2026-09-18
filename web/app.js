@@ -17,17 +17,38 @@
 
 import { $, api, state, containers, panes, bodyHTML, toast, debounce } from "./app-core.js";
 import {
-  measureViewport, identifyDevice, applyUrlViewMode, chooseViewMode, reportLayout,
+  measureViewport,
+  identifyDevice,
+  applyUrlViewMode,
+  chooseViewMode,
+  reportLayout,
 } from "./app-screen.js";
 import {
-  buildPanes, drawMessages, drawVotes, rebuildTranscripts, wirePaneControls,
+  buildPanes,
+  drawMessages,
+  drawVotes,
+  rebuildTranscripts,
+  wirePaneControls,
 } from "./app-transcript.js";
 import {
-  drawControls, drawSeats, drawMode, drawAttachments, drawContext, drawResearch, drawIdentity,
+  drawControls,
+  drawSeats,
+  drawMode,
+  drawAttachments,
+  drawContext,
+  drawResearch,
+  drawIdentity,
 } from "./app-controls.js";
 import { currentMode, refreshLineup } from "./app-lineup.js";
 import {
-  run, send, save, saveIdentity, setMode, setDepth, addFiles, refreshKept,
+  run,
+  send,
+  save,
+  saveIdentity,
+  setMode,
+  setDepth,
+  addFiles,
+  refreshKept,
 } from "./app-commands.js";
 
 // ── The reply being written ────────────────────────────────────────────────────────
@@ -102,7 +123,10 @@ const liveReply = (() => {
         const live = liveFor(seat.id);
         const existing = document.querySelector(`.msg.live[data-seat-id="${cssEscape(seat.id)}"]`);
         const active = live && (live.isGenerating || live.text || live.reasoning);
-        if (!active) { existing?.remove(); continue; }
+        if (!active) {
+          existing?.remove();
+          continue;
+        }
         const el = existing ?? createLiveElement(seat.id, seat.name, -1);
         $("thread").append(el);
         updateLiveElement(el, live);
@@ -117,7 +141,10 @@ const liveReply = (() => {
       const live = liveFor(seat.id);
       const existing = pane.transcript.querySelector(".msg.live");
       const active = live && (live.isGenerating || live.text || live.reasoning);
-      if (!active) { existing?.remove(); continue; }
+      if (!active) {
+        existing?.remove();
+        continue;
+      }
       const el = existing ?? createLiveElement(seat.id, seat.name, index);
       pane.transcript.append(el);
       updateLiveElement(el, live);
@@ -186,7 +213,9 @@ function listen() {
   if (isCapture) return;
   const source = new EventSource("/api/events");
   source.addEventListener("snapshot", (event) => apply(JSON.parse(event.data)));
-  source.addEventListener("turn", () => { /* the following snapshot carries it */ });
+  source.addEventListener("turn", () => {
+    /* the following snapshot carries it */
+  });
   // The engine's own per-token events. Listening only for `snapshot` meant a reply appeared in one
   // piece when the turn ended, so a long research turn looked frozen while it was working while
   // the engine was publishing the words as it wrote them. `applyDelta` merges a fragment
@@ -215,8 +244,10 @@ async function startConversation() {
 
 function wire() {
   $("start").onclick = () => startConversation();
-  $("pause").onclick = () => run(() =>
-    api.post(state.snapshot && state.snapshot.status === "Paused" ? "/api/resume" : "/api/pause"));
+  $("pause").onclick = () =>
+    run(() =>
+      api.post(state.snapshot && state.snapshot.status === "Paused" ? "/api/resume" : "/api/pause")
+    );
   $("stop").onclick = () => run(() => api.post("/api/stop"));
   $("clear").onclick = () => run(() => api.post("/api/reset"));
   $("condense").onclick = () => run(() => api.post("/api/compact"));
@@ -258,17 +289,23 @@ function wire() {
   $("depth-quick").onclick = () => setDepth("quick");
   $("depth-standard").onclick = () => setDepth("standard");
   $("depth-deep").onclick = () => setDepth("deep");
-  $("report-close").onclick = () => { $("report-panel").hidden = true; };
+  $("report-close").onclick = () => {
+    $("report-panel").hidden = true;
+  };
   $("kept").onclick = () => {
     $("kept-panel").hidden = false;
     refreshKept();
   };
-  $("kept-close").onclick = () => { $("kept-panel").hidden = true; };
+  $("kept-close").onclick = () => {
+    $("kept-panel").hidden = true;
+  };
   $("lineup").onclick = () => {
     $("lineup-panel").hidden = false;
     refreshLineup();
   };
-  $("lineup-close").onclick = () => { $("lineup-panel").hidden = true; };
+  $("lineup-close").onclick = () => {
+    $("lineup-panel").hidden = true;
+  };
   $("lineup-surprise").onclick = async () => {
     // A scenario rather than a line-up: it sets the question as well, which is the point of
     // asking to be surprised.
@@ -299,8 +336,11 @@ function wire() {
     const blob = new Blob([report.markdown], { type: "text/markdown;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    const slug = (report.question || "report").replace(/[^a-zA-Z0-9 ]/g, "").trim()
-      .replace(/\s+/g, "-").slice(0, 60);
+    const slug = (report.question || "report")
+      .replace(/[^a-zA-Z0-9 ]/g, "")
+      .trim()
+      .replace(/\s+/g, "-")
+      .slice(0, 60);
     a.download = `ChatBots report ${slug}.md`;
     a.click();
     URL.revokeObjectURL(a.href);
@@ -317,20 +357,30 @@ function wire() {
   // at start-up. Attaching then only ever saw #thread — which the split layout hides — so
   // `state.follow` was never set to false and every streaming delta pulled the pane to the
   // bottom, making it impossible to read back while a reply arrived.
-  document.addEventListener("scroll", (event) => {
-    const container = event.target;
-    const isTranscript =
-      container === $("thread") ||
-      (container.classList && container.classList.contains("transcript"));
-    if (!isTranscript) return;
-    const distance = container.scrollHeight - container.scrollTop - container.clientHeight;
-    state.follow = distance < 40;
-  }, { capture: true, passive: true });
+  document.addEventListener(
+    "scroll",
+    (event) => {
+      const container = event.target;
+      const isTranscript =
+        container === $("thread") ||
+        (container.classList && container.classList.contains("transcript"));
+      if (!isTranscript) return;
+      const distance = container.scrollHeight - container.scrollTop - container.clientHeight;
+      state.follow = distance < 40;
+    },
+    { capture: true, passive: true }
+  );
 
   window.addEventListener("keydown", (event) => {
     if (event.metaKey || event.ctrlKey) {
-      if (event.key === "s") { event.preventDefault(); save(); }
-      if (event.key === "Enter") { event.preventDefault(); $("start").click(); }
+      if (event.key === "s") {
+        event.preventDefault();
+        save();
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        $("start").click();
+      }
     }
   });
 
@@ -347,7 +397,9 @@ function wire() {
   // Keep the message box visible when the keyboard opens on a phone, which otherwise
   // pushes the footer under it.
   $("message").addEventListener("focus", () => {
-    setTimeout(() => { if (state.follow) liveReply.scrollToBottom(); }, 250);
+    setTimeout(() => {
+      if (state.follow) liveReply.scrollToBottom();
+    }, 250);
   });
 }
 
@@ -357,6 +409,9 @@ function wire() {
 applyUrlViewMode();
 measureViewport();
 wire();
-api.get("/api/state").then(apply).catch((error) => toast(error.message));
+api
+  .get("/api/state")
+  .then(apply)
+  .catch((error) => toast(error.message));
 identifyDevice().then(() => reportLayout());
 listen();

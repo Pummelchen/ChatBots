@@ -5,7 +5,17 @@
 // exception — it is updated in place, and it lives in `app.js` with the other live drawing.
 
 import {
-  $, api, state, containers, panes, seatIndexOf, formatTime, bodyHTML, labelFor, voteFor, toast,
+  $,
+  api,
+  state,
+  containers,
+  panes,
+  seatIndexOf,
+  formatTime,
+  bodyHTML,
+  labelFor,
+  voteFor,
+  toast,
 } from "./app-core.js";
 import { run } from "./app-commands.js";
 
@@ -134,7 +144,10 @@ export function wirePaneControls() {
     button.dataset.wired = "1";
     button.addEventListener("dblclick", () => startRename(button));
     button.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") { event.preventDefault(); startRename(button); }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        startRename(button);
+      }
     });
   }
 }
@@ -167,8 +180,14 @@ function startRename(button) {
   };
   const onBlur = () => finish(true);
   const onKey = (event) => {
-    if (event.key === "Enter") { event.preventDefault(); finish(true); }
-    if (event.key === "Escape") { event.preventDefault(); finish(false); }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      finish(true);
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      finish(false);
+    }
   };
   button.addEventListener("blur", onBlur);
   button.addEventListener("keydown", onKey);
@@ -187,8 +206,11 @@ export function drawMessages() {
 
   for (const message of state.snapshot.messages) {
     const seat = seatIndexOf(message);
-    const shared = message.kind === "steering" || message.kind === "topic" ||
-                   message.kind === "summary" || message.kind === "direction";
+    const shared =
+      message.kind === "steering" ||
+      message.kind === "topic" ||
+      message.kind === "summary" ||
+      message.kind === "direction";
 
     // The single-column view holds everything once.
     if (inThread) {
@@ -221,9 +243,10 @@ function trimEmptyNotes() {
     if (!has && !note) {
       const empty = document.createElement("div");
       empty.className = "empty";
-      empty.textContent = document.body.dataset.layout === "thread"
-        ? "Nothing yet. Set a topic and press Start."
-        : "Nothing yet.";
+      empty.textContent =
+        document.body.dataset.layout === "thread"
+          ? "Nothing yet. Set a topic and press Start."
+          : "Nothing yet.";
       container.append(empty);
     }
   }

@@ -29,9 +29,15 @@ export function drawControls() {
 
   const pill = $("status");
   pill.textContent = s.status;
-  pill.className = "pill" +
-    (s.isRunning ? " running" : s.status === "Paused" ? " paused" :
-     String(s.status).startsWith("Failed") ? " failed" : "");
+  pill.className =
+    "pill" +
+    (s.isRunning
+      ? " running"
+      : s.status === "Paused"
+        ? " paused"
+        : String(s.status).startsWith("Failed")
+          ? " failed"
+          : "");
   $("counts").textContent = `${s.turnsCompleted} turn${s.turnsCompleted === 1 ? "" : "s"}`;
   if (s.error) toast(s.error);
 }
@@ -46,9 +52,9 @@ function drawAudience() {
     return;
   }
   el.hidden = false;
-  el.textContent = "Audience: " + entries
-    .map((entry) => `${entry.name} ${entry.score > 0 ? "+" : ""}${entry.score}`)
-    .join(" · ");
+  el.textContent =
+    "Audience: " +
+    entries.map((entry) => `${entry.name} ${entry.score > 0 ? "+" : ""}${entry.score}`).join(" · ");
 }
 
 /**
@@ -113,7 +119,9 @@ async function openPersonaPicker(seatIndex) {
   }
 
   sheet.querySelector("[data-close]").onclick = () => sheet.remove();
-  sheet.onclick = (event) => { if (event.target === sheet) sheet.remove(); };
+  sheet.onclick = (event) => {
+    if (event.target === sheet) sheet.remove();
+  };
   document.body.append(sheet);
 }
 
@@ -147,7 +155,9 @@ export function drawSeats() {
       picker.dataset.wiredPersona = picker.dataset.wiredPersona || "0";
       if (picker.dataset.wiredPersona !== "1") {
         picker.dataset.wiredPersona = "1";
-        picker.addEventListener("click", () => openPersonaPicker(Number(picker.dataset.personaSeat)));
+        picker.addEventListener("click", () =>
+          openPersonaPicker(Number(picker.dataset.personaSeat))
+        );
       }
     }
 
@@ -176,7 +186,8 @@ export function drawSeats() {
       if (modelPicker.dataset.wiredModel !== "1") {
         modelPicker.dataset.wiredModel = "1";
         modelPicker.addEventListener("change", () =>
-          run(() => api.post("/api/seat", { seat: seat.id, modelID: modelPicker.value })));
+          run(() => api.post("/api/seat", { seat: seat.id, modelID: modelPicker.value }))
+        );
       }
     }
 
@@ -184,13 +195,15 @@ export function drawSeats() {
     const busy = live && live.isGenerating;
     const stateEl = pane.root.querySelector(".state");
     stateEl.className = "state" + (busy ? " live" : "");
-    stateEl.textContent = busy ? (live.activity || "thinking…") : "ready";
+    stateEl.textContent = busy ? live.activity || "thinking…" : "ready";
     pane.root.querySelector(".params").textContent =
       `temp ${seat.temperature.toFixed(2)} · top-p ${seat.topP.toFixed(2)} · top-k ${seat.topK} · ` +
       `min-p ${seat.minP.toFixed(1)} · pres ${Math.abs(seat.presencePenalty ?? 0).toFixed(1)} · ` +
       `max ${Math.round(seat.maxTokens / 1024)}k${seat.webSearch ? " · web" : ""}`;
   }
-  $("persona-summary").textContent = s.seats.map((x) => `${x.name}: ${x.personaName}`).join("  ↔  ");
+  $("persona-summary").textContent = s.seats
+    .map((x) => `${x.name}: ${x.personaName}`)
+    .join("  ↔  ");
 
   const note = $("vision-note");
   if (s.imagesAllowed) {
@@ -223,8 +236,11 @@ export function drawAttachments() {
     remove.setAttribute("aria-label", `Remove ${doc.name}`);
     remove.disabled = !state.snapshot.canAttach;
     remove.onclick = async () => {
-      try { apply(await api.post("/api/attachments/remove", { value: doc.id })); }
-      catch (error) { toast(error.message); }
+      try {
+        apply(await api.post("/api/attachments/remove", { value: doc.id }));
+      } catch (error) {
+        toast(error.message);
+      }
     };
     chip.append(name, detail, remove);
     chips.append(chip);
@@ -248,8 +264,11 @@ export function drawResearch() {
   $("research-progress").textContent = research.statusLine;
   // The budget is only settable before the run, so the controls disable with it.
   const locked = !s.canAttach;
-  for (const [id, depth] of [["depth-quick", "quick"], ["depth-standard", "standard"],
-                             ["depth-deep", "deep"]]) {
+  for (const [id, depth] of [
+    ["depth-quick", "quick"],
+    ["depth-standard", "standard"],
+    ["depth-deep", "deep"],
+  ]) {
     const button = $(id);
     button.disabled = locked;
     button.classList.toggle("on", research.depth.toLowerCase() === depth);
@@ -279,19 +298,38 @@ function markdownToHTML(markdown) {
   const lines = escape(markdown).split("\n");
   let out = "";
   let inList = false;
-  const closeList = () => { if (inList) { out += "</ul>"; inList = false; } };
+  const closeList = () => {
+    if (inList) {
+      out += "</ul>";
+      inList = false;
+    }
+  };
 
   for (const raw of lines) {
     const line = raw.trimEnd();
-    if (line.startsWith("## ")) { closeList(); out += `<h2>${line.slice(3)}</h2>`; continue; }
-    if (line.startsWith("# ")) { closeList(); out += `<h1>${line.slice(2)}</h1>`; continue; }
+    if (line.startsWith("## ")) {
+      closeList();
+      out += `<h2>${line.slice(3)}</h2>`;
+      continue;
+    }
+    if (line.startsWith("# ")) {
+      closeList();
+      out += `<h1>${line.slice(2)}</h1>`;
+      continue;
+    }
     if (line.startsWith("- ") || line.startsWith("* ")) {
-      if (!inList) { out += "<ul>"; inList = true; }
+      if (!inList) {
+        out += "<ul>";
+        inList = true;
+      }
       out += `<li>${line.slice(2).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")}</li>`;
       continue;
     }
     closeList();
-    if (line === "---") { out += "<hr>"; continue; }
+    if (line === "---") {
+      out += "<hr>";
+      continue;
+    }
     if (line.trim() === "") continue;
     out += `<p>${line.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")}</p>`;
   }
@@ -338,7 +376,11 @@ export function drawIdentity() {
   }
   // The engine reports the display name; the select needs the identifier.
   const style = s.availablePersonas.find((p) => p.name === s.moderatorPersona);
-  const identifier = s.moderatorPersona.startsWith("Neutral") ? "neutral" : (style ? style.id : "neutral");
+  const identifier = s.moderatorPersona.startsWith("Neutral")
+    ? "neutral"
+    : style
+      ? style.id
+      : "neutral";
   if (document.activeElement !== select) select.value = identifier;
 
   if (document.activeElement !== $("mod-name")) {

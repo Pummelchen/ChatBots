@@ -46,9 +46,7 @@ export async function refreshKept() {
     toast(error.message);
     return;
   }
-  $("kept-meta").textContent = list.length
-    ? `${list.length} kept`
-    : "";
+  $("kept-meta").textContent = list.length ? `${list.length} kept` : "";
 
   if (!list.length) {
     const empty = document.createElement("div");
@@ -115,9 +113,8 @@ export async function refreshKept() {
       // receiving the link needs. The snapshot's value is the fallback for an origin that is not
       // a usable base (`file:` pages report "null").
       const origin = window.location.origin;
-      const base = origin && origin !== "null"
-        ? origin
-        : (state.snapshot && state.snapshot.shareBase);
+      const base =
+        origin && origin !== "null" ? origin : state.snapshot && state.snapshot.shareBase;
       const url = `${base}/s/${item.id}`;
       try {
         await navigator.clipboard.writeText(url);
@@ -138,10 +135,12 @@ export async function refreshKept() {
 // ── Who the moderator is ─────────────────────────────────────────────────────────
 
 export function saveIdentity() {
-  run(() => api.post("/api/moderator", {
-    name: $("mod-name").value.trim() || "Moderator",
-    personaID: $("mod-persona").value,
-  }));
+  run(() =>
+    api.post("/api/moderator", {
+      name: $("mod-name").value.trim() || "Moderator",
+      personaID: $("mod-persona").value,
+    })
+  );
 }
 
 // ── Mode and the research budget ─────────────────────────────────────────────────
@@ -203,10 +202,12 @@ export async function addFiles(files) {
       for (let i = 0; i < bytes.length; i += chunk) {
         binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
       }
-      apply(await api.post("/api/attachments", {
-        filename: file.name,
-        content: btoa(binary),
-      }));
+      apply(
+        await api.post("/api/attachments", {
+          filename: file.name,
+          content: btoa(binary),
+        })
+      );
       toast(`Added ${file.name}`, true);
     } catch (error) {
       toast(`${file.name}: ${error.message}`);
@@ -223,8 +224,10 @@ export function save() {
   const pad = (n) => String(n).padStart(2, "0");
   const stamp = (iso) => {
     const d = new Date(iso);
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
-           `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    return (
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+      `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+    );
   };
   const now = new Date();
   let out = "ChatBots — conversation log\n";
@@ -234,12 +237,19 @@ export function save() {
   for (const message of s.messages) {
     if (message.kind === "introduction") continue;
     out += `\n[${stamp(message.timestamp)}] ${labelFor(message)}\n`;
-    out += message.text.split("\n").map((line) => "    " + line).join("\n") + "\n";
+    out +=
+      message.text
+        .split("\n")
+        .map((line) => "    " + line)
+        .join("\n") + "\n";
   }
   const blob = new Blob([out], { type: "text/plain;charset=utf-8" });
   const a = document.createElement("a");
-  const slug = (s.topic || "conversation").replace(/[^a-zA-Z0-9 ]/g, "").trim()
-    .replace(/\s+/g, "-").slice(0, 60);
+  const slug = (s.topic || "conversation")
+    .replace(/[^a-zA-Z0-9 ]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .slice(0, 60);
   a.href = URL.createObjectURL(blob);
   a.download = `ChatBots ${slug} ${stamp(now).replace(/:/g, "-")}.txt`;
   a.click();

@@ -45,6 +45,10 @@ ChatBots.wiki/
 __pycache__/
 *.py[cod]
 
+# The JavaScript toolchain's installed packages. `package.json` and `package-lock.json` are the
+# pin; `node_modules/` is the product of `npm ci` and is rebuilt, never committed.
+node_modules/
+
 # `swift test --enable-code-coverage` makes every product in that build instrumented, so running one
 # by hand — `chatbots-cli --check --model-a …`, which is how a checkpoint is verified — writes this
 # profile into the working directory. It is build output, not evidence: the coverage this repository

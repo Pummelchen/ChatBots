@@ -30,7 +30,7 @@ and every subsequent `swift build`/`swift test`/sanitizer run are serialized del
 | Swift | swift-format 603.0.0 | SwiftLint 0.65.1 | osv-scanner 2.6.0 | swiftc 6.4 (Swift 6 language mode) | semgrep 1.176.0 | ThreadSanitizer via `swift test --sanitize=thread` |
 | Python (`tools/`) | ruff format 0.16.7 | ruff check 0.16.7 | pip-audit (only if a requirements/lock file exists — none does) | (dropped per brief for Python) | semgrep 1.176.0 | n/a |
 | Shell (`tools/`, `*.sh`) | (see JS/shell note) | shellcheck 0.11.0 (`-S style`) | n/a | bash -n | semgrep 1.176.0 | n/a |
-| JavaScript (`web/`) | prettier (see JS note) | eslint (see JS note) | no manifest / no dependencies | n/a | semgrep 1.176.0 | n/a |
+| JavaScript (`web/`) | prettier 3.9.8 | eslint 10.10.0 | no manifest dependencies / no third-party packages | n/a | semgrep 1.176.0 | n/a |
 | C | — | — | — | — | — | — |
 
 Install method for every tool: Homebrew on the primary host, except the three release
@@ -48,9 +48,12 @@ ruff 0.16.7
 pyright 1.1.414
 semgrep 1.176.0
 gitleaks 8.30.1
-osv-scanner 2.6.0        # local; tools/toolchain-versions.txt pins 2.5.1 — see AUDIT-0002
+osv-scanner 2.6.0        # local Homebrew; tools/toolchain-versions.txt pins the CI binary at 2.5.1
 shellcheck 0.11.0
 node v26.8.2
+eslint 10.10.0           # from package-lock.json via `npm ci`
+prettier 3.9.8           # from package-lock.json via `npm ci`
+globals 17.12.0          # eslint's browser/node global tables, same lockfile
 python3 3.14.7
 jq 1.8.2
 bash 5.3.20(1)

@@ -28,12 +28,19 @@ Provenance is `brew list --versions …` unless stated.
 | `ruff` | 0.16.7 | Python lint and format check |
 | `pyright` | 1.1.414 | Python type check |
 | `shellcheck` | 0.11.0 | shell lint |
+| `eslint` | 10.10.0 | JavaScript lint (pinned by `package-lock.json`, installed with `npm ci`) |
+| `prettier` | 3.9.8 | JavaScript, HTML and CSS format check (same lockfile) |
+| Node.js | 26 | runs `tools/check-web-*.js` and the JavaScript toolchain |
 | Python | 3.14 | runs `tools/*.py` |
 | `jq` | 1.8 | parsing scanner output |
 
 `swiftlint` and `swift-format` have a recorded residual rather than a zero target, explained by rule in
 `.swiftlint.yml` and `.swift-format` and capped in `tools/analysis-waivers.txt` — the file both gates
 read. The semgrep findings this project accepts are in the same file.
+
+The JavaScript toolchain is installed with `npm ci` from the committed `package-lock.json`; the
+lockfile is the pin. `tools/mac-checks.sh` and CI both fail when it has not been installed rather than
+skipping the gate, because a gate that silently does nothing is not a gate.
 
 ## Reproducing it
 

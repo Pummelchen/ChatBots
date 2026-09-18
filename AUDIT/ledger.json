@@ -517,13 +517,13 @@
     "file_line": "web/",
     "title": "JavaScript has no committed formatter or linter and no pinned toolchain",
     "category": "tooling/standard",
-    "status": "OPEN",
+    "status": "DONE",
     "host": "Node1.local",
     "discovered_by": "human",
-    "evidence_before": "web/ holds 11 browser-facing JS modules on the LAN-served page and there is no package.json, no eslint/prettier config and no npm dependency scanner. The only JS checks are the two hand-written behavioural rules in tools/check-web-deltas.js and tools/check-web-votes.js; nothing checks syntax, escaping or unused bindings across the other nine modules.",
-    "fix_summary": "",
-    "evidence_after": "",
-    "commit": "",
+    "evidence_before": "No package.json, no eslint/prettier config, no lockfile; the only JavaScript checks were the two hand-written behavioural rules in tools/check-web-*.js (baseline in AUDIT/baseline.md).",
+    "fix_summary": "Added a pinned JavaScript toolchain: package.json + package-lock.json (eslint 10.10.0, prettier 3.9.8, globals 17.12.0), an eslint.config.mjs with separate browser-module, classic-script and CommonJS blocks, and .prettierrc.json. Ran the Prettier sweep over the JavaScript (the CSS and HTML are left hand-formatted: Prettier's CSS printer puts every declaration on its own line, which pushed web/style-panes.css from 377 to 547 lines and broke the 500-line rule) and regenerated WebAssets.swift. Wired a new ninth gate into tools/mac-checks.sh (a missing `npm ci` is a failure, not a skip) and the same eslint/prettier steps into CI's static-analysis job. Documented in docs/toolchain.md and AUDIT/environment.md.",
+    "evidence_after": "`eslint web tools/check-web-*.js` clean, `prettier --check web/*.js tools/check-web-*.js` clean, both Node web rules pass, and all 9 Mac-only gates pass (AUDIT/evidence-batch12-mac-checks.log): 1074 tests, swiftlint 215/217, swift-format 439/444, no file over 500 lines.",
+    "commit": "audit(AUDIT-0031): a pinned formatter and linter for the JavaScript",
     "blocked_reason": ""
   },
   {
@@ -1197,14 +1197,14 @@
     "file_line": "Sources/ChatBotsCore/HTTP/APIServer.swift:83-90",
     "title": "The same-origin check compares Origin against Host/X-Forwarded-Host, so DNS rebinding defeats it",
     "category": "authz",
-    "status": "OPEN",
+    "status": "BLOCKED",
     "host": "Node1.local",
     "discovered_by": "subagent-http",
     "evidence_before": "`originHost == addressedHost` compares two names the browser derives from the URL it fetched. A page served at http://evil.example:7788 that DNS-rebinds to the Mac sends Origin evil.example and X-Forwarded-Host evil.example (Caddy sets it from the original Host; the Caddyfile carries no host so any Host is served), so a same-origin POST is accepted and Sec-Fetch-Site is same-origin. Chrome Private Network Access may block public-to-private fetches; Safari and Firefox do not implement it.",
     "fix_summary": "",
     "evidence_after": "",
     "commit": "",
-    "blocked_reason": ""
+    "blocked_reason": "OWNER: repository owner (Pummelchen). REASON: the same-origin check compares Origin against Host/X-Forwarded-Host, which a DNS-rebinding page satisfies because both are the attacker's own name; the defense needs either authentication (AUDIT-0018's decision) or a Host allow-list of the names this deployment is legitimately served under, and the latter is not derivable without owner input \u2014 Caddy serves any Host, and a legitimate remote-access name (a VPN name, say) must not be broken. TRIED: read APIServer.crossOriginRefusal, the Caddyfile and tools/start.sh; confirmed the equality check and the application/json requirement, and that Sec-Fetch-Site is same-origin after a rebind. OPTIONS FOR A HUMAN: (1) resolve AUDIT-0018 by adding authentication, which subsumes this; (2) configure an explicit Host allow-list (loopback/LAN IPs, .local names, plus any owner-named remote host) and refuse others; (3) accept the risk explicitly as part of the LAN-trust sign-off."
   },
   {
     "id": "AUDIT-0072",

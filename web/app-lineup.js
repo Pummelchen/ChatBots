@@ -79,23 +79,27 @@ export async function refreshLineup() {
   });
   body.append(random);
   for (const roster of rosters) {
-    body.append(lineupRow({
-      title: roster.name,
-      note: roster.summary,
-      who: roster.personaIDs.join(" · "),
-      path: "/api/roster",
-      body: { id: roster.id },
-    }));
+    body.append(
+      lineupRow({
+        title: roster.name,
+        note: roster.summary,
+        who: roster.personaIDs.join(" · "),
+        path: "/api/roster",
+        body: { id: roster.id },
+      })
+    );
   }
 
   body.append(heading("Scenarios"));
   for (const scenario of scenarios) {
-    body.append(lineupRow({
-      title: scenario.topic,
-      note: scenario.note,
-      who: scenario.depth ? `budget: ${scenario.depth}` : "",
-      path: "/api/scenario",
-      body: { id: scenario.id },
-    }));
+    body.append(
+      lineupRow({
+        title: scenario.topic,
+        note: scenario.note,
+        who: scenario.depth ? `budget: ${scenario.depth}` : "",
+        path: "/api/scenario",
+        body: { id: scenario.id },
+      })
+    );
   }
 }
