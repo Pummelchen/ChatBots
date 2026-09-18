@@ -1,73 +1,34 @@
-# Audit status — resume point
+# The audit, and where its record is
 
-Read `AUDIT/ledger.json` first: it is the single source of truth. `AUDIT/ledger.md` is the
-open-work tracker rendered from it, and it is the file to read for what is left. This note is
-only the orientation a resumed run needs, so it does not repeat either.
+The September 2026 pre-production audit is **closed**. Every finding it raised is either fixed or
+accepted by the owner, and there is no open work here — open work lives in exactly one place, the
+[Project Tracker](https://github.com/Pummelchen/ChatBots/wiki/Project-Tracker), per
+[`docs/task-table-standard.md`](../docs/task-table-standard.md).
 
-## Where the run is
+This file used to be a resume point for a run in progress, with a rendered open-work table beside it
+in `AUDIT/ledger.md`. Both are gone: the tracker is the wiki page now, and a second table in the
+repository contradicted the standard. What is left in this directory is the **record**, not a
+backlog:
 
-- **Phase A — complete and committed** (`fb3cfc3`): inventory and tier table, environment and
-  language-standard proofs, baseline, ledger opened.
-- **Phase B/C — drained except one S2.** All discovery passes have run (L0-L7 plus the facade
-  sweep); every S0, S1 and S3 is closed. `AUDIT-0029` is the last open task.
-- **Phase D — DONE (AUDIT-0104).** Every scanner CI runs was run by hand over the frozen tree; two gates
-  were red and are fixed (AUDIT-0106 ruff format, AUDIT-0107 the shellcheck probe).
-- **Phase E — DONE (AUDIT-0105).** Verified on `MacBook-AB.local`, an independent host with the same
-  pinned tools: all nine gates passed on the same commit with the same 1086 tests.
+- **`AUDIT/ledger.json`** — the single source of truth. 107 findings, each with the defect as it was
+  found (`evidence_before`), what was done (`fix_summary`), what now proves it (`evidence_after`),
+  the closing commit, and for the accepted ones the owner's decision. Read this first.
+- **`AUDIT/evidence-*.log`** and **`AUDIT/evidence-*-host.md`** — the raw output behind those claims:
+  per-batch gate runs, the Phase D convergence sweep, the session token watched working against a
+  live engine, and the independent-host verification.
+- **`AUDIT/tool-coverage.md`** — the proof that each configured check is in force, probe by probe.
+- **`AUDIT/probes/`** — the deliberately-broken inputs those proofs use.
 
-## Ledger state at the last commit
+## How it ended
 
-`done: 103, open: 0, blocked: 4` — S0 0, S1 0, S2 0, S3 0. Every task is DONE or
-BLOCKED-with-owner. The four awaiting a decision are the security findings
-(AUDIT-0018, 0058, 0071, 0077).
+Four phases, all closed. The findings were drained in severity order S0→S1→S2→S3; the convergence
+sweep then re-ran every scanner CI runs and found two gates already red, which are fixed; and the
+final gate run was repeated on an independent host at the same commit with the same 1102 tests.
 
-The closure invariant holds: the non-terminal count fell at every milestone report, from 96 at
-the start to 1 now.
-
-## The one open task: AUDIT-0029, now only AUDIT-0099
-
-Replace the recorded waivers in `tools/analysis-waivers.txt` with `--strict`. It was split on the
-record — not narrowed — into:
-
-- **AUDIT-0097** (DONE): `force_unwrapping` enabled in `.swiftlint.yml` and its 32 sites removed.
-  The waivers were tightened with it, from 217/444 to 208/307.
-- **AUDIT-0098** (DONE): `line_length` — all 88 lines wrapped.
-- **AUDIT-0099** the only thing left. SwiftLint is down to 13 findings from 32 at the round's
-  start: the CLI/probe and the HTTP/OpenAI/Engine groups are done. A final pass covers the rest —
-  Conversation (`ConflictState.apply` 22, `ConflictReader`), Research (`ResearchReading.read` 17),
-  Room (`SocialPersonas` 14), Transport (`TransportCheck.run` 18, `WebTransportClientReader` 18 and
-  13, `WebTransportServerSession` 14) and App (`ChatController` 15, `APIEndpointsSheet`). Then
-  AUDIT-0102 switches both gates to `--strict` and deletes the waiver counts.
-- **AUDIT-0100** (DONE): the mechanical rule classes.
-- **AUDIT-0101** (DONE): the swift-format sweep — 444 → 0.
-- **AUDIT-0102** switch both gates to `--strict`, delete the two waiver counts, and delete the
-  waiver file if nothing else needs it.
-
-Reconfiguring a threshold to pass would be a §0 violation, so these are real edits or real
-refactors, not a waiver bump.
-
-## Awaiting an owner decision (4)
-
-`AUDIT-0018`, `AUDIT-0058`, `AUDIT-0071` and `AUDIT-0077` — the LAN-trust model, the engine's
-identity on 7790, DNS rebinding, and the default Caddy bind. Each carries its owner, the
-situation and the options in `AUDIT/ledger.md` and in the JSON.
-
-## Phase E is blocked on a second host
-
-The brief requires the final verification on **one independent host**. Only `Node1.local` exists,
-and a Swift 6.4 / macOS 26 Apple-Silicon host cannot be provisioned without asking; no VPS meets
-the floor. **Owner: the repository owner.** Options: (a) provide a second Mac with Xcode 27 and
-authorise a fresh-clone `tools/mac-checks.sh` there; (b) accept a signed waiver that Phase E is
-verified on the primary host only, recorded in the ledger.
-
-## Conventions in force
-
-- Branch `audit/2026-09-18` only; no force-push, no history rewrite.
-- `bash tools/mac-checks.sh` is the gate after every batch — **9 gates**, including eslint and
-  prettier (`npm ci` first). Metrics must not regress: both style gates run `--strict` against zero (SwiftLint 0, swift-format 0);
-no waiver caps remain. Previously:
-  swift-format ≤ 2 (measured 0), no file over 500 lines.
-- Every fix carries before/after evidence in `AUDIT/evidence-*.log`, and the closed record —
-  what was found, what was changed, which commit — is in `AUDIT/ledger.json`.
-- `python3 tools/embed-web.py` must be re-run whenever `web/` changes.
-- Nothing is closed by narrowing scope; new findings get a new id immediately.
+Four findings were **accepted rather than fixed** by the owner on 2026-09-18 — the unauthenticated
+`/api` surface reachable from the LAN, the every-interface plaintext default, the DNS-rebinding gap
+in the same-origin check, and the limits of the session token added for the fourth. They are stated
+for users in `SECURITY.md`, in the 1.1 release notes and in the wiki's
+[Accepted limits](https://github.com/Pummelchen/ChatBots/wiki/Accepted-Limits); the options that were
+declined are recorded in [`CHANGELOG.md`](../CHANGELOG.md) rather than here, because history does not
+live in the tracker.
