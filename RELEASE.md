@@ -235,6 +235,18 @@ Leave previous releases' notes and performance tables alone.
   signing only), a Swift job in CI (deliberate), semgrep's rule set (fetched at scan time),
   ThreadSanitizer (named as a check but never run in this audit) and a Python dependency audit
   (there is no requirements or lock file to scan).
+- **The third release**, `1.2`, was published on 2026-09-19 from `56a009e` (tag `v1.2`,
+  https://github.com/Pummelchen/ChatBots/releases/tag/v1.2):
+  `ChatBots-1.2-macos-arm64.tar.gz`, 63,117,866 bytes, sha256
+  `9be43f9209cae3a27e5a77abdfb2b1004614d5c48e5c186cd9f1f0e58763abdd`, with its `.sha256` beside
+  it. §1.9 was checked by downloading both assets again and verifying the digest, and the now
+  existing `CHANGELOG.md` points at this tag. **It ships no code change**: no file under `Sources`,
+  `Tests`, `web`, `tools` or `names` differs from 1.1, so its archive is the same program rebuilt,
+  and the independent-host verification recorded for 1.1 still describes it. The release exists to
+  carry the repository's own process work — the changelog this record lives beside, the task-table
+  standard, and the removal of a second open-work table that contradicted it. The dry run's archive
+  differed from the published one by 31 bytes, which is the rebuild §1.8 warns about; only the
+  published digest is quoted here.
 - **Code scanning** runs CodeQL **default setup** — there is no `codeql.yml` here —
   and AI Scan for pull requests is disabled. The Autofind job asks
   `api.individual.githubcopilot.com` for a model an individual Copilot plan does not

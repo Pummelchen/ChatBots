@@ -7,6 +7,19 @@ each release is in its notes, linked below; this file is the index and the recor
 [Project Tracker](https://github.com/Pummelchen/ChatBots/wiki/Project-Tracker), and what was tried,
 measured, accepted or rejected lives here and in the closing commit.
 
+## 1.2 — 2026-09-19
+
+Tag [`v1.2`](https://github.com/Pummelchen/ChatBots/releases/tag/v1.2) from `56a009e`.
+`ChatBots-1.2-macos-arm64.tar.gz`, 63,117,866 bytes, sha256
+`9be43f9209cae3a27e5a77abdfb2b1004614d5c48e5c186cd9f1f0e58763abdd`.
+Full notes: [docs/release-notes-v1.2.md](docs/release-notes-v1.2.md).
+
+**No product code changed.** This is a repository-process release — not one source file differs from
+1.1, and the notes say so rather than implying a delta. What it carries is how the repository keeps
+its own record: this `CHANGELOG.md`, which `AGENTS.md` and `RELEASE.md` both already required; one
+written standard for the task tracker, with open work in exactly one place; and the removal of the
+audit's second table, which contradicted it. Nothing here is a reason to upgrade from 1.1.
+
 ## 1.1 — 2026-09-18
 
 Tag [`v1.1`](https://github.com/Pummelchen/ChatBots/releases/tag/v1.1) from `9dffd25`.
