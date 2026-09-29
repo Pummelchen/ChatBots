@@ -199,4 +199,24 @@ struct StreamPacerTests {
         _ = pool.drain(elapsed: 10)
         #expect(!pool.isDraining)
     }
+
+    @Test("drainAll releases everything at once, which is what instant streaming asks for")
+    func drainAllReleasesEverything() {
+        let text = "a whole reply that the paced reveal would hold back"
+
+        let paced = StreamPacerPool()
+        paced.enqueue(text, agentID: "Agent 1", channel: .answer)
+        // One hundredth of a second at the paced rate releases nothing yet: that is the pacing doing
+        // its job, and the reason the instant mode needs a call of its own rather than a bigger tick.
+        #expect(paced.drain(elapsed: 0.01).isEmpty)
+
+        let instant = StreamPacerPool()
+        instant.enqueue(text, agentID: "Agent 1", channel: .answer)
+        let released = instant.drainAll()
+
+        #expect(released.count == 1)
+        #expect(released.first?.text == text)
+        #expect(instant.backlog(agentID: "Agent 1") == 0, "nothing is left waiting")
+        #expect(!instant.isDraining)
+    }
 }

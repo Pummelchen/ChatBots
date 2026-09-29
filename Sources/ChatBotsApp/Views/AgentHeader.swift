@@ -320,9 +320,12 @@ struct ModelControl: View {
             .pickerStyle(.inline)
         } label: {
             HStack(spacing: 4) {
-                Image(systemName: "brain")
+                // The seat's own label, which is the API model's name when the seat is on the API
+                // backend and the checkpoint's when it is local. This read `modelShortName`, so a
+                // seat running DeepSeek advertised the local checkpoint beside it instead.
+                Image(systemName: spec.backend == .openAIResponses ? "cloud" : "brain")
                     .scaledFont(size: 9)
-                Text(spec.modelShortName)
+                Text(spec.modelLabel)
                     .scaledFont(size: 10, weight: .medium, design: .rounded)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -352,6 +355,13 @@ struct ModelControl: View {
 
     private var helpText: String {
         guard isEnabled else { return "The model is fixed while this seat is generating" }
+        // The picker sets the local checkpoint. On an API seat that is only what the seat would fall
+        // back to, so the tooltip names the model actually in use rather than implying the checkpoint
+        // is the one running.
+        if spec.backend == .openAIResponses {
+            return "Running \(spec.modelLabel) from \(spec.openAI.baseURL). "
+                + "This checkpoint is used if the seat is switched back to MLX."
+        }
         let current = ModelCatalog.choice(for: spec.modelID)?.summary
         return current ?? "MLX checkpoint for this seat: \(spec.modelID)"
     }

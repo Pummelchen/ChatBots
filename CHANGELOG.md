@@ -22,6 +22,50 @@ measured, accepted or rejected lives here and in the closing commit.
   both refused. Found by installing the 9B for the first time — the path was documented but had
   never been exercised end to end.
 
+- **A stored seat was drawn on the pane but never given to the engine, for two fields at once.** The
+  app pushes the moderator and the endpoints when it connects, and it did not push a seat's backend
+  or its checkpoint — so an engine launched on its own defaults won: a saved checkpoint was shown
+  while the seat ran the default, and a seat the user had switched to an API backend was silently
+  returned to the local engine, which is what made "Use API" look as though it switched itself off on
+  the next launch. Both are now sent, and only when the engine's reported value differs, because
+  changing a seat makes the engine release the weights it is holding. Found by measuring an engine the
+  app had adopted rather than by reading: the seats stayed on the 4B while the saved setting said 9B,
+  and `POST /api/seat` moved them at once.
+- **A topic being typed is no longer overwritten.** Every snapshot adopted the engine's topic whenever
+  it differed from the field, so the once-a-second poll wiped the field and a topic could not be
+  entered at all; a freshly started engine's *default* topic also replaced the stored one on launch.
+  The engine's topic is now adopted only when the engine is the one that moved it, or when it already
+  holds a conversation to show.
+- **Restart clears the run it replaces.** `startOrRestart` cleared the engine but left the previous run
+  on screen — the paused pacer, a half-revealed reply and the old rate samples — so Restart read as
+  "the session did not change". It now drops the same local state `reset` (Clear) always did, from one
+  shared place.
+- **Instant streaming, and a transcript that keeps the last line visible.** New "Instant stream"
+  toggle, on by default: text is shown as the model emits it and the transcript follows it, instead of
+  being revealed at a paced rate with the view moving only when a turn ends. The transcript also
+  carries a bottom inset, so the end of a reply is no longer flush against the pane's edge and half cut
+  off. The follow-scroll is driven by the document growing — never by a timer, which this view cannot
+  use — and was checked against the freeze the scroll view documents: a streamed conversation left the
+  main thread idle in the AppKit run loop rather than pinned in `flushTransactions`.
+- **The entertainment prompt now grants the licence it was only hinting at.** The show's rules asked
+  for conflict, mockery and sarcasm and then capped them three times ("never harassment", "clever beats
+  crude", per-persona "rather than crude"), so the participants had no permission to be unpleasant. It
+  now says plainly that they are characters, that no real person is involved, and that they may be
+  rude, harsh, mean, crude, insulting and offensive, escalate, get personal and start fights — with the
+  anti-patterns that actually spoil the show named (assistant phrasing, disclaimers, therapy-speak,
+  sanitised corporate language). The per-persona conduct lines lost their caps too, and the licence is
+  pinned by a test so a later tidy-up cannot soften it. One line is kept on purpose: the target is the
+  characters in the room, not groups of real people.
+- **DeepSeek is the default API endpoint, and its key no longer looks unconfigured.** A new API seat
+  starts on `https://api.deepseek.com/v1` with `deepseek-flash` (the slug the API actually offers;
+  `deepseek-v4.1-flash` does not exist) instead of a local URL the user has to replace. The endpoint
+  sheet showed "not needed for a local server" for a key the app could in fact use, because it only
+  consulted the Keychain: it now also recognises the built-in key for a host that key belongs to, so
+  the field reads as configured. The key itself stays where it belongs — the environment or the
+  gitignored `.secrets.env`, and only ever sent to `api.deepseek.com` — and the *decode* fallbacks are
+  deliberately left alone, because those mean "an older saved payload" and repointing them would move
+  an existing local-server configuration to DeepSeek.
+
 ## 1.2 — 2026-09-19
 
 Tag [`v1.2`](https://github.com/Pummelchen/ChatBots/releases/tag/v1.2) from `56a009e`.

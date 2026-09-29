@@ -60,7 +60,8 @@ struct ChatPane: View {
         // AppKit does the scrolling; see AppKitScrollView for why ScrollViewReader's
         // `scrollTo` could not be used here.
         AppKitScrollView(
-            scrollToBottomSignal: pane.scrollSignal
+            scrollToBottomSignal: pane.scrollSignal,
+            followsContent: controller.instantStreaming
         ) {
             LazyVStack(alignment: .leading, spacing: 8) {
                 ForEach(turns) { turn in

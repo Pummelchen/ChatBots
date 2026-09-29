@@ -50,6 +50,7 @@ extension ChatController {
             _ = try? await client.send(.setModerator(restoredModerator))
             if let snapshot = try? await client.state() { apply(snapshot) }
         }
+        await handOverStoredSeatConfiguration(client)
         startPumps()
 
         // A safety net, not the primary path.
@@ -88,6 +89,72 @@ extension ChatController {
                 }
             }
         )
+    }
+
+    /// Hand the engine the seat configuration this app has stored.
+    ///
+    /// A seat's backend and checkpoint live in this app's settings, and the engine is launched on
+    /// its own defaults, so unless they are sent the seat runs the default while the interface draws
+    /// the user's choice — the mismatch `setModel` exists to prevent on a click. The backend is sent
+    /// first and on its own account: without it a seat the user had switched to an API is silently
+    /// returned to the local engine, which is the same defect one field over, and the one that made
+    /// "Use API" appear to switch itself off. A refusal is left where the engine put it: `deliver`
+    /// puts the reason in `engineConnection`, and the refreshed state then shows what is really set.
+    private func handOverStoredSeatConfiguration(_ client: WebTransportEngineClient) async {
+        guard let snapshot = try? await client.state() else { return }
+        let models = Dictionary(
+            snapshot.seats.map { ($0.id, $0.model) }, uniquingKeysWith: { first, _ in first })
+        let backends = Dictionary(
+            snapshot.seats.map { ($0.id, $0.backend) }, uniquingKeysWith: { first, _ in first })
+        var changed = false
+        for change in Self.storedSeatChanges(
+            stored: panes.map(\.spec), engineModels: models, engineBackends: backends)
+        {
+            let request: EngineRequest
+            switch change {
+            case .backend(let seatID, let backend):
+                request = .updateSeat(.init(seatID: seatID, backend: backend))
+            case .model(let seatID, let modelID):
+                request = .updateSeat(.init(seatID: seatID, modelID: modelID))
+            }
+            if await deliver(request) { changed = true }
+        }
+        if changed, let refreshed = try? await client.state() { apply(refreshed) }
+    }
+
+    /// One seat setting this app has stored that the engine is not running.
+    enum StoredSeatChange: Equatable {
+        case backend(seatID: String, backend: AgentSpec.Backend)
+        case model(seatID: String, modelID: String)
+    }
+
+    /// The seat settings whose stored value is not the one the engine reports.
+    ///
+    /// Separated from the sending so the rule can be tested without a socket, and deliberately
+    /// narrow: only a seat that really differs is returned, because changing a seat makes the engine
+    /// release the old weights and load new ones, so a launch that would change nothing must ask for
+    /// nothing. A local checkpoint is never handed to an API-backed seat — the field is meaningless
+    /// there and the engine would try to load it.
+    static func storedSeatChanges(
+        stored: [AgentSpec],
+        engineModels: [String: String],
+        engineBackends: [String: String]
+    ) -> [StoredSeatChange] {
+        var changes: [StoredSeatChange] = []
+        for spec in stored {
+            // Which engine a seat uses comes first: it decides whether the checkpoint beside it
+            // means anything at all.
+            if let running = engineBackends[spec.id],
+                AgentSpec.Backend(rawValue: running) != spec.backend
+            {
+                changes.append(.backend(seatID: spec.id, backend: spec.backend))
+            }
+            guard spec.backend == .mlx, let running = engineModels[spec.id] else { continue }
+            let wanted = ModelCatalog.resolve(spec.modelID)
+            guard !wanted.isEmpty, wanted != running else { continue }
+            changes.append(.model(seatID: spec.id, modelID: wanted))
+        }
+        return changes
     }
 
     /// Try to connect eight times with a growing delay, returning the last error.

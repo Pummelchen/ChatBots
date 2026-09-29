@@ -135,6 +135,13 @@ public final class ChatController: ObservableObject {
     @Published public var showReasoning: Bool {
         didSet { if !isApplyingRemoteState { saveSettings() } }
     }
+    /// Shows generated text as it arrives instead of revealing it at a paced rate.
+    ///
+    /// It also decides how the transcript follows a stream: instant keeps the newest line in
+    /// sight as it is written, paced moves the view once a turn is finished and drained.
+    @Published public var instantStreaming: Bool {
+        didSet { if !isApplyingRemoteState { saveSettings() } }
+    }
 
     // MARK: Outputs
 
@@ -190,6 +197,10 @@ public final class ChatController: ObservableObject {
     /// snapshot cannot be applied out of order behind one that landed while it was in flight.
     var appliedSnapshotCount = 0
 
+    /// The topic the engine last reported, so a change the engine made can be told apart from a
+    /// topic being typed here. See `adoptsEngineTopic`.
+    private var lastEngineTopic: String?
+
     /// Called whenever anything the user set changes, so it can be written to disk.
     var onSettingsChanged: (() -> Void)?
     /// The moderator's identity as restored from settings, pushed to the engine when the
@@ -213,11 +224,13 @@ public final class ChatController: ObservableObject {
         initialTopic: String = ChatController.defaultTopic,
         initialModeratorDraft: String = "",
         initialShowReasoning: Bool = true,
+        initialInstantStreaming: Bool = true,
         initialModerator: ModeratorIdentity = ModeratorIdentity()
     ) {
         self.topic = initialTopic
         self.moderatorDraft = initialModeratorDraft
         self.showReasoning = initialShowReasoning
+        self.instantStreaming = initialInstantStreaming
         self.restoredModerator = initialModerator
 
         // No engine is built here any more. The seats are drawn from the given specs so the
@@ -245,11 +258,17 @@ public final class ChatController: ObservableObject {
         lastSnapshot = snapshot
         reconcileRestoredAttachments(with: snapshot)
         turns = Self.turns(from: snapshot.messages)
-        if !snapshot.topic.isEmpty, topic != snapshot.topic {
-            isApplyingRemoteState = true
-            topic = snapshot.topic
-            isApplyingRemoteState = false
+        if Self.adoptsEngineTopic(
+            reported: snapshot.topic, previous: lastEngineTopic,
+            engineHasMessages: !snapshot.messages.isEmpty)
+        {
+            if topic != snapshot.topic {
+                isApplyingRemoteState = true
+                topic = snapshot.topic
+                isApplyingRemoteState = false
+            }
         }
+        if !snapshot.topic.isEmpty { lastEngineTopic = snapshot.topic }
         status = RunStatus(
             label: snapshot.status, isRunning: snapshot.isRunning, isPaused: snapshot.isPaused,
             error: snapshot.error)
@@ -265,6 +284,24 @@ public final class ChatController: ObservableObject {
 
         // Seat settings are the engine's, so a change made in another front end appears here.
         applySeats(from: snapshot)
+    }
+
+    /// Whether the topic a snapshot reports should replace the one the field holds.
+    ///
+    /// The engine owns the topic of a conversation it already holds, and a topic it moved — a kept
+    /// conversation loaded, or a change made in the browser — has to appear here. What it must not
+    /// do is overwrite a topic being typed: the engine keeps its old topic until `start` sends the
+    /// new one, so comparing the field with the engine on every snapshot wiped the field once a
+    /// second, and a topic could never be entered at all. A freshly started engine holds only its
+    /// default and no messages, and the topic in this app's settings is the user's, so nothing is
+    /// adopted until the engine either moves the topic itself or has a conversation to show.
+    static func adoptsEngineTopic(
+        reported: String,
+        previous: String?,
+        engineHasMessages: Bool
+    ) -> Bool {
+        guard !reported.isEmpty, reported != previous else { return false }
+        return previous != nil || engineHasMessages
     }
 
     /// Whether `snapshot` was produced before the newest state already applied.
@@ -321,7 +358,10 @@ public final class ChatController: ObservableObject {
     /// Release whatever text is due, and finish any turn whose text has now been fully
     /// shown.
     func reveal(elapsed: Double) {
-        for release in pacer.drain(elapsed: elapsed) {
+        // Instant takes whatever has arrived; paced releases it at the rate the model is producing.
+        // Both go through the same queue, so the only difference is how long text waits in it.
+        let due = instantStreaming ? pacer.drainAll() : pacer.drain(elapsed: elapsed)
+        for release in due {
             guard let pane = pane(release.agentID) else { continue }
             switch release.channel {
             case StreamPacerPool.Channel.answer:

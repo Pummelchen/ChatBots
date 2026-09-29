@@ -132,6 +132,19 @@ struct ControlBar: View {
                 .controlSize(.mini)
                 .help("Stream the models' <think> blocks into their panes. Thinking is never part of the shared log.")
 
+                Toggle(isOn: $controller.instantStreaming) {
+                    Label("Instant stream", systemImage: "bolt")
+                        .lineLimit(1)
+                        .fixedSize()
+                        .scaledFont(size: 11)
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .help(
+                    "On: text appears as the model writes it and the transcript follows it, so the "
+                        + "newest line stays in sight. Off: text is revealed at a paced rate and "
+                        + "the view moves once a turn is finished.")
+
                 notesMenu
             }
         }

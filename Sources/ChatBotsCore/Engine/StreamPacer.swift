@@ -137,6 +137,19 @@ public struct StreamPacer: Sendable {
         pending = ""
         carry = 0
     }
+
+    /// Release everything queued, ignoring the rate.
+    ///
+    /// The pacing exists to make a fast stream readable at a human speed. A viewer who would rather
+    /// watch the text arrive as the model produces it takes this path, and then the queue is only
+    /// a hop between two ticks rather than a delay.
+    public mutating func drainAll() -> String {
+        guard !pending.isEmpty else { return "" }
+        let all = pending
+        pending = ""
+        carry = 0
+        return all
+    }
 }
 
 /// Paces several streams at once — one per seat, and one for each seat's reasoning — while
@@ -201,6 +214,17 @@ public final class StreamPacerPool {
     /// How much text is still queued for a seat's answer.
     public func backlog(agentID: String, channel: Channel = .answer) -> Int {
         pacers[Key(agentID: agentID, channel: channel)]?.backlog ?? 0
+    }
+
+    /// Release everything queued on every channel, for the instant display mode.
+    public func drainAll() -> [(agentID: String, channel: Channel, text: String)] {
+        var released: [(String, Channel, String)] = []
+        for (key, var pacer) in pacers {
+            let text = pacer.drainAll()
+            pacers[key] = pacer
+            if !text.isEmpty { released.append((key.agentID, key.channel, text)) }
+        }
+        return released
     }
 
     /// True while any answer still has text waiting to be shown.

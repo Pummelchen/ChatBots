@@ -47,4 +47,19 @@ struct ModelLabelTests {
         #expect(prompt.contains("Qwen3.5-32B-8bit"), "the seat is told what it is running")
         #expect(!prompt.contains("Qwen3.5-4B-4bit"), "and not the default checkpoint's name")
     }
+
+    @Test("A seat on the API backend is labelled with the server's model, not its checkpoint")
+    func apiSeatsAreLabelledWithTheServerModel() {
+        // The defect: the seat header read `modelShortName`, so a seat running DeepSeek advertised the
+        // local checkpoint sitting beside it — a name for a model the seat was not using at all. The
+        // endpoint is named explicitly so this does not depend on what the compiled default is.
+        var seat = AgentSpec.seat(index: 0, modelID: "mlx-community/Qwen3.5-4B-MLX-4bit")
+        seat.backend = .openAIResponses
+        seat.openAI = OpenAIEndpoint(
+            baseURL: "https://api.deepseek.com/v1", model: "deepseek-flash")
+
+        #expect(seat.modelLabel == "DeepSeek V4.1 Flash")
+        #expect(seat.backendLabel == "DeepSeek V4.1 Flash")
+        #expect(seat.modelShortName == "Qwen3.5-4B-4bit", "which is what it must not be shown as")
+    }
 }

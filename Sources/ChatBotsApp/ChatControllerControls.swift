@@ -18,12 +18,31 @@ extension ChatController {
         // Stop and reset first when there is something to clear, then start. The engine
         // refuses to start without a topic, so the topic is set before the start rather than
         // being assumed to have arrived already.
+        //
+        // The local run state is dropped here for the same reason `reset` drops it: clearing the
+        // engine while the panes keep the previous run's streamed tail, its reasoning and its rate
+        // samples is what made Restart read as "the session did not change". A partial reply the
+        // pacer still holds would also be revealed into the new conversation.
+        clearLocalRunState()
         run { client in
             if self.status.isActive { _ = try await client.send(.stop) }
             if !self.turns.isEmpty { _ = try await client.send(.reset) }
             _ = try await client.send(.setTopic(self.topic))
             _ = try await client.send(.start)
         }
+    }
+
+    /// Drop everything a finished, cleared or replaced run left in the interface.
+    ///
+    /// One place, because three commands need the same "start from nothing on screen" and only one
+    /// of them used to do it: a restart that cleared the engine but not the display kept the old
+    /// run visible, which is the whole of the defect this records.
+    private func clearLocalRunState() {
+        for pane in panes {
+            pacer.clear(agentID: pane.id)
+            pane.endTurn()
+        }
+        rateSamples.removeAll()
     }
 
     public func togglePause() {
@@ -36,21 +55,14 @@ extension ChatController {
         run { client in _ = try await client.send(.stop) }
         // An explicit stop means stop: drop whatever is still queued rather than continuing
         // to type it out.
-        for pane in panes {
-            pacer.clear(agentID: pane.id)
-            pane.endTurn()
-        }
+        clearLocalRunState()
     }
 
     public func reset() {
         run { client in _ = try await client.send(.reset) }
         // Drop anything still queued for display: a fresh conversation must not begin by
         // revealing the tail of the one that was just cleared.
-        for pane in panes {
-            pacer.clear(agentID: pane.id)
-            pane.endTurn()
-        }
-        rateSamples.removeAll()
+        clearLocalRunState()
         errorBanner = nil
     }
 

@@ -135,7 +135,10 @@ struct UnifiedConversation: View {
     }
 
     private var transcript: some View {
-        AppKitScrollView(scrollToBottomSignal: controller.threadScrollSignal) {
+        AppKitScrollView(
+            scrollToBottomSignal: controller.threadScrollSignal,
+            followsContent: controller.instantStreaming
+        ) {
             // No stack spacing: each row brings its own. A group chat's rhythm is the point —
             // messages from one person sit tight together and a change of speaker gets air —
             // and a uniform gap throws exactly that information away.

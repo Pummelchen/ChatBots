@@ -17,10 +17,13 @@
 //
 // So the transcript is hosted in a plain `NSScrollView`, scrolled through AppKit's
 // direct, one-way primitive (`contentView.scroll(to:)`, no animation) from a deferred
-// main-queue turn. Scrolling is strictly event-driven — once per completed turn. A timer
-// that re-scrolls while a model streams re-enters SwiftUI's update pass on every tick and
-// the window stops drawing, at both 40 ms and 500 ms cadence. It also brings the standard
-// macOS overlay scrollbars and rubber-banding for free.
+// main-queue turn. Two things ask for that scroll: the caller's signal, which is how a finished
+// turn brings its last line into view, and — with `followsContent`, the default the app ships —
+// the document growing, which keeps a streamed reply in sight as it is written. A *timer* that
+// re-scrolls while a model streams re-enters SwiftUI's update pass on every tick and the window
+// stops drawing, at both 40 ms and 500 ms cadence; a resize is not that, because the update pass
+// that grew the document is already running and the scroll is deferred out of it. It also brings
+// the standard macOS overlay scrollbars and rubber-banding for free.
 
 import AppKit
 import SwiftUI
@@ -33,6 +36,17 @@ struct AppKitScrollView<Content: View>: NSViewRepresentable {
     /// Bumped by the caller when it wants the view scrolled to the bottom. Scrolling only
     /// happens when this value changes, so a redraw alone never moves the viewport.
     var scrollToBottomSignal: Int
+    /// Keep the newest line in sight as the content grows, instead of only on a signal.
+    ///
+    /// This is the "instant" side of the streaming toggle: it is what makes a reply readable while
+    /// it is being written rather than after it has finished.
+    var followsContent: Bool = false
+    /// Empty space kept below the last line.
+    ///
+    /// Without it the transcript ends flush against the bottom edge, so the last line sits half
+    /// under the pane's edge and a descender or a wrapped word is cut off — the end of a reply was
+    /// routinely unreadable. The inset is content, so scrolling to the bottom leaves it visible.
+    var bottomInset: CGFloat = 28
     @ViewBuilder var content: () -> Content
 
     func makeCoordinator() -> Coordinator {
@@ -50,7 +64,9 @@ struct AppKitScrollView<Content: View>: NSViewRepresentable {
         scrollView.horizontalScrollElasticity = .none
         scrollView.scrollerStyle = .overlay
 
-        let hosting = NSHostingView(rootView: AnyView(content()))
+        // The inset is content rather than a clip-view inset, so the document is genuinely taller
+        // than the text and the scroll to the bottom lands on empty space below the last line.
+        let hosting = NSHostingView(rootView: AnyView(content().padding(.bottom, bottomInset)))
         hosting.translatesAutoresizingMaskIntoConstraints = true
         hosting.autoresizingMask = [.width]
         scrollView.documentView = hosting
@@ -63,12 +79,15 @@ struct AppKitScrollView<Content: View>: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let hosting = context.coordinator.hostingView else { return }
 
-        // Re-render the SwiftUI content.
-        hosting.rootView = AnyView(content())
+        // Re-render the SwiftUI content. The inset is applied here as well as at creation: the
+        // root view is replaced on every pass, so leaving it out of one of the two drops the empty
+        // space below the last line as soon as the first update arrives.
+        hosting.rootView = AnyView(content().padding(.bottom, bottomInset))
 
         // The document view must be as tall as the content wants to be, otherwise the
         // scroll view has nothing to scroll.
         let fitting = hosting.fittingSize
+        var resized = false
         if abs(hosting.frame.height - fitting.height) > 0.5
             || abs(hosting.frame.width - scrollView.contentSize.width) > 0.5
         {
@@ -77,11 +96,14 @@ struct AppKitScrollView<Content: View>: NSViewRepresentable {
                 width: max(fitting.width, scrollView.contentSize.width),
                 height: max(fitting.height, scrollView.contentSize.height)
             )
+            resized = true
         }
 
         let signalChanged = context.coordinator.lastSignal != scrollToBottomSignal
         context.coordinator.lastSignal = scrollToBottomSignal
-        guard signalChanged else { return }
+        // Following the stream makes a document that grew reason enough to scroll. The signal stays
+        // the only trigger when following is off, so a redraw alone still never moves the viewport.
+        guard signalChanged || (followsContent && resized) else { return }
 
         // Scroll *after* this update pass, never inside it. Touching the clip view
         // during `updateNSView` invalidates the layout that is still being applied, so
