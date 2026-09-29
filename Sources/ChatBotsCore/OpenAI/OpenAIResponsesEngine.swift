@@ -273,13 +273,28 @@ public actor OpenAIResponsesEngine: LLMEngine {
         var answer = ""
         var usage = OpenAIUsage()
         var failed: String?
+        // A hosted model is not limited by this Mac, so a seat carrying a ceiling has its stream
+        // consumed at that rate. The wait happens before the next delta is read, which is backpressure
+        // on the server rather than a buffer here: the interface's own pacer only delays what has
+        // already arrived, and a transcript running minutes ahead of the window is what that looks
+        // like. Nil for a seat without a ceiling, which is every local checkpoint — the GPU already
+        // paces those.
+        var budget = OutputBudget(tokensPerSecond: spec.maximumTokensPerSecond)
 
         for try await event in responsesClient().stream(request) {
             try Task.checkCancellation()
             switch event {
             case .text(let delta):
                 answer += delta
+                // The text is emitted first and the wait taken after it, so the first words of a reply
+                // appear at once; the pause then happens before the next delta is read, which is where
+                // the backpressure lands — the socket is not consumed while the reader catches up.
                 await onEvent(.token(agentID: agentID, text: delta))
+                if let wait = budget.delay(
+                    forEmitting: delta.count, now: Date.now.timeIntervalSince(started))
+                {
+                    try await Task.sleep(for: .seconds(wait))
+                }
 
             case .reasoning(let delta):
                 await onEvent(.reasoning(agentID: agentID, text: delta))

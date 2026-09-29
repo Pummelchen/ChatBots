@@ -86,6 +86,15 @@ measured, accepted or rejected lives here and in the closing commit.
   new text keeps arriving below without moving the view, and scrolling back to the bottom hands it back
   to the stream. The check is made before the content is replaced, because afterwards the document has
   already grown and a view that was at the bottom no longer is.
+- **A "Slow down" switch, on by default, holds the seats to about ten tokens a second.** A local model
+  is paced by this Mac's GPU; a hosted one is not, and a flash-tier API finishes a reply before it can be
+  read — with the next turn written on top of it. The delay is applied where the engine consumes the
+  stream, which is real backpressure: the server's send window fills and its own rate comes down, and
+  nothing piles up in between. Slowing the *display* instead only moves the problem — the transcript
+  races ahead of the window and the gap grows with every turn, which is what a buffered pace looks like.
+  The ceiling is per seat and carried in the seat's spec, so it survives a launch, and `0` means off
+  because `nil` over the wire means "leave this field alone". Local checkpoints are untouched by design:
+  the code path is the API stream, and nothing else reads the field.
 
 ## 1.2 — 2026-09-19
 

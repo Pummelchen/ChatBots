@@ -144,4 +144,40 @@ extension ChatController {
     public var isCloudOnly: Bool {
         !panes.isEmpty && panes.allSatisfy { $0.spec.backend == .openAIResponses }
     }
+
+    /// Hold every seat to a readable pace, or release them.
+    ///
+    /// One switch rather than one per seat, for the same reason "Cloud only" is one: what makes it
+    /// necessary is the backend, not the seat, and a show where one participant is slowed and the
+    /// other is not reads as a stall rather than as pacing.
+    func setSlowdown(_ on: Bool) {
+        for pane in panes {
+            setMaximumTokensPerSecond(on ? AgentSpec.readableTokensPerSecond : 0, for: pane.id)
+        }
+    }
+
+    /// Whether any seat is being held to a readable pace.
+    ///
+    /// A view over the seats rather than a setting of its own, so it cannot disagree with what the
+    /// engines were told.
+    public var isSlowdownOn: Bool {
+        panes.contains { ($0.spec.maximumTokensPerSecond ?? 0) > 0 }
+    }
+
+    /// Point one seat at an output ceiling, in tokens per second; `0` removes it.
+    ///
+    /// Zero rather than nil for "off" because `SeatChange` reads nil as "leave this field alone", the
+    /// convention every other field there follows.
+    func setMaximumTokensPerSecond(_ tokensPerSecond: Double, for agentID: String) {
+        run { client in
+            _ = try await client.send(
+                .updateSeat(
+                    .init(seatID: agentID, maximumTokensPerSecond: tokensPerSecond)))
+        }
+        // A snapshot does not carry this field, so the pane is the app's only record of it — and the
+        // thing that gets saved. A ceiling that lived only in the engine would be forgotten on the
+        // next launch, which is how a setting stops meaning anything.
+        pane(agentID)?.spec.maximumTokensPerSecond = tokensPerSecond > 0 ? tokensPerSecond : nil
+        saveSettings()
+    }
 }

@@ -78,6 +78,20 @@ struct ControlBar: View {
                 .controlSize(.mini)
                 .help("Skip the local models entirely and route every seat through its API endpoint")
 
+                Toggle(isOn: slowdownBinding) {
+                    Label("Slow down", systemImage: "tortoise")
+                        .scaledFont(size: 11)
+                        .lineLimit(1)
+                        .fixedSize()
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .help(
+                    "Hold every seat to about \(Int(AgentSpec.readableTokensPerSecond)) tokens a "
+                        + "second, so a hosted model cannot finish a reply before it can be read. The "
+                        + "delay is put on the stream itself — the server is read more slowly — rather "
+                        + "than buffered here, so the transcript cannot run ahead of the window.")
+
                 Button {
                     showEndpoints = true
                 } label: {
@@ -355,6 +369,13 @@ struct ControlBar: View {
         Binding(
             get: { controller.isCloudOnly },
             set: { controller.useAPIForAllSeats($0, store: endpoints) }
+        )
+    }
+
+    private var slowdownBinding: Binding<Bool> {
+        Binding(
+            get: { controller.isSlowdownOn },
+            set: { controller.setSlowdown($0) }
         )
     }
 

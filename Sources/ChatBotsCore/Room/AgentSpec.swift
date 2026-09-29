@@ -62,6 +62,13 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
     /// Maximum tokens for the *answer*, reasoning excluded. The hard generation cap is
     /// this plus whatever `thinking` budgets for reasoning.
     public var maxTokens: Int
+    /// A ceiling on how fast this seat's text may be produced, in tokens per second.
+    ///
+    /// Nil means no ceiling, which is right for a local checkpoint: the GPU is the limit and the
+    /// output is already slower than reading. It exists for a hosted model, which is not limited by
+    /// anything here and will finish a reply before it can be read. The engine applies it where it
+    /// consumes the stream, so the delay is backpressure rather than a buffer in the interface.
+    public var maximumTokensPerSecond: Double?
     /// The seat's context window, in tokens, when it cannot be discovered.
     ///
     /// The MLX backend reads this from the checkpoint's own config; a server does not
@@ -103,6 +110,7 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
         presencePenalty: Double? = nil,
         repetitionPenalty: Double? = nil,
         maxTokens: Int = 1024,
+        maximumTokensPerSecond: Double? = nil,
         contextWindow: Int = AgentSpec.defaultContextWindow,
         visionOverride: VisionSupport? = nil,
         mode: DiscussionMode = .entertainment,
@@ -123,12 +131,35 @@ public struct AgentSpec: Identifiable, Sendable, Hashable, Codable {
         self.presencePenalty = presencePenalty
         self.repetitionPenalty = repetitionPenalty
         self.maxTokens = maxTokens
+        self.maximumTokensPerSecond = maximumTokensPerSecond
         self.contextWindow = contextWindow
         self.visionOverride = visionOverride
         self.mode = mode
         self.webSearchEnabled = webSearchEnabled
         self.thinking = thinking
         self.personaID = personaID
+    }
+
+    /// The ceiling the app's "slow down" mode applies: about as fast as a person reads.
+    ///
+    /// Ten tokens a second is roughly forty characters, which is the paced reveal rate this app has
+    /// always used and far below what a hosted flash-tier model produces.
+    public static let readableTokensPerSecond: Double = 10
+
+    /// The roster with a readable pace applied to every seat that has never been given one.
+    ///
+    /// On rather than off, because the app exists to be watched and a hosted model finishes a reply
+    /// before anyone can read it. A seat that already carries a ceiling is left exactly as it is —
+    /// including `0`, which means "off" — and that is what makes turning it off stick across launches.
+    /// Nothing local is affected: the ceiling is applied where the API stream is consumed, and a
+    /// checkpoint on this Mac's GPU is already slower than reading.
+    public static func applyingReadablePaceToUnset(_ specs: [AgentSpec]) -> [AgentSpec] {
+        specs.map { spec in
+            guard spec.maximumTokensPerSecond == nil else { return spec }
+            var copy = spec
+            copy.maximumTokensPerSecond = readableTokensPerSecond
+            return copy
+        }
     }
 
     public static let defaultModelID = "mlx-community/Qwen3.5-4B-MLX-4bit"

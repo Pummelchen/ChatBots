@@ -103,6 +103,10 @@ public enum EngineRequest: Sendable, Hashable, Codable {
         public var baseURL: String?
         public var apiModel: String?
         public var apiKey: String?
+        /// A ceiling on this seat's output, in tokens per second. `0` turns the ceiling off: `nil`
+        /// here means "leave the field alone", the same convention as every other field, so "off"
+        /// needs a value rather than an absence.
+        public var maximumTokensPerSecond: Double?
 
         public init(
             seatID: String,
@@ -113,7 +117,8 @@ public enum EngineRequest: Sendable, Hashable, Codable {
             modelID: String? = nil,
             baseURL: String? = nil,
             apiModel: String? = nil,
-            apiKey: String? = nil
+            apiKey: String? = nil,
+            maximumTokensPerSecond: Double? = nil
         ) {
             self.seatID = seatID
             self.name = name
@@ -124,6 +129,7 @@ public enum EngineRequest: Sendable, Hashable, Codable {
             self.baseURL = baseURL
             self.apiModel = apiModel
             self.apiKey = apiKey
+            self.maximumTokensPerSecond = maximumTokensPerSecond
         }
     }
 }

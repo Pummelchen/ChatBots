@@ -24,7 +24,7 @@ struct ChatBotsApp: App {
         // and the thinking-block toggle — and write it back on every change.
         let store = UserSettingsStore()
         let restored = ChatController(
-            specs: store.settings.seats,
+            specs: AgentSpec.applyingReadablePaceToUnset(store.settings.seats),
             initialTopic: store.settings.topic,
             initialModeratorDraft: store.settings.moderatorDraft,
             initialShowReasoning: store.settings.showReasoning,

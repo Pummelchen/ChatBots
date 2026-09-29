@@ -338,6 +338,8 @@ public struct APICommand: Codable, Sendable {
     public var baseURL: String?
     public var apiModel: String?
     public var apiKey: String?
+    /// A ceiling on a seat's output, in tokens per second. `0` turns it off.
+    public var maximumTokensPerSecond: Double?
     /// A base64 document, for a front end that cannot do multipart uploads.
     public var filename: String?
     public var content: String?

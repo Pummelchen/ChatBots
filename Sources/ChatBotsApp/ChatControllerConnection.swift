@@ -131,6 +131,17 @@ extension ChatController {
             // round trip that could land before the moderator's.
             await deliver(request)
         }
+        // The output ceiling is sent for every seat rather than compared, because a snapshot does not
+        // carry it: the app is the only side that knows it, and a freshly started engine has none. A
+        // seat with no ceiling stores nil and sends `0`, which is how "leave this alone" is told apart
+        // from "off" on the wire.
+        for spec in panes.map(\.spec) {
+            await deliver(
+                .updateSeat(
+                    .init(
+                        seatID: spec.id,
+                        maximumTokensPerSecond: spec.maximumTokensPerSecond ?? 0)))
+        }
     }
 
     /// One seat setting this app has stored that the engine is not running.

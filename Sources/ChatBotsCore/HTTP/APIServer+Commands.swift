@@ -70,7 +70,8 @@ extension APIServer {
             thinking: thinking,
             backend: backend,
             modelID: body.modelID,
-            baseURL: body.baseURL, apiModel: body.apiModel, apiKey: body.apiKey)
+            baseURL: body.baseURL, apiModel: body.apiModel, apiKey: body.apiKey,
+            maximumTokensPerSecond: body.maximumTokensPerSecond)
     }
 
     /// Turn an HTTP request into an engine request.

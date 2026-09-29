@@ -321,6 +321,9 @@ extension EngineService {
         }
         if let model = change.apiModel { spec.openAI.model = model }
         if let key = change.apiKey { spec.openAI.apiKey = key }
+        // `0` is how a caller turns the ceiling off: a budget of zero means no ceiling rather than no
+        // output, so the value is stored and `OutputBudget` decides.
+        if let ceiling = change.maximumTokensPerSecond { spec.maximumTokensPerSecond = ceiling }
     }
 
     /// The three attachment routes. `addAttachment` does its own conversion and validation; the
