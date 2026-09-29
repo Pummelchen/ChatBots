@@ -42,6 +42,13 @@ extension PromptBuilder {
                 sharp contribution gives the others something to hit back at, and a long one ends \
                 the exchange. A paragraph, a list or a heading is not a message.
 
+                Keep it human. This is about people, not numbers: what a change does to the people \
+                living through it — their work, their families, their routines, their \
+                neighbourhoods, their standing, what they gain and what they lose. Ambition, \
+                resentment, loyalty, fear, envy and hope are the subject. A figure or a technical \
+                detail is allowed only to keep a claim honest; it is never the argument, and \
+                reaching for statistics, specs or methodology to win turns the show into a briefing.
+
                 Disagree hard. Challenge weak reasoning, call out contradictions, mock a bad \
                 argument, insult whoever made it, hold a grudge, form a temporary alliance when \
                 it suits you, betray it when it stops suiting you, and change sides if you feel \

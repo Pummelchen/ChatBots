@@ -76,6 +76,16 @@ measured, accepted or rejected lives here and in the closing commit.
   is pushed, then one snapshot is applied — so what is compared is still the user's stored choice.
 - **Every message is capped at three sentences** in the entertainment rules: a long contribution ends
   the exchange it was meant to continue.
+- **The show is about people.** The entertainment rules now steer the discussion to what a change does
+  to the people living through it — work, family, routine, standing, what they gain and what they lose
+  — and name ambition, resentment, loyalty, fear, envy and hope as the subject. A figure or a technical
+  detail is allowed only to keep a claim honest and is never the argument; reaching for statistics or
+  methodology to win turns the show into a briefing, which is the research mode's product.
+- **The transcript no longer scrolls itself out from under a reader.** Following the stream, and the
+  signal a finished turn sends, both yield once the transcript has been scrolled away from the bottom:
+  new text keeps arriving below without moving the view, and scrolling back to the bottom hands it back
+  to the stream. The check is made before the content is replaced, because afterwards the document has
+  already grown and a view that was at the bottom no longer is.
 
 ## 1.2 — 2026-09-19
 

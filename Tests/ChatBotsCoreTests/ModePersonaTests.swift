@@ -285,6 +285,11 @@ struct ModePromptTests {
         #expect(text.contains("Fights are good television"))
         // A length limit is a product decision too, and an unbounded reply is what ends the exchange.
         #expect(text.contains("three sentences at most"))
+        // So is the subject: the show is about people, and data is only allowed to keep it honest.
+        #expect(text.contains("Keep it human"))
+        #expect(text.contains("never the argument"))
+        // The research rules are the opposite product, so they must not carry either.
+        #expect(!prompt(mode: .research).contains("Keep it human"))
     }
 
     @Test("The research rules ask for method, labelling and revision")
