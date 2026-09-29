@@ -442,6 +442,11 @@ struct VisionSupportTests {
     func unknownAPIModel() {
         var spec = AgentSpec.seat(index: 0)
         spec.backend = .openAIResponses
+        // Named where an API seat actually names its model, as the test above does. This one used to
+        // set only the checkpoint id and lean on the default endpoint being empty, which stopped
+        // being true once the default endpoint named a real server model.
+        spec.openAI = OpenAIEndpoint(
+            baseURL: "https://example.test/v1", model: "some-local-server/my-finetune")
         spec.modelID = "some-local-server/my-finetune"
         #expect(spec.visionSupport == .unknown)
         #expect(!spec.visionSupport.allowsImages, "unknown must not mean yes")

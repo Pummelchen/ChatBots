@@ -8,6 +8,22 @@ import Foundation
 
 /// Configuration for an OpenAI-compatible endpoint.
 public struct OpenAIEndpoint: Sendable, Hashable, Codable {
+
+    /// The endpoint a new API seat starts on.
+    ///
+    /// DeepSeek is the provider this app is measured against and the one its built-in key belongs
+    /// to, so a seat switched to the API backend lands on something that works rather than on a URL
+    /// the user has to replace first. A local server is still one field away; `.secrets.env` and
+    /// the environment remain the only places a key lives, and nothing here is a key.
+    public static let defaultBaseURL = "https://api.deepseek.com/v1"
+
+    /// The model id `defaultBaseURL` names, as *that server* spells it.
+    ///
+    /// Deliberately not `AgentSpec.defaultModelID`: this field is the identifier the endpoint is
+    /// asked for over the wire, and a checkpoint id would be sent to DeepSeek as a model name.
+    /// `ModelNames` turns this slug into "DeepSeek V4.1 Flash" for display.
+    public static let defaultModel = "deepseek-flash"
+
     /// Base URL without a path, e.g. `http://localhost:1234`. `/v1/responses` is appended.
     public var baseURL: String
     /// Model identifier as the *server* names it. For LM Studio this is the loaded model's
@@ -19,8 +35,8 @@ public struct OpenAIEndpoint: Sendable, Hashable, Codable {
     public var compatibility: APICompatibility
 
     public init(
-        baseURL: String = "http://localhost:1234",
-        model: String = AgentSpec.defaultModelID,
+        baseURL: String = OpenAIEndpoint.defaultBaseURL,
+        model: String = OpenAIEndpoint.defaultModel,
         apiKey: String? = nil,
         compatibility: APICompatibility? = nil
     ) {

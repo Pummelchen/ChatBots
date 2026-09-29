@@ -41,12 +41,19 @@ final class APIEndpointStore: ObservableObject {
         while endpoints.count < Self.seatCount {
             endpoints.append(OpenAIEndpoint())
         }
-        self.endpoints = Array(endpoints.prefix(Self.seatCount))
+        let resolved = Array(endpoints.prefix(Self.seatCount))
+        self.endpoints = resolved
 
         let override = environment[Self.apiKeyEnvironmentKey]
         self.keys = (0..<Self.seatCount).map { index in
             if let override, !override.isEmpty { return override }
-            return Self.loadKey(seat: index) ?? ""
+            if let stored = Self.loadKey(seat: index) { return stored }
+            // Then the key the app can find for itself, which is the one DeepSeek's endpoint is
+            // meant to use: `.secrets.env` or `DEEPSEEK_API_KEY`, and only for a host that key
+            // belongs to. Without this the sheet said "not needed for a local server" for an
+            // endpoint the app could in fact authenticate, so the field read as unconfigured
+            // while requests went out with the built-in key anyway.
+            return BuiltInKeys.key(forBaseURL: resolved[index].baseURL) ?? ""
         }
     }
 

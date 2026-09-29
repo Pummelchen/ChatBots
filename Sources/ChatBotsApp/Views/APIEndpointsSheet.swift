@@ -105,7 +105,7 @@ struct APIEndpointsSheet: View {
             GridRow {
                 Text("API key").scaledFont(size: 11).foregroundStyle(.secondary)
                 SecureField(
-                    store.keys[seat].isEmpty ? "not needed for a local server" : "",
+                    store.keys[seat].isEmpty ? "none stored — not needed for a local server" : "",
                     text: keyBinding(seat)
                 )
                 .textFieldStyle(.roundedBorder)

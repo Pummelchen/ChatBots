@@ -61,6 +61,11 @@ struct VisionCapabilityTests {
         // "Qwen3.5-4B", which it never was.
         var spec = AgentSpec.seat(index: 0)
         spec.backend = .openAIResponses
+        // The endpoint's own field is where an API seat names its model, and it has to be given one
+        // here: relying on the default endpoint made this pass for the wrong reason as soon as that
+        // default became a real server model, because a recognised id is not an unrecognised one.
+        spec.openAI = OpenAIEndpoint(
+            baseURL: "https://example.test/v1", model: "mlx-community/Qwen3.5-4B-MLX-4bit")
         spec.modelID = "mlx-community/Qwen3.5-4B-MLX-4bit"
         #expect(spec.visionSupport == .unknown, "a text checkpoint's id is not evidence")
     }

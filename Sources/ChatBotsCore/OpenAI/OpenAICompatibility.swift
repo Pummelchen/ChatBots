@@ -56,6 +56,10 @@ public enum ModelNames {
         ("deepseek-v4.1-pro", "DeepSeek V4.1 Pro"),
         ("deepseek-v4-flash", "DeepSeek V4.1 Flash"),
         ("deepseek-v4.1-flash", "DeepSeek V4.1 Flash"),
+        // The slug the API actually offers for that tier, and the one this app's own measurements
+        // were made against: without an entry here the pane showed "Deepseek Flash" for the model
+        // the server had been asked for by name.
+        ("deepseek-flash", "DeepSeek V4.1 Flash"),
         ("deepseek-v4", "DeepSeek V4.1"),
         ("deepseek-v3", "DeepSeek V3"),
         ("deepseek-reasoner", "DeepSeek Reasoner"),
