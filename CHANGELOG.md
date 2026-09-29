@@ -7,6 +7,21 @@ each release is in its notes, linked below; this file is the index and the recor
 [Project Tracker](https://github.com/Pummelchen/ChatBots/wiki/Project-Tracker), and what was tried,
 measured, accepted or rejected lives here and in the closing commit.
 
+## Unreleased
+
+- **`tools/install.sh --model huihui9b` could not finish.** The installer's last completeness check
+  accepted only `model.safetensors` or `model-00001-of-00001.safetensors`, so a **sharded**
+  checkpoint — the Huihui 9B ships as `model-00001-of-00002` and `model-00002-of-00002` beside a
+  `model.safetensors.index.json` — was reported as having "no weights file" *after* every byte had
+  downloaded correctly, and the build step never ran. The check now mirrors the rule the loader
+  actually applies, `ModelStore.isCompleteCheckpoint`: when an index is present it is the manifest
+  and every shard it names must be beside it, and with no index a single `.safetensors` blob is
+  complete. The two rules disagreeing is what produced this, so they are now stated once each and
+  in the same terms. Verified both ways: the real single-blob 4B and the real sharded 9B are
+  accepted, while an index naming two shards with one on disk, and an index naming nothing, are
+  both refused. Found by installing the 9B for the first time — the path was documented but had
+  never been exercised end to end.
+
 ## 1.2 — 2026-09-19
 
 Tag [`v1.2`](https://github.com/Pummelchen/ChatBots/releases/tag/v1.2) from `56a009e`.

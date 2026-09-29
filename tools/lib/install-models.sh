@@ -427,8 +427,29 @@ than starting over."
       die "The checkpoint $MODEL_ID is missing $required, so the model cannot be loaded."
     fi
   done
-  if [ ! -f "$MODEL_DIR/model.safetensors" ] && [ ! -f "$MODEL_DIR/model-00001-of-00001.safetensors" ]; then
-    die "The checkpoint $MODEL_ID has no weights file, so the model cannot be loaded."
+  # The weights are one blob or a set of shards, and this mirrors `ModelStore.isCompleteCheckpoint`
+  # because that is the rule the loader actually applies — the two must not disagree. An index is
+  # the manifest, so every shard it names has to be beside it: an interrupted download leaves the
+  # index with some or none of them, and that must not read as a complete checkpoint. With no
+  # index, a single `.safetensors` blob is complete on its own.
+  local index="" shard complete=1
+  for shard in "$MODEL_DIR"/*.safetensors.index.json; do
+    [ -f "$shard" ] && index="$shard"
+  done
+  if [ -n "$index" ]; then
+    while IFS= read -r shard; do
+      [ -f "$MODEL_DIR/$shard" ] || complete=0
+    done < <(grep -oE '"[A-Za-z0-9._-]+\.safetensors"' "$index" | tr -d '"' | sort -u)
+    # An index that names nothing proves nothing, which is not the same as complete.
+    grep -qE '"[A-Za-z0-9._-]+\.safetensors"' "$index" || complete=0
+  else
+    complete=0
+    for shard in "$MODEL_DIR"/*.safetensors; do
+      [ -f "$shard" ] && complete=1
+    done
+  fi
+  if [ "$complete" -ne 1 ]; then
+    die "The checkpoint $MODEL_ID has no complete weights file, so the model cannot be loaded."
   fi
   ok "Model ready at $MODEL_DIR"
 }
