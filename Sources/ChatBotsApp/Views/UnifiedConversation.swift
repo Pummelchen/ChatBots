@@ -137,13 +137,15 @@ struct UnifiedConversation: View {
 
     private var transcript: some View {
         AppKitScrollView(
-            scrollToBottomSignal: controller.threadScrollSignal,
-            followsContent: controller.instantStreaming
+            scrollToBottomSignal: controller.threadScrollSignal
         ) {
+            // Eager, not `LazyVStack`: the scroll view sizes its document from this content's fitting
+            // size, and a lazy stack only estimates that until its rows have been measured — which
+            // leaves the newest row clipped and unreachable. See `AppKitScrollView`.
             // No stack spacing: each row brings its own. A group chat's rhythm is the point —
             // messages from one person sit tight together and a change of speaker gets air —
             // and a uniform gap throws exactly that information away.
-            LazyVStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
                 ForEach(rows) { row in
                     if let turn = row.turn {
                         ThreadMessage(

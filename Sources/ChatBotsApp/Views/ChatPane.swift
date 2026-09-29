@@ -60,10 +60,12 @@ struct ChatPane: View {
         // AppKit does the scrolling; see AppKitScrollView for why ScrollViewReader's
         // `scrollTo` could not be used here.
         AppKitScrollView(
-            scrollToBottomSignal: pane.scrollSignal,
-            followsContent: controller.instantStreaming
+            scrollToBottomSignal: pane.scrollSignal
         ) {
-            LazyVStack(alignment: .leading, spacing: 8) {
+            // Eager, not `LazyVStack`: the scroll view sizes its document from this content's fitting
+            // size, and a lazy stack only estimates that until its rows have been measured — which
+            // leaves the newest row clipped and unreachable. See `AppKitScrollView`.
+            VStack(alignment: .leading, spacing: 8) {
                 ForEach(turns) { turn in
                     TurnRow(
                         controller: controller,

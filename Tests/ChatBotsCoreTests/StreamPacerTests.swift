@@ -80,6 +80,20 @@ struct StreamPacerTests {
         #expect(!first.hasSuffix("quic"))
     }
 
+    @Test("A finished sentence is preferred as the cut, so text lands as speech")
+    func cutsAtSentenceEnds() {
+        var pacer = StreamPacer()
+        pacer.revealRate = 100  // ten characters per tenth of a second
+        pacer.enqueue("One short line. And a second sentence that is still arriving")
+
+        // The first ten characters are inside the first sentence, so the cut falls back to the word
+        // boundary rather than releasing a fragment of a word.
+        #expect(pacer.drain(elapsed: 0.1) == "One short ")
+        // The next ten reach the full stop, and the release stops there — five characters rather than
+        // the ten that were due — so what lands is a finished sentence and not "line. And ".
+        #expect(pacer.drain(elapsed: 0.1) == "line.")
+    }
+
     @Test("A long word without a boundary is released anyway rather than stalling")
     func doesNotHoldTextForever() {
         var pacer = StreamPacer()

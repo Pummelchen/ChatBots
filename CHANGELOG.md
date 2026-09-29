@@ -104,6 +104,16 @@ measured, accepted or rejected lives here and in the closing commit.
   which is what carries the identity, and the avatar still does. The row is mirrored rather than
   shifted, so a bubble on the right keeps its avatar on the outside edge.
 
+- **The transcript's scrolling, reworked rather than patched again.** The transcript was a `LazyVStack`
+  inside a scroll view whose document is sized from its content — and a lazy stack reports an
+  *estimate* until its off-screen rows have been measured, which they cannot be until they scroll into
+  view. So the document was too short: the newest row was clipped and unreachable, and text shifted
+  under a reader as the estimate was revised. The transcript is laid out eagerly now (it is bounded by
+  the turn limit, so laziness bought nothing here), the scrollbar stays visible instead of hiding
+  itself, and the bottom inset grew to 36 pt. The reveal also prefers a finished sentence as its cut —
+  text lands as speech rather than in whatever chunks the server sent, which is what "blocky" was — and
+  the toggle is now **Smooth text**, on by default, with off showing the raw arrival.
+
 ## 1.2 — 2026-09-19
 
 Tag [`v1.2`](https://github.com/Pummelchen/ChatBots/releases/tag/v1.2) from `56a009e`.

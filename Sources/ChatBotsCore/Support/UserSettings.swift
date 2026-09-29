@@ -19,11 +19,13 @@ public struct UserSettings: Codable, Sendable, Equatable {
     public var moderatorDraft: String
     /// Whether the models' thinking blocks are streamed into the panes.
     public var showReasoning: Bool
-    /// Whether generated text is shown as it arrives rather than revealed at a paced rate.
+    /// Whether generated text is released a sentence at a time at the pace the model is producing it,
+    /// rather than in whatever chunks a server happens to send.
     ///
-    /// True by default: the paced reveal exists to make a very fast stream readable, but watching
-    /// the words land is what a live conversation looks like, and the pacing is one toggle away.
-    public var instantStreaming: Bool
+    /// On by default: a hosted model answers in uneven bursts, and handing those straight to the view
+    /// is what a blocky, jumpy transcript looks like. Turning it off shows the raw arrival, which is
+    /// useful when the question is what the server sent rather than what it reads like.
+    public var smoothStreaming: Bool
     /// How many seats this configuration is for, so a 3- or 4-seat room reopens as one.
     ///
     /// Stored separately from the `seats` array because reconciling a stored roster against
@@ -53,7 +55,7 @@ public struct UserSettings: Codable, Sendable, Equatable {
         topic: String,
         moderatorDraft: String = "",
         showReasoning: Bool = true,
-        instantStreaming: Bool = true,
+        smoothStreaming: Bool = true,
         seats: [AgentSpec],
         seatCount: Int? = nil,
         attachments: [AttachedDocument] = [],
@@ -63,7 +65,7 @@ public struct UserSettings: Codable, Sendable, Equatable {
         self.topic = topic
         self.moderatorDraft = moderatorDraft
         self.showReasoning = showReasoning
-        self.instantStreaming = instantStreaming
+        self.smoothStreaming = smoothStreaming
         self.seats = seats
         self.seatCount = seatCount ?? seats.count
         self.attachments = attachments
@@ -83,8 +85,8 @@ public struct UserSettings: Codable, Sendable, Equatable {
         self.topic = try container.decodeIfPresent(String.self, forKey: .topic) ?? ""
         self.moderatorDraft = try container.decodeIfPresent(String.self, forKey: .moderatorDraft) ?? ""
         self.showReasoning = try container.decodeIfPresent(Bool.self, forKey: .showReasoning) ?? true
-        self.instantStreaming =
-            try container.decodeIfPresent(Bool.self, forKey: .instantStreaming) ?? true
+        self.smoothStreaming =
+            try container.decodeIfPresent(Bool.self, forKey: .smoothStreaming) ?? true
         self.seats = try container.decodeIfPresent([AgentSpec].self, forKey: .seats) ?? []
         // A payload from before the field existed describes as many seats as it holds.
         self.seatCount =

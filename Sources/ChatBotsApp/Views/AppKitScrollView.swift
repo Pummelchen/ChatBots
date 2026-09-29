@@ -18,10 +18,16 @@
 // So the transcript is hosted in a plain `NSScrollView`, scrolled through AppKit's
 // direct, one-way primitive (`contentView.scroll(to:)`, no animation) from a deferred
 // main-queue turn. Two things ask for that scroll: the caller's signal, which is how a finished
-// turn brings its last line into view, and — with `followsContent`, the default the app ships —
-// the document growing, which keeps a streamed reply in sight as it is written. Both yield to the
-// reader: while the transcript is scrolled away from the bottom nothing moves it, and returning to
-// the bottom hands it back to the stream. A *timer* that
+// turn brings its last line into view, and the document growing, which keeps a streamed reply in
+// sight as it is written. Both yield to the reader: while the transcript is scrolled away from the
+// bottom nothing moves it, and returning to the bottom hands it back to the stream.
+//
+// **The content must be laid out eagerly.** This view sizes its document from the content's own
+// fitting size, so a lazy stack — which reports an *estimate* until its off-screen rows have been
+// measured, and they cannot be measured until they scroll into view — leaves the document too short.
+// The visible result is the newest row clipped and unreachable, and text that shifts under the
+// reader as the estimate is revised. A transcript is bounded by the turn limit, so there is nothing
+// for laziness to buy here. A *timer* that
 // re-scrolls while a model streams re-enters SwiftUI's update pass on every tick and the window
 // stops drawing, at both 40 ms and 500 ms cadence; a resize is not that, because the update pass
 // that grew the document is already running and the scroll is deferred out of it. It also brings
@@ -48,17 +54,13 @@ struct AppKitScrollView<Content: View>: NSViewRepresentable {
     /// Bumped by the caller when it wants the view scrolled to the bottom. Scrolling only
     /// happens when this value changes, so a redraw alone never moves the viewport.
     var scrollToBottomSignal: Int
-    /// Keep the newest line in sight as the content grows, instead of only on a signal.
-    ///
-    /// This is the "instant" side of the streaming toggle: it is what makes a reply readable while
-    /// it is being written rather than after it has finished.
-    var followsContent: Bool = false
     /// Empty space kept below the last line.
     ///
     /// Without it the transcript ends flush against the bottom edge, so the last line sits half
-    /// under the pane's edge and a descender or a wrapped word is cut off — the end of a reply was
-    /// routinely unreadable. The inset is content, so scrolling to the bottom leaves it visible.
-    var bottomInset: CGFloat = 28
+    /// under the pane's edge and a descender or a wrapped word is cut off. The inset is content, so
+    /// scrolling to the bottom leaves it visible — and the document has to be sized from its content
+    /// for that to be true at all, which is what the eager layout in the transcript views is for.
+    var bottomInset: CGFloat = 36
     @ViewBuilder var content: () -> Content
 
     func makeCoordinator() -> Coordinator {
@@ -69,7 +71,10 @@ struct AppKitScrollView<Content: View>: NSViewRepresentable {
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
-        scrollView.autohidesScrollers = true
+        // Always visible. Overlay scrollers hide themselves once the pointer leaves, and a transcript
+        // you cannot tell the length of — or even that it scrolls — is what "there is no scrollbar"
+        // means from the outside.
+        scrollView.autohidesScrollers = false
         scrollView.drawsBackground = false
         scrollView.borderType = .noBorder
         scrollView.verticalScrollElasticity = .allowed
@@ -118,13 +123,11 @@ struct AppKitScrollView<Content: View>: NSViewRepresentable {
 
         let signalChanged = context.coordinator.lastSignal != scrollToBottomSignal
         context.coordinator.lastSignal = scrollToBottomSignal
-        // Following the stream makes a document that grew reason enough to scroll, and the signal is
-        // the caller asking for one. Both yield to the reader: scrolling up means "stay here", so a
-        // reply that arrives while someone is reading earlier in the conversation no longer drags the
-        // view off the page they were on. Scrolling back to the bottom hands the view back to the
-        // stream, and keeping the signal behind the same test is what stops a new turn yanking a
-        // transcript that has been scrolled away from.
-        guard wasAtBottom, signalChanged || (followsContent && resized) else { return }
+        // Following the stream makes a document that grew reason enough to scroll, and the signal is the
+        // caller asking for one. Both yield to the reader: scrolling up means "stay here", so a reply
+        // that arrives while someone is reading earlier in the conversation no longer drags the view off
+        // the page they were on. Scrolling back to the bottom hands the view back to the stream.
+        guard wasAtBottom, signalChanged || resized else { return }
 
         // Scroll *after* this update pass, never inside it. Touching the clip view
         // during `updateNSView` invalidates the layout that is still being applied, so

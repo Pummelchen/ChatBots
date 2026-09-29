@@ -28,7 +28,7 @@ struct ChatBotsApp: App {
             initialTopic: store.settings.topic,
             initialModeratorDraft: store.settings.moderatorDraft,
             initialShowReasoning: store.settings.showReasoning,
-            initialInstantStreaming: store.settings.instantStreaming,
+            initialSmoothStreaming: store.settings.smoothStreaming,
             initialModerator: store.settings.moderator
         )
         // Source material is handed back before any turn can run. The engine is a fresh
@@ -44,7 +44,7 @@ struct ChatBotsApp: App {
                 topic: restored?.topic ?? "",
                 moderatorDraft: restored?.moderatorDraft ?? "",
                 showReasoning: restored?.showReasoning ?? true,
-                instantStreaming: restored?.instantStreaming ?? true,
+                smoothStreaming: restored?.smoothStreaming ?? true,
                 seats: restored?.currentSeats ?? AgentSpec.SeatRoster.specs(),
                 attachments: restored?.attachments ?? [],
                 moderator: restored?.restoredModerator ?? ModeratorIdentity()

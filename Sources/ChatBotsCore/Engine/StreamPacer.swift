@@ -21,6 +21,15 @@
 
 import Foundation
 
+private extension Character {
+    /// Whether this character ends a sentence, as a boundary for the reveal.
+    ///
+    /// Deliberately crude: this decides where to stop showing text for a moment, not what prose means.
+    /// An abbreviation or a decimal point costs nothing worse than a slightly earlier pause, and a
+    /// parser here would be a parser to get wrong.
+    var endsSentence: Bool { self == "." || self == "!" || self == "?" || self == "\n" }
+}
+
 /// Decides how much queued text to release and how fast.
 public struct StreamPacer: Sendable {
     /// Characters per second when nothing has been measured yet. Roughly the pace of this
@@ -54,6 +63,12 @@ public struct StreamPacer: Sendable {
     /// brings the visible gap straight back.
     public var minimumRate: Double = 5
     /// Hard cap, for when no generation rate has been measured yet.
+    ///
+    /// Deliberately far above reading speed. This is the reveal's own safety net, not a readability
+    /// limit: the rate converges to the model's throughput, and holding it *below* that grows the queue
+    /// — the buffering this whole mechanism exists to prevent. What makes a fast backend readable is
+    /// the engine's ceiling (`OutputBudget`), applied to the stream itself, where the delay costs
+    /// nothing because the server's own send rate comes down with it.
     public var maximumRate: Double = 240
     /// The rate the model itself is producing at, measured.
     ///
@@ -100,9 +115,12 @@ public struct StreamPacer: Sendable {
 
     /// Release the text due for `elapsed` seconds.
     ///
-    /// Cutting at the last word boundary within the due amount avoids the other blocky
-    /// artefact: a word appearing letter by letter. If no boundary is near, the text is
-    /// released anyway rather than being held back indefinitely.
+    /// The cut prefers the last **sentence** end inside the amount due, then the last word boundary,
+    /// and releases the due amount anyway when neither is close. A sentence is the unit a reader takes
+    /// in at once, so releasing whole ones is what makes the text appear as speech rather than in
+    /// whatever arbitrary chunks a server happened to send — the blocky look. The word fallback is for
+    /// text with no punctuation yet, and it stays because a word appearing letter by letter is the
+    /// other artefact this has always avoided.
     public mutating func drain(elapsed: Double) -> String {
         guard !pending.isEmpty, elapsed > 0 else { return "" }
         carry += revealRate * elapsed
@@ -116,9 +134,11 @@ public struct StreamPacer: Sendable {
             return all
         }
 
-        // Prefer to stop after whitespace so words appear whole.
         let limit = pending.index(pending.startIndex, offsetBy: due)
-        if let boundary = pending[..<limit].lastIndex(where: \.isWhitespace) {
+        if let sentence = pending[..<limit].lastIndex(where: \.endsSentence) {
+            // Up to and including the terminator, so what lands is a finished sentence.
+            due = pending.distance(from: pending.startIndex, to: sentence) + 1
+        } else if let boundary = pending[..<limit].lastIndex(where: \.isWhitespace) {
             let distance = pending.distance(from: pending.startIndex, to: boundary) + 1
             // Do not hold text back for long chasing a boundary.
             if due - distance <= 12 {

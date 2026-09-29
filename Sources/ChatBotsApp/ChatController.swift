@@ -135,11 +135,8 @@ public final class ChatController: ObservableObject {
     @Published public var showReasoning: Bool {
         didSet { if !isApplyingRemoteState { saveSettings() } }
     }
-    /// Shows generated text as it arrives instead of revealing it at a paced rate.
-    ///
-    /// It also decides how the transcript follows a stream: instant keeps the newest line in
-    /// sight as it is written, paced moves the view once a turn is finished and drained.
-    @Published public var instantStreaming: Bool {
+    /// Releases generated text a sentence at a time instead of in the server's own chunks.
+    @Published public var smoothStreaming: Bool {
         didSet { if !isApplyingRemoteState { saveSettings() } }
     }
 
@@ -224,13 +221,13 @@ public final class ChatController: ObservableObject {
         initialTopic: String = ChatController.defaultTopic,
         initialModeratorDraft: String = "",
         initialShowReasoning: Bool = true,
-        initialInstantStreaming: Bool = true,
+        initialSmoothStreaming: Bool = true,
         initialModerator: ModeratorIdentity = ModeratorIdentity()
     ) {
         self.topic = initialTopic
         self.moderatorDraft = initialModeratorDraft
         self.showReasoning = initialShowReasoning
-        self.instantStreaming = initialInstantStreaming
+        self.smoothStreaming = initialSmoothStreaming
         self.restoredModerator = initialModerator
 
         // No engine is built here any more. The seats are drawn from the given specs so the
@@ -358,9 +355,10 @@ public final class ChatController: ObservableObject {
     /// Release whatever text is due, and finish any turn whose text has now been fully
     /// shown.
     func reveal(elapsed: Double) {
-        // Instant takes whatever has arrived; paced releases it at the rate the model is producing.
-        // Both go through the same queue, so the only difference is how long text waits in it.
-        let due = instantStreaming ? pacer.drainAll() : pacer.drain(elapsed: elapsed)
+        // Smooth releases whole sentences at the rate the model is producing them; raw hands over
+        // whatever arrived the moment it arrived, which is what a server's own chunking looks like on
+        // screen — uneven, and often several words at a time.
+        let due = smoothStreaming ? pacer.drain(elapsed: elapsed) : pacer.drainAll()
         for release in due {
             guard let pane = pane(release.agentID) else { continue }
             switch release.channel {
