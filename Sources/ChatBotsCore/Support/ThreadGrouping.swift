@@ -15,11 +15,30 @@ import Foundation
 
 public enum ThreadGrouping {
 
+    /// Which side of the thread a bubble sits on.
+    public enum Side: Equatable, Sendable {
+        case leading
+        case trailing
+    }
+
+    /// The side a seat's messages sit on.
+    ///
+    /// Alternating rather than "mine on one side, everybody else on the other". This app is watched
+    /// rather than used: with two or three models in the room, every participant but one on the same
+    /// side reads as a monologue with interruptions. The turns already rotate in seat order, so
+    /// alternating puts each contribution opposite the one before it, which is the back-and-forth a
+    /// two-party chat has. Four seats balance two aside, and the name — drawn in the seat's own
+    /// colour — carries the identity either way, because a side alone cannot name four people.
+    public static func side(forSeatIndex index: Int) -> Side {
+        index.isMultiple(of: 2) ? .leading : .trailing
+    }
+
     /// How one row is drawn. A group chat has exactly three shapes.
     public enum Shape: Equatable, Sendable {
-        /// The human's own message: their side, their colour, no name and no picture.
+        /// The human's own message: their colour, no name and no picture.
         case mine
-        /// Another participant: the other side, with a name and a picture.
+        /// Another participant: a name and a picture. Which side it sits on is not part of the
+        /// shape — that comes from `side(forSeatIndex:)`.
         case theirs
         /// The application speaking — a condensed history, a report, the moderator assigning
         /// work. Not a message from anybody in the room.

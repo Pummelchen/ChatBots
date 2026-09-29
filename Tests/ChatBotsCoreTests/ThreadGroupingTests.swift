@@ -163,4 +163,24 @@ struct ThreadGroupingTests {
         #expect(ThreadGrouping.flags(for: rows, now: noon, locale: locale).count == rows.count)
         #expect(ThreadGrouping.flags(for: [], now: noon, locale: locale).isEmpty)
     }
+
+    @Test("The seats alternate sides, so consecutive turns do not land together")
+    func sidesAlternate() {
+        // The turns rotate in seat order, so alternating sides is what turns a rotation into a
+        // back-and-forth. Four seats balance two aside; a side alone cannot name four people, which is
+        // why the name is drawn in the seat's own colour.
+        let sides = (0..<4).map { ThreadGrouping.side(forSeatIndex: $0) }
+
+        #expect(sides == [.leading, .trailing, .leading, .trailing])
+        #expect(sides.filter { $0 == .leading }.count == 2, "four seats balance")
+    }
+
+    @Test("A two-seat room puts the two seats opposite each other")
+    func twoSeatsAreOpposite() {
+        #expect(ThreadGrouping.side(forSeatIndex: 0) == .leading)
+        #expect(ThreadGrouping.side(forSeatIndex: 1) == .trailing)
+        #expect(
+            ThreadGrouping.side(forSeatIndex: 0) != ThreadGrouping.side(forSeatIndex: 1),
+            "which is the whole point: two participants, two sides")
+    }
 }

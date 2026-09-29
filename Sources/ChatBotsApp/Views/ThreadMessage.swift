@@ -16,6 +16,9 @@ import SwiftUI
 struct ThreadRow: Identifiable {
     var turn: Turn?
     var live: AgentPaneState?
+    /// The seat this row came from, when it came from one. Nil for the human's own turns and for the
+    /// app's own notes, which belong to no seat.
+    var seatIndex: Int?
     var flags = ThreadGrouping.Flags(
         opensRun: true, closesRun: true, startsGroup: true, divider: nil)
 
@@ -28,6 +31,16 @@ struct ThreadRow: Identifiable {
     var shape: ThreadGrouping.Shape {
         guard let turn else { return .theirs }  // a seat mid-generation
         return ThreadGrouping.shape(of: turn.kind)
+    }
+
+    /// Which side of the thread this row sits on.
+    ///
+    /// The seats alternate; anything with no seat takes the trailing side, which is where a chat app
+    /// puts your own messages — so the human's own line lands on the right, and so does the app's own
+    /// note when it is not drawn as a centred system line.
+    var side: ThreadGrouping.Side {
+        guard let seatIndex else { return .trailing }
+        return ThreadGrouping.side(forSeatIndex: seatIndex)
     }
 
     var speaker: String? {
@@ -130,7 +143,9 @@ struct ThreadMessage: View {
                 theirs
             }
         }
-        .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
+        // The side comes from the seat, not from "is this the human's": the seats alternate, so a
+        // two- or three-handed show reads as a back-and-forth rather than as a column.
+        .frame(maxWidth: .infinity, alignment: row.side == .trailing ? .trailing : .leading)
         .padding(.top, row.flags.startsGroup && row.flags.divider == nil ? 9 : 0)
     }
 
@@ -162,45 +177,59 @@ struct ThreadMessage: View {
 
     // MARK: Everybody else
 
+    /// Another participant, on whichever side its seat sits.
+    ///
+    /// The whole row is mirrored rather than only the bubble: the avatar keeps the outside edge and
+    /// the name and bubble lean away from it, so a message on the right is not a left-hand layout
+    /// pushed across. The name is drawn in the seat's own colour, because a side alone cannot name
+    /// four people.
     private var theirs: some View {
-        HStack(alignment: .bottom, spacing: 6) {
-            // The avatar holds the place even when it is not drawn, so every bubble in a run
-            // starts at the same edge and the column does not wobble.
-            Group {
-                if row.flags.closesRun {
-                    SeatAvatar(
-                        seatID: speakerID ?? "unknown",
-                        palette: palette,
-                        isStreaming: turn == nil
-                    )
-                } else {
-                    Color.clear.frame(width: 26, height: 26)
-                }
+        let trailing = row.side == .trailing
+        let contents = VStack(alignment: trailing ? .trailing : .leading, spacing: 3) {
+            if row.flags.opensRun {
+                Text(name)
+                    .scaledFont(size: 10.5, weight: .semibold)
+                    .foregroundStyle(tint)
+                    .padding(trailing ? .trailing : .leading, 3)
             }
-
-            VStack(alignment: .leading, spacing: 3) {
-                if row.flags.opensRun {
-                    Text(name)
-                        .scaledFont(size: 10.5, weight: .semibold)
-                        .foregroundStyle(palette.textSecondary)
-                        .padding(.leading, 3)
-                }
-                if !liveReasoning.isEmpty, showReasoning {
-                    ReasoningBlock(text: liveReasoning, tint: tint)
-                        .frame(maxWidth: 560, alignment: .leading)
-                }
-                bubble(
-                    text: text,
-                    blocks: liveBlocks,
-                    fill: palette.bubbleTheirs,
-                    foreground: Color.primary,
-                    maxWidth: 520,
+            if !liveReasoning.isEmpty, showReasoning {
+                ReasoningBlock(text: liveReasoning, tint: tint)
+                    .frame(maxWidth: 560, alignment: trailing ? .trailing : .leading)
+            }
+            bubble(
+                text: text,
+                blocks: liveBlocks,
+                fill: palette.bubbleTheirs,
+                foreground: Color.primary,
+                maxWidth: 520,
+                isStreaming: turn == nil
+            )
+            if turn == nil { ActivityLine(activity: activity) }
+            if let turn { VoteButtons(controller: controller, turn: turn) }
+        }
+        // The avatar holds the place even when it is not drawn, so every bubble in a run
+        // starts at the same edge and the column does not wobble.
+        let avatar = Group {
+            if row.flags.closesRun {
+                SeatAvatar(
+                    seatID: speakerID ?? "unknown",
+                    palette: palette,
                     isStreaming: turn == nil
                 )
-                if turn == nil { ActivityLine(activity: activity) }
-                if let turn { VoteButtons(controller: controller, turn: turn) }
+            } else {
+                Color.clear.frame(width: 26, height: 26)
             }
-            Spacer(minLength: 40)
+        }
+        return HStack(alignment: .bottom, spacing: 6) {
+            if trailing {
+                Spacer(minLength: 40)
+                contents
+                avatar
+            } else {
+                avatar
+                contents
+                Spacer(minLength: 40)
+            }
         }
     }
 

@@ -96,6 +96,14 @@ measured, accepted or rejected lives here and in the closing commit.
   because `nil` over the wire means "leave this field alone". Local checkpoints are untouched by design:
   the code path is the API stream, and nothing else reads the field.
 
+- **Thread mode uses both sides.** The seats alternate sides — the first leading, the second trailing,
+  and so on — so a two- or three-handed show reads as a back-and-forth instead of a column of
+  statements, and four seats balance two aside. The human's own messages keep the trailing side, where
+  a chat app puts them. This reverses an earlier decision that put every participant but the human on
+  one side because "a side cannot name four people": the name is now drawn in the seat's own colour,
+  which is what carries the identity, and the avatar still does. The row is mirrored rather than
+  shifted, so a bubble on the right keeps its avatar on the outside edge.
+
 ## 1.2 — 2026-09-19
 
 Tag [`v1.2`](https://github.com/Pummelchen/ChatBots/releases/tag/v1.2) from `56a009e`.

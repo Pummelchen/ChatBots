@@ -1,13 +1,14 @@
 // ChatBotsApp — the single-thread window mode
 //
-// One conversation, newest at the bottom, drawn the way a group chat draws one: your own
-// messages on the right in blue, everybody else's on the left in grey, a name above the first
-// message of a run, an avatar beside the last, and the app's own notes as centred grey lines.
+// One conversation, newest at the bottom, drawn the way a chat draws one: the seats alternate
+// sides, so the thread reads as a back-and-forth rather than as a column of statements, the
+// human's own messages take the trailing side in their own colour, a name sits above the first
+// message of a run, an avatar beside the last, and the app's own notes are centred grey lines.
 //
-// The identity is carried by the name and the avatar rather than by which side a bubble is on,
-// which is the whole reason a group chat looks like this: with four people in the room, two
-// sides cannot tell you who is speaking. This is the alternative to the split view, where each
-// seat gets its own pane.
+// The side carries the rhythm and the name carries the identity. A side alone cannot name four
+// people, which is why the name is drawn in the seat's own colour and the avatar keeps it — the
+// pairing is what makes a four-seat room readable. This is the alternative to the split view,
+// where each seat gets its own pane.
 //
 // Everything in here obeys the two SwiftUI rules this app learned the hard way, both of
 // which otherwise pin the main thread in `GraphHost.flushTransactions` and stop the
@@ -39,12 +40,12 @@ struct UnifiedConversation: View {
             switch turn.kind {
             case .introduction, .tool: nil
             case .topic, .steering, .direction, .chat, .summary, .report:
-                ThreadRow(turn: turn)
+                ThreadRow(turn: turn, seatIndex: controller.seatIndex(forSpeaker: turn.speakerID))
             }
         }
         // An actively generating seat gets a row, with whatever it has produced so far.
         for pane in controller.panes where pane.isGenerating {
-            built.append(ThreadRow(live: pane))
+            built.append(ThreadRow(live: pane, seatIndex: pane.seatIndex))
         }
         return ThreadRow.grouped(built)
     }
