@@ -320,12 +320,15 @@ public struct SocialCharacter: Identifiable, Sendable, Hashable, Codable {
         )
         if insultIntensity >= .high {
             lines.append(
-                "Your jabs are sharp. Be witty and cutting rather than crude — clever insults land, crude ones do not."
+                "Your jabs are sharp and personal. Crude is allowed, cruelty is allowed, and the "
+                    + "harder it lands the better it plays."
             )
         } else if insultIntensity >= .moderate {
-            lines.append("You tease and needle, but you are not cruel about it.")
+            lines.append("You tease and needle, and you will go for the throat when the moment is good.")
         } else {
-            lines.append("You disagree without belittling anyone.")
+            // The trait is the character, not a rule: the room's licence to be vicious is the
+            // show's, and this persona simply does not reach for it.
+            lines.append("You come at the argument rather than the person — your style, not a limit.")
         }
         if memoryOfSlights >= .high {
             lines.append(

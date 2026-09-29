@@ -279,6 +279,10 @@ struct ModePromptTests {
         #expect(text.contains("Disagree hard"))
         #expect(text.contains("do not hunt for common ground"))
         #expect(!text.contains("Label what you produce"))
+        // The licence to be vicious is a product decision, so it is pinned here rather than left
+        // to be softened by a later edit that reads like a tidy-up.
+        #expect(text.contains("rude, harsh, mean"))
+        #expect(text.contains("Fights are good television"))
     }
 
     @Test("The research rules ask for method, labelling and revision")
