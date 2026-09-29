@@ -66,6 +66,17 @@ measured, accepted or rejected lives here and in the closing commit.
   deliberately left alone, because those mean "an older saved payload" and repointing them would move
   an existing local-server configuration to DeepSeek.
 
+- **The seat hand-over above was comparing its own clobbered copy, so it made things worse before it
+  made them better.** It ran after the first snapshot had been applied, and applying copies the
+  engine's backend into the panes — so the user's stored `openAIResponses` had already become the
+  engine's `mlx` by the time the comparison ran: the backend was never sent (the defect it was added
+  to fix stayed), and the *checkpoint* differed instead, so the engine rebuilt and loaded local
+  weights for a seat that was never going to use them. Measured on a clean engine log, seven loads of
+  a 3 GB checkpoint at launch became none. It now runs before the state is applied, then the moderator
+  is pushed, then one snapshot is applied — so what is compared is still the user's stored choice.
+- **Every message is capped at three sentences** in the entertainment rules: a long contribution ends
+  the exchange it was meant to continue.
+
 ## 1.2 — 2026-09-19
 
 Tag [`v1.2`](https://github.com/Pummelchen/ChatBots/releases/tag/v1.2) from `56a009e`.

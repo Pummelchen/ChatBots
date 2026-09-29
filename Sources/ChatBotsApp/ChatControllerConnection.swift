@@ -40,17 +40,23 @@ extension ChatController {
         self.client = client
         engineConnection = nil
 
-        // The current state first, so the interface is correct before any event arrives.
+        // What this app knows and the engine does not, sent *before* the engine's state is applied.
+        //
+        // The order is the whole point: `apply` copies the engine's backend into the panes, so
+        // applying first replaced the user's stored choice with the engine's default and left this
+        // hand-over comparing against its own clobbered copy. It then "corrected" the checkpoint of a
+        // seat the user had put on an API — making the engine rebuild and load local weights for a
+        // seat that was never going to use them, which is minutes of loading and no progress on
+        // screen — and never sent the backend at all. A freshly started engine has the default
+        // moderator too, and that is the other thing this side knows.
+        await handOverStoredSeatConfiguration(client)
+        if !restoredModerator.isDefault {
+            _ = try? await client.send(.setModerator(restoredModerator))
+        }
+        // Then the current state, so the interface is correct before any event arrives.
         if let snapshot = try? await client.state() {
             apply(snapshot)
         }
-        // Then what this app knows that the engine does not: a freshly started engine has the
-        // default moderator, and the user's own name and persona live in this app's settings.
-        if !restoredModerator.isDefault {
-            _ = try? await client.send(.setModerator(restoredModerator))
-            if let snapshot = try? await client.state() { apply(snapshot) }
-        }
-        await handOverStoredSeatConfiguration(client)
         startPumps()
 
         // A safety net, not the primary path.
@@ -98,15 +104,18 @@ extension ChatController {
     /// the user's choice — the mismatch `setModel` exists to prevent on a click. The backend is sent
     /// first and on its own account: without it a seat the user had switched to an API is silently
     /// returned to the local engine, which is the same defect one field over, and the one that made
-    /// "Use API" appear to switch itself off. A refusal is left where the engine put it: `deliver`
-    /// puts the reason in `engineConnection`, and the refreshed state then shows what is really set.
+    /// "Use API" appear to switch itself off.
+    ///
+    /// This must run before the caller applies a snapshot (see `connect`), because it compares the
+    /// panes with what the engine reports and `apply` overwrites the panes with the engine's own
+    /// values. A refusal is left where the engine put it: `deliver` puts the reason in
+    /// `engineConnection`, and the caller's single `apply` then shows what is really set.
     private func handOverStoredSeatConfiguration(_ client: WebTransportEngineClient) async {
         guard let snapshot = try? await client.state() else { return }
         let models = Dictionary(
             snapshot.seats.map { ($0.id, $0.model) }, uniquingKeysWith: { first, _ in first })
         let backends = Dictionary(
             snapshot.seats.map { ($0.id, $0.backend) }, uniquingKeysWith: { first, _ in first })
-        var changed = false
         for change in Self.storedSeatChanges(
             stored: panes.map(\.spec), engineModels: models, engineBackends: backends)
         {
@@ -117,9 +126,11 @@ extension ChatController {
             case .model(let seatID, let modelID):
                 request = .updateSeat(.init(seatID: seatID, modelID: modelID))
             }
-            if await deliver(request) { changed = true }
+            // The reply is not used to re-read the state here: the caller applies one snapshot once
+            // every request has gone out, so a refusal becomes the engine's truth instead of a second
+            // round trip that could land before the moderator's.
+            await deliver(request)
         }
-        if changed, let refreshed = try? await client.state() { apply(refreshed) }
     }
 
     /// One seat setting this app has stored that the engine is not running.

@@ -283,6 +283,8 @@ struct ModePromptTests {
         // to be softened by a later edit that reads like a tidy-up.
         #expect(text.contains("rude, harsh, mean"))
         #expect(text.contains("Fights are good television"))
+        // A length limit is a product decision too, and an unbounded reply is what ends the exchange.
+        #expect(text.contains("three sentences at most"))
     }
 
     @Test("The research rules ask for method, labelling and revision")
