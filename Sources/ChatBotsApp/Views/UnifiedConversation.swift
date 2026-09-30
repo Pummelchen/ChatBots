@@ -34,20 +34,23 @@ struct UnifiedConversation: View {
     /// Turns with the setup brief and tool traffic removed, plus the seats' live text spliced
     /// in at the end, so the thread reads like a chat rather than as a debug log.
     ///
-    /// The setup brief is not a message and belongs in `SetupBlock`, which is where it is.
+    /// The setup brief is not a message and belongs in `SetupBlock`, which is where it is: the filter
+    /// lives in `ThreadGrouping.messageTurns` so this view and the split view cannot disagree about
+    /// what a message is, and the brief itself is drawn at the top of the transcript below.
     private var rows: [ThreadRow] {
-        var built: [ThreadRow] = controller.turns.compactMap { turn in
-            switch turn.kind {
-            case .introduction, .tool: nil
-            case .topic, .steering, .direction, .chat, .summary, .report:
-                ThreadRow(turn: turn, seatIndex: controller.seatIndex(forSpeaker: turn.speakerID))
-            }
+        var built: [ThreadRow] = ThreadGrouping.messageTurns(from: controller.turns).map { turn in
+            ThreadRow(turn: turn, seatIndex: controller.seatIndex(forSpeaker: turn.speakerID))
         }
         // An actively generating seat gets a row, with whatever it has produced so far.
         for pane in controller.panes where pane.isGenerating {
             built.append(ThreadRow(live: pane, seatIndex: pane.seatIndex))
         }
         return ThreadRow.grouped(built)
+    }
+
+    /// The brief both models were given when the conversation started.
+    private var setupBrief: String? {
+        ThreadGrouping.setupBrief(in: controller.turns)
     }
 
     var body: some View {
@@ -146,6 +149,14 @@ struct UnifiedConversation: View {
             // messages from one person sit tight together and a change of speaker gets air —
             // and a uniform gap throws exactly that information away.
             VStack(alignment: .leading, spacing: 0) {
+                // The brief both models were given, collapsed, above the argument it produced. The
+                // split layout shows it as a row in each pane; the thread showed nothing at all,
+                // which made the topic and the house rules invisible in the one layout that has no
+                // per-pane header to carry them.
+                if let brief = setupBrief {
+                    SetupBlock(text: brief)
+                        .padding(.bottom, 10)
+                }
                 ForEach(rows) { row in
                     if let turn = row.turn {
                         ThreadMessage(

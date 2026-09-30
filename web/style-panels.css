@@ -196,6 +196,32 @@
 
 .model-picker:disabled { opacity: 0.6; }
 
+/* The output ceiling, beside the checkpoint and styled to match it. A toggle rather than a picker, so
+   it has to be able to say which state it is in: filled means the seat is being held to the readable
+   pace the engine reports. */
+.pace-picker {
+  font: inherit;
+  font-size: var(--font-small);
+  color: var(--text);
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: calc(2px * var(--scale)) calc(6px * var(--scale));
+  margin-left: calc(6px * var(--scale));
+  white-space: nowrap;
+}
+
+/* Stated rather than left to the user-agent rule: an author `display` on the class would otherwise
+   beat `[hidden]`, and the control is hidden whenever the engine is too old to send the rate. */
+.pace-picker[hidden] { display: none; }
+
+.pace-picker.on {
+  background: var(--seat-a);
+  border-color: var(--seat-a);
+  color: #06121f;
+  font-weight: 600;
+}
+
 /* The list itself. A native-feeling panel rather than a floating dropdown, because it can
    hold the whole cast and works the same with a finger and a mouse. */
 .persona-sheet {

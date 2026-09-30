@@ -48,8 +48,9 @@ struct ModelChoiceAppTests {
         // runs the default while the pane draws the user's choice. Seat 1 differs and is handed
         // over; seat 2 already runs the stored one and must not be sent, because asking for a
         // change makes the engine release weights it is holding and load them again.
+        let checkpoint = "TheWirelessPhoenix/Huihui-Qwen3.5-9B-abliterated-oQ4e"
         let stored = [
-            AgentSpec.seat(index: 0, modelID: "TheWirelessPhoenix/Huihui-Qwen3.5-9B-abliterated-oQ4e"),
+            AgentSpec.seat(index: 0, modelID: checkpoint),
             AgentSpec.seat(index: 1, modelID: AgentSpec.defaultModelID),
         ]
 
@@ -58,12 +59,9 @@ struct ModelChoiceAppTests {
             engineModels: ["Agent 1": AgentSpec.defaultModelID, "Agent 2": AgentSpec.defaultModelID],
             engineBackends: ["Agent 1": "mlx", "Agent 2": "mlx"])
 
-        #expect(
-            changes == [
-                .model(
-                    seatID: "Agent 1",
-                    modelID: "TheWirelessPhoenix/Huihui-Qwen3.5-9B-abliterated-oQ4e")
-            ])
+        // Written as one line because the two style gates disagree about where a trailing comma goes
+        // in a multi-line array holding one call: SwiftLint wants it, swift-format does not.
+        #expect(changes == [.model(seatID: "Agent 1", modelID: checkpoint)])
     }
 
     @Test("A seat the user switched to an API is handed over rather than returned to the default")

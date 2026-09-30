@@ -31,6 +31,7 @@ extension EngineService {
             contextWindow: usage.window,
             contextFraction: usage.fraction,
             compactThreshold: engine.configuration.compactThreshold,
+            readableTokensPerSecond: AgentSpec.readableTokensPerSecond,
             attachments: attachments(),
             canAttach: engine.canAttachFiles,
             imagesAllowed: engine.allSeatsSupportVision,
@@ -171,6 +172,7 @@ extension EngineService {
             webSearch: spec.webSearchEnabled,
             vision: spec.visionSupport.allowsImages,
             endpoint: spec.backend == .openAIResponses ? spec.openAI.baseURL : nil,
-            apiModel: spec.backend == .openAIResponses ? spec.openAI.model : nil)
+            apiModel: spec.backend == .openAIResponses ? spec.openAI.model : nil,
+            maximumTokensPerSecond: spec.maximumTokensPerSecond)
     }
 }

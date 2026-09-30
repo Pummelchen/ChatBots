@@ -21,13 +21,13 @@
 
 import Foundation
 
-private extension Character {
+extension Character {
     /// Whether this character ends a sentence, as a boundary for the reveal.
     ///
     /// Deliberately crude: this decides where to stop showing text for a moment, not what prose means.
     /// An abbreviation or a decimal point costs nothing worse than a slightly earlier pause, and a
     /// parser here would be a parser to get wrong.
-    var endsSentence: Bool { self == "." || self == "!" || self == "?" || self == "\n" }
+    fileprivate var endsSentence: Bool { self == "." || self == "!" || self == "?" || self == "\n" }
 }
 
 /// Decides how much queued text to release and how fast.

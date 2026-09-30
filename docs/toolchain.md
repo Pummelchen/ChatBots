@@ -71,6 +71,17 @@ notices tool passes, the shell, Python and JavaScript are linted and scanned, an
 `osv-scanner` are clean. The Swift gates cannot run there — no hosted image is macOS 26 on Apple silicon
 with MLX — so they live in `tools/mac-checks.sh` and are run on a Mac.
 
+A build tuned for the machine it runs on goes through `tools/make-app.sh`'s documented hook, so the flag
+set travels with the build log rather than living in a shell history:
+
+```sh
+CHATBOTS_SWIFT_FLAGS="-Xcc -mtune=apple-m3" bash tools/make-app.sh
+```
+
+`-mtune` rather than `-mcpu`: the feature flag reaches the MLX C++ dependency, where `base_simd.h:92`
+fails to resolve `abs` (measured 2026-09-30 on an M3), so what can be tuned here is scheduling, not the
+instruction set.
+
 The size limit is one number in one script. `tools/check-file-sizes.sh` asks git for the tracked files,
 measures the code (Swift, JavaScript, CSS, HTML, shell, Python) and exempts the two generated files,
 `WebAssets.swift` and `NameLists.swift`, whose length is a function of the sources they are built from.

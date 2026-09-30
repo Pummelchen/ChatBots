@@ -33,6 +33,13 @@ public struct APISnapshot: Codable, Sendable {
         public var vision: Bool
         public var endpoint: String?
         public var apiModel: String?
+        /// A ceiling on this seat's output, in tokens per second; nil or absent means none, and `0`
+        /// means the same thing said explicitly over the wire.
+        ///
+        /// The app has always been able to set this and the website never could, so a cloud seat could
+        /// only be slowed down from the desktop. It is carried here so a page can both show what a seat
+        /// is set to and change it.
+        public var maximumTokensPerSecond: Double?
     }
 
     public struct Message: Codable, Sendable {
@@ -74,6 +81,13 @@ public struct APISnapshot: Codable, Sendable {
     public var contextWindow: Int
     public var contextFraction: Double
     public var compactThreshold: Double
+    /// What this build means by "a readable pace", in tokens per second — the number a front end
+    /// should send to switch a seat's ceiling on.
+    ///
+    /// It is here rather than copied into the page so the two cannot disagree about what "on" means,
+    /// and it is optional because a snapshot from an engine that predates the field must still decode:
+    /// a page that does not receive it offers no ceiling control rather than inventing a rate.
+    public var readableTokensPerSecond: Double?
     public var attachments: [APIAttachment]
     public var canAttach: Bool
     public var imagesAllowed: Bool

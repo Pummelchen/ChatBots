@@ -74,6 +74,15 @@ bash tools/make-release.sh       # package a release (dry run; --publish to tag 
 Every start script takes `--help` and `--local-only` (which binds `127.0.0.1`).
 The assembled app also lands at `~/Applications/ChatBots.command`.
 
+A host-tuned build goes through one documented hook rather than somebody's shell history:
+`CHATBOTS_SWIFT_FLAGS="-Xcc -mtune=apple-m3" bash tools/make-app.sh`. The value is split on
+whitespace, added to every `swift build` this script runs, and echoed into the log with the build, so
+a measurement carries the flag set that produced it. `-mtune` is the spelling that works here:
+measured on an M3 (Mac15,3) on 2026-09-30, the feature flag `-mcpu=apple-m3` reaches the dependency's
+C++ targets and MLX's `base_simd.h:92` fails to resolve `abs` (`-Xcxx -mcpu=…` fails identically),
+while `-Xcc -mtune=apple-m3` builds the bundle. Only this script reads the variable, so `swift build`
+and the gates are unaffected.
+
 Warnings-as-errors is **not** a flag here: `Package.swift` sets
 `treatAllWarnings(as: .error)` per target, so no invocation can bypass it.
 
@@ -135,7 +144,7 @@ test that pins it (`Tests/ChatBotsCoreTests/DefaultCheckpointTests.swift`).
 - **The suite is swift-testing, not XCTest.** A successful run still prints
   `Test Suite 'All tests' … Executed 0 tests`. The real result is the
   `Test run with N tests in M suites` line, which is what `mac-checks.sh`
-  greps — `1126 tests in 204 suites` when this was written, and the line, not the
+  greps — `1135 tests in 206 suites` when this was written, and the line, not the
   number, is the thing to read: the count moves with every test added. Do not read the
   XCTest zero as "no tests ran".
 - **The website listens on every interface and `/api/*` has no password**, so anyone

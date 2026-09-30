@@ -191,6 +191,42 @@ export function drawSeats() {
       }
     }
 
+    const pace = pane.root.querySelector(".pace-picker");
+    if (pace) {
+      // The engine sends its own readable rate, so the page and the app cannot disagree about what
+      // "on" means; an engine too old to send one leaves the control hidden rather than guessing.
+      const rate = s.readableTokensPerSecond;
+      pace.hidden = !rate;
+      if (rate) {
+        const ceiling = seat.maximumTokensPerSecond ?? 0;
+        pace.classList.toggle("on", ceiling > 0);
+        pace.textContent = ceiling > 0 ? `Slow · ${ceiling}/s` : "Slow";
+        pace.title =
+          ceiling > 0
+            ? `Held to ${ceiling} tokens a second — press to let this seat answer at full speed`
+            : "Hold this seat to a readable pace, so a hosted model cannot finish its reply before " +
+              "it can be read. Applied to the stream rather than buffered here.";
+        pace.dataset.wiredPace = pace.dataset.wiredPace || "0";
+        if (pace.dataset.wiredPace !== "1") {
+          pace.dataset.wiredPace = "1";
+          pace.addEventListener("click", () => {
+            // Read at click time, not at wiring time: the control is wired once and the seat it
+            // describes changes underneath it.
+            const currentSeat = state.snapshot.seats[index];
+            const wanted = state.snapshot.readableTokensPerSecond;
+            if (!currentSeat || !wanted) return;
+            const current = currentSeat.maximumTokensPerSecond ?? 0;
+            run(() =>
+              api.post("/api/seat", {
+                seat: currentSeat.id,
+                maximumTokensPerSecond: current > 0 ? 0 : wanted,
+              })
+            );
+          });
+        }
+      }
+    }
+
     const live = s.live.find((l) => l.seatID === seat.id);
     const busy = live && live.isGenerating;
     const stateEl = pane.root.querySelector(".state");

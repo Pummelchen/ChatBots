@@ -183,4 +183,51 @@ struct ThreadGroupingTests {
             ThreadGrouping.side(forSeatIndex: 0) != ThreadGrouping.side(forSeatIndex: 1),
             "which is the whole point: two participants, two sides")
     }
+
+    @Test("The setup brief is not a message, and is offered on its own")
+    func theBriefIsNotAMessage() {
+        // The thread hid the brief for as long as it has existed: the row filter dropped the
+        // introduction, and `SetupBlock` — written to draw it — was never wired in, so the topic and
+        // the house rules were invisible in the one layout with no per-pane header to carry them.
+        let turns = [
+            turn(1, .topic, "Is remote work better?", speaker: nil),
+            turn(2, .introduction, "You are in a room. The topic is: Is remote work better?"),
+            turn(3, .chat, "It depends who you ask.", speaker: "a"),
+            turn(4, .tool, "web_search: 3 results", speaker: "a"),
+            turn(5, .chat, "That is a dodge.", speaker: "b"),
+        ]
+
+        #expect(
+            ThreadGrouping.messageTurns(from: turns).map(\.kind) == [.topic, .chat, .chat],
+            "the brief and the tool traffic are not messages")
+        #expect(
+            ThreadGrouping.setupBrief(in: turns)
+                == "You are in a room. The topic is: Is remote work better?")
+    }
+
+    @Test("A conversation with no brief offers none, and an empty one is not a brief")
+    func noBriefIsNil() {
+        #expect(ThreadGrouping.setupBrief(in: [turn(1, .chat, "Hello.", speaker: "a")]) == nil)
+        #expect(
+            ThreadGrouping.setupBrief(in: [turn(1, .introduction, "")]) == nil,
+            "an empty introduction is a missing brief, not an empty block")
+    }
+
+    @Test("A kept conversation whose log already has a brief does not get a second one")
+    func theFirstBriefWins() {
+        // A restored run carries its original introduction at the front of the log; showing the
+        // newest would quietly replace the brief the argument was actually written against.
+        let turns = [
+            turn(1, .introduction, "the original"),
+            turn(2, .chat, "I disagree.", speaker: "a"),
+            turn(3, .introduction, "a later one"),
+        ]
+        #expect(ThreadGrouping.setupBrief(in: turns) == "the original")
+    }
+
+    private func turn(
+        _ sequence: Int, _ kind: Turn.Kind, _ content: String, speaker: String? = nil
+    ) -> Turn {
+        Turn(sequence: sequence, speakerID: speaker, speakerName: speaker ?? "App", kind: kind, content: content)
+    }
 }

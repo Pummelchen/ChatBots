@@ -147,6 +147,10 @@ public enum WebAssets {
         <!-- The checkpoint this seat runs. A native select rather than a sheet: the list is short,
              and it is the control a phone gets for free. Filled from the engine's own catalogue. -->
         <select class="model-picker" title="Change the checkpoint this seat runs"></select>
+        <!-- The output ceiling. A hosted model answers faster than anyone can read, so this holds the
+             seat to the engine's own readable pace. It stays hidden when the engine is too old to say
+             what that pace is, rather than inventing a rate. -->
+        <button class="pace-picker" hidden></button>
       </div>
       <div class="params"></div>
       <div class="transcript"></div>
@@ -1107,6 +1111,32 @@ body[data-device="tablet"] .toggle-text { display: inline; }
 }
 
 .model-picker:disabled { opacity: 0.6; }
+
+/* The output ceiling, beside the checkpoint and styled to match it. A toggle rather than a picker, so
+   it has to be able to say which state it is in: filled means the seat is being held to the readable
+   pace the engine reports. */
+.pace-picker {
+  font: inherit;
+  font-size: var(--font-small);
+  color: var(--text);
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: calc(2px * var(--scale)) calc(6px * var(--scale));
+  margin-left: calc(6px * var(--scale));
+  white-space: nowrap;
+}
+
+/* Stated rather than left to the user-agent rule: an author `display` on the class would otherwise
+   beat `[hidden]`, and the control is hidden whenever the engine is too old to send the rate. */
+.pace-picker[hidden] { display: none; }
+
+.pace-picker.on {
+  background: var(--seat-a);
+  border-color: var(--seat-a);
+  color: #06121f;
+  font-weight: 600;
+}
 
 /* The list itself. A native-feeling panel rather than a floating dropdown, because it can
    hold the whole cast and works the same with a finger and a mouse. */
@@ -2613,6 +2643,42 @@ export function drawSeats() {
         modelPicker.addEventListener("change", () =>
           run(() => api.post("/api/seat", { seat: seat.id, modelID: modelPicker.value }))
         );
+      }
+    }
+
+    const pace = pane.root.querySelector(".pace-picker");
+    if (pace) {
+      // The engine sends its own readable rate, so the page and the app cannot disagree about what
+      // "on" means; an engine too old to send one leaves the control hidden rather than guessing.
+      const rate = s.readableTokensPerSecond;
+      pace.hidden = !rate;
+      if (rate) {
+        const ceiling = seat.maximumTokensPerSecond ?? 0;
+        pace.classList.toggle("on", ceiling > 0);
+        pace.textContent = ceiling > 0 ? `Slow · ${ceiling}/s` : "Slow";
+        pace.title =
+          ceiling > 0
+            ? `Held to ${ceiling} tokens a second — press to let this seat answer at full speed`
+            : "Hold this seat to a readable pace, so a hosted model cannot finish its reply before " +
+              "it can be read. Applied to the stream rather than buffered here.";
+        pace.dataset.wiredPace = pace.dataset.wiredPace || "0";
+        if (pace.dataset.wiredPace !== "1") {
+          pace.dataset.wiredPace = "1";
+          pace.addEventListener("click", () => {
+            // Read at click time, not at wiring time: the control is wired once and the seat it
+            // describes changes underneath it.
+            const currentSeat = state.snapshot.seats[index];
+            const wanted = state.snapshot.readableTokensPerSecond;
+            if (!currentSeat || !wanted) return;
+            const current = currentSeat.maximumTokensPerSecond ?? 0;
+            run(() =>
+              api.post("/api/seat", {
+                seat: currentSeat.id,
+                maximumTokensPerSecond: current > 0 ? 0 : wanted,
+              })
+            );
+          });
+        }
       }
     }
 

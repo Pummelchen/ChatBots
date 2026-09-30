@@ -114,6 +114,56 @@ measured, accepted or rejected lives here and in the closing commit.
   text lands as speech rather than in whatever chunks the server sent, which is what "blocky" was — and
   the toggle is now **Smooth text**, on by default, with off showing the raw arrival.
 
+- **The website can hold a seat to a readable pace, and show what each seat is set to.** The engine
+  accepted the ceiling over `POST /api/seat` and never reported it, so a slowdown could only be
+  switched on from the desktop app, and the page could not have shown the state even with a control.
+  The ceiling is on the snapshot per seat now, beside the rate this build means by "readable" —
+  `AgentSpec.readableTokensPerSecond`, sent rather than copied into the JavaScript, because two copies
+  of that number is how a page and an app come to disagree about what "on" means. Each pane header has
+  a **Slow** button next to the checkpoint: filled when the seat is held, and pressing it sends either
+  the engine's own rate or `0` for off. Both fields are optional on the wire, so a frame from an engine
+  that predates them still decodes, and a page talking to one hides the control rather than inventing a
+  rate.
+
+- **An API seat's checkpoint menu is gone rather than doing nothing.** The header showed the server's
+  model in its label and then opened a menu of local checkpoints whose selection could not change what
+  that seat was running: the checkpoint is only what the seat falls back to on MLX, and the connect-time
+  hand-over deliberately never gives one to an API seat. A control that looks like a model picker on a
+  seat that is not choosing a local model is a trap, so the label is now the whole control and the
+  tooltip says the endpoint sheet is where an API model is chosen. The rule lives in
+  `ModelControl.offersCheckpointMenu(for:)` rather than in a condition inside the view, so it is tested
+  instead of asserted by eye.
+
+- **Thread mode shows the setup brief.** The single-thread layout filtered `.introduction` out of its
+  rows while `SetupBlock` — the collapsing view written for exactly that text — had no call site, so
+  the topic and the house rules both models were given were invisible in the one layout with no
+  per-pane header to carry them. The brief is drawn, collapsed, at the top of the thread. "Which turns
+  are messages" now has one answer, in `ThreadGrouping.messageTurns`/`setupBrief`, instead of two: the
+  split view rendered the brief as a row and the thread dropped it, and a rule each layout owns
+  privately is a rule that drifts.
+
+- **The two style gates were red on `main` before this release, and are green again.** `tools/mac-checks.sh`
+  failed at gate 5 and gate 6 on the four app commits that follow v1.2: SwiftLint flagged
+  `PromptModeRules.modeRules` (85 lines against the 80-line limit) and a missing trailing comma in
+  `ModelChoiceAppTests`, and swift-format rejected `private extension Character` in `StreamPacer`. The
+  two rule blocks moved into their own functions — with the prompt text compared character for
+  character against the previous file and unchanged — the extension's member now carries the access
+  modifier, and the test builds its checkpoint as a local so that neither formatter has to arbitrate a
+  trailing comma.
+
+- **A host-tuned build is a repeatable flag set, and the one this repository assumed does not build.**
+  `tools/make-app.sh` hardcoded `swift build -c <config>` with no way in, so a measured host-tuned
+  build lived on somebody's command line. `CHATBOTS_SWIFT_FLAGS` now adds flags to every build the
+  script runs and echoes them beside the build output, because a measurement is only reproducible
+  while its flag set is recorded with it. Measuring it found the tracker's assumed set to be wrong:
+  on this M3 (Mac15,3), `-Xcc -mcpu=apple-m3` **fails** — the flag reaches the dependency's C++
+  targets, where MLX's `base_simd.h:92` cannot resolve `abs` and every unary after it errors the same
+  way, and `-Xcxx -mcpu=apple-m3` fails identically, so the scope is not the problem but the feature
+  flag is. `-Xcc -mtune=apple-m3` builds the bundle cleanly, which is the flag set now recorded in
+  `AGENTS.md`, and tuning rather than re-targeting is the honest thing to ask of a dependency nobody
+  here maintains. The two successful release builds took 297 s and 340 s, which is this machine and
+  the rebuild rather than a claim about the flag.
+
 ## 1.2 — 2026-09-19
 
 Tag [`v1.2`](https://github.com/Pummelchen/ChatBots/releases/tag/v1.2) from `56a009e`.

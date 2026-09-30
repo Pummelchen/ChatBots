@@ -21,9 +21,16 @@ ALLOW_UNSIGNED=0
 # package comes from a clean build rather than an incremental one; `--out` puts the bundle
 # somewhere other than `dist/`, which is how a release stages it. `--help` exists because
 # every script here answers it.
+#
+# A host-tuned build is a flag set, not a command line somebody remembers, so it comes in through
+# `CHATBOTS_SWIFT_FLAGS` and is echoed into the log with the build. Measured on an M3 (Mac15,3):
+# `-Xcc -mtune=apple-m3` builds the bundle, while the feature flag `-Xcc -mcpu=apple-m3` does not —
+# it reaches MLX's C++ targets, where `base_simd.h:92` cannot resolve `abs` — so what is tuned here is
+# the scheduling, not the instruction set. See AGENTS.md § Build, test, run.
 usage() {
   sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'
   printf '\nusage: tools/make-app.sh [--scratch <build-dir>] [--out <app-path>] [--allow-unsigned]\n'
+  printf '       CHATBOTS_SWIFT_FLAGS="<flags>" adds Swift flags to every build (host tuning)\n'
 }
 
 while [ $# -gt 0 ]; do
@@ -84,6 +91,16 @@ echo "==> Building ($CONFIG)"
 # several silently builds only the last one. That is what produced a bundle containing the probe
 # and not the engine while writing this fix.
 build_args=(-c "$CONFIG")
+# Extra Swift flags for a host-tuned build, from `CHATBOTS_SWIFT_FLAGS`. Split on whitespace on
+# purpose: this is a list of compiler flags, not a path, and a path with a space in it is not what
+# the variable is for. Echoed because a measurement nobody can reproduce is an anecdote — the flag
+# set belongs in the same log as the build it produced.
+if [ -n "${CHATBOTS_SWIFT_FLAGS:-}" ]; then
+  # shellcheck disable=SC2206  # word splitting is the feature here, not an accident
+  extra_swift_flags=(${CHATBOTS_SWIFT_FLAGS})
+  build_args+=("${extra_swift_flags[@]}")
+  echo "==> Extra Swift flags: $CHATBOTS_SWIFT_FLAGS"
+fi
 if [ -n "$SCRATCH" ]; then
   build_args+=(--scratch-path "$SCRATCH")
   echo "==> Building into $SCRATCH"

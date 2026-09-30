@@ -302,6 +302,10 @@ struct BackendControl: View {
 /// when it is not in the catalogue — a seat can be pointed at any repository id from the command line,
 /// and a picker that could not display the model in use would be lying about it.
 ///
+/// A seat on the API backend gets the label and no menu: the list is local checkpoints, and choosing
+/// one there cannot change what that seat is running, so offering it would be a control that does
+/// nothing. The endpoint sheet is where an API model is chosen, and the tooltip says as much.
+///
 /// Same isolation as the other controls: plain values and a callback, never an observation of the
 /// streaming pane, because a `Menu` rebuilt on every token sends the hosting view into a transaction
 /// loop.
@@ -311,30 +315,46 @@ struct ModelControl: View {
     let onSelect: (String) -> Void
 
     var body: some View {
-        Menu {
-            Picker("Model", selection: binding) {
-                ForEach(choices) { choice in
-                    Text(choice.name).tag(choice.id)
+        if Self.offersCheckpointMenu(for: spec) {
+            Menu {
+                Picker("Model", selection: binding) {
+                    ForEach(choices) { choice in
+                        Text(choice.name).tag(choice.id)
+                    }
                 }
+                .pickerStyle(.inline)
+            } label: {
+                label
             }
-            .pickerStyle(.inline)
-        } label: {
-            HStack(spacing: 4) {
-                // The seat's own label, which is the API model's name when the seat is on the API
-                // backend and the checkpoint's when it is local. This read `modelShortName`, so a
-                // seat running DeepSeek advertised the local checkpoint beside it instead.
-                Image(systemName: spec.backend == .openAIResponses ? "cloud" : "brain")
-                    .scaledFont(size: 9)
-                Text(spec.modelLabel)
-                    .scaledFont(size: 10, weight: .medium, design: .rounded)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .disabled(!isEnabled)
+            .help(helpText)
+        } else {
+            label.help(helpText)
         }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
-        .disabled(!isEnabled)
-        .help(helpText)
+    }
+
+    /// Whether this seat's header offers the local-checkpoint menu.
+    ///
+    /// The one place the question is answered, as a rule rather than a condition inside the view, so
+    /// it can be tested: a checkpoint can only change what a seat runs when that seat runs checkpoints.
+    static func offersCheckpointMenu(for spec: AgentSpec) -> Bool {
+        spec.backend == .mlx
+    }
+
+    private var label: some View {
+        HStack(spacing: 4) {
+            // The seat's own label, which is the API model's name when the seat is on the API
+            // backend and the checkpoint's when it is local. This read `modelShortName`, so a
+            // seat running DeepSeek advertised the local checkpoint beside it instead.
+            Image(systemName: spec.backend == .openAIResponses ? "cloud" : "brain")
+                .scaledFont(size: 9)
+            Text(spec.modelLabel)
+                .scaledFont(size: 10, weight: .medium, design: .rounded)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
     }
 
     /// The catalogue, plus whatever this seat is running if the catalogue does not have it.

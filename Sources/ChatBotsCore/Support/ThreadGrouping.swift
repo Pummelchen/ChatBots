@@ -135,6 +135,27 @@ public enum ThreadGrouping {
         return out
     }
 
+    /// The turns a thread draws as messages, in order.
+    ///
+    /// The setup brief is not a message — it is drawn once at the top of the thread by its own
+    /// collapsing block, from `setupBrief(in:)` — and a tool round-trip is a detail of the turn that
+    /// ran it rather than something anybody said. Both are dropped here rather than by each front end
+    /// asking the question itself, because "what is a message" has to have one answer: the split view
+    /// and the thread disagreeing about it is how the thread came to hide the brief.
+    public static func messageTurns(from turns: [Turn]) -> [Turn] {
+        turns.filter { $0.kind != .introduction && $0.kind != .tool }
+    }
+
+    /// The setup brief to show above the thread, if this conversation has one.
+    ///
+    /// The first non-empty `.introduction` turn wins: a kept conversation carries its original brief
+    /// at the front of the log, and a restored run must not grow a second one.
+    public static func setupBrief(in turns: [Turn]) -> String? {
+        guard let brief = turns.first(where: { $0.kind == .introduction && !$0.content.isEmpty })
+        else { return nil }
+        return brief.content
+    }
+
     /// Which shape a logged turn is drawn as.
     public static func shape(of kind: Turn.Kind) -> Shape {
         switch kind {
