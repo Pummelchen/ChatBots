@@ -164,6 +164,21 @@ measured, accepted or rejected lives here and in the closing commit.
   here maintains. The two successful release builds took 297 s and 340 s, which is this machine and
   the rebuild rather than a claim about the flag.
 
+- **Swift CodeQL is not possible on GitHub's runners, measured rather than assumed.** CB-003 asked
+  whether Swift should be covered; default setup cannot (Swift is not a language it offers, and its
+  autobuild image is Swift 6.3.3 against this package's 6.4 manifest), so the advanced-setup route this
+  file records was tried on a branch: `runs-on: xcode-27`, the preview image that really does carry
+  Xcode 27.0 and Swift 6.4 (the job log's own `swift --version` says `arm64-apple-macosx27.0.0`), with
+  `build-mode: manual` and the Metal toolchain installed first. It fails in the build step, for a reason
+  no workflow can fix: CodeQL publishes only `codeql-bundle-osx64` for macOS — arm64 bundles exist for
+  Linux alone — so the Swift extractor's x86_64 `libtrace.dylib` is injected into arm64 SwiftPM
+  manifest processes and dyld answers `Bad CPU type in executable (86)`. The x86_64 escape hatch is
+  closed as well: the `xcode-27` image runs macOS 27, which is Apple-silicon-only, so no Intel image can
+  carry the Xcode this package needs. The trial branch was deleted; CB-003 is Blocked on upstream
+  shipping an osx-arm64 bundle, and the incidental finding — a hosted arm64 runner now provides the
+  Xcode 27 toolchain this package builds with — is recorded where the reason for keeping Swift out of
+  the push is written.
+
 ## 1.2 — 2026-09-19
 
 Tag [`v1.2`](https://github.com/Pummelchen/ChatBots/releases/tag/v1.2) from `56a009e`.

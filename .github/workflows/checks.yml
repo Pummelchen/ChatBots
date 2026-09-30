@@ -26,9 +26,13 @@
 #     a step below can compare them. The Python and Node tools are not in that script on purpose:
 #     PyPI and npm refuse to publish a version twice, so for them the version is the pin.
 #
-# Not on the push, and why: the Swift gates. The package requires macOS 26 and Apple-silicon MLX, and
-# no hosted runner image is either and none has a GPU, so a Swift job here would be a red build that
-# says nothing about the code. Those gates run on a Mac instead, in one command:
+# Not on the push, and why: the Swift gates. They are run on a Mac, deliberately — the decision is
+# recorded in `docs/release-notes-v1.0.md` — because they build MLX and run the whole suite with
+# coverage, which is minutes of a runner per push against this job's couple of minutes. The reason
+# originally written here is now out of date and is corrected rather than left to mislead: GitHub does
+# host arm64 macOS images now (`macos-26`) and an `xcode-27` preview with the Xcode 27 / Swift 6.4
+# toolchain this package needs, and a Swift job on one is a question nobody here has measured. The
+# gates themselves are one command:
 #
 #   tools/mac-checks.sh
 #
