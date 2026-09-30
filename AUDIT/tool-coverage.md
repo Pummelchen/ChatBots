@@ -143,4 +143,4 @@ by reading, not by a scanner:
 | Swift | swift-format 603.0.0 (config committed) | SwiftLint 0.65.1 (config committed) | osv-scanner 2.6.0 | swiftc 6.4 (proven in force) | semgrep 1.176.0 | `swift test --sanitize=thread` |
 | Python | ruff format 0.16.7 | ruff check 0.16.7 | pip-audit — **no requirements/lock file exists**, so nothing to scan | dropped per brief | semgrep 1.176.0 | n/a |
 | Shell | (none installed) | shellcheck 0.11.0 | n/a | `bash -n` | semgrep 1.176.0 | n/a |
-| JavaScript | pending AUDIT-0031 | pending AUDIT-0031 | no manifest / no dependencies | n/a | semgrep 1.176.0 | n/a |
+| JavaScript | prettier 3.9.8 (config committed, pinned by `package-lock.json`) | eslint 10.10.0 (config committed, same lockfile) | dev-only `package-lock.json`; `osv-scanner` scans `Package.resolved` only | n/a | semgrep 1.176.0 | n/a |

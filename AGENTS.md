@@ -25,7 +25,8 @@ Swift 6.4 / SwiftPM, package floor macOS 26, Apple Silicon only.
 
 ## Layout
 
-- `Sources/ChatBotsCore/` — the engine-agnostic domain: 99 files in topic directories. `Engine/`
+- `Sources/ChatBotsCore/` — the engine-agnostic domain: 107 files in topic directories, 109
+  `.swift` files in all (the two generated files below are the difference). `Engine/`
   (the MLX engine, the engine service and the turn loop), `Conversation/` (the engine that drives a
   room), `Room/` (seats, personas, rosters, modes and the social library), `Prompt/`, `Research/`
   (the moderator, its reading and the report), `HTTP/` (the server and its API), `Transport/`
@@ -79,7 +80,8 @@ Warnings-as-errors is **not** a flag here: `Package.swift` sets
 ## Identity
 
 `VERSION` at the repository root is the one authoritative value, a semantic version
-(`1.0`); the tag is `v` plus it. Nothing else declares it: `tools/make-app.sh` reads
+(`1.2` today — read the file, not this line); the tag is `v` plus it. Nothing else
+declares it: `tools/make-app.sh` reads
 the file and writes both `CFBundleShortVersionString` and `CFBundleVersion` from it, so
 the bundle cannot misreport what it is. `tools/check-identity.sh` fails when the file is
 malformed, when the bundle builder has grown a copy of its own, or when the release notes
@@ -133,8 +135,9 @@ test that pins it (`Tests/ChatBotsCoreTests/DefaultCheckpointTests.swift`).
 - **The suite is swift-testing, not XCTest.** A successful run still prints
   `Test Suite 'All tests' … Executed 0 tests`. The real result is the
   `Test run with N tests in M suites` line, which is what `mac-checks.sh`
-  greps — `1048 tests in 195 suites` when this was written, and the line, not the
-  number, is the thing to read. Do not read the XCTest zero as "no tests ran".
+  greps — `1126 tests in 204 suites` when this was written, and the line, not the
+  number, is the thing to read: the count moves with every test added. Do not read the
+  XCTest zero as "no tests ran".
 - **The website listens on every interface and `/api/*` has no password**, so anyone
   on the LAN can read and steer conversations. The engine itself is loopback-only on
   7789 and is never exposed directly; `--local-only` inserts `bind 127.0.0.1`.

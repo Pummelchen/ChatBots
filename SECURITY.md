@@ -101,5 +101,7 @@ the finding (AUDIT-0058) rather than left implicit.
 
 ## Supported versions
 
-Only `main` is supported. There are no releases or long-lived branches; fixes land on `main`
-and the wiki records what is known to be open.
+Only `main` is supported. There are no maintenance branches: a release is a tag on `main`, not a
+branch that receives backported fixes, and the only other branch on the remote, `audit/2026-09-18`,
+is the closed September 2026 audit's record, already contained in `main`. Fixes land on `main` and
+the wiki records what is known to be open.

@@ -7,7 +7,7 @@ there is no tool matrix across hosts.
 
 | Fact | Value |
 | --- | --- |
-| Host | `Node1.local` (the only host available; see Phase E note below) |
+| Host | `Node1.local` (the primary host — the Phase E gate run happened on the independent host `MacBook-AB.local`, see below) |
 | OS | macOS 27.0 (build 26A428) |
 | Arch | arm64 (Apple Silicon) |
 | CPU / RAM | 8 cores / 8 GB |
@@ -30,7 +30,7 @@ and every subsequent `swift build`/`swift test`/sanitizer run are serialized del
 | Swift | swift-format 603.0.0 | SwiftLint 0.65.1 | osv-scanner 2.6.0 | swiftc 6.4 (Swift 6 language mode) | semgrep 1.176.0 | ThreadSanitizer via `swift test --sanitize=thread` |
 | Python (`tools/`) | ruff format 0.16.7 | ruff check 0.16.7 | pip-audit (only if a requirements/lock file exists — none does) | (dropped per brief for Python) | semgrep 1.176.0 | n/a |
 | Shell (`tools/`, `*.sh`) | (see JS/shell note) | shellcheck 0.11.0 (`-S style`) | n/a | bash -n | semgrep 1.176.0 | n/a |
-| JavaScript (`web/`) | prettier 3.9.8 | eslint 10.10.0 | no manifest dependencies / no third-party packages | n/a | semgrep 1.176.0 | n/a |
+| JavaScript (`web/`) | prettier 3.9.8 | eslint 10.10.0 | dev-only `package-lock.json` (eslint, prettier, globals); no CVE scan of it — osv-scanner reads `Package.resolved` | n/a | semgrep 1.176.0 | n/a |
 | C | — | — | — | — | — | — |
 
 Install method for every tool: Homebrew on the primary host, except the three release
@@ -75,13 +75,23 @@ Result recorded in `AUDIT/baseline.md`.
 
 ## Independent verification host (Phase E)
 
-The brief requires the final Phase E verification on **one independent host**. Only one
-host exists in this environment (`Node1.local`). A macOS/Swift 6.4 host cannot be
-provisioned without asking (and no VPS satisfies the macOS 26 + Apple Silicon floor), so
-Phase E is recorded as BLOCKED on an owner until a second macOS 26 / Xcode 27 host is
-provided. See the ledger entry for the Phase E blocker.
+The brief requires the final Phase E verification on **one independent host**, and it was done:
+`MacBook-AB.local` (reached as `macbook-ab`), a different machine from the primary host.
+`AUDIT/evidence-phase-e-host.md` is that host's own toolchain record and
+`AUDIT/evidence-phase-e-final-macbook-ab.log` is the raw gate log; `tools/mac-checks.sh` exited 0
+with all nine gates passing and the same `1102 tests in 201 suites` the primary host reported
+(`AUDIT/ledger.json`, AUDIT-0105, DONE).
+
+Its anchor is the one caveat. The log's first line names commit `aa7a942…`, the tip of the
+`audit/2026-09-18` branch the host cloned, and that commit is **not in this repository** —
+`git cat-file -t` fails and no ref names it; the branch ref here ends at `bbe7361`, an ancestor of
+`main`. So the evidence is the log and the host record rather than a revision this checkout can
+reproduce. The coverage total is not comparable either (6.45% on that host against 53% here): gate
+4 enforces no floor, and the record says so rather than glossing over it.
 
 ## What is installed where
 
-Everything above is installed on the primary host (`Node1.local`) only. No remote host was
-provisioned; nothing was installed on any other machine.
+Everything above is installed on the primary host (`Node1.local`). The second host,
+`MacBook-AB.local`, already had the toolchain the gate requires and was used only for the Phase E
+run; the clone, the bundle and the log were removed from it afterwards, and nothing outside `/tmp`
+was written there. See `AUDIT/evidence-phase-e-host.md`.

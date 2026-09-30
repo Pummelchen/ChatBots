@@ -201,7 +201,7 @@ Leave previous releases' notes and performance tables alone.
   `tools/make-app.sh` derives the bundle's `CFBundleShortVersionString` and `CFBundleVersion`
   from the file — and `tools/check-identity.sh` fails when the file is malformed, when the
   bundle builder has grown a copy of its own, or when the notes for that version are missing.
-  It runs in CI, as the eighth gate of `tools/mac-checks.sh`, and (against the built bundle)
+  It runs in CI, as the ninth gate of `tools/mac-checks.sh`, and (against the built bundle)
   inside `tools/make-release.sh`. `tools/set-version.sh <X.Y[.Z]>` is the one command a bump
   needs: it writes the file and then runs the check. The shipped checkpoint is a decision
   rather than a propagated number, so it keeps its own declaration and test.

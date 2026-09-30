@@ -3,7 +3,7 @@
 **Status: implemented.** All 21 tasks landed on `main`; this file is kept as the record of what
 was planned and why, so it describes the intent at the time rather than the current state. The
 test count below (372) is the figure when the plan was written, not today's. For what is still
-open, see the wiki's [What is left to do](https://github.com/Pummelchen/ChatBots/wiki/What-is-left-to-do).
+open, see the wiki's [Project Tracker](https://github.com/Pummelchen/ChatBots/wiki/Project-Tracker).
 
 Goal: the desktop app talks to the engine over WebTransport instead of holding one. Caddy
 keeps serving the website over HTTP. Both front ends reach one engine.

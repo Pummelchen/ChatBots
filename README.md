@@ -120,7 +120,7 @@ Full guides are in the **[wiki](https://github.com/Pummelchen/ChatBots/wiki)**:
 | [Documents and images](https://github.com/Pummelchen/ChatBots/wiki/Documents-and-images) | giving the models something to read or look at |
 | [Troubleshooting](https://github.com/Pummelchen/ChatBots/wiki/Troubleshooting) | when it will not start, crashes, or is slow |
 | [How it works](https://github.com/Pummelchen/ChatBots/wiki/How-it-works) | the architecture, if you are curious |
-| [What is left to do](https://github.com/Pummelchen/ChatBots/wiki/What-is-left-to-do) | the open work, and the limits that are accepted |
+| [Project Tracker](https://github.com/Pummelchen/ChatBots/wiki/Project-Tracker) | the open work; the [accepted limits](https://github.com/Pummelchen/ChatBots/wiki/Accepted-Limits) have their own page |
 | [Security policy](SECURITY.md) | what leaves the machine, and how to report a vulnerability |
 
 ## Requirements
