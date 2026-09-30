@@ -83,3 +83,8 @@ All 9 Mac-only gates passed.  GATE_EXIT=0
 token and its 16 new tests behave identically on the second machine. The raw log is
 `AUDIT/evidence-phase-e-final-macbook-ab.log`. The clone, the bundle and the logs were removed from
 the host again, and the credential file was removed locally.
+
+The `audit/2026-09-18` branch was deleted from the remote on 2026-09-30, once the audit was closed
+and this record was taken. Every commit it held is in `main`, so the bundle described above can
+still be rebuilt from history — but not by that branch name, which is why the name is recorded
+here rather than left as a reference a reader could follow.

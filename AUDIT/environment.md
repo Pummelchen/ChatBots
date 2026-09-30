@@ -84,10 +84,12 @@ with all nine gates passing and the same `1102 tests in 201 suites` the primary 
 
 Its anchor is the one caveat. The log's first line names commit `aa7a942…`, the tip of the
 `audit/2026-09-18` branch the host cloned, and that commit is **not in this repository** —
-`git cat-file -t` fails and no ref names it; the branch ref here ends at `bbe7361`, an ancestor of
-`main`. So the evidence is the log and the host record rather than a revision this checkout can
-reproduce. The coverage total is not comparable either (6.45% on that host against 53% here): gate
-4 enforces no floor, and the record says so rather than glossing over it.
+`git cat-file -t` fails and no ref names it. That branch was deleted from the remote on 2026-09-30,
+after this record was taken: it held nothing `main` did not already have (`git rev-list
+main..audit/2026-09-18` was 0, and it was an ancestor), so what went was a label rather than a
+commit. The evidence is therefore the log and the host record rather than a revision this checkout
+can reproduce. The coverage total is not comparable either (6.45% on that host against 53% here):
+gate 4 enforces no floor, and the record says so rather than glossing over it.
 
 ## What is installed where
 

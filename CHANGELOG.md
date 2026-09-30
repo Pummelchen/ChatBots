@@ -179,6 +179,14 @@ measured, accepted or rejected lives here and in the closing commit.
   Xcode 27 toolchain this package builds with — is recorded where the reason for keeping Swift out of
   the push is written.
 
+- **The audit branch is gone from the remote, and the documents that pointed at it now say so.** The
+  closed audit's `audit/2026-09-18` branch held nothing `main` did not already have: `git rev-list
+  main..audit/2026-09-18` was 0 and it was an ancestor, so deleting the ref lost a label rather than
+  a commit. `main` is now the only branch on the repository. `SECURITY.md` no longer lists it as a
+  second branch, the Phase E note in `AUDIT/environment.md` records the deletion instead of a ref
+  that no longer exists, and the host record in `AUDIT/evidence-phase-e-host.md` keeps the branch
+  name as what the bundle was called while saying plainly that it cannot be fetched any more.
+
 ## 1.2 — 2026-09-19
 
 Tag [`v1.2`](https://github.com/Pummelchen/ChatBots/releases/tag/v1.2) from `56a009e`.
